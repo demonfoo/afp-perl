@@ -1,0 +1,84 @@
+# This package implements the Random Number Exchange User Authentication
+# Method for AFP. It uses Crypt::DES for the actual DES encryption used
+# as part of the authentication process.
+
+package Net::AFP::UAMs::Randnum;
+use constant UAMNAME => 'Randnum exchange';
+
+use Crypt::DES;
+use Net::AFP::Result;
+use strict;
+use warnings;
+
+Net::AFP::UAMs::RegisterUAM(UAMNAME, __PACKAGE__, 50);
+
+sub Authenticate {
+	my($session, $AFPVersion, $username, $pw_cb) = @_;
+
+	# Ensure that we've been handed an appropriate object.
+	die('Object MUST be of type Net::AFP::Connection!')
+			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
+
+	die('Password callback MUST be a subroutine ref')
+			unless ref($pw_cb) eq 'CODE';
+
+	# Pack just the username into a Pascal-style string, and send that to
+	# the server.
+	my $authinfo = pack('C/a*', $username);
+	my $resp = undef;
+	my $rc = $session->FPLogin($AFPVersion, UAMNAME, $authinfo,
+			\$resp);
+	undef $authinfo;
+	print 'FPLogin() completed with result code ', $rc, "\n"
+			if defined $::__AFP_DEBUG;
+	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
+
+	# The server will send us a random 8-byte number; take that, and encrypt
+	# it with the password the user gave us.
+	my ($randnum) = unpack('a8', $resp->{'UserAuthInfo'});
+	print '$randnum is 0x', unpack('H*', $randnum), "\n"
+			if defined $::__AFP_DEBUG;
+	my $deshash = new Crypt::DES(pack('a8', &$pw_cb()));
+	my $crypted = $deshash->encrypt($randnum);
+	undef $randnum;
+	print '$crypted is 0x', unpack('H*', $crypted), "\n"
+			if defined $::__AFP_DEBUG;
+
+	# Send the response back to the server, and hope we did this right.
+	$rc = $session->FPLoginCont($resp->{'ID'}, $crypted);
+	undef $crypted;
+	print 'FPLoginCont() completed with result code ', $rc, "\n"
+			if defined $::__AFP_DEBUG;
+	return $rc;
+}
+
+sub ChangePassword {
+	my ($session, $username, $oldPassword, $newPassword) = @_;
+
+	# Ensure that we've been handed an appropriate object.
+	die('Object MUST be of type Net::AFP::Connection!')
+			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
+
+	# Establish encryption contexts for each of the supplied passwords. Then
+	# pack the old password encrypted with the new one, and the new password
+	# encrypted with the old one, as directed.
+	my $oldcrypt = new Crypt::DES(pack('a8', $oldPassword));
+	my $newcrypt = new Crypt::DES(pack('a8', $newPassword));
+	my $message = pack('a8a8', $newcrypt->encrypt($oldPassword),
+			$oldcrypt->encrypt($newPassword));
+	undef $oldcrypt;
+	undef $newcrypt;
+
+	# Send the message to the server, and pass the return code directly
+	# back to the caller.
+	# FIXME: We'll have to do this the right way for pre-AFP 3.0 stacks.
+	# The docs say that 3.0 and up expect an empty username.
+	my $rc = $session->FPChangePassword(UAMNAME, '', $message);
+	undef $message;
+	print 'FPChangePassword() completed with result code ', $rc, "\n"
+			if defined $::__AFP_DEBUG;
+	return $rc;
+}
+
+1;
+# vim: ts=4
