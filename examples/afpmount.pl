@@ -330,8 +330,9 @@ if (defined $values{'username'}) {
 # at us.
 # open volume {{{1
 my $volInfo;
-$rc = $afpSession->FPOpenVol(Net::AFP::VolParms::kFPVolAttributeBit,
-		$values{'volume'}, undef, \$volInfo);
+$rc = $afpSession->FPOpenVol(Net::AFP::VolParms::kFPVolAttributeBit |
+		Net::AFP::VolParms::kFPVolSignatureBit, $values{'volume'}, undef,
+		\$volInfo);
 if ($rc == Net::AFP::Result::kFPAccessDenied) {
 	# no volume password; does apple's AFP server even support volume
 	# passwords anymore? I don't really know.
@@ -355,6 +356,12 @@ if ($rc == Net::AFP::Result::kFPAccessDenied) {
 	exit(1);
 }
 print Dumper($volInfo) if defined $::_DEBUG;
+
+if ($$volInfo{'Signature'} == 3) {
+	print "Volume uses variable Directory IDs; not currently supported\n";
+	syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, &EINVAL));
+	exit(1);
+}
 
 $currVolID = $$volInfo{'ID'};
 # Copy out the attribute value, since there are some flags we should really
