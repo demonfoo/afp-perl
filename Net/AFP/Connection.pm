@@ -78,6 +78,7 @@ use Encode;
 # }}}1
 
 # define constants {{{1
+our $VERSION = '0.50';
 use constant kFPByteRangeLock			=> 1;	# AFP 2.0
 use constant kFPCloseVol				=> 2;	# AFP 2.0
 use constant kFPCloseDir				=> 3;	# AFP 2.0
@@ -208,10 +209,6 @@ use constant kFPUTF8Name		=> 3;
 
 =cut
 
-#			 'Client Krb v2',		# Kerberos (I don't really know this)
-#			 'Recon1' );			# Reconnect UAM; requires use of one of
-									# the DHX variants, or Kerberos
-
 # This class is only to be inherited. It uses virtual methods to talk to
 # the server by whatever protocol the inheriting class is supposed to
 # talk over, so we want this to be as generic as possible.
@@ -253,72 +250,6 @@ sub PackagePath($$;$) { # {{{1
 	print "Invalid path type ", $PathType, "; called from '", (caller(1))[1],
 			"', line ", (caller(1))[2], "\n";
 	die;
-} # }}}1
-
-sub uuid_unpack($) { # {{{1
-	my($uuid_bin) = @_;
-	my @parts = unpack('H[8]H[4]H[4]H[4]H[12]', $uuid_bin);
-	my $uuid = join('-', @parts);
-	$uuid =~ tr/A-Z/a-z/;
-	return $uuid;
-} # }}}1
-
-sub uuid_pack($) { # {{{1
-	my($uuid) = @_;
-	$uuid = join('', split(/-/, $uuid));
-	my $uuid_bin = pack('H32', $uuid);
-	return $uuid_bin;
-} # }}}1
-
-sub long_convert($) { # {{{1
-	my($number) = @_;
-
-	if ($number < 0) {
-		$number = ~(-$number - 1) & 0xFFFFFFFF;
-	}
-	return $number;
-} # }}}1
-
-sub long_unconvert($) { # {{{1
-	my($number) = @_;
-
-	if ($number & 0x80000000) {
-		$number = -((~$number & 0xFFFFFFFF) + 1);
-	}
-	return $number;
-} # }}}1
-
-sub ll_convert($) { # {{{1
-	my($number) = @_;
-	
-	my($hi, $lo);
-	
-	if ($number < 0) {
-		$number = (-$number - 1);
-		$hi = ~int($number / (2 ** 32)) & 0xFFFFFFFF;
-		$lo = ~int($number % (2 ** 32)) & 0xFFFFFFFF;
-	} else {
-		$hi = int($number / (2 ** 32));
-		$lo = int($number % (2 ** 32));
-	}
-
-	return($hi, $lo);
-} # }}}1
-
-sub ll_unconvert { # {{{1
-	my($hi, $lo) = @_;
-
-	my $number;
-
-	if ($hi & 0x80000000) {
-		$hi = ~$hi & 0xFFFFFFFF;
-		$lo = ~$lo & 0xFFFFFFFF;
-		$number = -(($hi * (2 ** 32)) + $lo + 1);
-	} else {
-		$number = ($hi * (2 ** 32)) + $lo;
-	}
-
-	return $number;
 } # }}}1
 
 =item FPAccess()
@@ -1740,10 +1671,10 @@ sub FPEnumerate($$$$$$$$$$$) { # {{{1
 		my ($IsFileDir, $OffspringParameters) = unpack('xCa*', $Entry);
 		if ($IsFileDir == 0x80) {
 			# This child is a directory
-			push(@results, Net::AFP::Parsers::_ParseDirParms($DirectoryBitmap, $OffspringParameters));
+			push(@results, _ParseDirParms($DirectoryBitmap, $OffspringParameters));
 		} else {
 			# This child is a file
-			push(@results, Net::AFP::Parsers::_ParseFileParms($FileBitmap, $OffspringParameters));
+			push(@results, _ParseFileParms($FileBitmap, $OffspringParameters));
 		}
 	}
 	$$resp_r = [@results];
@@ -1896,9 +1827,9 @@ sub FPEnumerateExt($$$$$$$$$$$) { # {{{1
 		# isFileDir bit, next byte is a pad
 		my ($IsFileDir, $OffspringParameters) = unpack('xxCxa*', $Entry);
 		if ($IsFileDir == 0x80) { # This child is a directory
-			push(@results, Net::AFP::Parsers::_ParseDirParms($DirectoryBitmap, $OffspringParameters));
+			push(@results, _ParseDirParms($DirectoryBitmap, $OffspringParameters));
 		} else { # This child is a file
-			push(@results, Net::AFP::Parsers::_ParseFileParms($FileBitmap, $OffspringParameters));
+			push(@results, _ParseFileParms($FileBitmap, $OffspringParameters));
 		}
 	}
 	$$resp_r = [@results];
@@ -2051,9 +1982,9 @@ sub FPEnumerateExt2($$$$$$$$$$$) { # {{{1
 		# isFileDir bit, next byte is a pad
 		my ($IsFileDir, $OffspringParameters) = unpack('x[2]Cxa*', $Entry);
 		if ($IsFileDir == 0x80) { # This child is a directory
-			push(@results, Net::AFP::Parsers::_ParseDirParms($DirectoryBitmap, $OffspringParameters));
+			push(@results, _ParseDirParms($DirectoryBitmap, $OffspringParameters));
 		} else { # This child is a file
-			push(@results, Net::AFP::Parsers::_ParseFileParms($FileBitmap, $OffspringParameters));
+			push(@results, _ParseFileParms($FileBitmap, $OffspringParameters));
 		}
 	}
 	$$resp_r = [@results];
@@ -2337,7 +2268,7 @@ sub FPGetAPPL {
 	my $rc = $self->SendAFPMessage($msg, \$resp);
 	return($rc) unless $rc == Net::AFP::Result::kFPNoErr;
 	my($Bitmap_n, $APPLTag, $data) = unpack('nNa*', $resp);
-	my $info = Net::AFP::Parsers::_ParseFileParms($Bitmap_n, $data);
+	my $info = _ParseFileParms($Bitmap_n, $data);
 	$$resp_r = {
 				 'Bitmap'			=> $Bitmap_n,
 				 'APPLTag'			=> $APPLTag,
@@ -2698,7 +2629,7 @@ sub FPGetFileDirParms($$$$$$$$) { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
 	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
-	$$resp_r = Net::AFP::Parsers::_ParseFileDirParms($resp);
+	$$resp_r = _ParseFileDirParms($resp);
 	return $rc;
 } # }}}1
 
@@ -2757,7 +2688,7 @@ sub FPGetForkParms($$$$) { # {{{1
 	my $rc = $self->SendAFPMessage(pack('Cxnn', kFPGetForkParms, $OForkRefNum,
 			$Bitmap), \$resp);
 	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
-	$$resp_r = Net::AFP::Parsers::_ParseFileParms(unpack('na*', $resp));
+	$$resp_r = _ParseFileParms(unpack('na*', $resp));
 	return $rc;
 } # }}}1
 
@@ -3163,8 +3094,7 @@ sub FPGetSrvrParms($$) { # {{{1
 	my ($time, @volinfo) = unpack('NC/(CC/a)', $resp);
 	# AFP does not express times since 1 Jan 1970 00:00 GMT, but since 
 	# 1 Jan 2000 00:00 GMT (I think GMT, anyway). Good call, Apple...
-	$data->{'ServerTime'} = long_unconvert($time) +
-			$Net::AFP::Parsers::globalTimeOffset;
+	$$data{'ServerTime'} = long_unconvert($time) + globalTimeOffset;
 	$data->{'Volumes'} = [];
 	while (scalar(@volinfo) > 0) {
 		my $flags = shift @volinfo;
@@ -3333,7 +3263,7 @@ sub FPGetVolParms($$$$) { # {{{1
 	my $rc = $self->SendAFPMessage(pack('Cxnn', kFPGetVolParms, $VolumeID,
 			$Bitmap), \$resp);
 	return($rc) unless $rc == Net::AFP::Result::kFPNoErr;
-	$$resp_r = Net::AFP::Parsers::_ParseVolParms($resp);
+	$$resp_r = _ParseVolParms($resp);
 	return $rc;
 } # }}}1
 
@@ -4393,7 +4323,7 @@ sub FPOpenFork($$$$$$$$$) { # {{{1
 	my $rc = $self->SendAFPMessage($msg, \$resp);
 	if ($rc == Net::AFP::Result::kFPNoErr) {
 		my ($rBitmap, $OForkRefNum, $FileParameters) = unpack('nna*', $resp);
-		$$resp_r = Net::AFP::Parsers::_ParseFileParms($rBitmap, $FileParameters);
+		$$resp_r = _ParseFileParms($rBitmap, $FileParameters);
 		$$resp_r->{'OForkRefNum'} = $OForkRefNum;
 	}
 	return $rc;
@@ -4490,7 +4420,7 @@ sub FPOpenVol($$$$$) { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
 	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
-	$$resp_r = Net::AFP::Parsers::_ParseVolParms($resp);
+	$$resp_r = _ParseVolParms($resp);
 	return $rc;
 } # }}}1
 
@@ -4997,7 +4927,7 @@ sub FPResolveID {
 	my $rc = $self->SendAFPMessage($msg, \$resp);
 	return($rc) unless $rc == Net::AFP::Result::kFPNoErr;
 	my($Bitmap_n, $data) = unpack('na*', $resp);
-	my $info = Net::AFP::Parsers::_ParseFileParms($Bitmap_n, $data);
+	my $info = _ParseFileParms($Bitmap_n, $data);
 	$$resp_r = {
 				 'Bitmap'				=> $Bitmap_n,
 				 'RequestedParameters'	=> $info,
@@ -5222,8 +5152,7 @@ sub FPSetDirParms($$$$$$%) { # {{{1
 	if ($Bitmap & Net::AFP::DirParms::kFPCreateDateBit) {
 		return Net::AFP::Result::kFPParamErr
 				unless exists $DirectoryParameters{'CreateDate'};
-		my $time = $DirectoryParameters{'CreateDate'} -
-				$Net::AFP::Parsers::globalTimeOffset;
+		my $time = $DirectoryParameters{'CreateDate'} - globalTimeOffset;
 		if ($time < 0) {
 			$time = ~(-$time - 1) & 0xFFFFFFFF;
 		}
@@ -5233,16 +5162,14 @@ sub FPSetDirParms($$$$$$%) { # {{{1
 	if ($Bitmap & Net::AFP::DirParms::kFPModDateBit) {
 		return Net::AFP::Result::kFPParamErr
 				unless exists $DirectoryParameters{'ModDate'};
-		my $time = $DirectoryParameters{'ModDate'} -
-				$Net::AFP::Parsers::globalTimeOffset;
+		my $time = $DirectoryParameters{'ModDate'} - globalTimeOffset;
 		$ParamsBlock .= pack('N', long_convert($time));
 	}
 
 	if ($Bitmap & Net::AFP::DirParms::kFPBackupDateBit) {
 		return Net::AFP::Result::kFPParamErr
 				unless exists $DirectoryParameters{'BackupDate'};
-		my $time = $DirectoryParameters{'BackupDate'} -
-				$Net::AFP::Parsers::globalTimeOffset;
+		my $time = $DirectoryParameters{'BackupDate'} - globalTimeOffset;
 		if ($time < 0) {
 			$time = ~(-$time - 1) & 0xFFFFFFFF;
 		}
@@ -5483,8 +5410,7 @@ sub FPSetFileDirParms($$$$$$%) { # {{{1
 	if ($Bitmap & Net::AFP::FileParms::kFPCreateDateBit) {
 		return Net::AFP::Result::kFPParamErr
 				unless exists $DirectoryParameters{'CreateDate'};
-		my $time = $DirectoryParameters{'CreateDate'} -
-				$Net::AFP::Parsers::globalTimeOffset;
+		my $time = $DirectoryParameters{'CreateDate'} - globalTimeOffset;
 		if ($time < 0) {
 			$time = ~(-$time - 1) & 0xFFFFFFFF;
 		}
@@ -5494,8 +5420,7 @@ sub FPSetFileDirParms($$$$$$%) { # {{{1
 	if ($Bitmap & Net::AFP::FileParms::kFPModDateBit) {
 		return Net::AFP::Result::kFPParamErr
 				unless exists $DirectoryParameters{'ModDate'};
-		my $time = $DirectoryParameters{'ModDate'} -
-				$Net::AFP::Parsers::globalTimeOffset;
+		my $time = $DirectoryParameters{'ModDate'} - globalTimeOffset;
 		if ($time < 0) {
 			$time = ~(-$time - 1) & 0xFFFFFFFF;
 		}
@@ -5505,8 +5430,7 @@ sub FPSetFileDirParms($$$$$$%) { # {{{1
 	if ($Bitmap & Net::AFP::FileParms::kFPBackupDateBit) {
 		return Net::AFP::Result::kFPParamErr
 				unless exists $DirectoryParameters{'BackupDate'};
-		my $time = $DirectoryParameters{'BackupDate'} -
-				$Net::AFP::Parsers::globalTimeOffset;
+		my $time = $DirectoryParameters{'BackupDate'} - globalTimeOffset;
 		if ($time < 0) {
 			$time = ~(-$time - 1) & 0xFFFFFFFF;
 		}
@@ -5640,8 +5564,7 @@ sub FPSetFileParms($$$$$$%) { # {{{1
 	if ($Bitmap & Net::AFP::FileParms::kFPCreateDateBit) {
 		return Net::AFP::Result::kFPParamErr
 				unless exists $DirectoryParameters{'CreateDate'};
-		my $time = $DirectoryParameters{'CreateDate'} -
-				$Net::AFP::Parsers::globalTimeOffset;
+		my $time = $DirectoryParameters{'CreateDate'} - globalTimeOffset;
 		if ($time < 0) {
 			$time = ~(-$time - 1) & 0xFFFFFFFF;
 		}
@@ -5651,8 +5574,7 @@ sub FPSetFileParms($$$$$$%) { # {{{1
 	if ($Bitmap & Net::AFP::FileParms::kFPModDateBit) {
 		return Net::AFP::Result::kFPParamErr
 				unless exists $DirectoryParameters{'ModDate'};
-		my $time = $DirectoryParameters{'ModDate'} -
-				$Net::AFP::Parsers::globalTimeOffset;
+		my $time = $DirectoryParameters{'ModDate'} - globalTimeOffset;
 		if ($time < 0) {
 			$time = ~(-$time - 1) & 0xFFFFFFFF;
 		}
@@ -5662,8 +5584,7 @@ sub FPSetFileParms($$$$$$%) { # {{{1
 	if ($Bitmap & Net::AFP::FileParms::kFPBackupDateBit) {
 		return Net::AFP::Result::kFPParamErr
 				unless exists $DirectoryParameters{'BackupDate'};
-		my $time = $DirectoryParameters{'BackupDate'} -
-				$Net::AFP::Parsers::globalTimeOffset;
+		my $time = $DirectoryParameters{'BackupDate'} - globalTimeOffset;
 		if ($time < 0) {
 			$time = ~(-$time - 1) & 0xFFFFFFFF;
 		}

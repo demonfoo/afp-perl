@@ -9,6 +9,11 @@ use Socket;
 use strict;
 use warnings;
 
+require Exporter;
+
+our @ISA = qw(Exporter);
+our @EXPORT = qw(globalTimeOffset long_convert long_unconvert ll_convert ll_unconvert uuid_unpack uuid_pack _ParseVolParms _ParseSrvrInfo _ParseFileDirParms _ParseFileParms _ParseDirParms);
+
 my $has_Socket6 = 1;
 eval { require Socket6; };
 if ($@) {
@@ -17,27 +22,27 @@ if ($@) {
 }
 
 # This is zero time for AFP - 1 Jan 2000 00:00 GMT.
-our $globalTimeOffset = 946684800;
+sub globalTimeOffset { return 946684800; }
 
-sub long_convert {
+sub long_convert { # {{{1
 	my($number) = @_;
 
 	if ($number < 0) {
 		$number = ~(-$number - 1) & 0xFFFFFFFF;
 	}
 	return $number;
-}
+} # }}}1
 
-sub long_unconvert {
+sub long_unconvert { # {{{1
 	my($number) = @_;
 
 	if ($number & 0x80000000) {
 		$number = -((~$number & 0xFFFFFFFF) + 1);
 	}
 	return $number;
-}
+} # }}}1
 
-sub ll_convert {
+sub ll_convert { # {{{1
 	my($number) = @_;
 	
 	my($hi, $lo);
@@ -52,9 +57,9 @@ sub ll_convert {
 	}
 
 	return($hi, $lo);
-}
+} # }}}1
 
-sub ll_unconvert {
+sub ll_unconvert { # {{{1
 	my($hi, $lo) = @_;
 
 	my $number;
@@ -68,7 +73,22 @@ sub ll_unconvert {
 	}
 
 	return $number;
-}
+} # }}}1
+
+sub uuid_unpack($) { # {{{1
+	my($uuid_bin) = @_;
+	my @parts = unpack('H[8]H[4]H[4]H[4]H[12]', $uuid_bin);
+	my $uuid = join('-', @parts);
+	$uuid =~ tr/A-Z/a-z/;
+	return $uuid;
+} # }}}1
+
+sub uuid_pack($) { # {{{1
+	my($uuid) = @_;
+	$uuid = join('', split(/-/, $uuid));
+	my $uuid_bin = pack('H32', $uuid);
+	return $uuid_bin;
+} # }}}1
 
 # Parsers for assorted reply types will be placed here. This isn't really
 # intended for public consumption - these are only for use in the
@@ -77,7 +97,7 @@ sub ll_unconvert {
 
 # FPGetVolParms and FPOpenVol will both need this to parse volume
 # parameter info from the server.
-sub _ParseVolParms {
+sub _ParseVolParms { # {{{1
 	my ($data) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -98,21 +118,21 @@ sub _ParseVolParms {
 	if ($Bitmap & Net::AFP::VolParms::kFPVolCreateDateBit) {
 		$$resp{'CreateDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
-				$globalTimeOffset;
+				globalTimeOffset;
 		$offset += 4;
 	}
 
 	if ($Bitmap & Net::AFP::VolParms::kFPVolModDateBit) {
 		$$resp{'ModDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
-				$globalTimeOffset;
+				globalTimeOffset;
 		$offset += 4;
 	}
 
 	if ($Bitmap & Net::AFP::VolParms::kFPVolBackupDateBit) {
 		$$resp{'BackupDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
-				$globalTimeOffset;
+				globalTimeOffset;
 		$offset += 4;
 	}
 
@@ -155,11 +175,11 @@ sub _ParseVolParms {
 	}
 
 	return $resp;
-}
+} # }}}1
 
 # The inheriting classes will need this to parse the response to the
 # FPGetSrvrInfo call.
-sub _ParseSrvrInfo {
+sub _ParseSrvrInfo { # {{{1
 	my ($data) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -280,9 +300,9 @@ _EOT_
 	}
 
 	return $resp;
-}
+} # }}}1
 
-sub _ParseFileDirParms {
+sub _ParseFileDirParms { # {{{1
 	my ($data) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -294,9 +314,9 @@ sub _ParseFileDirParms {
 	} else { # This is a file
 		return _ParseFileParms($FileBitmap, $ReqParams);
 	}
-}
+} # }}}1
 
-sub _ParseFileParms {
+sub _ParseFileParms { # {{{1
 	my ($Bitmap, $data) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	my $resp = {};
@@ -313,19 +333,19 @@ sub _ParseFileParms {
 	if ($Bitmap & Net::AFP::FileParms::kFPCreateDateBit) {
 		$$resp{'CreateDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
-				$globalTimeOffset;
+				globalTimeOffset;
 		$offset += 4;
 	}
 	if ($Bitmap & Net::AFP::FileParms::kFPModDateBit) {
 		$$resp{'ModDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
-				$globalTimeOffset;
+				globalTimeOffset;
 		$offset += 4;
 	}
 	if ($Bitmap & Net::AFP::FileParms::kFPBackupDateBit) {
 		$$resp{'BackupDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
-				$globalTimeOffset;
+				globalTimeOffset;
 		$offset += 4;
 	}
 	if ($Bitmap & Net::AFP::FileParms::kFPFinderInfoBit) {
@@ -382,9 +402,9 @@ sub _ParseFileParms {
 	}
 	$$resp{'FileIsDir'} = 0;
 	return $resp;
-}
+} # }}}1
 
-sub _ParseDirParms {
+sub _ParseDirParms { # {{{1
 	my ($Bitmap, $data) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	my $resp = {};
@@ -401,19 +421,19 @@ sub _ParseDirParms {
 	if ($Bitmap & Net::AFP::DirParms::kFPCreateDateBit) {
 		$$resp{'CreateDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
-				$globalTimeOffset;
+				globalTimeOffset;
 		$offset += 4;
 	}
 	if ($Bitmap & Net::AFP::DirParms::kFPModDateBit) {
 		$$resp{'ModDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
-				$globalTimeOffset;
+				globalTimeOffset;
 		$offset += 4;
 	}
 	if ($Bitmap & Net::AFP::DirParms::kFPBackupDateBit) {
 		$$resp{'BackupDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
-				$globalTimeOffset;
+				globalTimeOffset;
 		$offset += 4;
 	}
 	if ($Bitmap & Net::AFP::DirParms::kFPFinderInfoBit) {
@@ -464,7 +484,7 @@ sub _ParseDirParms {
 	}
 	$$resp{'FileIsDir'} = 1;
 	return $resp;
-}
+} # }}}1
 
 1;
-# vim: ts=4
+# vim: ts=4 fdm=marker
