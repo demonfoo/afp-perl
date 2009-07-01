@@ -12,6 +12,7 @@ if ($@) {
 }
 use IO::Socket::INET;
 use IO::Select;
+use IO::Handle;
 use Net::AFP::Result;
 use Time::HiRes qw(gettimeofday);
 use threads;
@@ -73,6 +74,8 @@ sub session_thread {
 		return;
 	}
 
+	$$shared{'conn_fd'} = fileno($conn);
+	$$shared{'conn_sem'}->up();
 	$$shared{'running'} = 1;
 	$$shared{'sockaddr'} = $conn->sockaddr();
 	$$shared{'sockport'} = $conn->sockport();
@@ -87,25 +90,26 @@ sub session_thread {
 	# important values. Also preallocate several variables which will be
 	# used in the main loop.
 	my $fileno = fileno($conn);
-	my $duration = 0.002;
-	my $last = time();
-	my($data, $real_length, $rlen, $resp, $nf, $rin, $wlen);
+	my $duration = 30;
+#	my $last = time();
+	my($data, $real_length, $rlen, $resp, $nf, $tl, $rin, $wlen);
 	my($type, $cmd, $id, $errcode, $length, $reserved, $req, $i);
-	while (($$shared{'exit'} == 0) or (scalar(@{$$shared{'sendq'}}) > 0)) {
+#	while (($$shared{'exit'} == 0) or (scalar(@{$$shared{'sendq'}}) > 0)) {
+	while ($$shared{'exit'} == 0) {
 		# instead of $last_sec and $last_usec containing info on the last
 		# time DSITickle was sent, key on the last time anything was sent;
 		# no point in sending DSITickle messages if we're really doing
 		# other things anyway.
-		for ($i = 0; $i < 20; $i++) {
-			$req = shift(@{$$shared{'sendq'}});
-			last unless defined $req;
-			$wlen = syswrite($conn, $req);
-			$last = time();
-		}
+#		for ($i = 0; $i < 20; $i++) {
+#			$req = shift(@{$$shared{'sendq'}});
+#			last unless defined $req;
+#			$wlen = syswrite($conn, $req);
+#			$last = time();
+#		}
 
 		$rin = '';
 		vec($rin, $fileno, 1) = 1;
-		$nf = select($rin, undef, undef, $duration);
+		($nf, $tl) = select($rin, undef, undef, $duration);
 		if ($nf > 0) {
 			# Try to get a message from the server.
 			$resp = '';
@@ -158,15 +162,21 @@ sub session_thread {
 			}
 		}
 
-		if ((time() - $last) > 30) {
+#		if ((time() - $last) > 30) {
+#		if ($tl == 0) {
 			# send a DSITickle to the server
 			# Field 2: Command: DSITickle(5)
 			# Manually queue the DSITickle message.
-			push(@{$$shared{'sendq'}}, pack('CCnNNN', 0, OP_DSI_TICKLE,
-					$shared->{'requestid'}++ % 65536, 0, 0, 0));
-		}
+			$$shared{'conn_sem'}->down();
+			syswrite($conn, pack('CCnNNN', 0, OP_DSI_TICKLE,
+					$$shared{'requestid'}++ % 65536, 0, 0, 0));
+			$$shared{'conn_sem'}->up();
+#			push(@{$$shared{'sendq'}}, pack('CCnNNN', 0, OP_DSI_TICKLE,
+#					$shared->{'requestid'}++ % 65536, 0, 0, 0));
+#		}
 	}
-	$shared->{'running'} = -1;
+	$$shared{'running'} = -1;
+	undef $$shared{'Conn'};
 	close($conn);
 
 	# Return kFPNoServer to any still-waiting callers. (Sort of a hack to
@@ -205,15 +215,21 @@ sub new { # {{{1
 				 # sent to the server.
 				 'requestid'	=> 0,
 				 # requests to be dispatched go here.
-				 'sendq'		=> &share([]),
+				 #'sendq'		=> &share([]),
+				 'conn_fd'		=> undef,
+				 'conn_sem'		=> new Thread::Semaphore(0),
 				 # completion handlers are registered here.
 				 'handlers'		=> &share({}),
 			   );
 
-	my $thread = threads->create(\&session_thread, $shared, $host, $port);
-
-	$$obj{'Dispatcher'} = $thread;
 	$$obj{'Shared'} = $shared;
+	my $thread = threads->create(\&session_thread, $shared, $host, $port);
+	$$obj{'Dispatcher'} = $thread;
+	$$shared{'conn_sem'}->down();
+	$$obj{'Conn'} = new IO::Handle;
+	$$obj{'Conn'}->fdopen($$shared{'conn_fd'}, 'w');
+	$$shared{'conn_sem'}->up();
+
 	return $obj;
 } # }}}1
 
@@ -288,7 +304,11 @@ sub SendMessage { # {{{1
 	# Don't send the message until after the handler has been set. Otherwise
 	# we open ourselves up to a race condition which can cause the whole mess
 	# to block forever. :|
-	push(@{$$self{'Shared'}->{'sendq'}}, $msg);
+	#push(@{$$self{'Shared'}->{'sendq'}}, $msg);
+	# Okay, let's try direct dispatch instead of queuing...
+	$$self{'Shared'}->{'conn_sem'}->down();
+	syswrite($$self{'Conn'}, $msg);
+	$$self{'Shared'}->{'conn_sem'}->up();
 
 	return $reqId;
 } # }}}2
