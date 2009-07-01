@@ -1,5 +1,13 @@
 package Net::AFP::ACL;
 
+=head1 NAME
+
+Net::AFP::ACL - ACL related flags and values
+
+=head1 DESCRIPTION
+
+=cut
+
 # for acl_flags
 use constant KAUTH_ACL_FLAGS_PRIVATE		=> 0xffff;
 use constant KAUTH_ACL_DEFER_INHERIT		=> (1<<16);
