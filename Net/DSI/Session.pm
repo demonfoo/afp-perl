@@ -91,22 +91,9 @@ sub session_thread {
 	# used in the main loop.
 	my $fileno = fileno($conn);
 	my $duration = 30;
-#	my $last = time();
 	my($data, $real_length, $rlen, $resp, $nf, $tl, $rin, $wlen);
 	my($type, $cmd, $id, $errcode, $length, $reserved, $req, $i);
-#	while (($$shared{'exit'} == 0) or (scalar(@{$$shared{'sendq'}}) > 0)) {
 	while ($$shared{'exit'} == 0) {
-		# instead of $last_sec and $last_usec containing info on the last
-		# time DSITickle was sent, key on the last time anything was sent;
-		# no point in sending DSITickle messages if we're really doing
-		# other things anyway.
-#		for ($i = 0; $i < 20; $i++) {
-#			$req = shift(@{$$shared{'sendq'}});
-#			last unless defined $req;
-#			$wlen = syswrite($conn, $req);
-#			$last = time();
-#		}
-
 		$rin = '';
 		vec($rin, $fileno, 1) = 1;
 		($nf, $tl) = select($rin, undef, undef, $duration);
@@ -136,33 +123,30 @@ sub session_thread {
 				}
 
 				# FIXME: probably should handle OP_DSI_ATTENTION here.
-
-				next;
-			}
+			} else {
 	
-			# Handle negative return codes in the canonical way.
-			if ($errcode & 0x80000000) {
-				$errcode = -((~$errcode & 0xFFFFFFFF) + 1);
-			}
+				# Handle negative return codes in the canonical way.
+				if ($errcode & 0x80000000) {
+					$errcode = -((~$errcode & 0xFFFFFFFF) + 1);
+				}
 
-			# Check for a completion handler block for the given message ID.
-			if (exists $$shared{'handlers'}{$id}) {
-				$handler = $$shared{'handlers'}{$id};
-				delete $$shared{'handlers'}{$id};
-				# push the data back to the caller
-				${$$handler[1]} = $data;
-				# push the return code in the message back to the caller
-				# HACKHACKHACK - compat hack for netatalk
-				${$$handler[2]} = ($errcode > 0) ? 0 : $errcode;
-				# release the semaphore, after which the caller will
-				# continue (if it had a semaphore, it should be blocking
-				# on down())
-				${$$handler[0]}->up();
-#				undef $handler;
+				# Check for a completion handler block for the given message ID.
+				if (exists $$shared{'handlers'}{$id}) {
+					$handler = $$shared{'handlers'}{$id};
+					delete $$shared{'handlers'}{$id};
+					# push the data back to the caller
+					${$$handler[1]} = $data;
+					# push the return code in the message back to the caller
+					# HACKHACKHACK - compat hack for netatalk
+					${$$handler[2]} = ($errcode > 0) ? 0 : $errcode;
+					# release the semaphore, after which the caller will
+					# continue (if it had a semaphore, it should be blocking
+					# on down())
+					${$$handler[0]}->up();
+				}
 			}
 		}
 
-#		if ((time() - $last) > 30) {
 #		if ($tl == 0) {
 			# send a DSITickle to the server
 			# Field 2: Command: DSITickle(5)
@@ -171,8 +155,6 @@ sub session_thread {
 			syswrite($conn, pack('CCnNNN', 0, OP_DSI_TICKLE,
 					$$shared{'requestid'}++ % 65536, 0, 0, 0));
 			$$shared{'conn_sem'}->up();
-#			push(@{$$shared{'sendq'}}, pack('CCnNNN', 0, OP_DSI_TICKLE,
-#					$shared->{'requestid'}++ % 65536, 0, 0, 0));
 #		}
 	}
 	$$shared{'running'} = -1;
