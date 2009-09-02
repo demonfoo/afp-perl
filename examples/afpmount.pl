@@ -398,10 +398,12 @@ $afpSession->FPOpenDT($currVolID, \$DTRefNum);
 
 my $client_uuid;
 if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
-	die("Need Data::UUID class for full ACL functionality")
-			unless $has_Data_UUID;
-	my $uo = new Data::UUID;
-	$client_uuid = $uo->create();
+    if ($has_Data_UUID) {
+	    my $uo = new Data::UUID;
+	    $client_uuid = $uo->create();
+    } else {
+	    print "Need Data::UUID class for full ACL functionality, ACL checking disabled\n";
+    }
 }
 # }}}1
 
@@ -604,7 +606,7 @@ sub afp_getdir { # {{{1
 	my $fileName = translate_path($dirname);
 	my @filesList = ('.', '..');
 
-	if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
 				Net::AFP::ACL::KAUTH_VNODE_LIST_DIRECTORY,
 				$pathType, $fileName);
@@ -677,7 +679,7 @@ sub afp_mknod { # {{{1
 	if (S_ISREG($mode)) {
 		my ($rc, $resp) = lookup_afp_entry(path_parent($fileName));
 		return $rc if $rc != Net::AFP::Result::kFPNoErr;
-		if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+		if (defined $client_uuid) {
 			my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 					$client_uuid, Net::AFP::ACL::KAUTH_VNODE_ADD_FILE,
 					$pathType, path_parent($fileName));
@@ -712,10 +714,10 @@ sub afp_mkdir { # {{{1
 	my $newDirID;
 	my ($rc, $resp) = lookup_afp_entry(path_parent($fileName));
 	return $rc if $rc != Net::AFP::Result::kFPNoErr;
-	if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
 				Net::AFP::ACL::KAUTH_VNODE_ADD_SUBDIRECTORY,
-				$pathType, $fileName);
+				$pathType, path_parent($fileName));
 		return -&EACCES if $rc == Net::AFP::Result::kFPAccessDenied;
 		return -&ENOENT if $rc == Net::AFP::Result::kFPObjectNotFound;
 		return -&EBADF  if $rc != Net::AFP::Result::kFPNoErr;
@@ -750,7 +752,7 @@ sub afp_unlink { # {{{1
 		delete $ofilecache{$fileName};
 	}
 
-	if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
 				Net::AFP::ACL::KAUTH_VNODE_DELETE, $pathType, $fileName);
 		return -&EACCES if $rc == Net::AFP::Result::kFPAccessDenied;
@@ -902,7 +904,15 @@ sub afp_rename { # {{{1
 				$newRealName);
 		$rc = $afpSession->FPMoveAndRename(@arglist);
 	}
-	return 0		if $rc == Net::AFP::Result::kFPNoErr;
+	if ($rc == Net::AFP::Result::kFPNoErr) {
+        # Move the open filehandle for the renamed file to the new name,
+        # if there is one.
+        if (exists $ofilecache{$oldXlated}) {
+            $ofilecache{$newXlated} = $ofilecache{$oldXlated};
+            delete $ofilecache{$oldXlated};
+        }
+        return 0;
+    }
 	return -&EACCES	if $rc == Net::AFP::Result::kFPAccessDenied;
 	return -&EINVAL	if $rc == Net::AFP::Result::kFPCantMove;
 	return -&EBUSY	if $rc == Net::AFP::Result::kFPObjectLocked;
@@ -927,7 +937,7 @@ sub afp_chmod { # {{{1
 	my ($rc, $resp) = lookup_afp_entry($fileName, 1);
 	return $rc if $rc != Net::AFP::Result::kFPNoErr;
 
-	if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
 				Net::AFP::ACL::KAUTH_VNODE_WRITE_ATTRIBUTES,
 				$pathType, $fileName);
@@ -960,7 +970,7 @@ sub afp_chown { # {{{1
 	my ($rc, $resp) = lookup_afp_entry($fileName, 1);
 	return $rc if $rc != Net::AFP::Result::kFPNoErr;
 
-	if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
 				Net::AFP::ACL::KAUTH_VNODE_CHANGE_OWNER,
 				$pathType, $fileName);
@@ -994,7 +1004,7 @@ sub afp_truncate { # {{{1
 	my $ofork;
 	my $close_fork = 0;
 
-	if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
 				Net::AFP::ACL::KAUTH_VNODE_WRITE_DATA,
 				$pathType, $fileName);
@@ -1133,7 +1143,7 @@ sub afp_read { # {{{1
 
 	return -&EBADF unless exists $ofilecache{$fileName};
 
-	if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
 				Net::AFP::ACL::KAUTH_VNODE_READ_DATA,
 				$pathType, $fileName);
@@ -1349,7 +1359,7 @@ sub afp_setxattr { # {{{1
 
 	# handle ACL xattr {{{2
 	if ($attr eq ACL_XATTR &&
-			($volAttrs & Net::AFP::VolAttrs::kSupportsACLs)) {
+			defined($client_uuid)) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 				$client_uuid, Net::AFP::ACL::KAUTH_VNODE_WRITE_SECURITY,
 				$pathType, $fileName);
@@ -1453,7 +1463,7 @@ sub afp_setxattr { # {{{1
 		return -&EOPNOTSUPP
 				unless $volAttrs & Net::AFP::VolAttrs::kSupportsExtAttrs;
 
-		if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+		if (defined $client_uuid) {
 			my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 					$client_uuid,
 					Net::AFP::ACL::KAUTH_VNODE_WRITE_EXTATTRIBUTES,
@@ -1498,7 +1508,7 @@ sub afp_getxattr { # {{{1
 	$attr = decode(ENCODING, $attr);
 	# handle ACL xattr {{{2
 	if ($attr eq ACL_XATTR &&
-			($volAttrs & Net::AFP::VolAttrs::kSupportsACLs)) {
+			defined($client_uuid)) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 				$client_uuid, Net::AFP::ACL::KAUTH_VNODE_READ_SECURITY,
 				$pathType, $fileName);
@@ -1553,7 +1563,7 @@ sub afp_getxattr { # {{{1
 		return -&EOPNOTSUPP
 				unless $volAttrs & Net::AFP::VolAttrs::kSupportsExtAttrs;
 
-		if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+		if (defined $client_uuid) {
 			my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 					$client_uuid,
 					Net::AFP::ACL::KAUTH_VNODE_READ_EXTATTRIBUTES,
@@ -1595,7 +1605,7 @@ sub afp_listxattr { # {{{1
 
 	# general xattr handling {{{2
 	if ($volAttrs & Net::AFP::VolAttrs::kSupportsExtAttrs) {
-		if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+		if (defined $client_uuid) {
 			my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 					$client_uuid,
 					Net::AFP::ACL::KAUTH_VNODE_READ_EXTATTRIBUTES,
@@ -1620,7 +1630,7 @@ sub afp_listxattr { # {{{1
 	# present, then include the special name in the list of extended
 	# attributes.
 	# handle ACL xattr {{{2
-	if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 				$client_uuid, Net::AFP::ACL::KAUTH_VNODE_READ_SECURITY,
 				$pathType, $fileName);
@@ -1659,7 +1669,7 @@ sub afp_removexattr { # {{{1
 	$attr = decode(ENCODING, $attr);
 	# handle ACL xattr {{{2
 	if ($attr eq ACL_XATTR &&
-			($volAttrs & Net::AFP::VolAttrs::kSupportsACLs)) {
+			defined($client_uuid)) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 				$client_uuid, Net::AFP::ACL::KAUTH_VNODE_WRITE_SECURITY,
 				$pathType, $fileName);
@@ -1693,7 +1703,7 @@ sub afp_removexattr { # {{{1
 
 		return -&EOPNOTSUPP
 				unless $volAttrs & Net::AFP::VolAttrs::kSupportsExtAttrs;
-		if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+		if (defined $client_uuid) {
 			my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 					$client_uuid,
 					Net::AFP::ACL::KAUTH_VNODE_WRITE_EXTATTRIBUTES,
@@ -1725,7 +1735,7 @@ sub lookup_afp_entry { # {{{1
 
 	my $resp = undef;
 
-	if ($volAttrs & Net::AFP::VolAttrs::kSupportsACLs) {
+	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
 				Net::AFP::ACL::KAUTH_VNODE_READ_ATTRIBUTES,
 				$pathType, $fileName);
@@ -1796,4 +1806,4 @@ sub path_parent { # {{{1
 	return join("\0", @path_parts);
 } # }}}1
 
-# vim: ts=4 fdm=marker
+# vim: ts=4 fdm=marker sw=4 et
