@@ -1116,7 +1116,7 @@ sub afp_open { # {{{1
 				'refnum'			=> $resp->{'OForkRefNum'},
 				'coalesce_offset'	=> undef,
 				'coalesce_len'		=> undef,
-				'coalesce_buf'		=> undef,
+				'coalesce_buf'		=> "\0" x COALESCE_MAX,
 				'refcount'			=> $refcount + 1 };
 		return(0);
 	}
@@ -1195,7 +1195,7 @@ sub afp_write { # {{{1
 	# with a download while writing to an AFP volume now.
 
 	# coalesce writes {{{2
-	if (defined $$of_ent{'coalesce_buf'} &&
+	if (defined $$of_ent{'coalesce_offset'} &&
 			$$of_ent{'coalesce_len'} >= COALESCE_MAX) {
 		my $rv = afp_flush($file_u);
 		if ($rv != 0) {
@@ -1205,10 +1205,11 @@ sub afp_write { # {{{1
 
 	# FIXME: add FPAccess() check
 
-	if (defined $$of_ent{'coalesce_buf'}) {
+	if (defined $$of_ent{'coalesce_offset'}) {
 		if ($offset == ($$of_ent{'coalesce_offset'} +
 				$$of_ent{'coalesce_len'})) {
-			$$of_ent{'coalesce_buf'} .= $data;
+			substr($$of_ent{'coalesce_buf'}, $$of_ent{'coalesce_len'},
+                    length($data), $data);
 			$$of_ent{'coalesce_len'} += length($data);
 			return length($data);
 		} else {
@@ -1218,7 +1219,7 @@ sub afp_write { # {{{1
 			}
 		}
 	} else {
-		$$of_ent{'coalesce_buf'} = $data;
+		substr($$of_ent{'coalesce_buf'}, 0, length($data), $data);
 		$$of_ent{'coalesce_len'} = length($data);
 		$$of_ent{'coalesce_offset'} = $offset;
 		return length($data);
@@ -1296,24 +1297,25 @@ sub afp_flush { # {{{1
 		# flushing the writes out to the remote volume. I'm probably
 		# implementing this in a rather naive fashion, but it works so
 		# far...
-		if (defined $ofilecache{$fileName}{'coalesce_buf'}) {
-			my($forkID, $offset, $len, $data) =
+		if (defined $ofilecache{$fileName}{'coalesce_offset'}) {
+			my($forkID, $offset, $len) =
 					@{$ofilecache{$fileName}}{'refnum', 'coalesce_offset',
-											  'coalesce_len', 'coalesce_buf'};
+											  'coalesce_len'};
+            my $data_ref = \$ofilecache{$fileName}{'coalesce_buf'};
 			my $lastwr;
 			my $rc;
 			if ($UseExtOps) {
-				$rc = $afpSession->FPWriteExt(0, $forkID, $offset, $len, $data,
-						\$lastwr);
+				$rc = $afpSession->FPWriteExt(0, $forkID, $offset, $len,
+                        $$data_ref, \$lastwr);
 			} else {
-				$rc = $afpSession->FPWrite(0, $forkID, $offset, $len, $data,
-						\$lastwr);
+				$rc = $afpSession->FPWrite(0, $forkID, $offset, $len,
+                        $$data_ref, \$lastwr);
 			}
 			if ($lastwr < $offset + $len) {
 				print "afp_flush(): truncated write in flush? wtf?\n";
 				return -&EIO;
 			}
-			undef $ofilecache{$fileName}{'coalesce_buf'};
+			undef $ofilecache{$fileName}{'coalesce_offset'};
 		}
 	}
 
