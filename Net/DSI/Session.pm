@@ -226,8 +226,8 @@ sub close { # {{{1
 #		 		server.
 #	$message:	The message payload, if any, to send with the command. Many
 #				of the command opcodes don't take any payload.
-#	$data:		Additional data outside the payload to include in the sent
-#				message; only used for DSIWrite operation.
+#	$data_r:	Reference to additional data outside the payload to include
+#				in the sent message; only used for DSIWrite operation.
 #	$sem_r:		A reference to contain a Thread::Semaphore object which can
 #				be used to determine when a response has been received. If
 #				no response is expected, should be undef.
@@ -236,7 +236,7 @@ sub close { # {{{1
 #				expected, this should be undef.
 #	$rc_r:		A reference to a scalar,
 sub SendMessage { # {{{1
-	my ($self, $cmd, $message, $data, $sem_r, $resp_r, $rc_r) = @_;
+	my ($self, $cmd, $message, $data_r, $sem_r, $resp_r, $rc_r) = @_;
 
 	if (defined $sem_r) {
 		# Create the Thread::Semaphore object, and initialize it to 0;
@@ -254,7 +254,7 @@ sub SendMessage { # {{{1
 
 	$message = defined($message) ? $message : '';
 
-	$data = defined($data) ? $data : '';
+	$data_r = defined($data_r) ? $data_r : \'';
 
 	# Cycle the request ID that DSI uses to identify the request/reply
 	# pairing. I'd like to handle that part asynchronously eventually.
@@ -271,9 +271,10 @@ sub SendMessage { # {{{1
 	# 		data offset for DSIWrite messages
 	# Arg 5: long MsgLength
 	# Arg 6: long Reserved: 0
-	my $msg = pack('CCnNNNa*a*', 0, $cmd, $reqId,
-			length($data) > 0 ? length($message) : 0,
-			length($message) + length($data), 0, $message, $data);
+	my $dlen = length($$data_r);
+	my $msg = pack('CCnNNNa*', 0, $cmd, $reqId,
+			$dlen > 0 ? length($message) : 0,
+			length($message) + $dlen, 0, $message);
 
 	if (defined $sem_r) {
 		my $handler = &share([]);
@@ -288,6 +289,7 @@ sub SendMessage { # {{{1
 	# Okay, let's try direct dispatch instead of queuing...
 	$$self{'Shared'}->{'conn_sem'}->down();
 	syswrite($$self{'Conn'}, $msg);
+	syswrite($$self{'Conn'}, $$data_r);
 	$$self{'Shared'}->{'conn_sem'}->up();
 
 	return $reqId;
@@ -373,11 +375,11 @@ sub DSITickle {
 
 sub DSIWrite {
 	# This should only be used for FPWrite and FPAddIcon
-	my ($self, $message, $data, $resp_r) = @_;
+	my ($self, $message, $data_r, $resp_r) = @_;
 
 	my $sem = undef;
 	my $rc = undef;
-	my $reqId = $self->SendMessage(OP_DSI_WRITE, $message, $data, \$sem,
+	my $reqId = $self->SendMessage(OP_DSI_WRITE, $message, $data_r, \$sem,
 			$resp_r, \$rc);
 	return $reqId if $reqId < 0;
 	$sem->down();

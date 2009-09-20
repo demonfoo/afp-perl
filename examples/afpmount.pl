@@ -826,10 +826,10 @@ sub afp_symlink { # {{{1
 
 	my $lastWritten;
 	if ($UseExtOps) {
-		$rc = $afpSession->FPWriteExt(0, $forkID, 0, length($target), $target,
+		$rc = $afpSession->FPWriteExt(0, $forkID, 0, length($target), \$target,
 				\$lastWritten);
 	} else {
-		$rc = $afpSession->FPWrite(0, $forkID, 0, length($target), $target,
+		$rc = $afpSession->FPWrite(0, $forkID, 0, length($target), \$target,
 				\$lastWritten);
 	}
 
@@ -1171,7 +1171,9 @@ sub afp_read { # {{{1
 } # }}}1
 
 sub afp_write { # {{{1
-	my ($file, $data, $offset) = @_;
+	#my ($file, $data, $offset) = @_;
+    my ($file, $offset) = @_[0,2];
+    my $data_r = \$_[1];
 	print 'called ', (caller(0))[3], "('", $file, "', [data], ", $offset, ")\n"
 			if defined $::_DEBUG;
 
@@ -1205,13 +1207,14 @@ sub afp_write { # {{{1
 
 	# FIXME: add FPAccess() check
 
+    my $dlen = length($$data_r);
 	if (defined $$of_ent{'coalesce_offset'}) {
 		if ($offset == ($$of_ent{'coalesce_offset'} +
 				$$of_ent{'coalesce_len'})) {
 			substr($$of_ent{'coalesce_buf'}, $$of_ent{'coalesce_len'},
-                    length($data), $data);
-			$$of_ent{'coalesce_len'} += length($data);
-			return length($data);
+                    $dlen, $$data_r);
+			$$of_ent{'coalesce_len'} += $dlen;
+			return $dlen;
 		} else {
 			my $rv = afp_flush($file_u);
 			if ($rv != 0) {
@@ -1219,23 +1222,23 @@ sub afp_write { # {{{1
 			}
 		}
 	} else {
-		substr($$of_ent{'coalesce_buf'}, 0, length($data), $data);
-		$$of_ent{'coalesce_len'} = length($data);
+		substr($$of_ent{'coalesce_buf'}, 0, $dlen, $$data_r);
+		$$of_ent{'coalesce_len'} = $dlen;
 		$$of_ent{'coalesce_offset'} = $offset;
-		return length($data);
+		return length($$data_r);
 	}
 	# }}}2
 	my $lastWritten;
 	my $rc;
 	if ($UseExtOps) {
-		$rc = $afpSession->FPWriteExt(0, $forkID, $offset, length($data),
-				$data, \$lastWritten);
+		$rc = $afpSession->FPWriteExt(0, $forkID, $offset, $dlen,
+				$data_r, \$lastWritten);
 	} else {
-		$rc = $afpSession->FPWrite(0, $forkID, $offset, length($data), $data,
-				\$lastWritten);
+		$rc = $afpSession->FPWrite(0, $forkID, $offset, $dlen,
+                $data_r, \$lastWritten);
 	}
 	
-	return length($data) if $rc == Net::AFP::Result::kFPNoErr;
+	return $dlen         if $rc == Net::AFP::Result::kFPNoErr;
 	return -&EACCES		 if $rc == Net::AFP::Result::kFPAccessDenied;
 	return -&ENOSPC		 if $rc == Net::AFP::Result::kFPDiskFull;
 	return -&ETXTBSY	 if $rc == Net::AFP::Result::kFPLockErr;
@@ -1306,10 +1309,10 @@ sub afp_flush { # {{{1
 			my $rc;
 			if ($UseExtOps) {
 				$rc = $afpSession->FPWriteExt(0, $forkID, $offset, $len,
-                        $$data_ref, \$lastwr);
+                        $data_ref, \$lastwr);
 			} else {
 				$rc = $afpSession->FPWrite(0, $forkID, $offset, $len,
-                        $$data_ref, \$lastwr);
+                        $data_ref, \$lastwr);
 			}
 			if ($lastwr < $offset + $len) {
 				print "afp_flush(): truncated write in flush? wtf?\n";

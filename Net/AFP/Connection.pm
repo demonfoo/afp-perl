@@ -5885,8 +5885,9 @@ Number of bytes to be written.
 
 =item $ForkData
 
-Data to be written, which is not part of the request block. Instead, the
-data is transmitted to the server in an intermediate exchange of DSI packets.
+A reference to a scalar containing data to be written, which is not part
+of the request block. Instead, the data is transmitted to the server in
+an intermediate exchange of DSI packets.
 
 =item $resp_r
 
@@ -5929,7 +5930,7 @@ Session reference numer or open fork reference number is unknown.
 # isn't already in use. Maybe it's just a holdover of AppleTalk days...
 #### /ERRATA ####
 sub FPWrite($$$$$$$) { # {{{1
-	my ($self, $Flag, $OForkRefNum, $Offset, $ReqCount, $ForkData,
+	my ($self, $Flag, $OForkRefNum, $Offset, $ReqCount, $ForkData_r,
 			$resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -5937,13 +5938,13 @@ sub FPWrite($$$$$$$) { # {{{1
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 
 	unless (defined $ReqCount) {
-		$ReqCount = length($ForkData);
+		$ReqCount = length($$ForkData_r);
 	}
 
 	my $msg = pack('CCnNN', kFPWrite, $Flag, $OForkRefNum, $Offset, $ReqCount);
 
 	my $resp;
-	my $rc = $self->SendAFPWrite($msg, $ForkData, \$resp);
+	my $rc = $self->SendAFPWrite($msg, $ForkData_r, \$resp);
 	if ($rc == Net::AFP::Result::kFPNoErr) {
 		$$resp_r = unpack('N', $resp);
 	}
@@ -5983,10 +5984,11 @@ fork relative to the end of the fork.
 
 Number of bytes to be written.
 
-=item $ForkData
+=item $ForkData_r
 
-Data to be written, which is not part of the request block. Instead, the
-data is transmitted to the server in an intermediate exchange of DSI packets.
+A reference to a scalar containing data to be written, which is not part of
+the request block. Instead, the data is transmitted to the server in an
+intermediate exchange of DSI packets.
 
 =item $resp_r
 
@@ -6023,7 +6025,7 @@ Session reference numer or open fork reference number is unknown.
 
 =cut
 sub FPWriteExt($$$$$$$) { # {{{1
-	my ($self, $Flag, $OForkRefNum, $Offset, $ReqCount, $ForkData,
+	my ($self, $Flag, $OForkRefNum, $Offset, $ReqCount, $ForkData_r,
 			$resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -6031,14 +6033,14 @@ sub FPWriteExt($$$$$$$) { # {{{1
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 
 	unless (defined $ReqCount) {
-		$ReqCount = length($ForkData);
+		$ReqCount = length($ForkData_r);
 	}
 
 	my $msg = pack('CCnNNNN', kFPWriteExt, $Flag, $OForkRefNum,
 			ll_convert($Offset), ll_convert($ReqCount));
 
 	my $resp;
-	my $rc = $self->SendAFPWrite($msg, $ForkData, \$resp);
+	my $rc = $self->SendAFPWrite($msg, $ForkData_r, \$resp);
 	if ($rc == Net::AFP::Result::kFPNoErr) {
 		$$resp_r = ll_unconvert(unpack('NN', $resp));
 	}
