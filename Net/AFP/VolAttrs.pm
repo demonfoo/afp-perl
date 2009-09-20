@@ -118,7 +118,20 @@ If set, the volume supports access control lists (ACLs).
 
 =cut
 use constant kSupportsACLs				=> 0x0800;
+=item kCaseSensitive
 
+If set, the volume supports case-sensitive filenames.
+
+=cut
+# New with AFP 3.3.
+use constant kCaseSensitive				=> 0x1000;
+=item kSupportsTMLockSteal
+
+If set, volume supports Time Machine lock stealing.
+
+=cut
+# New with AFP 3.3.
+use constant kSupportsTMLockSteal		=> 0x2000;
 =back
 
 =cut

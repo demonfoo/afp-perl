@@ -12,7 +12,12 @@ use constant kSupportsSrvrNotify	=> 0x0040;
 use constant kSupportsReconnect		=> 0x0080;
 use constant kSupportsDirServices	=> 0x0100;
 use constant kSupportsUTF8SrvrName	=> 0x0200;
+# This bit was added in AFP 3.2, along with ACL operations, and extended
+# operation of FPMapName() and FPMapID() for resolving UUIDs to names and
+# vice versa.
 use constant kSupportsUUIDs			=> 0x0400;
+# This bit was added in AFP 3.3.
+use constant kSupportsExtSleep		=> 0x0800;
 use constant kSupportsSuperClient	=> 0x8000;
 
 1;

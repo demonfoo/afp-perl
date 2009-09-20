@@ -22,7 +22,7 @@ our @versions = (
 		'VersionString'	=> 'AFP3.3',
 		'MajorNumber'	=> 3,
 		'MinorNumber'	=> 3,
-		'Supported'		=> 0,
+		'Supported'		=> 1,
 	},
 	{
 		'VersionString'	=> 'AFP3.2',
