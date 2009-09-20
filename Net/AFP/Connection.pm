@@ -1,7 +1,7 @@
 #
 # Notice:
 #	The information contained here is based on Apple's documentation of
-#	the Apple Filing Protocol version 3.2. The documents are available in
+#	the Apple Filing Protocol version 3.3. The documents are available in
 #	PDF format at the following URLs:
 #
 #     Conceptual overview:
@@ -10,17 +10,17 @@
 # 
 #     Protocol details:
 #
-# http://developer.apple.com/documentation/Networking/Reference/AFP_Reference/AFP_Reference.pdf
+# http://developer.apple.com/mac/library/documentation/Networking/Reference/AFP_Reference/AFP_Reference.pdf
 #
 #	or in HTML at the following URL:
 #
 #     Conceptual overview:
 #
-# http://developer.apple.com/documentation/Networking/Conceptual/AFP/index.html
+# http://developer.apple.com/mac/library/documentation/Networking/Conceptual/AFP/Introduction/Introduction.html
 #
 #     Protocol details:
 #
-# http://developer.apple.com/documentation/Networking/Reference/AFP_Reference/index.html
+# http://developer.apple.com/mac/library/documentation/Networking/Reference/AFP_Reference/Reference/reference.html
 #
 #	I also (due to vagueness or errors in the AFP 3.1 documentation; also,
 #	for a description of the DSI shim protocol) referred to the AFP 2.1/2.2
