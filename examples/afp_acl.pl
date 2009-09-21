@@ -1,17 +1,17 @@
 #!/usr/bin/env perl
 
 # imports {{{1
+use strict;
+use warnings;
+
 use lib qw(/home/demon/libafp);
 use Net::AFP::ACL;
 use File::ExtAttr qw(:all);
 use Getopt::Long;
 use Encode;
 use POSIX qw(EINVAL ENOENT EACCES EBADF EPERM EOPNOTSUPP);
-sub ENODATA() { return 61; }	# need this error constant for extended
+sub ENODATA { return 61; }	# need this error constant for extended
 								# attribute operations
-
-use strict;
-use warnings;
 # }}}1
 
 # define constants {{{1
@@ -21,7 +21,7 @@ use constant XATTR_NS		=> 'system';
 
 # Take a binary packed ACL representation and generate a structured
 # representation for us to twiddle.
-sub parse_xattr($) { # {{{1
+sub parse_xattr { # {{{1
 	my($raw_acl) = @_;
 
 	my($acl_flags, @acl_parts) = unpack('LS/(LS/aLL)', $raw_acl);
@@ -42,7 +42,7 @@ sub parse_xattr($) { # {{{1
 # Take a structured access control list and pack it into a serialized binary
 # form that we can then jam into the extended attribute for the FUSE
 # implementation to push on to the AFP server.
-sub assemble_xattr($$) { # {{{1
+sub assemble_xattr { # {{{1
 	my($acl_flags, $acl_ace) = @_;
 
 	my @acl_parts;

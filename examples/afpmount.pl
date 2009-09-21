@@ -1,6 +1,8 @@
 #!/usr/bin/env perl
 
 # imports {{{1
+use strict;
+use warnings;
 use Fuse qw(:xattr);			# preferably use Fuse 0.09_3 (or later), for
 								# decent support of files >= 2**31 bytes long
 use Net::AFP::Connection::TCP;	# the class which actually sets up and
@@ -32,13 +34,11 @@ use POSIX qw(EACCES EBADF EBUSY EEXIST EINVAL EISDIR EMFILE ENODEV
 			 ETXTBSY EOPNOTSUPP EIO O_RDONLY O_WRONLY O_RDWR O_ACCMODE);
 use Fcntl qw(:mode);			# macros and constants related to symlink
 								# checking code
-sub ENODATA() { return 61; }	# need this error constant for extended
+sub ENODATA { return 61; }	    # need this error constant for extended
 								# attribute operations
 
 use Data::Dumper;				# for diagnostic output when debugging is on
 
-use strict;
-use warnings;
 # }}}1
 
 # define constants {{{1
@@ -110,7 +110,7 @@ exit(&EINVAL) unless GetOptions('interactive'	=> \$opts{'i'},
 my($path, $mountpoint) = @ARGV;
 my %values;
 
-sub urldecode($) { # {{{1
+sub urldecode { # {{{1
 	my ($string) = @_;
 	if (defined $string) {
 		$string =~ tr/+/ /;
@@ -119,7 +119,7 @@ sub urldecode($) { # {{{1
 	return $string;
 } # }}}1
 
-sub urlencode($) { # {{{1
+sub urlencode { # {{{1
 	my ($string) = @_;
 	if (defined $string) {
 		$string =~ s/([^\w\/_\-. ])/sprintf('%%%02x',ord($1))/gei;
@@ -1456,9 +1456,10 @@ sub afp_setxattr { # {{{1
 		}
 		my $rc = $afpSession->FPAddComment($DTRefNum, $topDirID, $pathType,
 				$fileName, $value);
-		return -&EACCES if $rc == Net::AFP::Result::kFPAccessDenied;
-		return -&ENOENT if $rc == Net::AFP::Result::kFPObjectNotFound;
-		return -&EBADF  if $rc != Net::AFP::Result::kFPNoErr;
+		return -&EACCES     if $rc == Net::AFP::Result::kFPAccessDenied;
+		return -&ENOENT     if $rc == Net::AFP::Result::kFPObjectNotFound;
+        return -&EOPNOTSUPP if $rc == Net::AFP::Result::kFPCallNotSupported;
+		return -&EBADF      if $rc != Net::AFP::Result::kFPNoErr;
 		return 0;
 	} # }}}2
 	# general xattr handling {{{2

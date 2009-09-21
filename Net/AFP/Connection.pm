@@ -234,7 +234,7 @@ sub SendAFPWrite { # {{{1
 	die('Do not call the base class SendAFPWrite method');
 } # }}}1
 
-sub PackagePath($$;$) { # {{{1
+sub PackagePath { # {{{1
 	my ($PathType, $Pathname, $NoEncType) = @_;
 
 	if ($PathType == 1 or $PathType == 2) {
@@ -320,7 +320,7 @@ A parameter is invalid.
 =back
 
 =cut
-sub FPAccess($$$$$$$$) { # {{{1
+sub FPAccess { # {{{1
 	my($self, $VolumeID, $DirectoryID, $Bitmap, $UUID, $ReqAccess, $PathType,
 			$Pathname) = @_;
 
@@ -334,6 +334,8 @@ sub FPAccess($$$$$$$$) { # {{{1
 =item FPAddAPPL()
 
 Adds an APPL mapping to the Desktop database.
+
+Deprecated as of Mac OS X 10.6.
 
 Not yet implemented.
 
@@ -351,6 +353,8 @@ sub FPAddAPPL {
 =item FPAddComment()
 
 Adds a comment for a file or directory to a volume's Desktop database.
+
+Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
@@ -402,7 +406,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPAddComment($$$$$$) { # {{{1
+sub FPAddComment { # {{{1
 	my($self, $DTRefNum, $DirectoryID, $PathType, $Pathname, $Comment) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -414,6 +418,8 @@ sub FPAddComment($$$$$$) { # {{{1
 =item FPAddIcon()
 
 Adds an an icon bitmap to a volume's Desktop database.
+
+Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
@@ -555,7 +561,7 @@ locked.
 =back
 
 =cut
-sub FPByteRangeLock($$$$$$) { # {{{1
+sub FPByteRangeLock { # {{{1
 	my($self, $Flags, $OForkRefNum, $Offset, $Length, $resp_r) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -647,7 +653,7 @@ locked.
 =back
 
 =cut
-sub FPByteRangeLockExt($$$$$$) { # {{{1
+sub FPByteRangeLockExt { # {{{1
 	my($self, $Flags, $OForkRefNum, $Offset, $Length, $resp_r) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -770,7 +776,7 @@ A non-AFP error occurred.
 # does. This is necessary for chained invocations of FPChangePassword
 # to support the two-way conversations.
 #### /ERRATA ####
-sub FPChangePassword($$$$$) { # {{{1
+sub FPChangePassword { # {{{1
 	my ($self, $UAM, $UserName, $UserAuthInfo, $resp_r) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -820,7 +826,7 @@ A non-AFP error occurred.
 =back
 
 =cut
-sub FPCloseDir($$$) { # {{{1
+sub FPCloseDir { # {{{1
 	my ($self, $VolumeID, $DirectoryID) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -832,6 +838,8 @@ sub FPCloseDir($$$) { # {{{1
 =item FPCloseDT()
 
 Close a volume's Desktop database.
+
+Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
@@ -862,7 +870,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPCloseDT($$) { # {{{1
+sub FPCloseDT { # {{{1
 	my($self, $DTRefNum) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -903,7 +911,7 @@ A non-AFP error occurred.
 =back
 
 =cut
-sub FPCloseFork($$) { # {{{1
+sub FPCloseFork { # {{{1
 	my($self, $OForkRefNum) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -944,7 +952,7 @@ A non-AFP error occurred.
 =back
 
 =cut
-sub FPCloseVol($$) { # {{{1
+sub FPCloseVol { # {{{1
 	my ($self, $VolumeID) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -1055,7 +1063,7 @@ source or destination pathname is invalid.
 =back
 
 =cut
-sub FPCopyFile($$$$$$$$$$$) { # {{{1
+sub FPCopyFile { # {{{1
 	my($self, $SrcVolID, $SrcDirID, $DstVolID, $DstDirID, $SrcPathType,
 			$SrcPathname, $DstPathType, $DstPathname, $NewType, $NewName) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -1142,7 +1150,7 @@ Destination volume is read-only.
 =back
 
 =cut
-sub FPCreateDir($$$$$$) { # {{{1
+sub FPCreateDir { # {{{1
 	my($self, $VolumeID, $DirectoryID, $PathType, $Pathname, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -1233,7 +1241,7 @@ Session reference number, Volume ID, or pathname is null or invalid.
 =back
 
 =cut
-sub FPCreateFile($$$$$$) { # {{{1
+sub FPCreateFile { # {{{1
 	my($self, $Flag, $VolumeID, $DirectoryID, $PathType, $Pathname) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -1397,7 +1405,7 @@ Session reference number, Volume ID, or pathname is null or invalid.
 =back
 
 =cut
-sub FPDelete($$$$$) { # {{{1
+sub FPDelete { # {{{1
 	my($self, $VolumeID, $DirectoryID, $PathType, $Pathname) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -1515,7 +1523,7 @@ A non-AFP error occurred.
 # FIXME: wtf, documentation is all f'd up and inconsistent... wtf is this
 # crap. what is $Type? documentation says it's a short, then shows it as
 # one byte in the message diagram. what's the deal here?
-sub FPDisconnectOldSession($$$) {
+sub FPDisconnectOldSession {
 	my($self, $Type, $Token) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -1642,7 +1650,7 @@ Session reference number, Volume ID, or pathname type is unknown, pathname is ba
 =back
 
 =cut
-sub FPEnumerate($$$$$$$$$$$) { # {{{1
+sub FPEnumerate { # {{{1
 	my ($self, $VolumeID, $DirectoryID, $FileBitmap, $DirectoryBitmap,
 		$ReqCount, $StartIndex, $MaxReplySize, $PathType, $Pathname,
 		$resp_r) = @_;
@@ -1799,7 +1807,7 @@ Session reference number, Volume ID, or pathname type is unknown, pathname is ba
 =back
 
 =cut
-sub FPEnumerateExt($$$$$$$$$$$) { # {{{1
+sub FPEnumerateExt { # {{{1
 	my ($self, $VolumeID, $DirectoryID, $FileBitmap, $DirectoryBitmap,
 		$ReqCount, $StartIndex, $MaxReplySize, $PathType, $Pathname,
 		$resp_r) = @_;
@@ -1954,7 +1962,7 @@ Session reference number, Volume ID, or pathname type is unknown, pathname is ba
 =back
 
 =cut
-sub FPEnumerateExt2($$$$$$$$$$$) { # {{{1
+sub FPEnumerateExt2 { # {{{1
 	my ($self, $VolumeID, $DirectoryID, $FileBitmap, $DirectoryBitmap,
 		$ReqCount, $StartIndex, $MaxReplySize, $PathType, $Pathname,
 		$resp_r) = @_;
@@ -2036,7 +2044,7 @@ Session reference number or Volume ID is unknown.
 =back
 
 =cut
-sub FPFlush($$) { # {{{1
+sub FPFlush { # {{{1
 	my ($self, $VolumeID) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -2077,7 +2085,7 @@ Session reference number or fork reference number is unknown.
 =back
 
 =cut
-sub FPFlushFork($$) { # {{{1
+sub FPFlushFork { # {{{1
 	my ($self, $OForkRefNum) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -2174,7 +2182,7 @@ A parameter is invalid.
 =back
 
 =cut
-sub FPGetACL($$$$$$$$) { # {{{1
+sub FPGetACL { # {{{1
 	my($self, $VolumeID, $DirectoryID, $Bitmap, $MaxReplySize, $PathType,
 			$Pathname, $resp_r) = @_;
 
@@ -2222,6 +2230,8 @@ sub FPGetACL($$$$$$$$) { # {{{1
 =item FPGetAPPL()
 
 Retrieves an APPL mapping from a volume's Desktop database.
+
+Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
@@ -2332,7 +2342,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPGetAuthMethods($$$$$) { # {{{1
+sub FPGetAuthMethods { # {{{1
 	my($self, $Flags, $PathType, $Pathname, $resp_r) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -2352,6 +2362,8 @@ sub FPGetAuthMethods($$$$$) { # {{{1
 
 Gets the comment associated with a file or directory from the volume's
 Desktop database.
+
+Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
@@ -2412,7 +2424,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPGetComment($$$$$$) { # {{{1
+sub FPGetComment { # {{{1
 	my($self, $DTRefNum, $DirectoryID, $PathType, $Pathname, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -2517,7 +2529,7 @@ A parameter is invalid.
 =back
 
 =cut
-sub FPGetExtAttr($$$$$$$$$$$) { # {{{1
+sub FPGetExtAttr { # {{{1
 	my($self, $VolumeID, $DirectoryID, $Bitmap, $Offset, $ReqCount,
 			$MaxReplySize, $PathType, $Pathname, $Name, $resp_r) = @_;
 
@@ -2616,7 +2628,7 @@ pathname is invalid.
 =back
 
 =cut
-sub FPGetFileDirParms($$$$$$$$) { # {{{1
+sub FPGetFileDirParms { # {{{1
 	my ($self, $VolumeID, $DirectoryID, $FileBitmap, $DirectoryBitmap,
 		$PathType, $Pathname, $resp_r) = @_;
 
@@ -2677,7 +2689,7 @@ The request attempted to get information about the opened file's other fork.
 =back
 
 =cut
-sub FPGetForkParms($$$$) { # {{{1
+sub FPGetForkParms { # {{{1
 	my ($self, $OForkRefNum, $Bitmap, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -2695,6 +2707,8 @@ sub FPGetForkParms($$$$) { # {{{1
 =item FPGetIcon()
 
 Gets an icon from the Desktop database.
+
+Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
@@ -2768,6 +2782,8 @@ sub FPGetIcon {
 =item FPGetIconInfo()
 
 Gets icon information from the Desktop database.
+
+Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
@@ -2895,7 +2911,7 @@ A non-AFP error occurred.
 =back
 
 =cut
-sub FPGetSessionToken($$$$$) { # {{{1
+sub FPGetSessionToken { # {{{1
 	my ($self, $Type, $timeStamp, $ID, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -2969,7 +2985,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPGetSrvrInfo($$$) { # {{{1
+sub FPGetSrvrInfo$) { # {{{1
 	# As the die() suggests, this method should never be called directly. It
 	# should be overridden in the inheriting class, since AFP over TCP uses
 	# DSIGetStatus and AFP over ASP (AppleTalk) uses SPGetStatus - it doesn't
@@ -3029,7 +3045,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPGetSrvrMsg($$$$) { # {{{1
+sub FPGetSrvrMsg { # {{{1
 	my($self, $MessageType, $MessageBitmap, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3078,7 +3094,7 @@ Session reference number or Volume ID is unknown.
 =back
 
 =cut
-sub FPGetSrvrParms($$) { # {{{1
+sub FPGetSrvrParms { # {{{1
 	my ($self, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3175,7 +3191,7 @@ ThisUser bit is not set. (Should never happen.)
 =back
 
 =cut
-sub FPGetUserInfo($$$$) { # {{{1
+sub FPGetUserInfo { # {{{1
 	my ($self, $UserID, $Bitmap, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3252,7 +3268,7 @@ The session reference number or Volume ID is unknown.
 =back
 
 =cut
-sub FPGetVolParms($$$$) { # {{{1
+sub FPGetVolParms { # {{{1
 	my($self, $VolumeID, $Bitmap, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3355,7 +3371,7 @@ A parameter is invalid.
 =back
 
 =cut
-sub FPListExtAttrs($$$$$$$$$$) { # {{{1
+sub FPListExtAttrs { # {{{1
 	my($self, $VolumeID, $DirectoryID, $Bitmap, $ReqCount, $StartIndex,
 			$MaxReplySize, $PathType, $Pathname, $resp_r) = @_;
 
@@ -3468,7 +3484,7 @@ Authentication failed.
 =back
 
 =cut
-sub FPLogin($$$$$) { # {{{1
+sub FPLogin { # {{{1
 	my ($self, $AFPVersion, $UAM, $UserAuthInfo, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3570,7 +3586,7 @@ incorrect.
 =back
 
 =cut
-sub FPLoginCont($$$$) { # {{{1
+sub FPLoginCont { # {{{1
 	my ($self, $ID, $UserAuthInfo, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3719,7 +3735,7 @@ Authentication failed.
 =back
 
 =cut
-sub FPLoginExt($$$$$$$$$$) { # {{{1
+sub FPLoginExt { # {{{1
 	my ($self, $Flags, $AFPVersion, $UAM, $UserNameType, $UserName, $PathType,
 			$Pathname, $UserAuthInfo, $resp_r) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3779,7 +3795,7 @@ The session reference number is unknown.
 =back
 
 =cut
-sub FPLogout($) { # {{{1
+sub FPLogout { # {{{1
 	my ($self) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3833,7 +3849,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPMapID($$$$) { # {{{1
+sub FPMapID { # {{{1
 	my($self, $Subfunction, $ID, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3912,7 +3928,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPMapName($$$$) { # {{{1
+sub FPMapName { # {{{1
 	my($self, $Subfunction, $Name, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -4041,7 +4057,7 @@ Volume is ReadOnly.
 =back
 
 =cut
-sub FPMoveAndRename($$$$$$$$$$$) { # {{{1
+sub FPMoveAndRename { # {{{1
 	my ($self, $VolumeID, $SrcDirID, $DstDirID, $SrcPathType, $SrcPathname,
 			$DstPathType, $DstPathname, $NewType, $NewName, $resp_r) = @_;
 
@@ -4126,7 +4142,7 @@ pathname is invalid.
 =back
 
 =cut
-sub FPOpenDir($$$$$$) { # {{{1
+sub FPOpenDir { # {{{1
 	my($self, $VolumeID, $DirectoryID, $PathType, $Pathname, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -4144,6 +4160,8 @@ sub FPOpenDir($$$$$$) { # {{{1
 =item FPOpenDT()
 
 Opens the Desktop database on a particular volume.
+
+Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
@@ -4179,7 +4197,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPOpenDT($$$) { # {{{1
+sub FPOpenDT { # {{{1
 	my($self, $VolumeID, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -4310,7 +4328,7 @@ volume that is marked ReadOnly.
 =back
 
 =cut
-sub FPOpenFork($$$$$$$$$) { # {{{1
+sub FPOpenFork { # {{{1
 	my ($self, $Flag, $VolumeID, $DirectoryID, $Bitmap, $AccessMode, $PathType,
 		$Pathname, $resp_r) = @_;
 
@@ -4392,7 +4410,7 @@ Session reference number or volume name is unknown.
 =back
 
 =cut
-sub FPOpenVol($$$$$) { # {{{1
+sub FPOpenVol { # {{{1
 	my ($self, $Bitmap, $VolumeName, $Password, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -4497,7 +4515,7 @@ is invalid.
 =back
 
 =cut
-sub FPRead($$$$$$$) { # {{{1
+sub FPRead { # {{{1
 	my($self, $OForkRefNum, $Offset, $ReqCount, $NewLineMask,
 			$NewLineChar, $resp_r) = @_;
 	
@@ -4580,7 +4598,7 @@ ReqCount or Offset is negative; NewLineMask is invalid.
 =back
 
 =cut
-sub FPReadExt($$$$$) { # {{{1
+sub FPReadExt { # {{{1
 	my($self, $OForkRefNum, $Offset, $ReqCount, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -4597,6 +4615,8 @@ sub FPReadExt($$$$$) { # {{{1
 
 Removes an APPL mapping from a volume's Desktop database.
 
+Deprecated as of Mac OS X 10.6.
+
 Not yet implemented.
 
 =cut
@@ -4612,6 +4632,8 @@ sub FPRemoveAPPL {
 =item FPRemoveComment()
 
 Removes a comment from a volume's Desktop database.
+
+Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
@@ -4668,7 +4690,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPRemoveComment($$$$$) { # {{{1
+sub FPRemoveComment { # {{{1
 	my($self, $DTRefNum, $DirectoryID, $PathType, $Pathname) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -4746,7 +4768,7 @@ A parameter is invalid.
 =back
 
 =cut
-sub FPRemoveExtAttr($$$$$$$) { # {{{1
+sub FPRemoveExtAttr { # {{{1
 	my($self, $VolumeID, $DirectoryID, $Bitmap, $PathType, $Pathname,
 			$Name) = @_;
 
@@ -4835,7 +4857,7 @@ Volume is ReadOnly.
 =back
 
 =cut
-sub FPRename($$$$$$$) { # {{{1
+sub FPRename { # {{{1
 	my ($self, $VolumeID, $DirectoryID, $PathType, $Pathname, $NewType,
 			$NewName) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -5017,7 +5039,7 @@ A parameter is invalid.
 =back
 
 =cut
-sub FPSetACL($$$$$$;$) { # {{{1
+sub FPSetACL { # {{{1
 	my($self, $VolumeID, $DirectoryID, $Bitmap, $PathType, $Pathname,
 			$AdditionalInformation) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -5135,7 +5157,7 @@ Volume is ReadOnly.
 =back
 
 =cut
-sub FPSetDirParms($$$$$$%) { # {{{1
+sub FPSetDirParms { # {{{1
 	my ($self, $VolumeID, $DirectoryID, $Bitmap, $PathType, $Pathname,
 		%DirectoryParameters) = @_;
 	
@@ -5294,7 +5316,7 @@ A parameter is invalid.
 =back
 
 =cut
-sub FPSetExtAttr($$$$$$$$$) { # {{{1
+sub FPSetExtAttr { # {{{1
 	my($self, $VolumeID, $DirectoryID, $Bitmap, $Offset, $PathType, $Pathname,
 			$Name, $AttributeData) = @_;
 
@@ -5389,7 +5411,7 @@ Volume is ReadOnly.
 =back
 
 =cut
-sub FPSetFileDirParms($$$$$$%) { # {{{1
+sub FPSetFileDirParms { # {{{1
 	my ($self, $VolumeID, $DirectoryID, $Bitmap, $PathType, $Pathname,
 		%DirectoryParameters) = @_;
 
@@ -5547,7 +5569,7 @@ Volume is ReadOnly.
 =back
 
 =cut
-sub FPSetFileParms($$$$$$%) { # {{{1
+sub FPSetFileParms { # {{{1
 	my($self, $VolumeID, $DirectoryID, $Bitmap, $PathType, $Pathname,
 		%DirectoryParameters) = @_;
 
@@ -5694,7 +5716,7 @@ Volume is ReadOnly.
 # it; of course, this may be deprecated, or the documentation may just
 # be leaving something important out (it's been known to happen).
 #### /ERRATA ####
-sub FPSetForkParms($$$$) { # {{{1
+sub FPSetForkParms { # {{{1
 	my ($self, $OForkRefNum, $Bitmap, $ForkLen) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -5769,7 +5791,7 @@ Volume is ReadOnly.
 =back
 
 =cut
-sub FPSetVolParms($$$$) { # {{{1
+sub FPSetVolParms { # {{{1
 	my ($self, $VolumeID, $Bitmap, $BackupDate) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -5806,7 +5828,7 @@ Error replies:
 =back
 
 =cut
-sub FPSyncDir($$$) { # {{{1
+sub FPSyncDir { # {{{1
 	my($self, $VolumeID, $DirectoryID) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -5843,7 +5865,7 @@ Error replies:
 #  byte CommandCode
 #  byte Pad
 #  short OForkRefNum
-sub FPSyncFork($$) { # {{{1
+sub FPSyncFork { # {{{1
 	my($self, $OForkRefNum) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
@@ -5929,7 +5951,7 @@ Session reference numer or open fork reference number is unknown.
 # is a lie, as there is nowhere in the DSI packet for such a value to go that
 # isn't already in use. Maybe it's just a holdover of AppleTalk days...
 #### /ERRATA ####
-sub FPWrite($$$$$$$) { # {{{1
+sub FPWrite { # {{{1
 	my ($self, $Flag, $OForkRefNum, $Offset, $ReqCount, $ForkData_r,
 			$resp_r) = @_;
 
@@ -6024,7 +6046,7 @@ Session reference numer or open fork reference number is unknown.
 =back
 
 =cut
-sub FPWriteExt($$$$$$$) { # {{{1
+sub FPWriteExt { # {{{1
 	my ($self, $Flag, $OForkRefNum, $Offset, $ReqCount, $ForkData_r,
 			$resp_r) = @_;
 
@@ -6070,7 +6092,7 @@ Error replies:
 None.
 
 =cut
-sub FPZzzzz($$) { # {{{1
+sub FPZzzzz { # {{{1
 	my ($self, $Flags) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
