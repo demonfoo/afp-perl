@@ -347,7 +347,8 @@ sub DSIGetStatus {
 sub DSIOpenSession {
 	my ($self) = @_;
 
-	my $optiondata = pack('CC/a*', 1, pack('N', 1024));
+	#my $optiondata = pack('CC/a*', 1, pack('N', 1024));
+	my $optiondata = '';
 	my $sem = undef;
 	my $rc = undef;
 	my $resp = undef;
