@@ -2985,7 +2985,7 @@ Non-AFP error occurred.
 =back
 
 =cut
-sub FPGetSrvrInfo$) { # {{{1
+sub FPGetSrvrInfo { # {{{1
 	# As the die() suggests, this method should never be called directly. It
 	# should be overridden in the inheriting class, since AFP over TCP uses
 	# DSIGetStatus and AFP over ASP (AppleTalk) uses SPGetStatus - it doesn't
