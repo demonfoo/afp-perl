@@ -30,6 +30,11 @@ use constant OP_DSI_TICKLE			=> 5;
 use constant OP_DSI_WRITE			=> 6;
 use constant OP_DSI_ATTENTION		=> 8;
 
+use constant kRequestQuanta			=> 0x00;
+# not sure if this is the canonical name for this option code...
+use constant kAttentionQuanta		=> 0x01;
+use constant kServerReplayCacheSize	=> 0x02;
+
 # This function is the body of our thread. It's a dispatcher arrangement, and
 # it will also send periodic (~30 second interval) keepalive messages to the
 # server side. $shared will contain a shared data structure with an incoming
@@ -37,7 +42,7 @@ use constant OP_DSI_ATTENTION		=> 8;
 # the client through a reference, and completion notification handled via a
 # Thread::Semaphore object.. It also contains a 'running' flag, to allow
 # potential callers to know if the thread is in play or not.
-sub session_thread {
+sub session_thread { # {{{1
 	my($shared, $host, $port) = @_;
 
 	# Set up the connection to the server. Then we need to check that we've
@@ -168,7 +173,7 @@ sub session_thread {
 			${$$handler[2]} = Net::AFP::Result::kFPNoServer;
 			${$$handler[0]}->up();
 	}
-}
+} # }}}1
 
 # Arguments:
 #	$class: The class we're being called against. This class has to be
@@ -218,7 +223,7 @@ sub close { # {{{1
 	my ($self) = @_;
 	$self->{'Shared'}->{'exit'} = 1;
 	$self->{'Dispatcher'}->join();
-} # }}}2
+} # }}}1
 
 # Arguments:
 #	$self:		A Net::DSI::Session instance.
@@ -293,18 +298,18 @@ sub SendMessage { # {{{1
 	$$self{'Shared'}->{'conn_sem'}->up();
 
 	return $reqId;
-} # }}}2
+} # }}}1
 
-sub DSICloseSession {
+sub DSICloseSession { # {{{1
 	my ($self) = @_;
 
 	# Issue the DSICloseSession command to the server. Apparently the
 	# server doesn't have anything to say in response.
 	my $reqId = $self->SendMessage(OP_DSI_CLOSESESSION);
 	return undef;
-}
+} # }}}1
 
-sub DSICommand {
+sub DSICommand { # {{{1
 	my ($self, $message, $resp_r) = @_;
 
 	# Require that the caller includes a reference to stuff a reply block
@@ -317,9 +322,9 @@ sub DSICommand {
 	$sem->down();
 
 	return $rc;
-}
+} # }}}1
 
-sub DSIGetStatus {
+sub DSIGetStatus { # {{{1
 	my ($class, $host, $port, $resp_r) = @_;
 	if (ref($class) ne '') {
 		warn("DSIGetStatus() should NEVER be called against an open DSI context");
@@ -342,39 +347,63 @@ sub DSIGetStatus {
 	$obj->close();
 
 	return $rc;
-}
+} # }}}1
 
-sub DSIOpenSession {
-	my ($self) = @_;
+sub DSIOpenSession { # {{{1
+	my ($self, %options) = @_;
 
-	#my $optiondata = pack('CC/a*', 1, pack('N', 1024));
-	my $optiondata = '';
+	my $options_packed = '';
+	foreach my $key (keys %options) {
+		my $opttype;
+		my $optdata;
+		if ($key eq 'RequestQuanta') {
+			$opttype = kRequestQuanta;
+			$optdata = pack('N', $options{$key});
+		} elsif ($key eq 'AttentionQuanta') {
+			$opttype = kAttentionQuanta;
+			$optdata = pack('N', $options{$key});
+		} elsif ($key eq 'ServerReplayCacheSize') {
+			$opttype = kServerReplayCacheSize;
+			$optdata = pack('N', $options{$key});
+		} else {
+			die('Unknown option key ' . $key);
+		}
+		$options_packed .=  pack('CC/a*', $opttype, $optdata);
+	}
+
 	my $sem = undef;
 	my $rc = undef;
 	my $resp = undef;
-	my $reqId = $self->SendMessage(OP_DSI_OPENSESSION, $optiondata, undef,
+	my $reqId = $self->SendMessage(OP_DSI_OPENSESSION, $options_packed, undef,
 			\$sem, \$resp, \$rc);
 	return $reqId if $reqId < 0;
 	$sem->down();
-	if (length($resp) > 0) {
-		my($optionType, $optionData) = unpack('CC/a', $resp);
-		if (length($optionData) == 4) {
-			($$self{'serverQuantum'}) = unpack('N', $optionData);
+	
+	my %rcvd_opts;
+	while (length($resp) > 0) {
+		my ($opttype, $optdata) = unpack('CC/a', $resp);
+		if ($opttype == kRequestQuanta) {
+			$rcvd_opts{'RequestQuanta'} = unpack('N', $optdata);
+		} elsif ($opttype == kAttentionQuanta) {
+			$rcvd_opts{'AttentionQuanta'} = unpack('N', $optdata);
+		} elsif ($opttype == kServerReplayCacheSize) {
+			$rcvd_opts{'ServerReplayCacheSize'} = unpack('N', $optdata);
 		}
+		$resp = substr($resp, 2 + length($optdata));
 	}
-	return $rc;
-}
+	return wantarray ? ($rc, %rcvd_opts) : $rc;
+} # }}}1
 
 # This issues a keep-alive message to the server. This really needs to be
 # done on a regular basis - hence why I want to have a separate thread to
 # do dispatch duty, so it can handle things like that.
-sub DSITickle {
+sub DSITickle { # {{{1
 	my ($self) = @_;
 
 	my $reqId = $self->SendMessage(OP_DSI_TICKLE);
-}
+} # }}}1
 
-sub DSIWrite {
+sub DSIWrite { # {{{1
 	# This should only be used for FPWrite and FPAddIcon
 	my ($self, $message, $data_r, $resp_r) = @_;
 
@@ -385,7 +414,7 @@ sub DSIWrite {
 	return $reqId if $reqId < 0;
 	$sem->down();
 	return $rc;
-}
+} # }}}1
 
 1;
-# vim: ts=4
+# vim: ts=4 fdm=marker
