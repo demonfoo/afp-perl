@@ -30,9 +30,12 @@ sub ChangePassword {
 	die('Object MUST be of type Net::AFP::Connection!')
 			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
 
-	# FIXME: We'll have to do this the right way for pre-AFP 3.0 stacks.
-	# The docs say that 3.0 and up expect an empty username.
-	return $session->FPChangePassword(UAMNAME, '', pack('a8', $newPassword));
+	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
+				Net::AFP::Versions::AtLeast)) {
+		$username = '';
+	}
+	return $session->FPChangePassword(UAMNAME, $username,
+			pack('a8', $newPassword));
 }
 
 1;

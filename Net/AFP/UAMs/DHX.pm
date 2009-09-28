@@ -28,6 +28,7 @@ use Net::AFP::Result;
 # non-threaded to threaded changeover hoses it, so don't create Math::BigInt
 # objects until after threads are started.
 use Math::BigInt lib => 'GMP';
+use Net::AFP::Versions;
 use strict;
 use warnings;
 
@@ -207,9 +208,13 @@ sub ChangePassword {
 	print '$authinfo is 0x', unpack('H*', $authinfo), "\n"
 			if defined $::__AFP_DEBUG;
 	my $resp = undef;
-	# FIXME: We'll have to do this the right way for pre-AFP 3.0 stacks.
-	# The docs say that 3.0 and up expect an empty username.
-	my $rc = $session->FPChangePassword(UAMNAME, '', $authinfo, \$resp);
+
+	# Username is always an empty string with AFP 3.0 and up.
+	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
+				Net::AFP::Versions::AtLeast)) {
+		$username = '';
+	}
+	my $rc = $session->FPChangePassword(UAMNAME, $username, $authinfo, \$resp);
 	undef $authinfo;
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
@@ -279,11 +284,9 @@ sub ChangePassword {
 			if defined $::__AFP_DEBUG;
 
 	# Send the response back to the server, and hope we did this right.
-	# FIXME: We'll have to do this the right way for pre-AFP 3.0 stacks.
-	# The docs say that 3.0 and up expect an empty username.
 	$message = pack('na*', $ID, $ciphertext);
 	undef $ciphertext;
-	$rc = $session->FPChangePassword(UAMNAME, '', $message);
+	$rc = $session->FPChangePassword(UAMNAME, $username, $message);
 	undef $message;
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;

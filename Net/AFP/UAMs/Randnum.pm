@@ -71,9 +71,11 @@ sub ChangePassword {
 
 	# Send the message to the server, and pass the return code directly
 	# back to the caller.
-	# FIXME: We'll have to do this the right way for pre-AFP 3.0 stacks.
-	# The docs say that 3.0 and up expect an empty username.
-	my $rc = $session->FPChangePassword(UAMNAME, '', $message);
+	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
+				Net::AFP::Versions::AtLeast)) {
+		$username = '';
+	}
+	my $rc = $session->FPChangePassword(UAMNAME, $username, $message);
 	undef $message;
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;

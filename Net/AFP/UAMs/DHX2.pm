@@ -318,9 +318,12 @@ sub ChangePassword {
 	$nonce_limit->blsft(128);
 
 	my $resp = undef;
-	# FIXME: We'll have to do this the right way for pre-AFP 3.0 stacks.
-	# The docs say that 3.0 and up expect an empty username.
-	my $rc = $session->FPChangePassword(UAMNAME, '', undef, \$resp);
+
+	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
+				Net::AFP::Versions::AtLeast)) {
+		$username = '';
+	}
+	my $rc = $session->FPChangePassword(UAMNAME, $username, undef, \$resp);
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
 	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
@@ -416,7 +419,7 @@ sub ChangePassword {
 	# Send the message to the server containing Ma (our "public key"), and
 	# the encrypted nonce value.
 	my $sresp = '';
-	$rc = $session->FPChangePassword(UAMNAME, '', $message, \$sresp);
+	$rc = $session->FPChangePassword(UAMNAME, $username, $message, \$sresp);
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
 	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
@@ -479,7 +482,7 @@ sub ChangePassword {
 	undef $ciphertext;
 
 	# Send the response back to the server, and hope we did this right.
-	$rc = $session->FPChangePassword('DHX', '', $message);
+	$rc = $session->FPChangePassword('DHX', $username, $message);
 	undef $message;
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
