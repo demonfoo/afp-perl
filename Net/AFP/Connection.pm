@@ -1520,9 +1520,6 @@ A non-AFP error occurred.
 =back
 
 =cut
-# FIXME: wtf, documentation is all f'd up and inconsistent... wtf is this
-# crap. what is $Type? documentation says it's a short, then shows it as
-# one byte in the message diagram. what's the deal here?
 sub FPDisconnectOldSession {
 	my($self, $Type, $Token) = @_;
 
@@ -3056,7 +3053,22 @@ sub FPGetSrvrMsg { # {{{1
 	my $rc = $self->SendAFPMessage(pack('Cxnn', kFPGetSrvrMsg, $MessageType,
 			$MessageBitmap), \$resp);
 	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
-	# FIXME: Need to figure out the right way to parse this response...
+	my ($Length, $ServerMessage);
+	if ($MessageBitmap & 0x2) { # bit 1; means send message as UTF8
+		($Length, $MessageType, $MessageBitmap, $ServerMessage) =
+				unpack('nnna*', $resp);
+		$ServerMessage = decode_utf8($ServerMessage);
+	} else { # not UTF8, just a plain pstring (?)
+		($MessageType, $MessageBitmap, $ServerMessage) =
+				unpack('nnC/a', $resp);
+		$Length = length($ServerMessage);
+	}
+	$$resp_r = {
+				 'MessageType'		=> $MessageType,
+				 'MessageBitmap'	=> $MessageBitmap,
+				 'ServerMessage'	=> $ServerMessage,
+				 'Length'			=> $Length,
+			   };
 	return $rc;
 } # }}}1
 
