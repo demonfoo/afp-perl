@@ -26,6 +26,7 @@ use Net::AFP::Result;
 # cryptographic exchanges and derivation of the key.
 use Math::BigInt lib => 'GMP';
 use Digest::MD5 qw(md5);
+use Net::AFP::Versions;
 use strict;
 use warnings;
 

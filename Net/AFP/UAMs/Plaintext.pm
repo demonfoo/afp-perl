@@ -4,6 +4,7 @@
 package Net::AFP::UAMs::Plaintext;
 use constant UAMNAME => 'Cleartxt Passwrd';
 
+use Net::AFP::Versions;
 use strict;
 use warnings;
 

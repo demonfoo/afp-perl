@@ -7,6 +7,7 @@ use constant UAMNAME => 'Randnum exchange';
 
 use Crypt::DES;
 use Net::AFP::Result;
+use Net::AFP::Versions;
 use strict;
 use warnings;
 
