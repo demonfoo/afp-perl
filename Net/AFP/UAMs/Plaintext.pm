@@ -5,6 +5,7 @@ package Net::AFP::UAMs::Plaintext;
 use constant UAMNAME => 'Cleartxt Passwrd';
 
 use Net::AFP::Versions;
+use Net::AFP::Result;
 use strict;
 use warnings;
 
@@ -20,8 +21,20 @@ sub Authenticate {
 	die('Password callback MUST be a subroutine ref')
 			unless ref($pw_cb) eq 'CODE';
 
-	my $authinfo = substr(pack('xC/a*x![s]a8', $username, &$pw_cb()), 1);
-	return $session->FPLogin($AFPVersion, UAMNAME, $authinfo);
+	my $pw_data = pack('a8', &$pw_cb());
+	my $rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, $username, 3, '',
+			$pw_data);
+	print 'FPLoginExt() completed with result code ', $rc, "\n"
+			if defined $::__AFP_DEBUG;
+
+	if ($rc == Net::AFP::Result::kFPCallNotSupported) {
+		my $authinfo = substr(pack('xC/a*x![s]a8', $username, $pw_data), 1);
+		$rc = $session->FPLogin($AFPVersion, UAMNAME, $authinfo);
+		print 'FPLogin() completed with result code ', $rc, "\n"
+				if defined $::__AFP_DEBUG;
+	}
+
+	return $rc;
 }
 
 sub ChangePassword {

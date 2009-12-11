@@ -19,7 +19,16 @@ sub Authenticate {
 	die("Object MUST be of type Net::AFP::Connection!")
 			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
 	
-	return $session->FPLogin($AFPVersion, UAMNAME, '');
+	my $rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, '', 3, '');
+	print 'FPLoginExt() completed with result code ', $rc, "\n"
+			if defined $::__AFP_DEBUG;
+
+	if ($rc == Net::AFP::Result::kFPCallNotSupported) {
+		$rc = $session->FPLogin($AFPVersion, UAMNAME, '');
+		print 'FPLogin() completed with result code ', $rc, "\n"
+	}
+
+	return $rc;
 }
 
 1;
