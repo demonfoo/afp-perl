@@ -11,11 +11,11 @@ use constant kFPShortNameBit		=> 0x0080;
 use constant kFPNodeIDBit			=> 0x0100;
 use constant kFPDataForkLenBit		=> 0x0200;
 use constant kFPRsrcForkLenBit		=> 0x0400;
-use constant kFPExtDataForkLenBit	=> 0x0800;
+use constant kFPExtDataForkLenBit	=> 0x0800; # AFP >= 3.0
 use constant kFPLaunchLimitBit		=> 0x1000;
-use constant kFPUTF8NameBit			=> 0x2000;
-use constant kFPExtRsrcForkLenBit	=> 0x4000;
-use constant kFPUnixPrivsBit		=> 0x8000;
+use constant kFPUTF8NameBit			=> 0x2000; # AFP >= 3.0
+use constant kFPExtRsrcForkLenBit	=> 0x4000; # AFP >= 3.0
+use constant kFPUnixPrivsBit		=> 0x8000; # AFP >= 3.0
 
 1;
 # vim: ts=4
