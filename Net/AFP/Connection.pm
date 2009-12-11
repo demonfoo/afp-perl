@@ -59,7 +59,6 @@
 #   thread main loop) to work around this.
 
 # Unimplemented functions:
-#  - FP{Add,Get,Remove}APPL
 #  - FPCatSearch{,Ext}
 #  - FPExchangeFiles
 
@@ -337,7 +336,68 @@ Adds an APPL mapping to the Desktop database.
 
 Deprecated as of Mac OS X 10.6.
 
-Not yet implemented.
+Arguments:
+
+=over
+
+=item $self
+
+An object that is a subclass of Net::AFP::Connection.
+
+=item $DTRefNum
+
+Desktop database reference number.
+
+=item $DirectoryID
+
+Directory ID.
+
+=item $FileCreator
+
+File creator of the application corresponding to the APPL mapping being
+added.
+
+=item $ApplTag
+
+User-defined tag stored with the APPL mapping.
+
+=item $PathType
+
+Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+possible values.
+
+=item $Pathname
+
+Pathname to desired file or directory.
+
+=back
+
+Error replies:
+
+=over
+
+=item kFPAccessDenied
+
+User does not have the access privileges required to add an APPL mapping.
+
+=item kFPMiscErr
+
+Non-AFP error occurred.
+
+=item kFPObjectNotFound
+
+Input parameters do not point to an existing file.
+
+=item kFPObjectTypeErr
+
+Input parameters point to a directory.
+
+=item kFPParamErr
+
+Session reference or Desktop database reference number is unknown;
+pathname is invalid.
+
+=back
 
 =cut
 sub FPAddAPPL {
@@ -417,7 +477,7 @@ sub FPAddComment { # {{{1
 
 =item FPAddIcon()
 
-Adds an an icon bitmap to a volume's Desktop database.
+Adds an icon bitmap to a volume's Desktop database.
 
 Deprecated as of Mac OS X 10.6.
 
@@ -477,17 +537,19 @@ Non-AFP error occurred.
 =cut
 sub FPAddIcon {
 	my($self, $DTRefNum, $FileCreator, $FileType, $IconType, $IconTag,
-			$BitmapSize) = @_;
+			$BitmapSize, $IconBitmap) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	my $msg = pack('CxnNNCxNn', kFPAddIcon, $DTRefNum, $FileCreator, $FileType,
 			$IconType, $IconTag, $BitmapSize);
-	return $self->SendAFPMessage($msg);
+	return $self->SendAFPWrite($msg, \$IconBitmap);
 }
 
 =item FPByteRangeLock()
 
 Locks or unlocks a specified range of bytes within an open fork.
+
+Deprecated; use C<FPByteRangeLockExt()> instead.
 
 Arguments:
 
@@ -673,6 +735,8 @@ sub FPByteRangeLockExt { # {{{1
 
 Searches a volume for files and directories that match specified criteria.
 
+Deprecated; use C<FPCatSearchExt()> instead.
+
 Not yet implemented.
 
 =cut
@@ -792,6 +856,8 @@ sub FPChangePassword { # {{{1
 =item FPCloseDir()
 
 Closes a directory and invalidates its Directory ID.
+
+Deprecated; variable directory IDs are no longer supported.
 
 Arguments:
 
@@ -1254,6 +1320,10 @@ sub FPCreateFile { # {{{1
 
 Creates a unique File ID for a file.
 
+Deprecated; Mac OS X AFP clients assume that all files and directories
+have assigned IDs that are unique and are not reused when the item is
+deleted.
+
 Arguments:
 
 =over
@@ -1418,6 +1488,10 @@ sub FPDelete { # {{{1
 
 Invalidates all instances of the specified File ID.
 
+Deprecated; Mac OS X AFP clients assume that all files and directories
+have assigned IDs that are unique and are not reused when the item is
+deleted.
+
 Arguments:
 
 =over
@@ -1497,7 +1571,7 @@ An object that is a subclass of Net::AFP::Connection.
 
 =item $Type
 
-Volume ID. (?)
+Reserved; currently always zero (0).
 
 =item $Token
 
@@ -1532,6 +1606,8 @@ sub FPDisconnectOldSession {
 =item FPEnumerate()
 
 List the contents of a directory.
+
+Deprecated; use C<FPEnumerateExt2()> instead.
 
 Arguments:
 
@@ -1689,6 +1765,8 @@ sub FPEnumerate { # {{{1
 =item FPEnumerateExt()
 
 Lists the contents of a directory.
+
+Deprecated; use C<FPEnumerateExt2()> instead.
 
 Arguments:
 
@@ -2287,6 +2365,8 @@ sub FPGetAPPL {
 =item FPGetAuthMethods()
 
 Get the UAMs that an Open Directory domain supports.
+
+Deprecated (?).
 
 Arguments:
 
@@ -3131,8 +3211,8 @@ sub FPGetSrvrParms { # {{{1
 		# bit; ethereal seems to think it's the second bit, not the high
 		# bit. I'll have to see how to turn that on somewhere to find out.
 		# Also, looks like the HasUNIXPrivs bit is gone as of AFP 3.2...
-		push(@{$data->{'Volumes'}}, { 'HasUNIXPrivs'	=> $flags & 0x02,
-									  'HasPassword'		=> $flags & 0x01,
+		push(@{$data->{'Volumes'}}, { 'HasPassword'		=> $flags & 0x80,
+									  'HasConfigInfo'	=> $flags & 0x01,
 									  'VolName'			=> $volname } );
 	}
 	$$resp_r = $data;
@@ -3152,21 +3232,28 @@ Arguments:
 
 An object that is a subclass of Net::AFP::Connection.
 
+=item $Flags
+
+If the lowest bit (0x1) is set (the C<ThisUser> flag), information is
+obtained about the current user and the C<$UserID> field is ignored.
+
 =item $UserID
 
-A numeric user ID representing the user to get
-information about. It currently does nothing.
+ID of user for whom information is to be retrieved. (Not valid if the
+C<ThisUser> bit is set in the C<$Flags> field.)
+
+This field is deprecated for security reasons. The C<ThisUser> bit should
+always be set in the flags field.
 
 =item $Bitmap
 
-Set bit 0 to get the user ID of the currently logged
-in user. Set bit 1 to get the primary group ID of the
-currently logged in user.
+Bitmap describing which IDs to retrieve, where bit zero (0x1) is set to get
+the user’s User ID, bit 1 (0x2) is set to get the user’s Primary Group ID,
+and bit 2 (0x4) is set to get the user’s UUID.
 
 =item $resp_r
 
-A scalar reference to contain a hash ref, which will
-contain returned data.
+A scalar reference to contain a hash ref, which will contain returned data.
 
 =back
 
@@ -3198,20 +3285,31 @@ Non-AFP error occurred.
 
 =item kFPParamErr
 
-ThisUser bit is not set. (Should never happen.)
+ThisUser bit is not set.
+
+=item kFPPwdExpiredErr
+
+User’s password has expired. User is required to change his or her password.
+The user is logged on but can only change his or her password or log out.
+
+=item kFPPwdNeedsChangeErr
+
+User’s password needs to be changed. User is required to change his or her
+password. The user is logged on but can only change his or her password or
+log out.
 
 =back
 
 =cut
 sub FPGetUserInfo { # {{{1
-	my ($self, $UserID, $Bitmap, $resp_r) = @_;
+	my ($self, $Flags, $UserID, $Bitmap, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	die('$resp_r must be a scalar ref')
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 
 	my $resp;
-	my $rc = $self->SendAFPMessage(pack('CCNn', kFPGetUserInfo, 1, $UserID,
+	my $rc = $self->SendAFPMessage(pack('CCNn', kFPGetUserInfo, $Flags, $UserID,
 			$Bitmap), \$resp);
 
 	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
@@ -3219,13 +3317,17 @@ sub FPGetUserInfo { # {{{1
 	my $rbmp = unpack('n', $resp);
 	my $offset = 2;
 	$resp_r = {};
-	if ($rbmp & 0x0001) { # Get User ID bit
-		$resp_r->{'UserID'} = unpack('x' . $offset . 'N', $resp);
+	if ($rbmp & 0x1) { # Get User ID bit
+		$$resp_r{'UserID'} = unpack('x[' . $offset . ']N', $resp);
 		$offset += 4;
 	}
-	if ($rbmp & 0x0002 and length($resp) > $offset) {
-		$resp_r->{'PrimaryGroupID'} = unpack('x' . $offset . 'N', $resp);
+	if ($rbmp & 0x2) {
+		$$resp_r{'PrimaryGroupID'} = unpack('x[' . $offset . ']N', $resp);
 		$offset += 4;
+	}
+	if ($rbmp & 0x4) {
+		$$resp_r{'UUID'} = uuid_unpack(unpack('x['.$offset.']a[16]', $resp));
+		$offset += 16;
 	}
 
 	return $rc;
@@ -3412,6 +3514,8 @@ sub FPListExtAttrs { # {{{1
 =item FPLogin()
 
 Establishes a session with a server.
+
+Deprecated in AFP 3.x; use C<FPLoginExt()> instead.
 
 Arguments:
 
@@ -4093,6 +4197,8 @@ sub FPMoveAndRename { # {{{1
 Opens a directory on a variable Directory ID volume and returns its
 Directory ID.
 
+Deprecated in Mac OS X.
+
 Arguments:
 
 =over
@@ -4458,6 +4564,8 @@ sub FPOpenVol { # {{{1
 
 Reads a block of data.
 
+Deprecated; use C<FPReadExt()> instead.
+
 Arguments:
 
 =over
@@ -4629,7 +4737,64 @@ Removes an APPL mapping from a volume's Desktop database.
 
 Deprecated as of Mac OS X 10.6.
 
-Not yet implemented.
+Arguments:
+
+=over
+
+=item $self
+
+An object that is a subclass of Net::AFP::Connection.
+
+=item $DTRefNum
+
+Desktop database reference number.
+
+=item $DirectoryID
+
+Directory ID.
+
+=item $FileCreator
+
+File creator of the application corresponding to the APPL mapping that
+is to be removed.
+
+=item $PathType
+
+Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+possible values.
+
+=item $Pathname
+
+Pathname to desired file or directory.
+
+=back
+
+Error replies:
+
+=over
+
+=item kFPAccessDenied
+
+User does not have the access privileges required to use this command.
+
+=item kFPItemNotFound
+
+No APPL mapping corresponding to the input parameters was found in the
+Desktop database.
+
+=item kFPMiscErr
+
+Non-AFP error occurred.
+
+=item kFPObjectNotFound
+
+Input parameters do not point to an existing file.
+
+=item kFPParamErr
+
+Session reference or Desktop database reference number is unknown.
+
+=back
 
 =cut
 sub FPRemoveAPPL {
@@ -4996,7 +5161,7 @@ Bits that specify the values that are to be set. Specify C<kFileSec_UUID>
 to set the UUID of the specified file or directory. Specify
 C<kFileSec_GRPUUID> to set the Group UUID of the specified file or
 directory. Specify C<kFileSec_ACL> to set the ACL of the specified file
-or directory or C<kFileSec_REMOVEACL> to remove the file or directory’s
+or directory or C<kFileSec_REMOVEACL> to remove the file or directory's
 ACL. If sending this command is part of the creation of a new item, set
 the C<kFileSec_Inherit> bit. When the server receives an L</FPSetACL>
 command having a Bitmap parameter in which the C<kFileSec_Inherit> bit
@@ -5887,6 +6052,8 @@ sub FPSyncFork { # {{{1
 =item FPWrite()
 
 Write a block of data to an open fork.
+
+Deprecated; use C<FPWriteExt()> instead.
 
 Arguments:
 
