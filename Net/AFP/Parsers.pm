@@ -197,6 +197,7 @@ sub _ParseSrvrInfo { # {{{1
 			[unpack("x" . $afpvers_off . "C/(C/a)", $data)];
 	$$resp{'UAMs'} = [unpack("x" . $uams_off . "C/(C/a)", $data)];
 
+	# The server icon is now deprecated.
 	my (@icon_data, @icon_mask);
 	if ($icon_off > 0) {
 		# Convert the binary icon image into a transparent XPM. This makes it
@@ -267,6 +268,7 @@ _EOT_
 			# Apple's docs say this is a packed IP and port; the netatalk
 			# docs, however, indicate this is a string containing an FQDN
 			# hostname. Wouldn't be the first time Apple's docs lied.
+			# This type is deprecated.
 			#print "SSH tunnel type - not sure what needs to be added to handle this right\n";
 			#my($addr, $port) = unpack('a4n', $packed);
 			$$addrEnt{'hostname'} = $packed;
