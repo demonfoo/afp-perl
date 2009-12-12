@@ -4,14 +4,13 @@
 use strict;
 use warnings;
 
-use lib qw(/home/demon/libafp);
 use Net::AFP::ACL;
 use File::ExtAttr qw(:all);
 use Getopt::Long;
 use Encode;
 use POSIX qw(EINVAL ENOENT EACCES EBADF EPERM EOPNOTSUPP);
 sub ENODATA { return 61; }	# need this error constant for extended
-								# attribute operations
+							# attribute operations
 # }}}1
 
 # define constants {{{1
@@ -222,11 +221,18 @@ if (defined $remove) { # {{{1
 			# for the rights to be removed.
 			foreach my $entry (@$acl) {
 				next unless $$ace{'UTF8Name'} eq $$entry{'UTF8Name'};
+				# If the Bitmap field is nonzero (this determines if the
+				# entry is about a user or group)...
 				if ($$ace{'Bitmap'} != 0) {
+					# Then make sure the bitmaps match, otherwise they're not
+					# *really* about the same thing.
 					next unless $$ace{'Bitmap'} == $$entry{'Bitmap'};
 				}
+				# Make sure the ACE we're looking at modifying indicates
+				# taking the same kind of action.
 				next unless $$ace{'ace_flags'} ==
 						($$entry{'ace_flags'} & Net::AFP::ACL::KAUTH_ACE_KINDMASK);
+				# Looks good, add the additional rights we want to the mask.
 				$$entry{'ace_rights'} &= ~$$ace{'ace_rights'};
 			}
 			# Prune out any empty ACEs from the list.
@@ -273,11 +279,9 @@ elsif (defined $add) { # {{{1
 				unless (defined $first_allow) {
 					$first_allow = $i;
 				}
-			} else {
-				if (defined $first_allow) {
-					$non_canonical = 1;
-					last;
-				}
+			} elsif (defined $first_allow) {
+				$non_canonical = 1;
+				last;
 			}
 
 			# See if this entry matches the subject and type of the
@@ -291,7 +295,7 @@ elsif (defined $add) { # {{{1
 			}
 		} # }}}3
 		if ($non_canonical) {
-			print "The file \"", $file, "\" does not have an ACL in canonical order; use --insert instead.\n";
+			print "The file:\n\n\t", $file, "\n\ndoes not have an ACL in canonical order; use --insert instead.\n";
 			next;
 		}
 
@@ -373,7 +377,7 @@ elsif (scalar(@replace)) { # {{{1
 		}
 		# If the offset points to an entry that doesn't exist, then give up
 		# and move on to the next file.
-		if ($offset > scalar($#$acl)) {
+		if ($offset > $#$acl) {
 			print "Cannot replace ACL entry at offset ", $offset,
 					" for file \"", $file, "\"; offset too large\n";
 			next;
