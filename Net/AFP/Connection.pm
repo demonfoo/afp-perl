@@ -60,7 +60,6 @@
 
 # Unimplemented functions:
 #  - FPCatSearch{,Ext}
-#  - FPExchangeFiles
 
 # imports {{{1
 package Net::AFP::Connection;
@@ -2076,14 +2075,93 @@ sub FPEnumerateExt2 { # {{{1
 
 =item FPExchangeFiles()
 
-Preserves existing File IDs when performing a Save or a Save As operation.
+Exchanges file metadata between two files.
 
-Not yet implemented.
+Arguments:
+
+=over
+
+=item $self
+
+An object that is a subclass of Net::AFP::Connection.
+
+=item $VolumeID
+
+Volume ID.
+
+=item $SrcDirID
+
+Identifier of the directory containing the source file.
+
+=item $DstDirID
+
+Identifier of the directory containing the destination file.
+
+=item $SrcPathType
+
+Type of names in C<$SrcPathname>. See L</"Path Type Constants"> for
+possible values.
+
+=item $SrcPathname
+
+Pathname of the source file.
+
+=item $DstPathType
+
+Type of names in C<$SrcPathname>. See L</"Path Type Constants"> for
+possible values.
+
+=item $DstPathname
+
+Pathname of the destination file.
+
+=back
+
+Error replies:
+
+=over
+
+=item kFPAccessDenied
+
+User does not have the access privileges required to use this command.
+
+=item kFPBadIDErr
+
+File ID is not valid.
+
+=item kFPCallNotSupported
+
+Server does not support this command.
+
+=item kFPIDNotFound
+
+File ID was not found. (No file thread exists.)
+
+=item kFPMiscErr
+
+Non-AFP error occurred.
+
+=item kFPObjectTypeErr
+
+Object defined was a directory, not a file.
+
+=item kFPParamErr
+
+Session reference number, Volume ID, or pathname type is unknown; pathname
+is null or bad.
+
+=back
 
 =cut
 sub FPExchangeFiles {
+	my ($self, $VolumeID, $SrcDirID, $DstDirID, $SrcPathType, $SrcPathname,
+			$DstPathType, $DstPathname) = @_;
+
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
-	die('Not yet implemented');
+	my $msg = pack('CxnNNa*a*', kFPExchangeFiles, $VolumeID, $SrcDirID,
+			$DstDirID, PackagePath($SrcPathType, $SrcPathname),
+			PackagePath($DstPathType, $DstPathname));
+	return $self->SendAFPMessage($msg);
 }
 
 =item FPFlush()
