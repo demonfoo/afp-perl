@@ -29,8 +29,8 @@ eval { require Data::UUID; };
 if ($@) { $has_Data_UUID = 0; }
 
 use Getopt::Long;				# for parsing command line options
-use POSIX qw(EACCES EBADF EBUSY EEXIST EINVAL EISDIR EMFILE ENODEV
-			 ENOENT ENOSPC ENOSYS ENOTDIR ENOTEMPTY EPERM EROFS ESPIPE
+use POSIX qw(EACCES EBADF EBUSY EEXIST EINVAL EISDIR EMFILE ENODEV ENOENT
+			 ENOSPC ENOSYS ENOTDIR ENOTEMPTY EOPNOTSUPP EPERM EROFS ESPIPE
 			 ETXTBSY EOPNOTSUPP EIO O_RDONLY O_WRONLY O_RDWR O_ACCMODE);
 use Fcntl qw(:mode);			# macros and constants related to symlink
 								# checking code
@@ -73,22 +73,22 @@ my $DTRefNum = undef;
 our %ofilecache = ();
 
 # Set up the pattern to use for breaking the AFP URL into its components.
-my $ipv4_byte	= '(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2(?:[0-4][0-9]|5[0-5]))';
-my $v6grp_p		= '[0-9a-f]{1,4}';
+my $ipv4_byte	= qr/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2(?:[0-4][0-9]|5[0-5]))/;
+my $v6grp_p		= qr/[0-9a-f]{1,4}/i;
 my @ipv6_patterns = (
-		'(?:' . $v6grp_p . ':){7}(?:' . $v6grp_p . ')?',
-		'(?:' . $v6grp_p . ')?:(?::' . $v6grp_p . '){1,6}',
-		'(?:' . $v6grp_p . ':){2}(?::' . $v6grp_p . '){1,5}',
-		'(?:' . $v6grp_p . ':){3}(?::' . $v6grp_p . '){1,4}',
-		'(?:' . $v6grp_p . ':){4}(?::' . $v6grp_p . '){1,3}',
-		'(?:' . $v6grp_p . ':){5}(?::' . $v6grp_p . '){1,2}',
-		'(?:' . $v6grp_p . ':){6}:' . $v6grp_p,
-		'(?:' . $v6grp_p . ':){1,6}:',
+		qr/(?:$v6grp_p:){7}(?:$v6grp_p)?/,
+		qr/(?:$v6grp_p)?:(?::$v6grp_p){1,6}/,
+		qr/(?:$v6grp_p:){2}(?::$v6grp_p){1,5}/,
+		qr/(?:$v6grp_p:){3}(?::$v6grp_p){1,4}/,
+		qr/(?:$v6grp_p:){4}(?::$v6grp_p){1,3}/,
+		qr/(?:$v6grp_p:){5}(?::$v6grp_p){1,2}/,
+		qr/(?:$v6grp_p:){6}:$v6grp_p/,
+		qr/(?:$v6grp_p:){1,6}:/,
 		# IPv4-in-IPv6 addressing style, with zero-fill
-		'(?:0{1,4}:){5}(?:0|ffff):(?:' . $ipv4_byte . '\.){3}' . $ipv4_byte,
+		qr/(?:0{1,4}:){5}(?:0|ffff):(?:$ipv4_byte\.){3}$ipv4_byte/,
 		# IPv4-in-IPv6 addressing style, without zero-fill
-		'::(?:ffff:)?(?:' . $ipv4_byte . '\.){3}' . $ipv4_byte);
-my $ipv6_pattern = join('|', @ipv6_patterns);
+		qr/::(?:ffff:)?(?:$ipv4_byte\.){3}$ipv4_byte/);
+#my $ipv6_pattern = join('|', @ipv6_patterns);
 
 # FIXME: need to add IPv6 address handling to the AFP URL stuff...
 my $afp_url_pattern = qr/^(afp):\/(at)?\/(?:([^:\@\/;]*)(?:;AUTH=([^:\@\/;]+))?(?::([^:\@\/;]*))?\@)?([^:\/\@;]+)(?::([^:\/\@;]+))?(?:\/(?:([^:\/\@;]+)(\/.*)?)?)?$/;
@@ -127,6 +127,80 @@ sub urlencode { # {{{1
 	}
 	return $string;
 } # }}}1
+
+# Helper function to convert an AFP ACL into a format that is consumable
+# by afp_acl.pl (the tool for manipulating ACLs on an AFP share).
+sub acl_to_xattr {
+	my ($session, $acldata) = @_;
+
+	my @acl_parts;
+	foreach my $entry (@{$$acldata{'acl_ace'}}) {
+		my $name;
+		# map the UUID (this actually works for both user and group
+		# UUIDs, the FPMapID docs are useless) to a corresponding
+		# user or group name.
+		my $rc = $session->FPMapID(
+				Net::AFP::MapParms::kUserUUIDToUTF8Name,
+				$$entry{'ace_applicable'}, \$name);
+		return -&EBADF if $rc != Net::AFP::Result::kFPNoErr;
+		push(@acl_parts, pack('LS/aLL', $$name{'Bitmap'},
+				encode_utf8($$name{'UTF8Name'}),
+				@$entry{'ace_flags', 'ace_rights'}));
+	}
+	# Pack the ACL into a single byte sequence, and push it to
+	# the client.
+	return pack('LS/(a*)', $$acldata{'acl_flags'}, @acl_parts);
+}
+
+# Helper function to convert a byte-string form ACL from the ACL update client
+# into the structured form to be sent to the server.
+sub acl_from_xattr {
+	my ($session, $raw_xattr, $acl_data) = @_;
+
+	# unpack the ACL from the client, so we can structure it to be handed
+	# up to the AFP server
+	my($acl_flags, @acl_parts) = unpack('NS/(LS/aLL)', $raw_xattr);
+	my @entries;
+	while (scalar(@acl_parts) > 0) {
+		my $entry = {};
+		my $bitmap = shift(@acl_parts);
+		my $utf8name = decode_utf8(shift(@acl_parts));
+		my($uuid, $rc);
+		# do the appropriate type of name lookup based on the attributes
+		# given in the bitmap field.
+		if ($bitmap == Net::AFP::ACL::kFileSec_UUID) {
+			$rc = $session->FPMapName(
+					Net::AFP::MapParms::kUTF8NameToUserUUID, $utf8name,
+					\$uuid);
+		} elsif ($bitmap == Net::AFP::ACL::kFileSec_GRPUUID) {
+			$rc = $session->FPMapName(
+					Net::AFP::MapParms::kUTF8NameToGroupUUID, $utf8name,
+					\$uuid);
+		} else {
+			$rc = $session->FPMapName(
+					Net::AFP::MapParms::kUTF8NameToUserUUID, $utf8name,
+					\$uuid);
+			if ($rc == Net::AFP::Result::kFPItemNotFound) {
+				$rc = $session->FPMapName(
+						Net::AFP::MapParms::kUTF8NameToGroupUUID, $utf8name,
+						\$uuid);
+			}
+		}
+		# if we can't map a name to a UUID, then just tell the client
+		# that we can't proceed.
+		return -&EINVAL if $rc != Net::AFP::Result::kFPNoErr;
+
+		$$entry{'ace_applicable'} = $uuid;
+		$$entry{'ace_flags'} = shift(@acl_parts);
+		$$entry{'ace_rights'} = shift(@acl_parts);
+		push(@entries, $entry);
+	}
+	$$acl_data = {
+				'acl_ace'	=> [ @entries ],
+				'acl_flags'	=> $acl_flags,
+			  };
+	return 0;
+}
 
 @values{@args} = $path =~ $afp_url_pattern;
 foreach (keys(%values)) { $values{$_} = urldecode($values{$_}); }
@@ -326,6 +400,18 @@ if (defined $values{'username'}) {
 	}
 } # }}}1
 
+# Since AFP presents pre-localized times for everything, we need to get
+# the server's time offset, and compute the difference between that and
+# our timestamp, to appropriately apply time localization.
+my $srvParms;
+$rc = $afpSession->FPGetSrvrParms(\$srvParms);
+if ($rc != Net::AFP::Result::kFPNoErr) {
+	print "Couldn't get server params\n";
+	syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, &EACCES));
+	exit(1);
+}
+my $timedelta = time() - $$srvParms{'ServerTime'};
+
 # Open the volume indicated at start time, and abort if the server bitches
 # at us.
 # open volume {{{1
@@ -520,11 +606,11 @@ sub afp_getattr { # {{{1
 		# file size in bytes
 		$$resp{'FileIsDir'} ? 4096 : $$resp{$DForkLenKey},
 		# last accessed time
-		$$resp{'ModDate'},
+		$$resp{'ModDate'} + $timedelta,
 		# data modified time
-		$$resp{'ModDate'},
+		$$resp{'ModDate'} + $timedelta,
 		# inode changed time
-		$$resp{'CreateDate'},
+		$$resp{'CreateDate'} + $timedelta,
 		# preferred block size
 		512,
 		# size in blocks
@@ -848,7 +934,8 @@ sub afp_symlink { # {{{1
 
 	# apparently this is the magic to transmute a file into a symlink...
 	$rc = $afpSession->FPSetFileParms($currVolID, $topDirID, $bitmap, $pathType,
-			$fileName, 'FinderInfo' => 'slnkrhap', 'ModDate' => time());
+			$fileName, 'FinderInfo' => 'slnkrhap',
+			'ModDate' => time() + $timedelta);
 	
 	return 0		if $rc == Net::AFP::Result::kFPNoErr;
 	return -&EACCES if $rc == Net::AFP::Result::kFPAccessDenied;
@@ -1058,8 +1145,8 @@ sub afp_utime { # {{{1
 
 	my $rc = $afpSession->FPSetFileDirParms($currVolID, $topDirID,
 			Net::AFP::FileParms::kFPCreateDateBit | Net::AFP::FileParms::kFPModDateBit,
-			$pathType, $fileName, 'CreateDate' => $actime,
-			'ModDate' => $modtime);
+			$pathType, $fileName, 'CreateDate' => $actime - $timedelta,
+			'ModDate' => $modtime - $timedelta);
 	return 0		if $rc == Net::AFP::Result::kFPNoErr;
 	return -&EPERM	if $rc == Net::AFP::Result::kFPAccessDenied;
 	return -&ENOENT	if $rc == Net::AFP::Result::kFPObjectNotFound;
@@ -1388,48 +1475,11 @@ sub afp_setxattr { # {{{1
 			}
 		}
 	
-		# unpack the ACL from the client, so we can structure it to be handed
-		# up to the AFP server
-		my($acl_flags, @acl_parts) = unpack('NS/(LS/aLL)', $value);
-		my @entries;
-		while (scalar(@acl_parts) > 0) {
-			my $entry = {};
-			my $bitmap = shift(@acl_parts);
-			my $utf8name = decode_utf8(shift(@acl_parts));
-			my($uuid, $rc);
-			# do the appropriate type of name lookup based on the attributes
-			# given in the bitmap field.
-			if ($bitmap == Net::AFP::ACL::kFileSec_UUID) {
-				$rc = $afpSession->FPMapName(
-						Net::AFP::MapParms::kUTF8NameToUserUUID, $utf8name,
-						\$uuid);
-			} elsif ($bitmap == Net::AFP::ACL::kFileSec_GRPUUID) {
-				$rc = $afpSession->FPMapName(
-						Net::AFP::MapParms::kUTF8NameToGroupUUID, $utf8name,
-						\$uuid);
-			} else {
-				$rc = $afpSession->FPMapName(
-						Net::AFP::MapParms::kUTF8NameToUserUUID, $utf8name,
-						\$uuid);
-				if ($rc == Net::AFP::Result::kFPItemNotFound) {
-					$rc = $afpSession->FPMapName(
-							Net::AFP::MapParms::kUTF8NameToGroupUUID, $utf8name,
-							\$uuid);
-				}
-			}
-			# if we can't map a name to a UUID, then just tell the client
-			# that we can't proceed.
-			return -&EINVAL if $rc != Net::AFP::Result::kFPNoErr;
-
-			$$entry{'ace_applicable'} = $uuid;
-			$$entry{'ace_flags'} = shift(@acl_parts);
-			$$entry{'ace_rights'} = shift(@acl_parts);
-			push(@entries, $entry);
+		my $acl;
+		my $rv = acl_from_xattr($afpSession, $value, \$acl);
+		if ($rv != 0) {
+			return $rv;
 		}
-		my $acl = {
-					'acl_ace'	=> [ @entries ],
-					'acl_flags'	=> $acl_flags,
-				  };
 		# send the ACL on to the AFP server.
 		$rc = $afpSession->FPSetACL($currVolID, $topDirID,
 				Net::AFP::ACL::kFileSec_ACL, $pathType, $fileName, $acl);
@@ -1439,6 +1489,7 @@ sub afp_setxattr { # {{{1
 		return 0;
 	} # }}}2
 	# handle comment xattr {{{2
+	# comment stuff is deprecated as of AFP 3.3...
 	elsif ($attr eq COMMENT_XATTR && defined $DTRefNum) {
 		# If either of the flags is present, apply extra checking for the
 		# presence of a finder comment.
@@ -1518,40 +1569,25 @@ sub afp_getxattr { # {{{1
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
 				$client_uuid, Net::AFP::ACL::KAUTH_VNODE_READ_SECURITY,
 				$pathType, $fileName);
-		return -&EACCES if $rc == Net::AFP::Result::kFPAccessDenied;
-		return -&ENOENT if $rc == Net::AFP::Result::kFPObjectNotFound;
-		return -&EBADF  if $rc != Net::AFP::Result::kFPNoErr;
+		return -&ENODATA if $rc == Net::AFP::Result::kFPAccessDenied;
+		return -&ENODATA if $rc == Net::AFP::Result::kFPObjectNotFound;
+		return -&EBADF   if $rc != Net::AFP::Result::kFPNoErr;
 
 		# get the ACL from the server.
 		my $resp;
 		$rc = $afpSession->FPGetACL($currVolID, $topDirID,
 				Net::AFP::ACL::kFileSec_ACL, 0, $pathType, $fileName, \$resp);
-		return -&EACCES  if $rc == Net::AFP::Result::kFPAccessDenied;
-		return -&ENOENT  if $rc == Net::AFP::Result::kFPObjectNotFound;
+		return -&ENODATA if $rc == Net::AFP::Result::kFPAccessDenied;
+		return -&ENODATA if $rc == Net::AFP::Result::kFPObjectNotFound;
 		return -&EBADF   if $rc != Net::AFP::Result::kFPNoErr;
 		# Check to see if the server actually sent us an ACL in its
 		# response; if the file has no ACL, it'll just not return one.
 		if ($$resp{'Bitmap'} & Net::AFP::ACL::kFileSec_ACL) {
-			my @acl_parts;
-			foreach my $entry (@{$$resp{'acl_ace'}}) {
-				my $name;
-				# map the UUID (this actually works for both user and group
-				# UUIDs, the FPMapID docs are useless) to a corresponding
-				# user or group name.
-				my $rc = $afpSession->FPMapID(
-						Net::AFP::MapParms::kUserUUIDToUTF8Name,
-						$$entry{'ace_applicable'}, \$name);
-				return -&EBADF if $rc != Net::AFP::Result::kFPNoErr;
-				push(@acl_parts, pack('LS/aLL', $$name{'Bitmap'},
-						encode_utf8($$name{'UTF8Name'}),
-						@$entry{'ace_flags', 'ace_rights'}));
-			}
-			# Pack the ACL into a single byte sequence, and push it to
-			# the client.
-			return pack('LS/(a*)', $$resp{'acl_flags'}, @acl_parts);
+			return acl_to_xattr($afpSession, $resp);
 		}
 	} # }}}2
 	# handle comment xattr {{{2
+	# comment stuff is deprecated as of AFP 3.3...
 	elsif ($attr eq COMMENT_XATTR && defined $DTRefNum) {
 		# If the desktop DB was opened, then try getting the finder comment
 		# for the file. If one is present, return it.
@@ -1574,17 +1610,17 @@ sub afp_getxattr { # {{{1
 					$client_uuid,
 					Net::AFP::ACL::KAUTH_VNODE_READ_EXTATTRIBUTES,
 					$pathType, $fileName);
-			return -&EACCES if $rc == Net::AFP::Result::kFPAccessDenied;
-			return -&ENOENT if $rc == Net::AFP::Result::kFPObjectNotFound;
-			return -&EBADF  if $rc != Net::AFP::Result::kFPNoErr;
+			return -&ENODATA if $rc == Net::AFP::Result::kFPAccessDenied;
+			return -&ENODATA if $rc == Net::AFP::Result::kFPObjectNotFound;
+			return -&EBADF   if $rc != Net::AFP::Result::kFPNoErr;
 		}
 
 		my $resp;
 		my $rc = $afpSession->FPGetExtAttr($currVolID, $topDirID,
 				Net::AFP::ExtAttrs::kXAttrNoFollow, 0, -1, 131072, $pathType,
 				$fileName, $attr, \$resp);
-		return -&EACCES  if $rc == Net::AFP::Result::kFPAccessDenied;
-		return -&ENOENT  if $rc == Net::AFP::Result::kFPObjectNotFound;
+		return -&ENODATA if $rc == Net::AFP::Result::kFPAccessDenied;
+		return -&ENODATA if $rc == Net::AFP::Result::kFPObjectNotFound;
 		# hopefully this is correct...
 		return -&ENODATA if $rc == Net::AFP::Result::kFPMiscErr;
 		return -&EBADF   if $rc != Net::AFP::Result::kFPNoErr;
@@ -1593,7 +1629,7 @@ sub afp_getxattr { # {{{1
 			return $resp->{'AttributeData'};
 		}
 	} # }}}2
-	return -&ENODATA;
+	return -&EOPNOTSUPP;
 } # }}}1
 
 sub afp_listxattr { # {{{1
@@ -1654,6 +1690,7 @@ sub afp_listxattr { # {{{1
 	# If the desktop DB was opened (should have been...), check for a
 	# finder comment on the file.
 	# handle comment xattr {{{2
+	# comment stuff is deprecated as of AFP 3.3...
 	if (defined $DTRefNum) {
 		my $comment;
 		$rc = $afpSession->FPGetComment($DTRefNum, $topDirID, $pathType,
@@ -1693,6 +1730,7 @@ sub afp_removexattr { # {{{1
 		return 0;
 	} # }}}2
 	# handle comment xattr {{{2
+	# comment stuff is deprecated as of AFP 3.3...
 	elsif ($attr eq COMMENT_XATTR && defined $DTRefNum) {
 		# Remove the finder comment, if one is present.
 		my $rc = $afpSession->FPRemoveComment($DTRefNum, $topDirID,
