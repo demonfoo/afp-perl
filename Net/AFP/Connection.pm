@@ -71,12 +71,18 @@ use Net::AFP::Parsers;
 use Net::AFP::TokenTypes;
 use Net::AFP::ACL;
 use Net::AFP::ExtAttrs;
+use Net::AFP::FileParms;
+use Net::AFP::DirParms;
 use Net::AFP::MapParms;
 use Encode;
+use Exporter;
 # }}}1
 
+our @ISA = qw(Exporter);
+our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name);
+
 # define constants {{{1
-our $VERSION = '0.50';
+our $VERSION = '0.60';
 use constant kFPByteRangeLock			=> 1;	# AFP 2.0
 use constant kFPCloseVol				=> 2;	# AFP 2.0
 use constant kFPCloseDir				=> 3;	# AFP 2.0
@@ -181,13 +187,13 @@ doing thus far.
 Indicates that a C<$Pathname> parameter contains Short Names.
 
 =cut
-use constant kFPShortName		=> 1;
+sub kFPShortName	{ 1; }
 =item kFPLongName
 
 Indicates that a C<$Pathname> parameter contains Long Names.
 
 =cut
-use constant kFPLongName		=> 2;
+sub kFPLongName		{ 2; }
 =item kFPUTF8Name
 
 Indicates that a C<$Pathname> parameter contains an AFPName, which
@@ -195,7 +201,7 @@ consists of a four-byte text encoding hint followed a two-byte length,
 followed by a UTF-8 encoded pathname.
 
 =cut
-use constant kFPUTF8Name		=> 3;
+sub kFPUTF8Name		{ 3; }
 
 =back
 
@@ -632,7 +638,7 @@ sub FPByteRangeLock { # {{{1
 			long_convert($Offset), long_convert($Length));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	if ($rc == Net::AFP::Result::kFPNoErr) {
+	if ($rc == kFPNoErr) {
 		($$resp_r) = unpack('N', $resp);
 	}
 	return $rc;
@@ -724,7 +730,7 @@ sub FPByteRangeLockExt { # {{{1
 			ll_convert($Offset), ll_convert($Length));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	if ($rc == Net::AFP::Result::kFPNoErr) {
+	if ($rc == kFPNoErr) {
 		$$resp_r = ll_unconvert(unpack('NN', $resp));
 	}
 	return $rc;
@@ -1225,7 +1231,7 @@ sub FPCreateDir { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage(pack('CxnNa*', kFPCreateDir, $VolumeID,
 			$DirectoryID, PackagePath($PathType, $Pathname)), \$resp);
-	if ($rc == Net::AFP::Result::kFPNoErr) {
+	if ($rc == kFPNoErr) {
 		$$resp_r = unpack('N', $resp);
 	}
 	return $rc;
@@ -1394,7 +1400,7 @@ sub FPCreateID {
 	my $msg = pack('CxnNa*', kFPCreateID, $VolumeID, $DirectoryID,
 			PackagePath($PathType, $Pathname));
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return($rc) unless $rc == Net::AFP::Result::kFPNoErr;
+	return($rc) unless $rc == kFPNoErr;
 	($$resp_r) = unpack('N', $resp);
 	return $rc;
 }
@@ -1736,7 +1742,7 @@ sub FPEnumerate { # {{{1
 			$MaxReplySize, PackagePath($PathType, $Pathname));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	my($ActualCount, $ReplyBody);
 	($FileBitmap, $DirectoryBitmap, $ActualCount, $ReplyBody)
 			= unpack('nnna*', $resp);
@@ -1895,7 +1901,7 @@ sub FPEnumerateExt { # {{{1
 			$MaxReplySize, PackagePath($PathType, $Pathname));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	my($ActualCount, $ReplyBody);
 	($FileBitmap, $DirectoryBitmap, $ActualCount, $ReplyBody)
 			= unpack('nnna*', $resp);
@@ -2050,7 +2056,7 @@ sub FPEnumerateExt2 { # {{{1
 			$MaxReplySize, PackagePath($PathType, $Pathname));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	my($ActualCount, $ReplyBody);
 	($FileBitmap, $DirectoryBitmap, $ActualCount, $ReplyBody)
 			= unpack('nnna*', $resp);
@@ -2347,7 +2353,7 @@ sub FPGetACL { # {{{1
 			$MaxReplySize, PackagePath($PathType, $Pathname));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	my $rvals = {};
 	my $count;
 	($$rvals{'Bitmap'}, $resp) = unpack('na*', $resp);
@@ -2429,7 +2435,7 @@ sub FPGetAPPL {
 			$Bitmap);
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return($rc) unless $rc == Net::AFP::Result::kFPNoErr;
+	return($rc) unless $rc == kFPNoErr;
 	my($Bitmap_n, $APPLTag, $data) = unpack('nNa*', $resp);
 	my $info = _ParseFileParms($Bitmap_n, $data);
 	$$resp_r = {
@@ -2507,7 +2513,7 @@ sub FPGetAuthMethods { # {{{1
 			PackagePath($PathType, $Pathname));
 	my($resp, @UAMStrings);
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc if $rc != Net::AFP::Result::kFPNoErr;
+	return $rc if $rc != kFPNoErr;
 	($Flags, @UAMStrings) = unpack('CC/(C/a)', $resp);
 	$$resp_r = { 'Flags' => $Flags, 'UAMStrings' => [ @UAMStrings ] };
 	return $rc;
@@ -2590,7 +2596,7 @@ sub FPGetComment { # {{{1
 			PackagePath($PathType, $Pathname));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	($$resp_r) = unpack('C/a', $resp);
 	return $rc;
 } # }}}1
@@ -2698,7 +2704,7 @@ sub FPGetExtAttr { # {{{1
 			PackagePath($PathType, $Pathname), encode_utf8($Name));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	$$resp_r = {};
 	if ($MaxReplySize > 0) {
 		@{$$resp_r}{'Bitmap', 'AttributeData'} = unpack('nN/a*', $resp);
@@ -2795,7 +2801,7 @@ sub FPGetFileDirParms { # {{{1
 			$FileBitmap, $DirectoryBitmap, PackagePath($PathType, $Pathname));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	$$resp_r = _ParseFileDirParms($resp);
 	return $rc;
 } # }}}1
@@ -2854,7 +2860,7 @@ sub FPGetForkParms { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage(pack('Cxnn', kFPGetForkParms, $OForkRefNum,
 			$Bitmap), \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	$$resp_r = _ParseFileParms(unpack('na*', $resp));
 	return $rc;
 } # }}}1
@@ -2999,7 +3005,7 @@ sub FPGetIconInfo {
 	my $msg = pack('CxnNn', kFPGetIconInfo, $DTRefNum, $FileCreator,
 			$IconIndex);
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return($rc) unless $rc == Net::AFP::Result::kFPNoErr;
+	return($rc) unless $rc == kFPNoErr;
 	$$resp_r = {};
 	@$$resp_r{'IconTag', 'FileType', 'IconType', 'Size'} =
 			unpack('NNCxn', $resp);
@@ -3089,7 +3095,7 @@ sub FPGetSessionToken { # {{{1
 
 	my $msg = pack($pack_mask, @params);
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	if ($rc == Net::AFP::Result::kFPNoErr) {
+	if ($rc == kFPNoErr) {
 		$$resp_r = unpack('N/a', $resp);
 	}
 	return $rc;
@@ -3210,7 +3216,7 @@ sub FPGetSrvrMsg { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage(pack('Cxnn', kFPGetSrvrMsg, $MessageType,
 			$MessageBitmap), \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	my ($Length, $ServerMessage);
 	if ($MessageBitmap & 0x2) { # bit 1; means send message as UTF8
 		($Length, $MessageType, $MessageBitmap, $ServerMessage) =
@@ -3274,7 +3280,7 @@ sub FPGetSrvrParms { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage(pack('Cx', kFPGetSrvrParms), \$resp);
 	# If the response was not kFPNoErr, the info block will not be present.
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 
 	my $data = {};
 	my ($time, @volinfo) = unpack('NC/(CC/a)', $resp);
@@ -3326,8 +3332,8 @@ always be set in the flags field.
 =item $Bitmap
 
 Bitmap describing which IDs to retrieve, where bit zero (0x1) is set to get
-the user’s User ID, bit 1 (0x2) is set to get the user’s Primary Group ID,
-and bit 2 (0x4) is set to get the user’s UUID.
+the user's User ID, bit 1 (0x2) is set to get the user's Primary Group ID,
+and bit 2 (0x4) is set to get the user's UUID.
 
 =item $resp_r
 
@@ -3367,12 +3373,12 @@ ThisUser bit is not set.
 
 =item kFPPwdExpiredErr
 
-User’s password has expired. User is required to change his or her password.
+User's password has expired. User is required to change his or her password.
 The user is logged on but can only change his or her password or log out.
 
 =item kFPPwdNeedsChangeErr
 
-User’s password needs to be changed. User is required to change his or her
+User's password needs to be changed. User is required to change his or her
 password. The user is logged on but can only change his or her password or
 log out.
 
@@ -3390,7 +3396,7 @@ sub FPGetUserInfo { # {{{1
 	my $rc = $self->SendAFPMessage(pack('CCNn', kFPGetUserInfo, $Flags, $UserID,
 			$Bitmap), \$resp);
 
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	
 	my $rbmp = unpack('n', $resp);
 	my $offset = 2;
@@ -3470,7 +3476,7 @@ sub FPGetVolParms { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage(pack('Cxnn', kFPGetVolParms, $VolumeID,
 			$Bitmap), \$resp);
-	return($rc) unless $rc == Net::AFP::Result::kFPNoErr;
+	return($rc) unless $rc == kFPNoErr;
 	$$resp_r = _ParseVolParms($resp);
 	return $rc;
 } # }}}1
@@ -3576,7 +3582,7 @@ sub FPListExtAttrs { # {{{1
 			PackagePath($PathType, $Pathname));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	$$resp_r = {};
 	if ($MaxReplySize > 0) {
 		my $names;
@@ -3695,7 +3701,7 @@ sub FPLogin { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
 	
-	if ($rc == Net::AFP::Result::kFPAuthContinue and length($resp) >= 2) {
+	if ($rc == kFPAuthContinue and length($resp) >= 2) {
 		die('$resp_r must be a scalar ref')
 				unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 		$$resp_r = {};
@@ -3804,11 +3810,11 @@ sub FPLoginCont { # {{{1
 	# the last phase (when it returns kFPNoErr on successful completion).
 	# Thanks, Apple...
 	#### /ERRATA ####
-	if (($rc == Net::AFP::Result::kFPAuthContinue or $rc == Net::AFP::Result::kFPNoErr)
+	if (($rc == kFPAuthContinue or $rc == kFPNoErr)
 			and length($resp) > 0) {
 		$$resp_r = {};
 		my $offset = 0;
-		if ($rc == Net::AFP::Result::kFPAuthContinue) {
+		if ($rc == kFPAuthContinue) {
 			$$resp_r->{'ID'} = unpack('n', $resp);
 			$offset = 2;
 		}
@@ -3948,7 +3954,7 @@ sub FPLoginExt { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
 	
-	if ($rc == Net::AFP::Result::kFPAuthContinue and length($resp) >= 2) {
+	if ($rc == kFPAuthContinue and length($resp) >= 2) {
 		die('$resp_r must be a scalar ref')
 				unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 		$$resp_r = {};
@@ -4053,8 +4059,8 @@ sub FPMapID { # {{{1
 	my $resp;
 	my $pack_mask = 'CC';
 	my @pack_args = (kFPMapID, $Subfunction);
-	if ($Subfunction == Net::AFP::MapParms::kUserUUIDToUTF8Name ||
-			$Subfunction == Net::AFP::MapParms::kGroupUUIDToUTF8Name) {
+	if ($Subfunction == kUserUUIDToUTF8Name ||
+			$Subfunction == kGroupUUIDToUTF8Name) {
 		$pack_mask .= 'a[16]';
 		$ID = uuid_pack($ID);
 	} else {
@@ -4063,9 +4069,9 @@ sub FPMapID { # {{{1
 	push(@pack_args, $ID);
 	my $msg = pack($pack_mask, @pack_args);
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
-	if ($Subfunction == Net::AFP::MapParms::kUserUUIDToUTF8Name ||
-			$Subfunction == Net::AFP::MapParms::kGroupUUIDToUTF8Name) {
+	return $rc unless $rc == kFPNoErr;
+	if ($Subfunction == kUserUUIDToUTF8Name ||
+			$Subfunction == kGroupUUIDToUTF8Name) {
 		$$resp_r = {};
 		@{$$resp_r}{'Bitmap', 'NumericID', 'UTF8Name'} =
 				unpack('NNn/a', $resp);
@@ -4131,8 +4137,8 @@ sub FPMapName { # {{{1
 
 	my $resp;
 	my $pack_mask = 'CC';
-	if ($Subfunction == Net::AFP::MapParms::kUTF8NameToUserUUID ||
-			$Subfunction == Net::AFP::MapParms::kUTF8NameToGroupUUID) {
+	if ($Subfunction == kUTF8NameToUserUUID ||
+			$Subfunction == kUTF8NameToGroupUUID) {
 		$pack_mask .= 'n/a';
 		$Name = encode_utf8($Name);
 	} else {
@@ -4140,9 +4146,9 @@ sub FPMapName { # {{{1
 	}
 	my $msg = pack($pack_mask, kFPMapName, $Subfunction, $Name);
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
-	if ($Subfunction == Net::AFP::MapParms::kUTF8NameToUserUUID ||
-			$Subfunction == Net::AFP::MapParms::kUTF8NameToGroupUUID) {
+	return $rc unless $rc == kFPNoErr;
+	if ($Subfunction == kUTF8NameToUserUUID ||
+			$Subfunction == kUTF8NameToGroupUUID) {
 		$$resp_r = uuid_unpack($resp);
 	} else {
 		($$resp_r) = unpack('N', $resp);
@@ -4265,7 +4271,7 @@ sub FPMoveAndRename { # {{{1
 			PackagePath($NewType, $NewName));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	($$resp_r) = unpack('N', $resp);
 	return $rc;
 } # }}}1
@@ -4348,7 +4354,7 @@ sub FPOpenDir { # {{{1
 	my $resp;
 	my $rc = $self->SendAFPMessage(pack('CxnNa*', kFPOpenDir, $VolumeID,
 			$DirectoryID, PackagePath($PathType, $Pathname)), \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	($$resp_r) = unpack('N', $resp);
 	return $rc;
 } # }}}1
@@ -4402,7 +4408,7 @@ sub FPOpenDT { # {{{1
 
 	my $resp;
 	my $rc = $self->SendAFPMessage(pack('Cxn', kFPOpenDT, $VolumeID), \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	($$resp_r) = unpack('n', $resp);
 	return $rc;
 } # }}}1
@@ -4535,7 +4541,7 @@ sub FPOpenFork { # {{{1
 
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	if ($rc == Net::AFP::Result::kFPNoErr) {
+	if ($rc == kFPNoErr) {
 		my ($rBitmap, $OForkRefNum, $FileParameters) = unpack('nna*', $resp);
 		$$resp_r = _ParseFileParms($rBitmap, $FileParameters);
 		$$resp_r->{'OForkRefNum'} = $OForkRefNum;
@@ -4619,7 +4625,7 @@ sub FPOpenVol { # {{{1
 	}
 
 	# Make sure the VolID bit is set, because it's kind of necessary.
-	$Bitmap |= Net::AFP::VolParms::kFPVolIDBit;
+	$Bitmap |= kFPVolIDBit;
 
 	my $PackPattern = 'CxnCa*';
 	my @PackArgs = (kFPOpenVol, $Bitmap, length($VolumeName), $VolumeName);
@@ -4633,7 +4639,7 @@ sub FPOpenVol { # {{{1
 
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	$$resp_r = _ParseVolParms($resp);
 	return $rc;
 } # }}}1
@@ -5202,7 +5208,7 @@ sub FPResolveID {
 	my $resp;
 	my $msg = pack('CxnNn', kFPResolveID, $VolumeID, $FileID, $Bitmap);
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return($rc) unless $rc == Net::AFP::Result::kFPNoErr;
+	return($rc) unless $rc == kFPNoErr;
 	my($Bitmap_n, $data) = unpack('na*', $resp);
 	my $info = _ParseFileParms($Bitmap_n, $data);
 	$$resp_r = {
@@ -5420,14 +5426,14 @@ sub FPSetDirParms { # {{{1
 
 	my $ParamsBlock = '';
 
-	if ($Bitmap & Net::AFP::DirParms::kFPAttributeBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPAttributeBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'Attribute'};
 		$ParamsBlock .= pack('n', $DirectoryParameters{'Attribute'});
 	}
 
-	if ($Bitmap & Net::AFP::DirParms::kFPCreateDateBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPCreateDateBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'CreateDate'};
 		my $time = $DirectoryParameters{'CreateDate'} - globalTimeOffset;
 		if ($time < 0) {
@@ -5436,15 +5442,15 @@ sub FPSetDirParms { # {{{1
 		$ParamsBlock .= pack('N', $time);
 	}
 
-	if ($Bitmap & Net::AFP::DirParms::kFPModDateBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPModDateBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'ModDate'};
 		my $time = $DirectoryParameters{'ModDate'} - globalTimeOffset;
 		$ParamsBlock .= pack('N', long_convert($time));
 	}
 
-	if ($Bitmap & Net::AFP::DirParms::kFPBackupDateBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPBackupDateBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'BackupDate'};
 		my $time = $DirectoryParameters{'BackupDate'} - globalTimeOffset;
 		if ($time < 0) {
@@ -5453,36 +5459,36 @@ sub FPSetDirParms { # {{{1
 		$ParamsBlock .= pack('N', $time);
 	}
 
-	if ($Bitmap & Net::AFP::DirParms::kFPFinderInfoBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPFinderInfoBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'FinderInfo'};
 		$ParamsBlock .= pack('a[32]', $DirectoryParameters{'FinderInfo'});
 	}
 
-	if ($Bitmap & Net::AFP::DirParms::kFPOwnerIDBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPOwnerIDBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'OwnerID'};
 		$ParamsBlock .= pack('N', $DirectoryParameters{'OwnerID'});
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPGroupIDBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPGroupIDBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'GroupID'};
 		$ParamsBlock .= pack('N', $DirectoryParameters{'GroupID'});
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPAccessRightsBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPAccessRightsBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'AccessRights'};
 		$ParamsBlock .= pack('N', $DirectoryParameters{'AccessRights'});
 	}
 
-	if ($Bitmap & Net::AFP::DirParms::kFPUnixPrivsBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPUnixPrivsBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixUID'};
-		return Net::AFP::Result::kFPParamErr
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixGID'};
-		return Net::AFP::Result::kFPParamErr
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixPerms'};
-		return Net::AFP::Result::kFPParamErr
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixAccessRights'};
 
 		$ParamsBlock .= pack('NNNN', @DirectoryParameters{'UnixUID', 'UnixGID',
@@ -5678,14 +5684,14 @@ sub FPSetFileDirParms { # {{{1
 	# common to both files and directories. The parameters are the Invisible
 	# and System attributes, Creation Date, Modification Date, Backup Date,
 	# Finder Info, and UNIX privileges.
-	if ($Bitmap & Net::AFP::FileParms::kFPAttributeBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPAttributeBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'Attribute'};
 		$ParamsBlock .= pack('n', $DirectoryParameters{'Attribute'});
 	}
 
-	if ($Bitmap & Net::AFP::FileParms::kFPCreateDateBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPCreateDateBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'CreateDate'};
 		my $time = $DirectoryParameters{'CreateDate'} - globalTimeOffset;
 		if ($time < 0) {
@@ -5694,8 +5700,8 @@ sub FPSetFileDirParms { # {{{1
 		$ParamsBlock .= pack('N', $time);
 	}
 
-	if ($Bitmap & Net::AFP::FileParms::kFPModDateBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPModDateBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'ModDate'};
 		my $time = $DirectoryParameters{'ModDate'} - globalTimeOffset;
 		if ($time < 0) {
@@ -5704,8 +5710,8 @@ sub FPSetFileDirParms { # {{{1
 		$ParamsBlock .= pack('N', $time);
 	}
 
-	if ($Bitmap & Net::AFP::FileParms::kFPBackupDateBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPBackupDateBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'BackupDate'};
 		my $time = $DirectoryParameters{'BackupDate'} - globalTimeOffset;
 		if ($time < 0) {
@@ -5714,20 +5720,20 @@ sub FPSetFileDirParms { # {{{1
 		$ParamsBlock .= pack('N', $time);
 	}
 
-	if ($Bitmap & Net::AFP::FileParms::kFPFinderInfoBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPFinderInfoBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'FinderInfo'};
 		$ParamsBlock .= pack('a[32]', $DirectoryParameters{'FinderInfo'});
 	}
 
-	if ($Bitmap & Net::AFP::FileParms::kFPUnixPrivsBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPUnixPrivsBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixUID'};
-		return Net::AFP::Result::kFPParamErr
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixGID'};
-		return Net::AFP::Result::kFPParamErr
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixPerms'};
-		return Net::AFP::Result::kFPParamErr
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixAccessRights'};
 
 		$ParamsBlock .= pack('NNNN', @DirectoryParameters{'UnixUID', 'UnixGID',
@@ -5832,14 +5838,14 @@ sub FPSetFileParms { # {{{1
 
 	my $ParamsBlock = '';
 
-	if ($Bitmap & Net::AFP::FileParms::kFPAttributeBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPAttributeBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'Attribute'};
 		$ParamsBlock .= pack('n', $DirectoryParameters{'Attribute'});
 	}
 
-	if ($Bitmap & Net::AFP::FileParms::kFPCreateDateBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPCreateDateBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'CreateDate'};
 		my $time = $DirectoryParameters{'CreateDate'} - globalTimeOffset;
 		if ($time < 0) {
@@ -5848,8 +5854,8 @@ sub FPSetFileParms { # {{{1
 		$ParamsBlock .= pack('N', $time);
 	}
 
-	if ($Bitmap & Net::AFP::FileParms::kFPModDateBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPModDateBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'ModDate'};
 		my $time = $DirectoryParameters{'ModDate'} - globalTimeOffset;
 		if ($time < 0) {
@@ -5858,8 +5864,8 @@ sub FPSetFileParms { # {{{1
 		$ParamsBlock .= pack('N', $time);
 	}
 
-	if ($Bitmap & Net::AFP::FileParms::kFPBackupDateBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPBackupDateBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'BackupDate'};
 		my $time = $DirectoryParameters{'BackupDate'} - globalTimeOffset;
 		if ($time < 0) {
@@ -5868,22 +5874,22 @@ sub FPSetFileParms { # {{{1
 		$ParamsBlock .= pack('N', $time);
 	}
 
-	if ($Bitmap & Net::AFP::FileParms::kFPFinderInfoBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPFinderInfoBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'FinderInfo'};
 		$ParamsBlock .= pack('a[32]', $DirectoryParameters{'FinderInfo'});
 	}
 
 	# kFPLaunchLimitBit? what it do? can has knows?
 
-	if ($Bitmap & Net::AFP::FileParms::kFPUnixPrivsBit) {
-		return Net::AFP::Result::kFPParamErr
+	if ($Bitmap & kFPUnixPrivsBit) {
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixUID'};
-		return Net::AFP::Result::kFPParamErr
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixGID'};
-		return Net::AFP::Result::kFPParamErr
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixPerms'};
-		return Net::AFP::Result::kFPParamErr
+		return kFPParamErr
 				unless exists $DirectoryParameters{'UnixAccessRights'};
 
 		$ParamsBlock .= pack('NNNN', @DirectoryParameters{'UnixUID', 'UnixGID',
@@ -5976,11 +5982,11 @@ sub FPSetForkParms { # {{{1
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
 	my $packed = undef;
-	if (($Bitmap & Net::AFP::FileParms::kFPDataForkLenBit) or
-		($Bitmap & Net::AFP::FileParms::kFPRsrcForkLenBit)) {
+	if (($Bitmap & kFPDataForkLenBit) or
+		($Bitmap & kFPRsrcForkLenBit)) {
 		$packed = pack('N', $ForkLen);
-	} elsif (($Bitmap & Net::AFP::FileParms::kFPExtDataForkLenBit) or
-			 ($Bitmap & Net::AFP::FileParms::kFPExtRsrcForkLenBit)) {
+	} elsif (($Bitmap & kFPExtDataForkLenBit) or
+			 ($Bitmap & kFPExtRsrcForkLenBit)) {
 		$packed = pack('NN', ll_convert($ForkLen));
 	}
 
@@ -6224,7 +6230,7 @@ sub FPWrite { # {{{1
 
 	my $resp;
 	my $rc = $self->SendAFPWrite($msg, $ForkData_r, \$resp);
-	if ($rc == Net::AFP::Result::kFPNoErr) {
+	if ($rc == kFPNoErr) {
 		$$resp_r = unpack('N', $resp);
 	}
 	return($rc);
@@ -6320,7 +6326,7 @@ sub FPWriteExt { # {{{1
 
 	my $resp;
 	my $rc = $self->SendAFPWrite($msg, $ForkData_r, \$resp);
-	if ($rc == Net::AFP::Result::kFPNoErr) {
+	if ($rc == kFPNoErr) {
 		$$resp_r = ll_unconvert(unpack('NN', $resp));
 	}
 	return $rc;

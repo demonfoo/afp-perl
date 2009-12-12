@@ -5,6 +5,7 @@ use Net::DSI::Session;
 use Net::AFP::Connection;
 use Net::AFP::Parsers;
 use Net::AFP::Result;
+use Exporter;
 use strict;
 use warnings;
 
@@ -27,7 +28,8 @@ instantiated object.
 
 =cut
 
-our @ISA = qw(Net::AFP::Connection);
+our @ISA = qw(Net::AFP::Connection Exporter);
+our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name);
 
 # Arguments:
 #	$class: The class (Net::AFP::Connection::TCP) to create an instance of. This

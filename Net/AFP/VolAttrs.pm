@@ -1,5 +1,15 @@
 package Net::AFP::VolAttrs;
 
+use Exporter;
+
+our @ISA = qw(Exporter);
+our @EXPORT = qw(kReadOnly kHasVolumePassword kSupportsFileIDs
+				 kSupportsCatSearch kSupportsBlankAccessPrivs
+				 kSupportsUnixPrivs kSupportsUTF8Names
+				 kNoNetworkUserIDs kDefaultPrivsFromParent
+				 kNoExchangeFiles kSupportsExtAttrs kSupportsACLs
+				 kCaseSensitive kSupportsTMLockSteal);
+
 =head1 NAME
 
 Net::AFP::VolAttrs - Volume attribute flags
@@ -132,8 +142,6 @@ If set, volume supports Time Machine lock stealing.
 =cut
 # New with AFP 3.3.
 use constant kSupportsTMLockSteal		=> 0x2000;
-=back
 
-=cut
 1;
 # vim: ts=4

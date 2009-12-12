@@ -1,5 +1,14 @@
 package Net::AFP::MapParms;
 
+use Exporter;
+
+our @ISA = qw(Exporter);
+our @EXPORT = qw(kUserIDToName kGroupIDToName kUserIDToUTF8Name
+				 kGroupIDToUTF8Name kUserUUIDToUTF8Name
+				 kGroupUUIDToUTF8Name kNameToUserID kNameToGroupID
+				 kUTF8NameToUserID kUTF8NameToGroupID
+				 kUTF8NameToUserUUID kUTF8NameToGroupUUID);
+
 # for FPMapID()
 use constant kUserIDToName			=> 1;
 use constant kGroupIDToName			=> 2;

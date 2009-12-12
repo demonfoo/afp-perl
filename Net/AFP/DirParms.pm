@@ -1,5 +1,15 @@
 package Net::AFP::DirParms;
 
+use Exporter;
+
+our @ISA = qw(Exporter);
+our @EXPORT = qw(kFPAttributeBit kFPParentDirIDBit kFPCreateDateBit
+				 kFPModDateBit kFPBackupDateBit kFPFinderInfoBit
+				 kFPLongNameBit kFPShortNameBit kFPNodeIDBit
+				 kFPOffspringCountBit kFPOwnerIDBit kFPGroupIDBit
+				 kFPAccessRightsBit kFPProDOSInfoBit kFPUTF8NameBit
+				 kFPUnixPrivsBit kFPUUID);
+
 use constant kFPAttributeBit		=> 0x00001;
 use constant kFPParentDirIDBit		=> 0x00002;
 use constant kFPCreateDateBit		=> 0x00004;

@@ -1,5 +1,23 @@
 package Net::AFP::Result;
 
+use Exporter;
+
+our @ISA = qw(Exporter);
+our @EXPORT = qw(kFPNoErr kASPSessionClosed kFPAccessDenied kFPAuthContinue
+				 kFPBadUAM kFPBadVersNum kFPBitmapErr kFPCantMove
+				 kFPDenyConflict kFPDirNotEmpty kFPDiskFull kFPEOFErr
+				 kFPFileBusy kFPFlatVol kFPItemNotFound kFPLockErr kFPMiscErr
+				 kFPNoMoreLocks kFPNoServer kFPObjectExists kFPObjectNotFound
+				 kFPParamErr kFPRangeNotLocked kFPRangeOverlap kFPSessClosed
+				 kFPUserNotAuth kFPCallNotSupported kFPObjectTypeErr
+				 kFPTooManyFilesOpen kFPServerGoingDown kFPCantRename
+				 kFPDirNotFound kFPIconTypeErr kFPVolLocked kFPObjectLocked
+				 kFPContainsSharedErr kFPIDNotFound kPIDExists
+				 kFPCatalogChanged kFPSameObjectErr kFPBadIDErr
+				 kFPPwdSameErr kFPPwdTooShortErr kFPPwdExpiredErr
+				 kFPInsideSharedErr kFPInsideTrashErr kFPPwdNeedsChangeErr
+				 kFPPwdPolicyErr kFPDiskQuotaExceeded);
+
 use constant kFPNoErr				 => 0;
 use constant kASPSessionClosed		 => -1072;
 use constant kFPAccessDenied		 => -5000;

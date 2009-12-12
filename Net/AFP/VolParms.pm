@@ -1,5 +1,14 @@
 package Net::AFP::VolParms;
 
+use Exporter;
+
+our @ISA = qw(Exporter);
+our @EXPORT = qw(kFPVolAttributeBit kFPVolSignatureBit kFPVolCreateDateBit
+				 kFPVolModDateBit kFPVolBackupDateBit kFPVolIDBit
+				 kFPVolBytesFreeBit kFPVolBytesTotalBit kFPVolNameBit
+				 kFPVolExtBytesFreeBit kFPVolExtBytesTotalBit
+				 kFPVolBlockSizeBit kFPBadVolBitmap kFPBadVolPre222Bitmap);
+
 =head1 NAME
 
 Net::AFP::VolParms - Volume parameter arguments
