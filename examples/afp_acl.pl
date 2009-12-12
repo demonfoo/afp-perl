@@ -57,79 +57,79 @@ sub assemble_xattr { # {{{1
 my @ace_rights_info = ( # {{{1
 	{
 	  'name'	=> 'read',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_READ_DATA,
+	  'value'	=> KAUTH_VNODE_READ_DATA,
 	  'for_dir'	=> 0,
 	},
 	{
 	  'name'	=> 'list',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_LIST_DIRECTORY,
+	  'value'	=> KAUTH_VNODE_LIST_DIRECTORY,
 	  'for_dir'	=> 1,
 	},
 	{
 	  'name'	=> 'write',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_WRITE_DATA,
+	  'value'	=> KAUTH_VNODE_WRITE_DATA,
 	  'for_dir'	=> 0,
 	},
 	{
 	  'name'	=> 'add_file',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_ADD_FILE,
+	  'value'	=> KAUTH_VNODE_ADD_FILE,
 	  'for_dir'	=> 1,
 	},
 	{
 	  'name'	=> 'execute',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_EXECUTE,
+	  'value'	=> KAUTH_VNODE_EXECUTE,
 	  'for_dir'	=> 0,
 	},
 	{
 	  'name'	=> 'search',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_SEARCH,
+	  'value'	=> KAUTH_VNODE_SEARCH,
 	  'for_dir'	=> 1,
 	},
 	{
 	  'name'	=> 'delete',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_DELETE,
+	  'value'	=> KAUTH_VNODE_DELETE,
 	},
 	{
 	  'name'	=> 'append',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_APPEND_DATA,
+	  'value'	=> KAUTH_VNODE_APPEND_DATA,
 	  'for_dir'	=> 0,
 	},
 	{
 	  'name'	=> 'add_subdirectory',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_ADD_SUBDIRECTORY,
+	  'value'	=> KAUTH_VNODE_ADD_SUBDIRECTORY,
 	  'for_dir'	=> 1,
 	},
 	{
 	  'name'	=> 'delete_child',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_DELETE_CHILD,
+	  'value'	=> KAUTH_VNODE_DELETE_CHILD,
 	},
 	{
 	  'name'	=> 'readattr',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_READ_ATTRIBUTES,
+	  'value'	=> KAUTH_VNODE_READ_ATTRIBUTES,
 	},
 	{
 	  'name'	=> 'writeattr',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_WRITE_ATTRIBUTES,
+	  'value'	=> KAUTH_VNODE_WRITE_ATTRIBUTES,
 	},
 	{
 	  'name'	=> 'readextattr',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_READ_EXTATTRIBUTES,
+	  'value'	=> KAUTH_VNODE_READ_EXTATTRIBUTES,
 	},
 	{
 	  'name'	=> 'writeextattr',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_WRITE_EXTATTRIBUTES,
+	  'value'	=> KAUTH_VNODE_WRITE_EXTATTRIBUTES,
 	},
 	{
 	  'name'	=> 'readsecurity',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_READ_SECURITY,
+	  'value'	=> KAUTH_VNODE_READ_SECURITY,
 	},
 	{
 	  'name'	=> 'writesecurity',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_WRITE_SECURITY,
+	  'value'	=> KAUTH_VNODE_WRITE_SECURITY,
 	},
 	{
 	  'name'	=> 'chown',
-	  'value'	=> Net::AFP::ACL::KAUTH_VNODE_CHANGE_OWNER,
+	  'value'	=> KAUTH_VNODE_CHANGE_OWNER,
 	},
 ); # }}}1
 
@@ -157,10 +157,10 @@ sub make_ace { # {{{1
 	my @about_parts = split(/:/, $about);
 	$$ace{'Bitmap'} = 0;
 	if ($about_parts[0] eq 'user') {
-		$$ace{'Bitmap'} = Net::AFP::ACL::kFileSec_UUID;
+		$$ace{'Bitmap'} = kFileSec_UUID;
 		shift(@about_parts);
 	} elsif ($about_parts[0] eq 'group') {
-		$$ace{'Bitmap'} = Net::AFP::ACL::kFileSec_GRPUUID;
+		$$ace{'Bitmap'} = kFileSec_GRPUUID;
 		shift(@about_parts);
 	}
 	$$ace{'UTF8Name'} = decode_utf8($about_parts[0]);
@@ -168,9 +168,9 @@ sub make_ace { # {{{1
 	my $kind = shift(@parts);
 	$$ace{'ace_flags'} = 0;
 	if ($kind eq 'allow') {
-		$$ace{'ace_flags'} = Net::AFP::ACL::KAUTH_ACE_PERMIT;
+		$$ace{'ace_flags'} = KAUTH_ACE_PERMIT;
 	} elsif ($kind eq 'deny') {
-		$$ace{'ace_flags'} = Net::AFP::ACL::KAUTH_ACE_DENY;
+		$$ace{'ace_flags'} = KAUTH_ACE_DENY;
 	} else {
 		die("ACL kind " . $kind . " is not valid");
 	}
@@ -231,7 +231,7 @@ if (defined $remove) { # {{{1
 				# Make sure the ACE we're looking at modifying indicates
 				# taking the same kind of action.
 				next unless $$ace{'ace_flags'} ==
-						($$entry{'ace_flags'} & Net::AFP::ACL::KAUTH_ACE_KINDMASK);
+						($$entry{'ace_flags'} & KAUTH_ACE_KINDMASK);
 				# Looks good, add the additional rights we want to the mask.
 				$$entry{'ace_rights'} &= ~$$ace{'ace_rights'};
 			}
@@ -273,9 +273,8 @@ elsif (defined $add) { # {{{1
 			# a 'deny' ACE after it, the ACL is not in "canonical" order,
 			# and we can't do a normal 'add'.
 			my $entry = $$acl[$i];
-			my $acl_kind = $$entry{'ace_flags'} &
-					Net::AFP::ACL::KAUTH_ACE_KINDMASK;
-			if ($acl_kind == Net::AFP::ACL::KAUTH_ACE_PERMIT) {
+			my $acl_kind = $$entry{'ace_flags'} & KAUTH_ACE_KINDMASK;
+			if ($acl_kind == KAUTH_ACE_PERMIT) {
 				unless (defined $first_allow) {
 					$first_allow = $i;
 				}
@@ -308,8 +307,8 @@ elsif (defined $add) { # {{{1
 			# grouping.
 			my $offset = 0;
 			my $acl_kind = $$ace{'ace_flags'} &
-					Net::AFP::ACL::KAUTH_ACE_KINDMASK;
-			if ($acl_kind == Net::AFP::ACL::KAUTH_ACE_PERMIT) {
+					KAUTH_ACE_KINDMASK;
+			if ($acl_kind == KAUTH_ACE_PERMIT) {
 				if (defined($first_allow)) {
 					$offset = $first_allow;
 				} else {
@@ -425,17 +424,17 @@ else { # {{{1
 
 			# What sort of object is this entry about?
 			my $idtype;
-			if ($$entry{'Bitmap'} == Net::AFP::ACL::kFileSec_UUID) {
+			if ($$entry{'Bitmap'} == kFileSec_UUID) {
 				$idtype = 'user';
-			} elsif ($$entry{'Bitmap'} == Net::AFP::ACL::kFileSec_GRPUUID) {
+			} elsif ($$entry{'Bitmap'} == kFileSec_GRPUUID) {
 				$idtype = 'group';
 			}
-			my $acl_kind = $$entry{'ace_flags'} & Net::AFP::ACL::KAUTH_ACE_KINDMASK;
+			my $acl_kind = $$entry{'ace_flags'} & KAUTH_ACE_KINDMASK;
 			# What kind of action does it specify?
 			my $kind = 'unknown';
-			if ($acl_kind == Net::AFP::ACL::KAUTH_ACE_PERMIT) {
+			if ($acl_kind == KAUTH_ACE_PERMIT) {
 				$kind = 'allow';
-			} elsif ($acl_kind == Net::AFP::ACL::KAUTH_ACE_DENY) {
+			} elsif ($acl_kind == KAUTH_ACE_DENY) {
 				$kind = 'deny';
 			}
 
