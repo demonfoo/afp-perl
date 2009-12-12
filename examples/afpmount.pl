@@ -594,17 +594,17 @@ sub afp_getattr { # {{{1
 		# device number (just make it 0, since it's not a real device)
 		0,
 		# inode number (node ID works fine)
-		$resp->{'NodeID'},
+		$$resp{'NodeID'},
 		# permission mask
 		exists($$resp{'UnixPerms'}) ? $$resp{'UnixPerms'} :
 				($$resp{'FileIsDir'} ? 040755 : 0100644),
 		# link count
-		#$resp->{'FileIsDir'} ? $$resp{'OffspringCount'} + 2 : 1,
-		$resp->{'FileIsDir'} ? 2 : 1,
+		#$$resp{'FileIsDir'} ? $$resp{'OffspringCount'} + 2 : 1,
+		$$resp{'FileIsDir'} ? 2 : 1,
 		# UID number
-		exists($resp->{'UnixUID'}) ? $$resp{'UnixUID'} : 0,
+		exists($$resp{'UnixUID'}) ? $$resp{'UnixUID'} : 0,
 		# GID number
-		exists($resp->{'UnixGID'}) ? $$resp{'UnixGID'} : 0,
+		exists($$resp{'UnixGID'}) ? $$resp{'UnixGID'} : 0,
 		# device special major/minor number
 		0,
 		# file size in bytes
@@ -651,7 +651,7 @@ sub afp_readlink { # {{{1
 	# The UNIX privilege info is pretty universal, so just use the standard
 	# macros to see if the permissions show it to be a symlink.
 	# process symlink {{{2
-	if (S_ISLNK($resp->{'UnixPerms'})) {
+	if (S_ISLNK($$resp{'UnixPerms'})) {
 		# Now we have to open the "data fork" of this pseudo-file, read the
 		# "contents" (a single line containing the path of the symbolic link),
 		# and return that.
@@ -679,7 +679,7 @@ sub afp_readlink { # {{{1
 			return -&EINVAL unless $rc == kFPNoErr or $rc == kFPEOFErr;
 			$linkPath .= $readText;
 		} until ($rc == kFPEOFErr);
-		$afpSession->FPCloseFork($sresp->{'OForkRefNum'});
+		$afpSession->FPCloseFork($$sresp{'OForkRefNum'});
 		return encode(ENCODING, $linkPath);
 	} # }}}2
 
@@ -697,8 +697,7 @@ sub afp_getdir { # {{{1
 
 	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
-				KAUTH_VNODE_LIST_DIRECTORY,
-				$pathType, $fileName);
+				KAUTH_VNODE_LIST_DIRECTORY, $pathType, $fileName);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
@@ -736,7 +735,7 @@ sub afp_getdir { # {{{1
 		# anyone actually trying to readdir() gets the entries in reverse
 		# order, for some odd reason; bug in FUSE driver/libfuse/Fuse module?
 		push(@filesList, map {
-						my $name = $_->{$pathkey};
+						my $name = $$_{$pathkey};
 						$name =~ tr/\//:/;
 						encode(ENCODING, $name); } @$resp);
 
@@ -745,8 +744,7 @@ sub afp_getdir { # {{{1
 		undef $resp;
 	}
 	# }}}2
-	if ($rc == kFPObjectNotFound or
-			$rc == kFPNoErr) {
+	if ($rc == kFPObjectNotFound or $rc == kFPNoErr) {
 		return(reverse(@filesList), 0);
 	}
 	return -&EACCES  if $rc == kFPAccessDenied;
@@ -777,7 +775,7 @@ sub afp_mknod { # {{{1
 			return -&EBADF  if $rc != kFPNoErr;
 		}
 
-		$rc = $afpSession->FPCreateFile(0, $currVolID, $resp->{'NodeID'},
+		$rc = $afpSession->FPCreateFile(0, $currVolID, $$resp{'NodeID'},
 				 $pathType, node_name($fileName));
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOSPC if $rc == kFPDiskFull;
@@ -805,14 +803,14 @@ sub afp_mkdir { # {{{1
 	return $rc if $rc != kFPNoErr;
 	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
-				KAUTH_VNODE_ADD_SUBDIRECTORY,
-				$pathType, path_parent($fileName));
+				KAUTH_VNODE_ADD_SUBDIRECTORY, $pathType,
+				path_parent($fileName));
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
 	}
 
-	$rc = $afpSession->FPCreateDir($currVolID, $resp->{'NodeID'}, $pathType,
+	$rc = $afpSession->FPCreateDir($currVolID, $$resp{'NodeID'}, $pathType,
 			node_name($fileName), \$newDirID);
 	return 0		if $rc == kFPNoErr;
 	return -&EPERM	if $rc == kFPAccessDenied;
@@ -854,7 +852,7 @@ sub afp_unlink { # {{{1
 	# non-directory is done elsewhere. also, we're referencing this sub
 	# as the implementation for rmdir as well, which should work just fine
 	# since the same backend call does both.
-	$rc = $afpSession->FPDelete($currVolID, $resp->{'NodeID'}, $pathType,
+	$rc = $afpSession->FPDelete($currVolID, $$resp{'NodeID'}, $pathType,
 			node_name($fileName));
 	return 0			if $rc == kFPNoErr;
 	return -&EACCES		if $rc == kFPAccessDenied;
@@ -911,7 +909,7 @@ sub afp_symlink { # {{{1
 	return -&EMFILE  if $rc == kFPTooManyFilesOpen;
 	return -&EROFS   if $rc == kFPVolLocked;
 	return -&EBADF   if $rc != kFPNoErr;
-	my $forkID = $resp->{'OForkRefNum'};
+	my $forkID = $$resp{'OForkRefNum'};
 
 	my $lastWritten;
 	if ($UseExtOps) {
@@ -932,8 +930,7 @@ sub afp_symlink { # {{{1
 	# }}}2
 
 	# set finder info {{{2
-	my $bitmap = kFPFinderInfoBit |
-			kFPModDateBit;
+	my $bitmap = kFPFinderInfoBit | kFPModDateBit;
 
 	# apparently this is the magic to transmute a file into a symlink...
 	$rc = $afpSession->FPSetFileParms($currVolID, $topDirID, $bitmap, $pathType,
@@ -978,19 +975,19 @@ sub afp_rename { # {{{1
 
 	my @arglist;
 	my $resp;
-	if ($old_stat->{'FileIsDir'} == 1) {
-		@arglist = ($currVolID, $old_stat->{'ParentDirID'},
-				$new_stat->{'NodeID'}, $pathType, $oldRealName,
+	if ($$old_stat{'FileIsDir'} == 1) {
+		@arglist = ($currVolID, $$old_stat{'ParentDirID'},
+				$$new_stat{'NodeID'}, $pathType, $oldRealName,
 				$pathType, '', $pathType, $newRealName, \$resp);
 	} else {
-		@arglist = ($currVolID, $old_stat->{'ParentDirID'},
-				$new_stat->{'NodeID'}, $pathType, $oldRealName, $pathType, '',
+		@arglist = ($currVolID, $$old_stat{'ParentDirID'},
+				$$new_stat{'NodeID'}, $pathType, $oldRealName, $pathType, '',
 				$pathType, $newRealName, \$resp);
 	}
 	$rc = $afpSession->FPMoveAndRename(@arglist);
 
 	if ($rc == kFPObjectExists) {
-		$afpSession->FPDelete($currVolID, $new_stat->{'NodeID'}, $pathType,
+		$afpSession->FPDelete($currVolID, $$new_stat{'NodeID'}, $pathType,
 				$newRealName);
 		$rc = $afpSession->FPMoveAndRename(@arglist);
 	}
@@ -1029,8 +1026,7 @@ sub afp_chmod { # {{{1
 
 	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
-				KAUTH_VNODE_WRITE_ATTRIBUTES,
-				$pathType, $fileName);
+				KAUTH_VNODE_WRITE_ATTRIBUTES, $pathType, $fileName);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
@@ -1038,10 +1034,10 @@ sub afp_chmod { # {{{1
 
 	$rc = $afpSession->FPSetFileDirParms($currVolID, $topDirID,
 			kFPUnixPrivsBit, $pathType, $fileName,
-			'UnixPerms'			=> $mode | S_IFMT($resp->{'UnixPerms'}),
-			'UnixUID'			=> $resp->{'UnixUID'},
-			'UnixGID'			=> $resp->{'UnixGID'},
-			'UnixAccessRights'	=> $resp->{'UnixAccessRights'});
+			'UnixPerms'			=> $mode | S_IFMT($$resp{'UnixPerms'}),
+			'UnixUID'			=> $$resp{'UnixUID'},
+			'UnixGID'			=> $$resp{'UnixGID'},
+			'UnixAccessRights'	=> $$resp{'UnixAccessRights'});
 	return -&EPERM  if $rc == kFPAccessDenied;
 	return -&ENOENT if $rc == kFPObjectNotFound;
 	return -&EINVAL if $rc == kFPParamErr;
@@ -1062,8 +1058,7 @@ sub afp_chown { # {{{1
 
 	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
-				KAUTH_VNODE_CHANGE_OWNER,
-				$pathType, $fileName);
+				KAUTH_VNODE_CHANGE_OWNER, $pathType, $fileName);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
@@ -1071,10 +1066,10 @@ sub afp_chown { # {{{1
 
 	$rc = $afpSession->FPSetFileDirParms($currVolID, $topDirID,
 			kFPUnixPrivsBit, $pathType, $fileName,
-			'UnixPerms'			=> $resp->{'UnixPerms'},
+			'UnixPerms'			=> $$resp{'UnixPerms'},
 			'UnixUID'			=> $uid,
 			'UnixGID'			=> $gid,
-			'UnixAccessRights'	=> $resp->{'UnixAccessRights'});
+			'UnixAccessRights'	=> $$resp{'UnixAccessRights'});
 	return -&EPERM  if $rc == kFPAccessDenied;
 	return -&ENOENT if $rc == kFPObjectNotFound;
 	return -&EINVAL if $rc == kFPParamErr;
@@ -1096,8 +1091,7 @@ sub afp_truncate { # {{{1
 
 	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
-				KAUTH_VNODE_WRITE_DATA,
-				$pathType, $fileName);
+				KAUTH_VNODE_WRITE_DATA, $pathType, $fileName);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
@@ -1147,8 +1141,8 @@ sub afp_utime { # {{{1
 	my $fileName = translate_path($file);
 
 	my $rc = $afpSession->FPSetFileDirParms($currVolID, $topDirID,
-			kFPCreateDateBit | kFPModDateBit,
-			$pathType, $fileName, 'CreateDate' => $actime - $timedelta,
+			kFPCreateDateBit | kFPModDateBit, $pathType, $fileName,
+			'CreateDate' => $actime - $timedelta,
 			'ModDate' => $modtime - $timedelta);
 	return 0		if $rc == kFPNoErr;
 	return -&EPERM	if $rc == kFPAccessDenied;
@@ -1203,7 +1197,7 @@ sub afp_open { # {{{1
 				'ostamp'			=> time(),
 				'astamp'			=> time(),
 				'mode'				=> $accessBitmap,
-				'refnum'			=> $resp->{'OForkRefNum'},
+				'refnum'			=> $$resp{'OForkRefNum'},
 				'coalesce_offset'	=> undef,
 				'coalesce_len'		=> undef,
 				'coalesce_buf'		=> "\0" x COALESCE_MAX,
@@ -1235,8 +1229,7 @@ sub afp_read { # {{{1
 
 	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
-				KAUTH_VNODE_READ_DATA,
-				$pathType, $fileName);
+				KAUTH_VNODE_READ_DATA, $pathType, $fileName);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
@@ -1453,9 +1446,8 @@ sub afp_setxattr { # {{{1
 	# handle ACL xattr {{{2
 	if ($attr eq ACL_XATTR &&
 			defined($client_uuid)) {
-		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
-				$client_uuid, KAUTH_VNODE_WRITE_SECURITY,
-				$pathType, $fileName);
+		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
+				KAUTH_VNODE_WRITE_SECURITY, $pathType, $fileName);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
@@ -1464,15 +1456,12 @@ sub afp_setxattr { # {{{1
 		# presence of an ACL.
 		if ($flags) {
 			my $resp;
-			$rc = $afpSession->FPGetACL($currVolID, $topDirID,
-					kFileSec_ACL, 0, $pathType, $fileName,
-					\$resp);
+			$rc = $afpSession->FPGetACL($currVolID, $topDirID, kFileSec_ACL,
+					0, $pathType, $fileName, \$resp);
 			if ($flags & XATTR_CREATE) {
-				return -&EEXIST
-						if $$resp{'Bitmap'} & kFileSec_ACL;
+				return -&EEXIST if $$resp{'Bitmap'} & kFileSec_ACL;
 			} elsif ($flags & XATTR_REPLACE) {
-				return -&ENODATA
-						unless $$resp{'Bitmap'} & kFileSec_ACL;
+				return -&ENODATA unless $$resp{'Bitmap'} & kFileSec_ACL;
 			}
 		}
 	
@@ -1482,8 +1471,8 @@ sub afp_setxattr { # {{{1
 			return $rv;
 		}
 		# send the ACL on to the AFP server.
-		$rc = $afpSession->FPSetACL($currVolID, $topDirID,
-				kFileSec_ACL, $pathType, $fileName, $acl);
+		$rc = $afpSession->FPSetACL($currVolID, $topDirID, kFileSec_ACL,
+				$pathType, $fileName, $acl);
 		return -&EACCES  if $rc == kFPAccessDenied;
 		return -&ENOENT  if $rc == kFPObjectNotFound;
 		return -&EBADF   if $rc != kFPNoErr;
@@ -1518,14 +1507,12 @@ sub afp_setxattr { # {{{1
 	elsif ($attr =~ /^user\./) {
 		$attr =~ s/^user\.//;
 
-		return -&EOPNOTSUPP
-				unless $volAttrs & kSupportsExtAttrs;
+		return -&EOPNOTSUPP unless $volAttrs & kSupportsExtAttrs;
 
 		if (defined $client_uuid) {
 			my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
-					$client_uuid,
-					KAUTH_VNODE_WRITE_EXTATTRIBUTES,
-					$pathType, $fileName);
+					$client_uuid, KAUTH_VNODE_WRITE_EXTATTRIBUTES, $pathType,
+					$fileName);
 			return -&EACCES if $rc == kFPAccessDenied;
 			return -&ENOENT if $rc == kFPObjectNotFound;
 			return -&EBADF  if $rc != kFPNoErr;
@@ -1567,17 +1554,16 @@ sub afp_getxattr { # {{{1
 	# handle ACL xattr {{{2
 	if ($attr eq ACL_XATTR &&
 			defined($client_uuid)) {
-		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
-				$client_uuid, KAUTH_VNODE_READ_SECURITY,
-				$pathType, $fileName);
+		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
+				KAUTH_VNODE_READ_SECURITY, $pathType, $fileName);
 		return -&ENODATA if $rc == kFPAccessDenied;
 		return -&ENODATA if $rc == kFPObjectNotFound;
 		return -&EBADF   if $rc != kFPNoErr;
 
 		# get the ACL from the server.
 		my $resp;
-		$rc = $afpSession->FPGetACL($currVolID, $topDirID,
-				kFileSec_ACL, 0, $pathType, $fileName, \$resp);
+		$rc = $afpSession->FPGetACL($currVolID, $topDirID, kFileSec_ACL,
+				0, $pathType, $fileName, \$resp);
 		return -&ENODATA if $rc == kFPAccessDenied;
 		return -&ENODATA if $rc == kFPObjectNotFound;
 		return -&EBADF   if $rc != kFPNoErr;
@@ -1603,14 +1589,12 @@ sub afp_getxattr { # {{{1
 	elsif ($attr =~ /^user\./) {
 		$attr =~ s/^user\.//;
 
-		return -&EOPNOTSUPP
-				unless $volAttrs & kSupportsExtAttrs;
+		return -&EOPNOTSUPP unless $volAttrs & kSupportsExtAttrs;
 
 		if (defined $client_uuid) {
 			my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
-					$client_uuid,
-					KAUTH_VNODE_READ_EXTATTRIBUTES,
-					$pathType, $fileName);
+					$client_uuid, KAUTH_VNODE_READ_EXTATTRIBUTES, $pathType,
+					$fileName);
 			return -&ENODATA if $rc == kFPAccessDenied;
 			return -&ENODATA if $rc == kFPObjectNotFound;
 			return -&EBADF   if $rc != kFPNoErr;
@@ -1618,16 +1602,16 @@ sub afp_getxattr { # {{{1
 
 		my $resp;
 		my $rc = $afpSession->FPGetExtAttr($currVolID, $topDirID,
-				kXAttrNoFollow, 0, -1, 131072, $pathType,
-				$fileName, $attr, \$resp);
+				kXAttrNoFollow, 0, -1, 131072, $pathType, $fileName, $attr,
+				\$resp);
 		return -&ENODATA if $rc == kFPAccessDenied;
 		return -&ENODATA if $rc == kFPObjectNotFound;
 		# hopefully this is correct...
 		return -&ENODATA if $rc == kFPMiscErr;
 		return -&EBADF   if $rc != kFPNoErr;
-		if (defined $resp->{'AttributeData'} &&
-				$resp->{'AttributeData'} ne '') {
-			return $resp->{'AttributeData'};
+		if (defined $$resp{'AttributeData'} &&
+				$$resp{'AttributeData'} ne '') {
+			return $$resp{'AttributeData'};
 		}
 	} # }}}2
 	return -&EOPNOTSUPP;
@@ -1638,8 +1622,7 @@ sub afp_listxattr { # {{{1
 	print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
 			if defined $::_DEBUG;
 
-	return -&EOPNOTSUPP
-			unless $volAttrs & kSupportsExtAttrs;
+	return -&EOPNOTSUPP unless $volAttrs & kSupportsExtAttrs;
 	$file = decode(ENCODING, $file);
 	my $fileName = translate_path($file);
 
@@ -1650,9 +1633,8 @@ sub afp_listxattr { # {{{1
 	if ($volAttrs & kSupportsExtAttrs) {
 		if (defined $client_uuid) {
 			my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
-					$client_uuid,
-					KAUTH_VNODE_READ_EXTATTRIBUTES,
-					$pathType, $fileName);
+					$client_uuid, KAUTH_VNODE_READ_EXTATTRIBUTES, $pathType,
+					$fileName);
 			return -&EACCES if $rc == kFPAccessDenied;
 			return -&ENOENT if $rc == kFPObjectNotFound;
 			return -&EBADF  if $rc != kFPNoErr;
@@ -1660,12 +1642,11 @@ sub afp_listxattr { # {{{1
 
 		# Ask the server what extended attributes it knows for the file.
 		my $rc = $afpSession->FPListExtAttrs($currVolID, $topDirID,
-				kXAttrNoFollow, 0, 0, 131072, $pathType,
-				$fileName, \$resp);
+				kXAttrNoFollow, 0, 0, 131072, $pathType, $fileName, \$resp);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
-		@attrs = map { 'user.' . $_ } @{$resp->{'AttributeNames'}};
+		@attrs = map { 'user.' . $_ } @{$$resp{'AttributeNames'}};
 	} # }}}2
 
 	undef $resp;
@@ -1674,17 +1655,15 @@ sub afp_listxattr { # {{{1
 	# attributes.
 	# handle ACL xattr {{{2
 	if (defined $client_uuid) {
-		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
-				$client_uuid, KAUTH_VNODE_READ_SECURITY,
-				$pathType, $fileName);
+		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
+				KAUTH_VNODE_READ_SECURITY, $pathType, $fileName);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
 
-		$rc = $afpSession->FPGetACL($currVolID, $topDirID,
-				kFileSec_ACL, 0, $pathType, $fileName, \$resp);
-		if ($rc == kFPNoErr &&
-				($$resp{'Bitmap'} & kFileSec_ACL)) {
+		$rc = $afpSession->FPGetACL($currVolID, $topDirID, kFileSec_ACL, 0,
+				$pathType, $fileName, \$resp);
+		if ($rc == kFPNoErr && ($$resp{'Bitmap'} & kFileSec_ACL)) {
 			push(@attrs, ACL_XATTR);
 		}
 	} # }}}2
@@ -1714,16 +1693,15 @@ sub afp_removexattr { # {{{1
 	# handle ACL xattr {{{2
 	if ($attr eq ACL_XATTR &&
 			defined($client_uuid)) {
-		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
-				$client_uuid, KAUTH_VNODE_WRITE_SECURITY,
-				$pathType, $fileName);
+		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
+				KAUTH_VNODE_WRITE_SECURITY, $pathType, $fileName);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
 
 		# Remove the ACL from the indicated file.
-		$rc = $afpSession->FPSetACL($currVolID, $topDirID,
-				kFileSec_REMOVEACL, $pathType, $fileName);
+		$rc = $afpSession->FPSetACL($currVolID, $topDirID, kFileSec_REMOVEACL,
+				$pathType, $fileName);
 
 		return -&EACCES  if $rc == kFPAccessDenied;
 		return -&ENOENT  if $rc == kFPObjectNotFound;
@@ -1734,8 +1712,8 @@ sub afp_removexattr { # {{{1
 	# comment stuff is deprecated as of AFP 3.3...
 	elsif ($attr eq COMMENT_XATTR && defined $DTRefNum) {
 		# Remove the finder comment, if one is present.
-		my $rc = $afpSession->FPRemoveComment($DTRefNum, $topDirID,
-				$pathType, $fileName);
+		my $rc = $afpSession->FPRemoveComment($DTRefNum, $topDirID, $pathType,
+				$fileName);
 		return -&EACCES  if $rc == kFPAccessDenied;
 		return -&ENODATA if $rc == kFPItemNotFound;
 		return -&ENOENT  if $rc == kFPObjectNotFound;
@@ -1746,13 +1724,11 @@ sub afp_removexattr { # {{{1
 	elsif ($attr =~ /^user\./) {
 		$attr =~ s/^user\.//;
 
-		return -&EOPNOTSUPP
-				unless $volAttrs & kSupportsExtAttrs;
+		return -&EOPNOTSUPP unless $volAttrs & kSupportsExtAttrs;
 		if (defined $client_uuid) {
 			my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0,
-					$client_uuid,
-					KAUTH_VNODE_WRITE_EXTATTRIBUTES,
-					$pathType, $fileName);
+					$client_uuid, KAUTH_VNODE_WRITE_EXTATTRIBUTES, $pathType,
+					$fileName);
 			return -&EACCES if $rc == kFPAccessDenied;
 			return -&ENOENT if $rc == kFPObjectNotFound;
 			return -&EBADF  if $rc != kFPNoErr;
@@ -1760,8 +1736,7 @@ sub afp_removexattr { # {{{1
 
 		# Remove the requested extended attribute from the indicated file.
 		my $rc = $afpSession->FPRemoveExtAttr($currVolID, $topDirID,
-				kXAttrNoFollow, $pathType, $fileName,
-				$attr);
+				kXAttrNoFollow, $pathType, $fileName, $attr);
 		return -&EACCES  if $rc == kFPAccessDenied;
 		return -&ENOENT  if $rc == kFPObjectNotFound;
 		# hopefully this is correct...
@@ -1782,8 +1757,7 @@ sub lookup_afp_entry { # {{{1
 
 	if (defined $client_uuid) {
 		my $rc = $afpSession->FPAccess($currVolID, $topDirID, 0, $client_uuid,
-				KAUTH_VNODE_READ_ATTRIBUTES,
-				$pathType, $fileName);
+				KAUTH_VNODE_READ_ATTRIBUTES, $pathType, $fileName);
 		return -&EACCES if $rc == kFPAccessDenied;
 		return -&ENOENT if $rc == kFPObjectNotFound;
 		return -&EBADF  if $rc != kFPNoErr;
