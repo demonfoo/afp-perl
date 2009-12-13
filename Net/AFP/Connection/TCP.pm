@@ -96,7 +96,7 @@ sub new { # {{{1
 
 	$obj->{'DSISession'} = new Net::DSI::Session($host, $port);
 	my $rc = $obj->{'DSISession'}->DSIOpenSession();
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	return $obj;
 } # }}}1
 
@@ -202,7 +202,7 @@ sub FPGetSrvrInfo { # {{{1
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	my $resp = '';
 	my $rc = Net::DSI::Session->DSIGetStatus($host, $port, \$resp);
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 
 	$$resp_r = Net::AFP::Parsers::_ParseSrvrInfo($resp);
 	return $rc;

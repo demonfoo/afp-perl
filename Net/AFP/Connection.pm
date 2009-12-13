@@ -179,6 +179,8 @@ doing thus far.
 
 =head2 Path Type Constants
 
+Constants indicating the type of names in a C<Pathname> parameter.
+
 =over
 
 =item kFPShortName
@@ -201,6 +203,28 @@ followed by a UTF-8 encoded pathname.
 
 =cut
 use constant kFPUTF8Name	=> 3;
+
+=back
+
+=head2 File Creation Constants
+
+Constants used when creating files. These constants are used in the
+C<$Flag> parameter for the L</FPCreateFile()> command.
+
+=over
+
+=item kFPSoftCreate
+
+Indicates soft file creation.
+
+=cut
+use constant kFPSoftCreate	=> 0;
+=item kFPHardCreate
+
+Indicates hard file creation.
+
+=cut
+use constant kFPHardCreate	=> 0x80;
 
 =back
 
@@ -2357,17 +2381,17 @@ sub FPGetACL { # {{{1
 	my $count;
 	($$rvals{'Bitmap'}, $resp) = unpack('na*', $resp);
 
-	if ($$rvals{'Bitmap'} & Net::AFP::ACL::kFileSec_UUID) {
+	if ($$rvals{'Bitmap'} & kFileSec_UUID) {
 		($$rvals{'UUID'}, $resp) = unpack('a[16]a*', $resp);
 		$$rvals{'UUID'} = uuid_unpack($$rvals{'UUID'});
 	}
 
-	if ($$rvals{'Bitmap'} & Net::AFP::ACL::kFileSec_GRPUUID) {
+	if ($$rvals{'Bitmap'} & kFileSec_GRPUUID) {
 		($$rvals{'GRPUUID'}, $resp) = unpack('a[16]a*', $resp);
 		$$rvals{'GRPUUID'} = uuid_unpack($$rvals{'GRPUUID'});
 	}
 
-	if ($$rvals{'Bitmap'} & Net::AFP::ACL::kFileSec_ACL) {
+	if ($$rvals{'Bitmap'} & kFileSec_ACL) {
 		my $acl_entrycount;
 		($acl_entrycount, $$rvals{'acl_flags'}, $resp) = unpack('NNa*', $resp);
 		my @entries = unpack('(a[16]NN)[' . $acl_entrycount . ']', $resp);
@@ -3084,8 +3108,7 @@ sub FPGetSessionToken { # {{{1
 	}
 	my $pack_mask = 'CxnN';
 	my @params = (kFPGetSessionToken, $Type, length($ID));
-	if ($Type == Net::AFP::TokenTypes::kLoginWithTimeAndID ||
-			$Type == Net::AFP::TokenTypes::kReconnWithTimeAndID) {
+	if ($Type == kLoginWithTimeAndID || $Type == kReconnWithTimeAndID) {
 		$pack_mask .= 'N';
 		push(@params, $timeStamp);
 	}
@@ -5313,13 +5336,13 @@ sub FPSetACL { # {{{1
 	### /ERRATA ###
 	my $msg = pack('CxnNna*x![s]', kFPSetACL, $VolumeID, $DirectoryID,
 			$Bitmap, PackagePath($PathType, $Pathname));
-	if ($Bitmap & Net::AFP::ACL::kFileSec_UUID) {
+	if ($Bitmap & kFileSec_UUID) {
 		$msg .= uuid_pack($$AdditionalInformation{'UUID'});
 	}
-	if ($Bitmap & Net::AFP::ACL::kFileSec_GRPUUID) {
+	if ($Bitmap & kFileSec_GRPUUID) {
 		$msg .= uuid_pack($$AdditionalInformation{'GRPUUID'});
 	}
-	if ($Bitmap & Net::AFP::ACL::kFileSec_ACL) {
+	if ($Bitmap & kFileSec_ACL) {
 		my @ace_list;
 		foreach my $ace (@{$$AdditionalInformation{'acl_ace'}}) {
 			push(@ace_list, pack('a[16]NN', uuid_pack($$ace{'ace_applicable'}),

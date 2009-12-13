@@ -1,5 +1,11 @@
 package Net::AFP::TokenTypes;
 
+use Exporter qw(import);
+
+our @EXPORT = qw(kLoginWithoutID kLoginWithID kReconnWithID
+				 kLoginWithTimeAndID kReconnWithTimeAndID kRecon1Login
+				 kRecon1ReconnectLogin kRecon1Refresh kGetKerberosSessionKey);
+
 use constant kLoginWithoutID		=> 0;
 use constant kLoginWithID			=> 1;	# deprecated
 use constant kReconnWithID			=> 2;	# deprecated
