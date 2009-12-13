@@ -1,8 +1,7 @@
 package Net::AFP::ExtAttrs;
 
-use Exporter;
+use Exporter qw(import);
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(kXAttrNoFollow kXAttrCreate kXAttrReplace);
 
 use constant kXAttrNoFollow	=> 0x1;

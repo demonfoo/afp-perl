@@ -75,10 +75,9 @@ use Net::AFP::FileParms;
 use Net::AFP::DirParms;
 use Net::AFP::MapParms;
 use Encode;
-use Exporter;
+use Exporter qw(import);
 # }}}1
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name);
 
 # define constants {{{1
@@ -187,13 +186,13 @@ doing thus far.
 Indicates that a C<$Pathname> parameter contains Short Names.
 
 =cut
-sub kFPShortName	{ 1; }
+use constant kFPShortName	=> 1;
 =item kFPLongName
 
 Indicates that a C<$Pathname> parameter contains Long Names.
 
 =cut
-sub kFPLongName		{ 2; }
+use constant kFPLongName	=> 2;
 =item kFPUTF8Name
 
 Indicates that a C<$Pathname> parameter contains an AFPName, which
@@ -201,7 +200,7 @@ consists of a four-byte text encoding hint followed a two-byte length,
 followed by a UTF-8 encoded pathname.
 
 =cut
-sub kFPUTF8Name		{ 3; }
+use constant kFPUTF8Name	=> 3;
 
 =back
 

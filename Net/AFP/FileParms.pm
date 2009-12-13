@@ -1,8 +1,7 @@
 package Net::AFP::FileParms;
 
-use Exporter;
+use Exporter qw(import);
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(kFPAttributeBit kFPParentDirIDBit kFPCreateDateBit
 				 kPModDateBit kFPBackupDateBit kFPFinderInfoBit
 				 kFPLongNameBit kFPShortNameBit kFPNodeIDBit

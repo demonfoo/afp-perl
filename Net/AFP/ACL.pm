@@ -1,8 +1,7 @@
 package Net::AFP::ACL;
 
-use Exporter;
+use Exporter qw(import);
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(KAUTH_ACL_FLAGS_PRIVATE KAUTH_ACL_DEFER_INHERIT
 				 KAUTH_ACL_NO_INHERIT KAUTH_ACE_KINDMASK
 				 KAUTH_ACE_PERMIT KAUTH_ACE_DENY KAUTH_ACE_AUDIT

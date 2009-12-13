@@ -1,8 +1,7 @@
 package Net::AFP::VolAttrs;
 
-use Exporter;
+use Exporter qw(import);
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(kReadOnly kHasVolumePassword kSupportsFileIDs
 				 kSupportsCatSearch kSupportsBlankAccessPrivs
 				 kSupportsUnixPrivs kSupportsUTF8Names

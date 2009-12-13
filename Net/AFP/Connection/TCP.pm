@@ -5,7 +5,7 @@ use Net::DSI::Session;
 use Net::AFP::Connection;
 use Net::AFP::Parsers;
 use Net::AFP::Result;
-use Exporter;
+use Exporter qw(import);
 use strict;
 use warnings;
 
@@ -28,7 +28,7 @@ instantiated object.
 
 =cut
 
-our @ISA = qw(Net::AFP::Connection Exporter);
+our @ISA = qw(Net::AFP::Connection);
 our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name);
 
 # Arguments:

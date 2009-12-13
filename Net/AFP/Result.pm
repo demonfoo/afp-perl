@@ -1,8 +1,7 @@
 package Net::AFP::Result;
 
-use Exporter;
+use Exporter qw(import);
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(kFPNoErr kASPSessionClosed kFPAccessDenied kFPAuthContinue
 				 kFPBadUAM kFPBadVersNum kFPBitmapErr kFPCantMove
 				 kFPDenyConflict kFPDirNotEmpty kFPDiskFull kFPEOFErr

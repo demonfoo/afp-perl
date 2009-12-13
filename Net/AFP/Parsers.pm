@@ -9,9 +9,8 @@ use Socket;
 use strict;
 use warnings;
 
-require Exporter;
+use Exporter qw(import);
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(globalTimeOffset long_convert long_unconvert ll_convert ll_unconvert uuid_unpack uuid_pack _ParseVolParms _ParseSrvrInfo _ParseFileDirParms _ParseFileParms _ParseDirParms);
 
 my $has_Socket6 = 1;

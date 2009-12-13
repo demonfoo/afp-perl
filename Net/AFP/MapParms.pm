@@ -1,8 +1,7 @@
 package Net::AFP::MapParms;
 
-use Exporter;
+use Exporter qw(import);
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(kUserIDToName kGroupIDToName kUserIDToUTF8Name
 				 kGroupIDToUTF8Name kUserUUIDToUTF8Name
 				 kGroupUUIDToUTF8Name kNameToUserID kNameToGroupID

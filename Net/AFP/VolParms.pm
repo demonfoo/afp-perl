@@ -1,8 +1,7 @@
 package Net::AFP::VolParms;
 
-use Exporter;
+use Exporter qw(import);
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(kFPVolAttributeBit kFPVolSignatureBit kFPVolCreateDateBit
 				 kFPVolModDateBit kFPVolBackupDateBit kFPVolIDBit
 				 kFPVolBytesFreeBit kFPVolBytesTotalBit kFPVolNameBit
