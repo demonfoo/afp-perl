@@ -66,14 +66,14 @@ sub session_thread { # {{{1
 	my $handler;
 	unless (defined $conn and $conn->connected()) {
 		$$shared{'running'} = -1;
+		# gotta do this so new() completes, one way or another...
+		$$shared{'conn_sem'}->up();
 
 		# return kFPNoServer for all waiting callers, and up() all the waiting
 		# semaphores for them.
 		foreach my $id (keys %{$$shared{'handlers'}}) {
 			$handler = $$shared{'handlers'}{$id};
-#			if (defined $$handler[2]) {
-				${$$handler[2]} = Net::AFP::Result::kFPNoServer;
-#			}
+			${$$handler[2]} = kFPNoServer;
 			${$$handler[0]}->up();
 		}
 		return;
@@ -170,7 +170,7 @@ sub session_thread { # {{{1
 	# Thanks again, netatalk. :| )
 	foreach my $id (keys %{$$shared{'handlers'}}) {
 		$handler = $$shared{'handlers'}{$id};
-			${$$handler[2]} = Net::AFP::Result::kFPNoServer;
+			${$$handler[2]} = kFPNoServer;
 			${$$handler[0]}->up();
 	}
 } # }}}1
@@ -221,8 +221,8 @@ sub new { # {{{1
 # Need to implement this.
 sub close { # {{{1
 	my ($self) = @_;
-	$self->{'Shared'}->{'exit'} = 1;
-	$self->{'Dispatcher'}->join();
+	$$self{'Shared'}{'exit'} = 1;
+	$$self{'Dispatcher'}->join();
 } # }}}1
 
 # Arguments:
@@ -263,10 +263,10 @@ sub SendMessage { # {{{1
 
 	# Cycle the request ID that DSI uses to identify the request/reply
 	# pairing. I'd like to handle that part asynchronously eventually.
-	my $reqId = $self->{'Shared'}->{'requestid'}++ % 65536;
+	my $reqId = $$self{'Shared'}{'requestid'}++ % 65536;
 
-	if ($self->{'Shared'}->{'running'} == -1) {
-		return Net::AFP::Result::kFPNoServer;
+	if ($$self{'Shared'}{'running'} == -1) {
+		return kFPNoServer;
 	}
 	# Assemble the message header to be sent to the AFP over TCP server.
 	# Arg 1: byte Flags: 0 for request, 1 for reply
@@ -290,12 +290,13 @@ sub SendMessage { # {{{1
 	# Don't send the message until after the handler has been set. Otherwise
 	# we open ourselves up to a race condition which can cause the whole mess
 	# to block forever. :|
-	#push(@{$$self{'Shared'}->{'sendq'}}, $msg);
 	# Okay, let's try direct dispatch instead of queuing...
-	$$self{'Shared'}->{'conn_sem'}->down();
+	$$self{'Shared'}{'conn_sem'}->down();
 	syswrite($$self{'Conn'}, $msg);
-	syswrite($$self{'Conn'}, $$data_r);
-	$$self{'Shared'}->{'conn_sem'}->up();
+	if (length($$data_r)) {
+		syswrite($$self{'Conn'}, $$data_r);
+	}
+	$$self{'Shared'}{'conn_sem'}->up();
 
 	return $reqId;
 } # }}}1
