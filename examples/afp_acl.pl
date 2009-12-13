@@ -306,8 +306,7 @@ elsif (defined $add) { # {{{1
 			# Add the ACE to the list, at the beginning of the appropriate
 			# grouping.
 			my $offset = 0;
-			my $acl_kind = $$ace{'ace_flags'} &
-					KAUTH_ACE_KINDMASK;
+			my $acl_kind = $$ace{'ace_flags'} & KAUTH_ACE_KINDMASK;
 			if ($acl_kind == KAUTH_ACE_PERMIT) {
 				if (defined($first_allow)) {
 					$offset = $first_allow;
@@ -315,7 +314,8 @@ elsif (defined $add) { # {{{1
 					$offset = scalar(@$acl);
 				}
 			}
-			@$acl = (@$acl[0 .. ($offset - 1)], $ace, @$acl[$offset .. $#$acl]);
+			@$acl = (@$acl[0 .. ($offset - 1)], $ace,
+					@$acl[$offset .. $#$acl]);
 		} # }}}3
 
 		# Repack the ACL, and push it back out via the extended attribute.
