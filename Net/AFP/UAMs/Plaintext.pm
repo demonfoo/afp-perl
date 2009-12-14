@@ -27,7 +27,7 @@ sub Authenticate {
 	print 'FPLoginExt() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
 
-	if ($rc == Net::AFP::Result::kFPCallNotSupported) {
+	if ($rc == kFPCallNotSupported) {
 		my $authinfo = substr(pack('xC/a*x![s]a8', $username, $pw_data), 1);
 		$rc = $session->FPLogin($AFPVersion, UAMNAME, $authinfo);
 		print 'FPLogin() completed with result code ', $rc, "\n"

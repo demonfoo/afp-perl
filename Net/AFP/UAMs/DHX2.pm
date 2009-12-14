@@ -142,13 +142,13 @@ sub Authenticate {
 	print 'FPLoginExt() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
 
-	if ($rc == Net::AFP::Result::kFPCallNotSupported) {
+	if ($rc == kFPCallNotSupported) {
 		$rc = $session->FPLogin($AFPVersion, UAMNAME,
 				pack('C/a*x![s]', $username), \$resp);
 		print 'FPLogin() completed with result code ', $rc, "\n"
 				if defined $::__AFP_DEBUG;
 	}
-	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
+	return $rc unless $rc == kFPAuthContinue;
 
 	# Received message 2, parsing below.
 	# Get the value for g, and the length value for assorted things (p, Ma,
@@ -248,7 +248,7 @@ sub Authenticate {
 	undef $message;
 	print 'FPLoginCont() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
-	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
+	return $rc unless $rc == kFPAuthContinue;
 
 	# Decrypting message 4.
 	# Decrypt the message from the server, and separate the (hopefully)
@@ -327,7 +327,7 @@ sub ChangePassword {
 	my $rc = $session->FPChangePassword(UAMNAME, $username, undef, \$resp);
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
-	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
+	return $rc unless $rc == kFPAuthContinue;
 
 	# Get the value for g, and the length value for assorted things (p, Ma,
 	# Mb, Ra, Rb).
@@ -423,7 +423,7 @@ sub ChangePassword {
 	$rc = $session->FPChangePassword(UAMNAME, $username, $message, \$sresp);
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
-	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
+	return $rc unless $rc == kFPAuthContinue;
 	undef $message;
 
 	# Unpack the server response for our perusal.

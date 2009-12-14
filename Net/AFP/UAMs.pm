@@ -1,5 +1,7 @@
 package Net::AFP::UAMs;
 
+use Net::AFP::TokenTypes;
+
 =head1 NAME
 
 Net::AFP::UAMs - AFP authentication helper functions
@@ -10,16 +12,6 @@ This package contains convenience functions for calling User
 Authentication Method code on an AFP connection.
 
 =cut
-
-use constant kLoginWithoutID		=> 0;
-use constant kLoginWithID			=> 1;
-use constant kReconnWithID			=> 2;
-use constant kLoginWithTimeAndID	=> 3;
-use constant kReconnWithTimeAndID	=> 4;
-use constant kRecon1Login			=> 5;
-use constant kRecon1ReconnectLogin	=> 6;
-use constant kRecon1Refresh			=> 7;
-use constant kGetKerberosSessionKey	=> 8;
 
 # Try to import classes for the password based auth methods. If they can't
 # be imported, it probably means they have dependencies that can't be
@@ -88,7 +80,7 @@ Perform simple anonymous (guest) authentication with the server.
 sub GuestAuth($$) {
 	my($session, $AFPVersion) = @_;
 	my $rc = Net::AFP::UAMs::Anonymous::Authenticate($session, $AFPVersion);
-	if ($rc == Net::AFP::Result::kFPNoErr) {
+	if ($rc == kFPNoErr) {
 		$$session{'AFPVersion'} = $AFPVersion;
 	}
 	return $rc;
@@ -130,7 +122,7 @@ sub PasswordAuth($$$$$) {
 		print 'auth function is ', $function, "\n" if defined $::__AFP_DEBUG;
 		$session->{'username'} = $UserName;
 		my $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
-		if ($rc == Net::AFP::Result::kFPNoErr) {
+		if ($rc == kFPNoErr) {
 			$$session{'AFPVersion'} = $AFPVersion;
 		}
 		return $rc;
@@ -140,7 +132,7 @@ sub PasswordAuth($$$$$) {
 	print "", (caller(0))[3], 
 			" Could not find an agreeable UAM for authenticating to server\n"
 			if defined $::__AFP_DEBUG;
-	return Net::AFP::Result::kFPBadUAM;
+	return kFPBadUAM;
 }
 
 =back

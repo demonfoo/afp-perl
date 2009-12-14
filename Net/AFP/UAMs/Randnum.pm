@@ -34,14 +34,14 @@ sub Authenticate {
 	print 'FPLoginExt() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
 
-	if ($rc == Net::AFP::Result::kFPCallNotSupported) {
+	if ($rc == kFPCallNotSupported) {
 		my $authinfo = pack('C/a*', $username);
 		$rc = $session->FPLogin($AFPVersion, UAMNAME, $authinfo, \$resp);
 		print 'FPLogin() completed with result code ', $rc, "\n"
 				if defined $::__AFP_DEBUG;
 	}
 
-	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
+	return $rc unless $rc == kFPAuthContinue;
 
 	# The server will send us a random 8-byte number; take that, and encrypt
 	# it with the password the user gave us.

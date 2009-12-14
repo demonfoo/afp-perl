@@ -78,7 +78,8 @@ use Encode;
 use Exporter qw(import);
 # }}}1
 
-our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name);
+our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name kFPSoftCreate
+				 kFPHardCreate);
 
 # define constants {{{1
 our $VERSION = '0.60';
@@ -179,7 +180,7 @@ doing thus far.
 
 =head2 Path Type Constants
 
-Constants indicating the type of names in a C<Pathname> parameter.
+Constants indicating the type of names in a C<$Pathname> parameter.
 
 =over
 

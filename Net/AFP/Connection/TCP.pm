@@ -29,7 +29,8 @@ instantiated object.
 =cut
 
 our @ISA = qw(Net::AFP::Connection);
-our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name);
+our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name kFPSoftCreate
+				 kFPHardCreate);
 
 # Arguments:
 #	$class: The class (Net::AFP::Connection::TCP) to create an instance of. This

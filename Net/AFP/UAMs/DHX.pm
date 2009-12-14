@@ -88,7 +88,7 @@ sub Authenticate {
 
 	# Fall back to FPLogin if the server says it doesn't know what we're
 	# talking about.
-	if ($rc == Net::AFP::Result::kFPCallNotSupported) {
+	if ($rc == kFPCallNotSupported) {
 		my $authinfo = pack('C/a*x![s]a*', $username, $Ma_binary);
 		$rc = $session->FPLogin($AFPVersion, UAMNAME, $authinfo, \$resp);
 		print 'FPLogin() completed with result code ', $rc, "\n"
@@ -96,7 +96,7 @@ sub Authenticate {
 	}
 	undef $Ma_binary;
 	undef $authinfo;
-	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
+	return $rc unless $rc == kFPAuthContinue;
 	my ($Mb_binary, $message) = unpack('a16a*', $resp->{'UserAuthInfo'});
 	my $Mb = new Math::BigInt('0x' . unpack('H*', $Mb_binary));
 	undef $Mb_binary;
@@ -218,7 +218,7 @@ sub ChangePassword {
 	undef $authinfo;
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
-	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
+	return $rc unless $rc == kFPAuthContinue;
 
 	# Unpack the server response for our perusal.
 	my ($ID, $Mb_binary, $message) = unpack('na16a32', $resp);

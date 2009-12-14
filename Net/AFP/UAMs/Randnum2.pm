@@ -32,14 +32,14 @@ sub Authenticate {
 	print 'FPLoginExt() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
 
-	if ($rc == Net::AFP::Result::kFPCallNotSupported) {
+	if ($rc == kFPCallNotSupported) {
 		my $authinfo = pack('C/a*', $username);
 		$rc = $session->FPLogin($AFPVersion, UAMNAME, $authinfo, \$resp);
 		print 'FPLogin() completed with result code ', $rc, "\n"
 				if defined $::__AFP_DEBUG;
 	}
 
-	return $rc unless $rc == Net::AFP::Result::kFPAuthContinue;
+	return $rc unless $rc == kFPAuthContinue;
 
 	# The server will send us a random 8-byte number; take that, and encrypt
 	# it with the password the user gave us.
@@ -76,7 +76,7 @@ sub Authenticate {
 	undef $crypted;
 	print 'FPLoginCont() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
-	return $rc unless $rc == Net::AFP::Result::kFPNoErr;
+	return $rc unless $rc == kFPNoErr;
 	
 	# Now, verify the server's crypted copy of the password to ensure that
 	# they really have it.
@@ -88,12 +88,12 @@ sub Authenticate {
 	print '$recrypted is 0x', unpack('H*', $recrypted), "\n"
 			if defined $::__AFP_DEBUG;
 	# Maybe a different result code is in order? Not sure...
-	return Net::AFP::Result::kFPUserNotAuth unless $srv_hash eq $recrypted;
+	return kFPUserNotAuth unless $srv_hash eq $recrypted;
 	undef $srv_hash;
 	undef $recrypted;
 
 	# If we've reached this point, all went well, so return success.
-	return Net::AFP::Result::kFPNoErr;
+	return kFPNoErr;
 }
 
 # This UAM does not implement password changing; Randnum.pm's ChangePassword()

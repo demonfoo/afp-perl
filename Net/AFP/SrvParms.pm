@@ -1,5 +1,12 @@
 package Net::AFP::SrvParms;
 
+use Exporter qw(import);
+
+our @EXPORT = qw(kSupportsCopyFile kSupportChgPwd kDontAllowSavePwd
+				 kSupportsSrvrMsg kSrvrSig kSupportsTCP kSupportsSrvrNotify
+				 kSupportsReconnect kSupportsDirServices kSupportsUTF8SrvrName
+				 kSupportsUUIDs kSupportsExtSleep kSupportsSuperClient);
+
 use constant kSupportsCopyFile		=> 0x0001;
 use constant kSupportsChgPwd		=> 0x0002;
 # This bit was added as of AFP v2.1.

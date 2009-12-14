@@ -104,71 +104,71 @@ sub _ParseVolParms { # {{{1
 	my $Bitmap = unpack('n', $data);
 	my $resp = {};
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolAttributeBit) {
+	if ($Bitmap & kFPVolAttributeBit) {
 		$$resp{'VolAttribute'} = unpack('x' . $offset . 'n', $data);
 		$offset += 2;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolSignatureBit) {
+	if ($Bitmap & kFPVolSignatureBit) {
 		$$resp{'Signature'} = unpack('x' . $offset . 'n', $data);
 		$offset += 2;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolCreateDateBit) {
+	if ($Bitmap & kFPVolCreateDateBit) {
 		$$resp{'CreateDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
 				globalTimeOffset;
 		$offset += 4;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolModDateBit) {
+	if ($Bitmap & kFPVolModDateBit) {
 		$$resp{'ModDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
 				globalTimeOffset;
 		$offset += 4;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolBackupDateBit) {
+	if ($Bitmap & kFPVolBackupDateBit) {
 		$$resp{'BackupDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
 				globalTimeOffset;
 		$offset += 4;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolIDBit) {
+	if ($Bitmap & kFPVolIDBit) {
 		$$resp{'ID'} = unpack('x' . $offset . 'n', $data);
 		$offset += 2;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolBytesFreeBit) {
+	if ($Bitmap & kFPVolBytesFreeBit) {
 		$$resp{'BytesFree'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolBytesTotalBit) {
+	if ($Bitmap & kFPVolBytesTotalBit) {
 		$$resp{'BytesTotal'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolNameBit) {
+	if ($Bitmap & kFPVolNameBit) {
 		my $name_off = unpack('x' . $offset . 'n', $data);
 		$offset += 2;
 
 		$$resp{'Name'} = decode('MacRoman', unpack('x' . ($name_off + 2) . 'C/a', $data));
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolExtBytesFreeBit) {
+	if ($Bitmap & kFPVolExtBytesFreeBit) {
 		$$resp{'ExtBytesFree'} =
 				ll_unconvert(unpack('x[' . $offset . ']NN', $data));
 		$offset += 8;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolExtBytesTotalBit) {
+	if ($Bitmap & kFPVolExtBytesTotalBit) {
 		$$resp{'ExtBytesTotal'} = ll_unconvert(unpack('x[' . $offset . ']NN', $data));
 		$offset += 8;
 	}
 
-	if ($Bitmap & Net::AFP::VolParms::kFPVolBlockSizeBit) {
+	if ($Bitmap & kFPVolBlockSizeBit) {
 		$$resp{'BlockSize'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
@@ -232,11 +232,11 @@ _EOT_
 	}
 
 	# The server signature doesn't really do anything...
-	#if ($flags & Net::AFP::SrvParms::kSrvrSig) {
+	#if ($flags & kSrvrSig) {
 	#	$$resp{'ServerSignature'} = substr($data, $sig_off, 16);
 	#}
 
-	if ($flags & Net::AFP::SrvParms::kSupportsUTF8SrvrName) {
+	if ($flags & kSupportsUTF8SrvrName) {
 		$$resp{'UTF8ServerName'} =
 				decode_utf8(unpack('x' . $utf8name_off . 'n/a', $data));
 	}
@@ -289,7 +289,7 @@ _EOT_
 		push(@{$$resp{'NetworkAddresses'}}, $addrEnt);
 	}
 
-	if ($flags & Net::AFP::SrvParms::kSupportsDirServices) {
+	if ($flags & kSupportsDirServices) {
 		my ($dirservCount) = unpack('x' . $dirserv_off . 'C', $data);
 		$$resp{'DirectoryNames'} = [];
 		$offset = $dirserv_off + 1;
@@ -323,80 +323,80 @@ sub _ParseFileParms { # {{{1
 	my $resp = {};
 	my $offset = 0;
 
-	if ($Bitmap & Net::AFP::FileParms::kFPAttributeBit) {
+	if ($Bitmap & kFPAttributeBit) {
 		$$resp{'Attributes'} = unpack('x' . $offset . 'n', $data);
 		$offset += 2;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPParentDirIDBit) {
+	if ($Bitmap & kFPParentDirIDBit) {
 		$$resp{'ParentDirID'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPCreateDateBit) {
+	if ($Bitmap & kFPCreateDateBit) {
 		$$resp{'CreateDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
 				globalTimeOffset;
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPModDateBit) {
+	if ($Bitmap & kFPModDateBit) {
 		$$resp{'ModDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
 				globalTimeOffset;
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPBackupDateBit) {
+	if ($Bitmap & kFPBackupDateBit) {
 		$$resp{'BackupDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
 				globalTimeOffset;
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPFinderInfoBit) {
+	if ($Bitmap & kFPFinderInfoBit) {
 		$$resp{'FinderInfo'} = unpack('x' . $offset . 'a32', $data);
 		$offset += 32;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPLongNameBit) {
+	if ($Bitmap & kFPLongNameBit) {
 		my $position = unpack('x' . $offset . 'n', $data);
 		$$resp{'LongName'} = decode('MacRoman', unpack('x' . $position . 'C/a', $data));
 		$offset += 2;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPShortNameBit) {
+	if ($Bitmap & kFPShortNameBit) {
 		my $position = unpack('x' . $offset . 'n', $data);
 		$$resp{'ShortName'} = unpack('x' . $position . 'C/a', $data);
 		$offset += 2;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPNodeIDBit) {
+	if ($Bitmap & kFPNodeIDBit) {
 		$$resp{'NodeID'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPDataForkLenBit) {
+	if ($Bitmap & kFPDataForkLenBit) {
 		$$resp{'DataForkLen'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPRsrcForkLenBit) {
+	if ($Bitmap & kFPRsrcForkLenBit) {
 		$$resp{'RsrcForkLen'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPExtDataForkLenBit) {
+	if ($Bitmap & kFPExtDataForkLenBit) {
 		$$resp{'ExtDataForkLen'} =
 				ll_unconvert(unpack('x[' . $offset . ']NN', $data));
 		$offset += 8;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPLaunchLimitBit) {
+	if ($Bitmap & kFPLaunchLimitBit) {
 		$$resp{'LaunchLimit'} = unpack('x' . $offset . 'n', $data);
 		$offset += 2;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPUTF8NameBit) {
+	if ($Bitmap & kFPUTF8NameBit) {
 		my $position = unpack('x[' . $offset . ']n', $data);
 		@$resp{'UTF8Hint', 'UTF8Name'} =
 				unpack('x' . $position . 'Nn/a', $data);
 		$$resp{'UTF8Name'} = decode_utf8($$resp{'UTF8Name'});
 		$offset += 6;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPExtRsrcForkLenBit) {
+	if ($Bitmap & kFPExtRsrcForkLenBit) {
 		$$resp{'ExtRsrcForkLen'} =
 				ll_unconvert(unpack('x[' . $offset . ']NN', $data));
 		$offset += 8;
 	}
-	if ($Bitmap & Net::AFP::FileParms::kFPUnixPrivsBit) {
+	if ($Bitmap & kFPUnixPrivsBit) {
 		@$resp{'UnixUID', 'UnixGID', 'UnixPerms', 'UnixAccessRights'} =
 			unpack('x' . $offset . 'NNNN', $data);
 		$offset += 16;
@@ -411,74 +411,74 @@ sub _ParseDirParms { # {{{1
 	my $resp = {};
 	my $offset = 0;
 
-	if ($Bitmap & Net::AFP::DirParms::kFPAttributeBit) {
+	if ($Bitmap & kFPAttributeBit) {
 		$$resp{'Attributes'} = unpack('x' . $offset . 'n', $data);
 		$offset += 2;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPParentDirIDBit) {
+	if ($Bitmap & kFPParentDirIDBit) {
 		$$resp{'ParentDirID'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPCreateDateBit) {
+	if ($Bitmap & kFPCreateDateBit) {
 		$$resp{'CreateDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
 				globalTimeOffset;
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPModDateBit) {
+	if ($Bitmap & kFPModDateBit) {
 		$$resp{'ModDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
 				globalTimeOffset;
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPBackupDateBit) {
+	if ($Bitmap & kFPBackupDateBit) {
 		$$resp{'BackupDate'} =
 				long_unconvert(unpack('x' . $offset . 'N', $data)) +
 				globalTimeOffset;
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPFinderInfoBit) {
+	if ($Bitmap & kFPFinderInfoBit) {
 		$$resp{'FinderInfo'} = unpack('x' . $offset . 'a32', $data);
 		$offset += 32;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPLongNameBit) {
+	if ($Bitmap & kFPLongNameBit) {
 		my $position = unpack('x' . $offset . 'n', $data);
 		$$resp{'LongName'} = decode('MacRoman', unpack('x' . $position . 'C/a', $data));
 		$offset += 2;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPShortNameBit) {
+	if ($Bitmap & kFPShortNameBit) {
 		my $position = unpack('x' . $offset . 'n', $data);
 		$$resp{'ShortName'} = unpack('x' . $position . 'C/a', $data);
 		$offset += 2;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPNodeIDBit) {
+	if ($Bitmap & kFPNodeIDBit) {
 		$$resp{'NodeID'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPOffspringCountBit) {
+	if ($Bitmap & kFPOffspringCountBit) {
 		$$resp{'OffspringCount'} = unpack('x' . $offset . 'n', $data);
 		$offset += 2;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPOwnerIDBit) {
+	if ($Bitmap & kFPOwnerIDBit) {
 		$$resp{'OwnerID'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPGroupIDBit) {
+	if ($Bitmap & kFPGroupIDBit) {
 		$$resp{'GroupID'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPAccessRightsBit) {
+	if ($Bitmap & kFPAccessRightsBit) {
 		$$resp{'AccessRights'} = unpack('x' . $offset . 'N', $data);
 		$offset += 4;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPUTF8NameBit) {
+	if ($Bitmap & kFPUTF8NameBit) {
 		my $position = unpack('x' . $offset . 'n', $data);
 		@$resp{'UTF8Hint', 'UTF8Name'} =
 				unpack('x' . $position . 'Nn/a', $data);
 		$$resp{'UTF8Name'} = decode_utf8($$resp{'UTF8Name'});
 		$offset += 6;
 	}
-	if ($Bitmap & Net::AFP::DirParms::kFPUnixPrivsBit) {
+	if ($Bitmap & kFPUnixPrivsBit) {
 		@$resp{'UnixUID', 'UnixGID', 'UnixPerms', 'UnixAccessRights'} =
 			unpack('x' . $offset . 'NNNN', $data);
 		$offset += 16;
