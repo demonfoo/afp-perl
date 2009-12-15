@@ -471,13 +471,17 @@ if ($volAttrs & kSupportsUTF8Names) {
 }
 
 my $DForkLenFlag	= kFPDataForkLenBit;
+my $RForkLenFlag	= kFPRsrcForkLenBit;
 my $DForkLenKey		= 'DataForkLen';
+my $RForkLenKey		= 'RsrcForkLen';
 my $UseExtOps		= 0;
 # I *think* large file support entered the picture as of AFP 3.0...
 if (Net::AFP::Versions::CompareByVersionNum($afpSession, 3, 0,
-				Net::AFP::Versions::AtLeast)) {
+		kFPVerAtLeast)) {
 	$DForkLenFlag	= kFPExtDataForkLenBit;
+	$RForkLenFlag	= kFPExtRsrcForkLenBit;
 	$DForkLenKey	= 'ExtDataForkLen';
+	$RForkLenKey	= 'ExtRsrcForkLen';
 	$UseExtOps		= 1;
 }
 
