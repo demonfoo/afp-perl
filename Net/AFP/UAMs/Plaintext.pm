@@ -45,7 +45,7 @@ sub ChangePassword {
 			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
 
 	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
-				Net::AFP::Versions::AtLeast)) {
+			kFPVerAtLeast)) {
 		$username = '';
 	}
 	return $session->FPChangePassword(UAMNAME, $username,

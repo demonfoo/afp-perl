@@ -82,7 +82,7 @@ sub ChangePassword {
 	# Send the message to the server, and pass the return code directly
 	# back to the caller.
 	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
-				Net::AFP::Versions::AtLeast)) {
+			kFPVerAtLeast)) {
 		$username = '';
 	}
 	my $rc = $session->FPChangePassword(UAMNAME, $username, $message);

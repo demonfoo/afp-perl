@@ -321,7 +321,7 @@ sub ChangePassword {
 	my $resp = undef;
 
 	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
-				Net::AFP::Versions::AtLeast)) {
+			kFPVerAtLeast)) {
 		$username = '';
 	}
 	my $rc = $session->FPChangePassword(UAMNAME, $username, undef, \$resp);

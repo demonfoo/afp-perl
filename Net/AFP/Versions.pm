@@ -1,4 +1,11 @@
 # This package describes the versions of the AFP protocol that are known,
+
+use Net::AFP::TokenTypes;
+
+use Exporter qw(import);
+
+our @EXPORT = qw(kFPVerNewerThan kFPVerAtLeast kFPVerEqual kFPVerNoNowerThan
+				 kFPVerOlderThan);
 # and that are supported by us, as well as providing functions for
 # version checking (which can be used for enabling specific features based
 # on the protocol version agreed upon).
@@ -83,41 +90,41 @@ can be indicated with the following constants.
 
 =over
 
-=item NewerThan
+=item kFPVerNewerThan
 
 The protocol version in use for the active connection must be newer than
 the one passed.
 
 =cut
-use constant NewerThan		=> 0;
-=item AtLeast
+use constant kFPVerNewerThan		=> 0;
+=item kFPVerAtLeast
 
 The protocol version in use for the active connection must be equivalent
 to, or newer than, the one passed.
 
 =cut
-use constant AtLeast		=> 1;
-=item Equal
+use constant kFPVerAtLeast		=> 1;
+=item kFPVerEqual
 
 The protocol version in use for the active connection must be exactly
 the one passed.
 
 =cut
-use constant Equal			=> 2;
-=item NoNewerThan
+use constant kFPVerEqual		=> 2;
+=item kFPVerNoNewerThan
 
 The protocol version in use for the active connection must be older than
 or equivalent to, the one passed.
 
 =cut
-use constant NoNewerThan	=> 3;
-=item OlderThan
+use constant kFPVerNoNewerThan	=> 3;
+=item kFPVerOlderThan
 
 The protocol version in use for the active connection must be older than
 the one passed.
 
 =cut
-use constant OlderThan		=> 4;
+use constant kFPVerOlderThan	=> 4;
 
 =back
 
@@ -173,22 +180,22 @@ sub CompareByVersionNum {
 	my $running_ver = $versionmap{$$session{'AFPVersion'}};
 	my($r_major, $r_minor) = @$running_ver{'MajorNumber', 'MinorNumber'};
 
-	if ($cmptype == NewerThan) {
+	if ($cmptype == kFPVerNewerThan) {
 		return(1) if $r_major > $major;
 		return(1) if $r_major == $major && $r_minor > $minor;
 		return 0;
-	} elsif ($cmptype == AtLeast) {
+	} elsif ($cmptype == kFPVerAtLeast) {
 		return(1) if $r_major > $major;
 		return(1) if $r_major == $major && $r_minor >= $minor;
 		return 0;
-	} elsif ($cmptype == Equal) {
+	} elsif ($cmptype == kFPVerEqual) {
 		return(1) if $r_major == $major && $r_minor == $minor;
 		return 0;
-	} elsif ($cmptype == NoNewerThan) {
+	} elsif ($cmptype == kFPVerNoNewerThan) {
 		return(0) if $r_major > $major;
 		return(0) if $r_major == $major && $r_minor > $minor;
 		return 1;
-	} elsif ($cmptype == OlderThan) {
+	} elsif ($cmptype == kFPVerOlderThan) {
 		return(0) if $r_major > $major;
 		return(0) if $r_major == $major && $r_minor >= $minor;
 		return 1;

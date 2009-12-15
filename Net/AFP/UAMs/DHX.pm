@@ -211,7 +211,7 @@ sub ChangePassword {
 
 	# Username is always an empty string with AFP 3.0 and up.
 	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
-				Net::AFP::Versions::AtLeast)) {
+			kFPVerAtLeast)) {
 		$username = '';
 	}
 	my $rc = $session->FPChangePassword(UAMNAME, $username, $authinfo, \$resp);
