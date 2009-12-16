@@ -1,4 +1,8 @@
 # This package describes the versions of the AFP protocol that are known,
+# and that are supported by us, as well as providing functions for
+# version checking (which can be used for enabling specific features based
+# on the protocol version agreed upon).
+package Net::AFP::Versions;
 
 use Net::AFP::TokenTypes;
 
@@ -6,9 +10,6 @@ use Exporter qw(import);
 
 our @EXPORT = qw(kFPVerNewerThan kFPVerAtLeast kFPVerEqual kFPVerNoNowerThan
 				 kFPVerOlderThan);
-# and that are supported by us, as well as providing functions for
-# version checking (which can be used for enabling specific features based
-# on the protocol version agreed upon).
 
 =head1 NAME
 
@@ -22,7 +23,6 @@ by either major and minor number, or the symbolic version string, for
 e.g., enabling features based on the version of the AFP protocol in use.
 
 =cut
-package Net::AFP::Versions;
 
 our @versions = (
 	{
