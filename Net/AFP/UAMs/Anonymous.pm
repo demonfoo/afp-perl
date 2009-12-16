@@ -3,6 +3,7 @@
 
 package Net::AFP::UAMs::Anonymous;
 use constant UAMNAME => 'No User Authent';
+use Net::AFP::Result;
 
 use strict;
 use warnings;
