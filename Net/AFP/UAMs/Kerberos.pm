@@ -8,7 +8,7 @@ use Net::AFP::Connection;
 
 use strict;
 
-Net::AFP::UAMs::RegisterUAM(UAMNAME, __PACKAGE__, 300);
+#Net::AFP::UAMs::RegisterUAM(UAMNAME, __PACKAGE__, 300);
 
 sub Authenticate {
 	my ($session, $AFPVersion, $username, $pw_cb, $realm) = @_;
