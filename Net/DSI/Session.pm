@@ -96,21 +96,19 @@ sub session_thread { # {{{1
 	# used in the main loop.
 	my $poll = new IO::Poll;
 	$poll->mask($conn, POLLRDNORM);
-	my $duration = 30;
-	my($data, $real_length, $rlen, $resp, $nf, $tl, $wlen);
-	my($type, $cmd, $id, $errcode, $length, $reserved, $req, $i, $count);
+	my($data, $real_length, $resp);
+	my($type, $cmd, $id, $errcode, $length, $reserved);
 	while ($$shared{'exit'} == 0) {
-		$count = $poll->poll(30);
-		if ($count > 0) {
+		if ($poll->poll(30) > 0) {
 			# Try to get a message from the server.
-			$resp = '';
+#			$resp = '';
 			my $rsz = sysread($conn, $resp, 16);
 			last unless defined $rsz;
 			next unless $rsz == 16;
 			($type, $cmd, $id, $errcode, $length, $reserved) =
 					unpack('CCnNNN', $resp);
 	
-			$data = '';
+#			$data = '';
 			$real_length = 0;
 			# Get any additional data from the server, if the message
 			# indicated that there was a payload.
@@ -151,15 +149,13 @@ sub session_thread { # {{{1
 			}
 		}
 
-#		if ($tl == 0) {
-			# send a DSITickle to the server
-			# Field 2: Command: DSITickle(5)
-			# Manually queue the DSITickle message.
-			$$shared{'conn_sem'}->down();
-			syswrite($conn, pack('CCnNNN', 0, OP_DSI_TICKLE,
-					$$shared{'requestid'}++ % 65536, 0, 0, 0));
-			$$shared{'conn_sem'}->up();
-#		}
+		# send a DSITickle to the server
+		# Field 2: Command: DSITickle(5)
+		# Manually queue the DSITickle message.
+		$$shared{'conn_sem'}->down();
+		syswrite($conn, pack('CCnNNN', 0, OP_DSI_TICKLE,
+				$$shared{'requestid'}++ % 65536, 0, 0, 0));
+		$$shared{'conn_sem'}->up();
 	}
 	$$shared{'running'} = -1;
 	undef $$shared{'Conn'};
