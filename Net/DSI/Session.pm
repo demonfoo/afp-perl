@@ -11,7 +11,7 @@ if ($@) {
 	$has_IO_Socket_INET6 = 0;
 }
 use IO::Socket::INET;
-use IO::Select;
+use IO::Poll qw(POLLRDNORM POLLWRNORM POLLIN POLLHUP);
 use IO::Handle;
 use Net::AFP::Result;
 use Time::HiRes qw(gettimeofday);
@@ -94,13 +94,14 @@ sub session_thread { # {{{1
 	# Get the FD number for use with select(), and assign a few other
 	# important values. Also preallocate several variables which will be
 	# used in the main loop.
-	my $select = new IO::Select($conn);
+	my $poll = new IO::Poll;
+	$poll->mask($conn, POLLRDNORM);
 	my $duration = 30;
 	my($data, $real_length, $rlen, $resp, $nf, $tl, $wlen);
-	my($type, $cmd, $id, $errcode, $length, $reserved, $req, $i, @set);
+	my($type, $cmd, $id, $errcode, $length, $reserved, $req, $i, $count);
 	while ($$shared{'exit'} == 0) {
-		@set = $select->can_read(30);
-		if (scalar(@set) > 0) {
+		$count = $poll->poll(30);
+		if ($count > 0) {
 			# Try to get a message from the server.
 			$resp = '';
 			my $rsz = sysread($conn, $resp, 16);
