@@ -420,10 +420,10 @@ _EOT_
 			my $sresp = '';
 			if ($UseExtOps) {
 				$rc = $session->FPWriteExt(0x80, $$resp{'OForkRefNum'}, 0,
-						length($data), $data, \$sresp);
+						length($data), \$data, \$sresp);
 			} else {
 				$rc = $session->FPWrite(0x80, $$resp{'OForkRefNum'}, 0,
-						length($data), $data, \$sresp);
+						length($data), \$data, \$sresp);
 			}
 			#if ($hashmarks_enabled == 1) {
 #			my $pcnt = ($pos + length($data)) * 100 / $fileLen;
@@ -598,7 +598,7 @@ sub do_listentries {
 			$tfmt = '%b %e %H:%M';
 		}
 		my $up = $$ent{'UnixPerms'};
-		printf('%s%s%s%s%s%s%s%s%s%s %3d %5d %5d %8d %-11s %s' . "\n",
+		printf('%s%s%s%s%s%s%s%s%s%s %3d %5d %5d %8s %-11s %s' . "\n",
 			($$ent{'FileIsDir'} == 1 ? 'd' : '-'),
 			($up & 0400 ? 'r' : '-'),
 			($up & 0200 ? 'w' : '-'),
@@ -749,9 +749,9 @@ exit(0);
 sub doAFPConnection {
 	my($host, $port, $user, $password, $uam, $srvinf_r) = @_;
 	my $srvInfo;
-	my $rc = Net::AFP::Connection::TCP->FPGetSrvrInfo($host, $port, \$srvInfo);
+	my $rc = Net::AFP::Connection::TCP->GetStatus($host, $port, \$srvInfo);
 	if ($rc != kFPNoErr) {
-		print "Could not issue FPGetSrvrInfo on ", $host, "\n";
+		print "Could not issue GetStatus on ", $host, "\n";
 		exit(1);
 	}
 #	print Dumper($srvInfo);

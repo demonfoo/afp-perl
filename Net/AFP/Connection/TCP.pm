@@ -95,8 +95,8 @@ sub new { # {{{1
 	my $obj = {};
 	bless $obj, $class;
 
-	$obj->{'DSISession'} = new Net::DSI::Session($host, $port);
-	my $rc = $obj->{'DSISession'}->DSIOpenSession();
+	$$obj{'DSISession'} = new Net::DSI::Session($host, $port);
+	my $rc = $$obj{'DSISession'}->DSIOpenSession();
 	return $rc unless $rc == kFPNoErr;
 	return $obj;
 } # }}}1
@@ -126,8 +126,8 @@ sub close { # {{{1
 	my ($self) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
-#	$self->{'DSISession'}->DSICloseSession();
-	$self->{'DSISession'}->close();
+#	$$self{'DSISession'}->DSICloseSession();
+	$$self{'DSISession'}->close();
 } # }}}1
 
 =item SendAFPMessage()
@@ -142,7 +142,7 @@ sub SendAFPMessage { # {{{1
 	my($self, $payload, $resp_r) = @_;
 	
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
-	my $rc = $self->{'DSISession'}->DSICommand($payload, $resp_r);
+	my $rc = $$self{'DSISession'}->DSICommand($payload, $resp_r);
 	return $rc;
 } # }}}1
 
@@ -158,16 +158,16 @@ sub SendAFPWrite { # {{{1
 	my($self, $payload, $data_r, $resp_r) = @_;
 	
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
-	my $rc = $self->{'DSISession'}->DSIWrite($payload, $data_r, $resp_r);
+	my $rc = $$self{'DSISession'}->DSIWrite($payload, $data_r, $resp_r);
 	return $rc;
 } # }}}1
 
-=item FPGetSrvrInfo()
+=item GetStatus()
 
 Requests information about an AFP over TCP server. Should not be called
 against an open session; only call this method as follows:
 
-Net::AFP::Connection::TCP->FPGetSrvrInfo(...);
+Net::AFP::Connection::TCP->GetStatus(...);
 
 Other calling conventions will not work correctly.
 
@@ -193,15 +193,15 @@ the remote server upon success.
 =back
 
 =cut
-sub FPGetSrvrInfo { # {{{1
+sub GetStatus { # {{{1
 	my ($class, $host, $port, $resp_r) = @_;
 	if (ref($class) ne '') {
-		die('FPGetSrvrInfo() should NEVER be called against an active object');
+		die('GetStatus() should NEVER be called against an active object');
 		return -1;
 	}
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
-	my $resp = '';
+	my $resp;
 	my $rc = Net::DSI::Session->DSIGetStatus($host, $port, \$resp);
 	return $rc unless $rc == kFPNoErr;
 

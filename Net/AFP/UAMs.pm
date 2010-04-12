@@ -43,7 +43,7 @@ foreach my $incpath (@INC) {
 	my $uamincpath = $incpath . '/Net/AFP/UAMs';
 	if (-d $uamincpath) {
 		opendir(UAMDIR, $uamincpath);
-		push(@uampaths, map { $uamincpath . '/' . $_} grep(/\.pm$/, readdir(UAMDIR)));
+		push(@uampaths, map { $uamincpath . '/' . $_ } grep(/\.pm$/, readdir(UAMDIR)));
 		closedir(UAMDIR);
 	}
 }

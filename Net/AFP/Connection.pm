@@ -3128,23 +3128,13 @@ sub FPGetSessionToken { # {{{1
 
 Gets information about a server.
 
-This function is actually not implemented in this class; see the documentation
-for Net::AFP::Connection::TCP for more information on the arguments to this
-method, as there may be some variation due to low-level protocol particulars.
-
 Arguments:
 
 =over
 
-=item $class
+=item $self
 
-The subclass of Net::AFP::Connection that implements the transport desired.
-
-=item $host
-
-The hostname (in the case of the TCP transport, an IP address or DNS
-hostname, or in the case of the AppleTalk transport, an NBP name or an
-AppleTalk address) of the system to consult.
+An object that is a subclass of Net::AFP::Connection.
 
 =item $resp_r
 
@@ -3170,12 +3160,19 @@ Non-AFP error occurred.
 
 =cut
 sub FPGetSrvrInfo { # {{{1
-	# As the die() suggests, this method should never be called directly. It
-	# should be overridden in the inheriting class, since AFP over TCP uses
-	# DSIGetStatus and AFP over ASP (AppleTalk) uses SPGetStatus - it doesn't
-	# actually use the kFPGetSrvrInfo opcode. Who knew?
+	my ($self, $resp_r) = @_;
+
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
-	die('FPGetSrvrInfo base class method invoked - bad bad bad');
+	die('$resp_r must be a scalar ref')
+			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+
+	my $resp;
+	my $rc = $self->SendAFPMessage(pack('Cx', kFPGetSrvrInfo), \$resp);
+	# If the response was not kFPNoErr, the info block will not be present.
+	return $rc unless $rc == kFPNoErr;
+
+	$$resp_r = Net::AFP::Parsers::_ParseSrvrInfo($resp);
+	return $rc;
 } # }}}1
 
 =item FPGetSrvrMsg()

@@ -318,10 +318,10 @@ close(CHILD);
 # use later in the connection process.
 # get server information {{{1
 my $srvInfo;
-my $rc = Net::AFP::Connection::TCP->FPGetSrvrInfo(@values{'host', 'port'},
+my $rc = Net::AFP::Connection::TCP->GetStatus(@values{'host', 'port'},
 		\$srvInfo);
 if ($rc != kFPNoErr) {
-	print "Could not issue FPGetSrvrInfo on ", $values{'host'}, "\n";
+	print "Could not issue GetStatus on ", $values{'host'}, "\n";
 	syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, &ENODEV));
 	exit(1);
 }
@@ -1390,6 +1390,10 @@ sub afp_flush { # {{{1
 					@{$ofilecache{$fileName}}{'refnum', 'coalesce_offset',
 											  'coalesce_len'};
             my $data_ref = \$ofilecache{$fileName}{'coalesce_buf'};
+			if ($ofilecache{$fileName}{'coalesce_len'} < COALESCE_MAX) {
+				my $data = substr($$data_ref, 0, $ofilecache{$fileName}{'coalesce_len'});
+				$data_ref = \$data;
+			}
 			my $lastwr;
 			my $rc;
 			if ($UseExtOps) {

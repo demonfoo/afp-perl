@@ -5,10 +5,10 @@
 # caring about.
 package Net::DSI::Session;
 
-my $has_IO_Socket_INET6 = 1;
+my $has_IO__Socket__INET6 = 1;
 eval { require IO::Socket::INET6; };
 if ($@) {
-	$has_IO_Socket_INET6 = 0;
+	$has_IO__Socket__INET6 = 0;
 }
 use IO::Socket::INET;
 use IO::Poll qw(POLLRDNORM POLLWRNORM POLLIN POLLHUP);
@@ -20,7 +20,6 @@ use threads::shared;
 use Thread::Semaphore;
 use strict;
 use warnings;
-use Data::Dumper;
 
 use constant OP_DSI_CLOSESESSION	=> 1;
 use constant OP_DSI_COMMAND			=> 2;
@@ -52,12 +51,8 @@ sub session_thread { # {{{1
 						 'PeerPort'		=> $port,
 						 'HostPort'		=> 0,
 						 'Proto'		=> 'tcp',
-						 'Type'			=> SOCK_STREAM,
-						 'MultiHomed'	=> 1 );
-	if ($has_IO_Socket_INET6 == 1) {
-		# Try using IO::Socket::INET6 once first, before trying with
-		# IO::Socket::INET; on Linux INET6 can be used for both, but on
-		# *BSD, it can't.
+						 'Type'			=> SOCK_STREAM );
+	if ($has_IO__Socket__INET6 == 1) {
 		$conn = new IO::Socket::INET6(%connect_args);
 	}
 	if (!defined($conn) || !$conn->connected()) {
@@ -101,14 +96,12 @@ sub session_thread { # {{{1
 	while ($$shared{'exit'} == 0) {
 		if ($poll->poll(30) > 0) {
 			# Try to get a message from the server.
-#			$resp = '';
 			my $rsz = sysread($conn, $resp, 16);
 			last unless defined $rsz;
 			next unless $rsz == 16;
 			($type, $cmd, $id, $errcode, $length, $reserved) =
 					unpack('CCnNNN', $resp);
 	
-#			$data = '';
 			$real_length = 0;
 			# Get any additional data from the server, if the message
 			# indicated that there was a payload.
@@ -126,7 +119,6 @@ sub session_thread { # {{{1
 
 				# FIXME: probably should handle OP_DSI_ATTENTION here.
 			} else {
-	
 				# Handle negative return codes in the canonical way.
 				if ($errcode & 0x80000000) {
 					$errcode = -((~$errcode & 0xFFFFFFFF) + 1);
@@ -196,8 +188,6 @@ sub new { # {{{1
 				 # a counter for a (mostly) unique sequence ID for messages
 				 # sent to the server.
 				 'requestid'	=> 0,
-				 # requests to be dispatched go here.
-				 #'sendq'		=> &share([]),
 				 'conn_fd'		=> undef,
 				 'conn_sem'		=> new Thread::Semaphore(0),
 				 # completion handlers are registered here.
