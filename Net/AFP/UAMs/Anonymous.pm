@@ -17,8 +17,8 @@ sub Authenticate {
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
 	# Ensure that we've been handed an appropriate object.
-	die("Object MUST be of type Net::AFP::Connection!")
-			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
+	die("Object MUST be of type Net::AFP!")
+			unless ref($session) ne '' and $session->isa('Net::AFP');
 	
 	my $rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, '', 3, '');
 	print 'FPLoginExt() completed with result code ', $rc, "\n"

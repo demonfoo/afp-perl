@@ -15,8 +15,8 @@ Net::AFP::VolParms - Volume parameter arguments
 =head1 DESCRIPTION
 
 The following attributes are used for calls like
-L<Net::AFP::Connection/FPOpenVol> and
-L<Net::AFP::Connection/FPGetVolParms>.
+L<Net::AFP/FPOpenVol> and
+L<Net::AFP/FPGetVolParms>.
 
 =over
 

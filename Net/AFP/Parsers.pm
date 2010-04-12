@@ -91,7 +91,7 @@ sub uuid_pack($) { # {{{1
 
 # Parsers for assorted reply types will be placed here. This isn't really
 # intended for public consumption - these are only for use in the
-# Net::AFP::Connection package and its inheritors. Not that anyone else would
+# Net::AFP package and its inheritors. Not that anyone else would
 # really know what to do with them anyway.
 
 # FPGetVolParms and FPOpenVol will both need this to parse volume

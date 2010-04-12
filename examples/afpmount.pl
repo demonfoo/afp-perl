@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Fuse qw(:xattr);			# preferably use Fuse 0.09_3 (or later), for
 								# decent support of files >= 2**31 bytes long
-use Net::AFP::Connection::TCP;	# the class which actually sets up and
+use Net::AFP::TCP;				# the class which actually sets up and
 								# handles the guts of talking to an AFP
 								# server via TCP/IP
 use Net::AFP::Result;			# AFP result codes
@@ -318,7 +318,7 @@ close(CHILD);
 # use later in the connection process.
 # get server information {{{1
 my $srvInfo;
-my $rc = Net::AFP::Connection::TCP->GetStatus(@values{'host', 'port'},
+my $rc = Net::AFP::TCP->GetStatus(@values{'host', 'port'},
 		\$srvInfo);
 if ($rc != kFPNoErr) {
 	print "Could not issue GetStatus on ", $values{'host'}, "\n";
@@ -330,8 +330,8 @@ print Dumper($srvInfo) if defined $::_DEBUG;
 
 # Actually open a session to the server.
 # open server connection {{{1
-$afpSession = new Net::AFP::Connection::TCP(@values{'host', 'port'});
-unless (ref($afpSession) ne '' and $afpSession->isa('Net::AFP::Connection')) {
+$afpSession = new Net::AFP::TCP(@values{'host', 'port'});
+unless (ref($afpSession) ne '' and $afpSession->isa('Net::AFP')) {
 	print "Could not connect via AFP to ", $values{'host'}, "\n";
 	syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, &ENODEV));
 	exit(1);

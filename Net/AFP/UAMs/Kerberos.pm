@@ -4,7 +4,7 @@ use constant UAMNAME => 'Client Krb v2';
 
 use GSSAPI;
 use Net::AFP::Result;
-use Net::AFP::Connection;
+use Net::AFP;
 
 use strict;
 
@@ -14,8 +14,8 @@ sub Authenticate {
 	my ($session, $AFPVersion, $username, $pw_cb, $realm) = @_;
 
 	# Ensure that we've been handed an appropriate object.
-	die('Object MUST be of type Net::AFP::Connection!')
-			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
+	die('Object MUST be of type Net::AFP!')
+			unless ref($session) ne '' and $session->isa('Net::AFP');
 
 	die('Password callback MUST be a subroutine ref')
 			unless ref($pw_cb) eq 'CODE';

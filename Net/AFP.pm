@@ -62,7 +62,7 @@
 #  - FPCatSearch{,Ext}
 
 # imports {{{1
-package Net::AFP::Connection;
+package Net::AFP;
 use strict;
 use warnings;
 use Net::AFP::Result;
@@ -160,7 +160,7 @@ use constant kFPAddIcon					=> 192;	# AFP 2.0
 
 =head1 NAME
 
-Net::AFP::Connection - Perl module implementing an interface for accessing Apple File Protocol exports
+Net::AFP - Perl module implementing an interface for accessing Apple File Protocol exports
 
 =head1 DESCRIPTION
 
@@ -169,7 +169,7 @@ connect to an AFP server and perform operations on remote files and
 directories within an exported share.
 
 This class is not intended for direct use - currently, the
-Net::AFP::Connection::TCP package derives this class. This class implements
+Net::AFP::TCP package derives this class. This class implements
 generalized functionality; protocol-specific functionality is completely
 abstracted out from this class.
 
@@ -291,7 +291,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -371,7 +371,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -451,7 +451,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -516,7 +516,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -586,7 +586,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flags
 
@@ -678,7 +678,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flags
 
@@ -796,7 +796,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $UAM
 
@@ -894,7 +894,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -942,7 +942,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -983,7 +983,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $OForkRefNum
 
@@ -1024,7 +1024,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -1065,7 +1065,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $SrcVolID
 
@@ -1180,7 +1180,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -1271,7 +1271,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flag
 
@@ -1359,7 +1359,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -1439,7 +1439,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -1527,7 +1527,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -1596,7 +1596,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Type
 
@@ -1644,7 +1644,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -1803,7 +1803,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -1958,7 +1958,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -2113,7 +2113,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -2204,7 +2204,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -2245,7 +2245,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $OForkRefNum
 
@@ -2286,7 +2286,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -2422,7 +2422,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -2482,7 +2482,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flags
 
@@ -2556,7 +2556,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -2635,7 +2635,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -2748,7 +2748,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -2840,7 +2840,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $OForkRefNum
 
@@ -2901,7 +2901,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -2976,7 +2976,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -3046,7 +3046,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Type
 
@@ -3134,7 +3134,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $resp_r
 
@@ -3185,7 +3185,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $MessageType
 
@@ -3267,7 +3267,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $resp_r
 
@@ -3334,7 +3334,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flags
 
@@ -3448,7 +3448,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -3511,7 +3511,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -3627,7 +3627,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $AFPVersion
 
@@ -3744,7 +3744,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $ID
 
@@ -3855,7 +3855,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flags
 
@@ -3996,7 +3996,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =back
 
@@ -4033,7 +4033,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Subfunction
 
@@ -4112,7 +4112,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Subfunction
 
@@ -4186,7 +4186,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -4309,7 +4309,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -4391,7 +4391,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -4443,7 +4443,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flag
 
@@ -4579,7 +4579,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Bitmap
 
@@ -4676,7 +4676,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $OForkRefNum
 
@@ -4770,7 +4770,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $OForkRefNum
 
@@ -4847,7 +4847,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -4922,7 +4922,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $DTRefNum
 
@@ -4990,7 +4990,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -5071,7 +5071,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -5158,7 +5158,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -5249,7 +5249,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -5363,7 +5363,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -5530,7 +5530,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -5620,7 +5620,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -5776,7 +5776,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -5931,7 +5931,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $OForkRefNum
 
@@ -6024,7 +6024,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -6090,7 +6090,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $VolumeID
 
@@ -6127,7 +6127,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $OForkRefNum
 
@@ -6165,7 +6165,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flag
 
@@ -6266,7 +6266,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flag
 
@@ -6362,7 +6362,7 @@ Arguments:
 
 =item $self
 
-An object that is a subclass of Net::AFP::Connection.
+An object that is a subclass of Net::AFP.
 
 =item $Flags
 

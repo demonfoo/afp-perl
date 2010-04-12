@@ -15,8 +15,8 @@ sub Authenticate {
 	my($session, $AFPVersion, $username, $pw_cb) = @_;
 
 	# Ensure that we've been handed an appropriate object.
-	die("Object MUST be of type Net::AFP::Connection!")
-			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
+	die("Object MUST be of type Net::AFP!")
+			unless ref($session) ne '' and $session->isa('Net::AFP');
 	
 	die('Password callback MUST be a subroutine ref')
 			unless ref($pw_cb) eq 'CODE';
@@ -41,8 +41,8 @@ sub ChangePassword {
 	my ($session, $username, $oldPassword, $newPassword) = @_;
 
 	# Ensure that we've been handed an appropriate object.
-	die('Object MUST be of type Net::AFP::Connection!')
-			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
+	die('Object MUST be of type Net::AFP!')
+			unless ref($session) ne '' and $session->isa('Net::AFP');
 
 	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
 			kFPVerAtLeast)) {

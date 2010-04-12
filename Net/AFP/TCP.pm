@@ -1,8 +1,8 @@
 # Implementation of a subclass that implements the necessary virtual methods
 # for handling an AFP session over TCP protocol.
-package Net::AFP::Connection::TCP;
+package Net::AFP::TCP;
 use Net::DSI::Session;
-use Net::AFP::Connection;
+use Net::AFP;
 use Net::AFP::Parsers;
 use Net::AFP::Result;
 use Exporter qw(import);
@@ -11,14 +11,14 @@ use warnings;
 
 =head1 NAME
 
-Net::AFP::Connection::TCP - Perl module implementing AFP over TCP interface
+Net::AFP::TCP - Perl module implementing AFP over TCP interface
 
 =head1 DESCRIPTION
 
 This package implements the necessary methods to interface to an
-AFP over TCP server. It is a subclass of Net::AFP::Connection, which
+AFP over TCP server. It is a subclass of Net::AFP, which
 implements the generic parts of the AFP protocol; this module adds
-AFP over TCP specific code. See L<Net::AFP::Connection/AFP SERVER COMMANDS>
+AFP over TCP specific code. See L<Net::AFP/AFP SERVER COMMANDS>
 for a list of all the inherited methods which can be called against the
 instantiated object.
 
@@ -28,14 +28,14 @@ instantiated object.
 
 =cut
 
-our @ISA = qw(Net::AFP::Connection);
+our @ISA = qw(Net::AFP);
 our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name kFPSoftCreate
 				 kFPHardCreate);
 
 # Arguments:
-#	$class: The class (Net::AFP::Connection::TCP) to create an instance of. This
-#			must be invoked as 'new Net::AFP::Connection::TCP' or
-#			'Net::AFP::Connection::TCP->new'.
+#	$class: The class (Net::AFP::TCP) to create an instance of. This
+#			must be invoked as 'new Net::AFP::TCP' or
+#			'Net::AFP::TCP->new'.
 #	$host: The IP address (a DNS name should work as well) of the AFP over
 #		   TCP server we wish to connect to. (IPv6 addresses will work as
 #		   well, if IO::Socket::INET6 is available.)
@@ -43,18 +43,18 @@ our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name kFPSoftCreate
 #		   is to be used (default is 548).
 =item new()
 
-Create a new instance of a Net::AFP::Connection::TCP session. Should always
+Create a new instance of a Net::AFP::TCP session. Should always
 be called like:
 
-Net::AFP::Connection::TCP->new(...);
+Net::AFP::TCP->new(...);
 
 or:
 
-new Net::AFP::Connection::TCP (...);
+new Net::AFP::TCP (...);
 
 DO NOT call:
 
-Net::AFP::Connection::TCP::new(...);
+Net::AFP::TCP::new(...);
 
 This calling convention will not work.
 
@@ -111,7 +111,7 @@ and FPLogout() should be called to close the session out.
 
 =item $self
 
-An instance of Net::AFP::Connection::TCP which is to be shut down and
+An instance of Net::AFP::TCP which is to be shut down and
 disbanded.
 
 =back
@@ -132,12 +132,12 @@ sub close { # {{{1
 
 =item SendAFPMessage()
 
-Private method, used internally by Net::AFP::Connection for dispatching
+Private method, used internally by Net::AFP for dispatching
 AFP requests. Do not use.
 
 =cut
 # This is a virtual method which is not for public consumption. Only
-# Net::AFP::Connection methods should ever call this.
+# Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
 	my($self, $payload, $resp_r) = @_;
 	
@@ -148,12 +148,12 @@ sub SendAFPMessage { # {{{1
 
 =item SendAFPWrite()
 
-Private method, used internally by Net::AFP::Connection for dispatching
+Private method, used internally by Net::AFP for dispatching
 AFP write requests. Do not use.
 
 =cut
 # This is a virtual method which is not for public consumption. Only
-# Net::AFP::Connection methods should ever call this.
+# Net::AFP methods should ever call this.
 sub SendAFPWrite { # {{{1
 	my($self, $payload, $data_r, $resp_r) = @_;
 	
@@ -167,9 +167,13 @@ sub SendAFPWrite { # {{{1
 Requests information about an AFP over TCP server. Should not be called
 against an open session; only call this method as follows:
 
-Net::AFP::Connection::TCP->GetStatus(...);
+Net::AFP::TCP->GetStatus(...);
 
 Other calling conventions will not work correctly.
+
+Note that this returns the same data structure that FPGetSrvrInfo() does, but
+is intended for getting server information prior to setting up a full-on
+session with the server.
 
 =over
 

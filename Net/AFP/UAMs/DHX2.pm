@@ -123,8 +123,8 @@ sub Authenticate {
 	my $randsrc = new IO::File('/dev/urandom', 'r');
 
 	# Ensure that we've been handed an appropriate object.
-	die('Object MUST be of type Net::AFP::Connection!')
-			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
+	die('Object MUST be of type Net::AFP!')
+			unless ref($session) ne '' and $session->isa('Net::AFP');
 
 	my $nonce_limit = new Math::BigInt(1);
 	$nonce_limit->blsft(128);
@@ -312,8 +312,8 @@ sub ChangePassword {
 	my $randsrc = new IO::File('/dev/urandom', 'r');
 
 	# Ensure that we've been handed an appropriate object.
-	die('Object MUST be of type Net::AFP::Connection!')
-			unless ref($session) ne '' and $session->isa('Net::AFP::Connection');
+	die('Object MUST be of type Net::AFP!')
+			unless ref($session) ne '' and $session->isa('Net::AFP');
 
 	my $nonce_limit = new Math::BigInt(1);
 	$nonce_limit->blsft(128);

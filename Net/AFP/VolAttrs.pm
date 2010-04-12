@@ -28,7 +28,7 @@ use constant kReadOnly					=> 0x0001;
 If set, the volume has a volume password. Volume passwords were supported
 in prior versions of AFP; now the volume attributes reflect this
 information. This bit is the same as the C<HasPassword> bit returned for
-each volume by L<Net::AFP::Connection/FPGetSrvrParms>.
+each volume by L<Net::AFP/FPGetSrvrParms>.
 
 =cut
 # This bit was added as of AFP v2.1; volume passwords were supported
@@ -47,10 +47,10 @@ bit allows the server to be more selective, if necessary.
 use constant kSupportsFileIDs			=> 0x0004;
 =item kSupportsCatSearch
 
-If set, the volume supports the L<Net::AFP::Connection/FPCatSearch> and
-L<Net::AFP::Connection/FPCatSearchExt> commands. Support for
-L<Net::AFP::Connection/FPCatSearch> and
-L<Net::AFP::Connection/FPCatSearchExt> is optional. This bit allows the
+If set, the volume supports the L<Net::AFP/FPCatSearch> and
+L<Net::AFP/FPCatSearchExt> commands. Support for
+L<Net::AFP/FPCatSearch> and
+L<Net::AFP/FPCatSearchExt> is optional. This bit allows the
 server to make this capability available on a per-volume basis.
 
 =cut
@@ -85,10 +85,10 @@ If set, always map UNIX user IDs, group IDs and permissions to
 traditional User IDs, Group IDs and permissions. If not set, after
 logging into the server, an AFP client running on a UNIX-based machine
 should call C<getuid()> to get the user's local user ID and send an
-L<Net::AFP::Connection/FPGetUserInfo> command to get the user's user ID
+L<Net::AFP/FPGetUserInfo> command to get the user's user ID
 from the server. If the user IDs match, the AFP client should call
 C<getpwuid()> to get the user's local user name, which is returned in
-the C<pw_name> field, and send an L<Net::AFP::Connection/FPMapID>
+the C<pw_name> field, and send an L<Net::AFP/FPMapID>
 command to get the user's user name from the server. If the user names
 match, the AFP client assumes both machines are operating from a common
 user directory, and displays UNIX permissions without mapping them.

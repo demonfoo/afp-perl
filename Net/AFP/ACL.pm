@@ -268,14 +268,14 @@ use constant kFileSec_ACL					=> 0x04;
 =item C<kFileSec_REMOVEACL>
 
 Set this bit to remove an ACL. This bit is not valid when used with the
-L<Net::AFP::Connection/FPGetACL> command.
+L<Net::AFP/FPGetACL> command.
 
 =cut
 use constant kFileSec_REMOVEACL				=> 0x08;
 =item C<kFileSec_Inherit>
 
 Set this bit to inherit all ACEs from the parent directory. This constant
-is used only with the L<Net::AFP::Connection/FPSetACL> command.
+is used only with the L<Net::AFP/FPSetACL> command.
 
 =cut
 use constant kFileSec_Inherit				=> 0x10;

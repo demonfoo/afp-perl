@@ -3,7 +3,7 @@
 # set the proper library path for AFP over TCP
 #use lib qw(/home/demon/libafp);
 
-use Net::AFP::Connection::TCP;
+use Net::AFP::TCP;
 use Net::AFP::Result;
 use Net::AFP::VolParms;
 use Net::AFP::VolAttrs;
@@ -211,7 +211,6 @@ my %commands = (
 					if ($rc == kFPCallNotSupported) {
 						$rc = $session->FPEnumerate(@arglist);
 					}
-					print "enum call returned $rc\n";
 					if (ref($results) eq 'ARRAY') {
 						push(@records, @$results);
 						$offset += scalar(@$results);
@@ -266,11 +265,20 @@ my %commands = (
 	},
 	'cd'	=> sub {
 		my @words = @_;
+		my $path;
+		if (scalar(@words) == 1) {
+			$path = '/';
+		} elsif (scalar(@words) == 2) {
+			$path = $words[1];
+		} else {
+			print "Incorrect number of arguments\n";
+			return 1;
+		}
 		my ($newDirId, $fileName) = resolve_path($session, $volID,
 				$words[1]);
 		if (defined $fileName or !defined $newDirId) {
 			print "sorry, couldn't change directory\n";
-			next;
+			return 1;
 		}
 		$curdirnode = $newDirId;
 		return 1;
@@ -284,7 +292,7 @@ Error: Specify the name of the file to retrieve, and optionally the name of
 the file to store the local copy to. Quote the name if needed (to account
 for spaces or special characters).
 _EOT_
-			next;
+			return 1;
 		}
 		my ($dirId, $fileName) = resolve_path($session, $volID,
 				$words[1]);
@@ -292,13 +300,13 @@ _EOT_
 			print <<'_EOT_';
 Error: Couldn't resolve path; possibly no such file?
 _EOT_
-			next;
+			return 1;
 		}
 		unless (defined $fileName) {
 			print <<'_EOT_';
 Error: Not a file; you must specify the name of a file to retrieve.
 _EOT_
-			next;
+			return 1;
 		}
 		my $targetFile = (scalar(@words) == 2 ? $fileName : $words[2]);
 		my $resp = '';
@@ -306,14 +314,14 @@ _EOT_
 				$pathType, $fileName, \$resp);
 		if ($rc != kFPNoErr) {
 			print "open attempt failed with code ", $rc, "\n";
-			next;
+			return 1;
 		}
 		
 		my $local_fh = new IO::File($targetFile, 'w');
 		unless (defined $local_fh) {
 			print "Couldn't open local file for writing!\n";
 			$session->FPCloseFork($$resp{'OForkRefNum'});
-			next;
+			return 1;;
 		}
 
 		my $sresp = '';
@@ -371,7 +379,7 @@ Error: Specify the name of the file to send, and optionally the name of
 the file to store the remote copy to. Quote the name if needed (to account
 for spaces or special characters).
 _EOT_
-			next;
+			return 1;
 		}
 
 		my $srcFileName = basename($words[1]);
@@ -382,7 +390,7 @@ _EOT_
 			print <<'_EOT_';
 Error: Couldn't resolve path; possibly no such file?
 _EOT_
-			next;
+			return 1;
 		}
 		unless (defined $fileName) {
 			$fileName = $srcFileName;
@@ -391,20 +399,20 @@ _EOT_
 		my $srcFile = new IO::File($words[1], 'r');
 		unless (defined $srcFile) {
 			print "couldn't open source file\n";
-			next;
+			return 1;
 		}
 		my $rc = $session->FPCreateFile(0x80, $volID, $dirID, $pathType,
 				$fileName);
 		if ($rc != kFPNoErr) {
 			print "Couldn't create file on remote server; server returned code ", $rc, "\n";
-			next;
+			return 1;
 		}
 		my $resp = '';
 		$rc = $session->FPOpenFork(0, $volID, $dirID, 0, 0x2, $pathType,
 				$fileName, \$resp);
 		if ($rc != kFPNoErr) {
 			print "open attempt failed with code ", $rc, "\n";
-			next;
+			return 1;
 		}
 
 		my $fileLen = (stat($srcFile))[7];
@@ -470,7 +478,7 @@ _EOT_
 			print <<'_EOT_';
 Please specify the name of the directory to create.
 _EOT_
-			next;
+			return 1;
 		}
 		# FIXME: need to resolve the provided path, but path resolver needs
 		# to be modified to handle the "final element of split path doesn't
@@ -489,7 +497,7 @@ _EOT_
 			print <<'_EOT_';
 Please specify the name of one or more files or directories to remove.
 _EOT_
-			next;
+			return 1;
 		}
 		# FIXME: need to resolve the provided path, but path resolver needs
 		# to be modified to handle the "final element of split path doesn't
@@ -500,13 +508,13 @@ _EOT_
 			print <<'_EOT_';
 Error: Couldn't resolve path; possibly no such file?
 _EOT_
-			next;
+			return 1;
 		}
 		unless (defined $fileName) {
 			print <<'_EOT_';
 Error: Name not found; possibly does not exist?
 _EOT_
-			next;
+			return 1;
 		}
 		my $rc = $session->FPDelete($volID, $dirID, $pathType,
 				$fileName);
@@ -544,7 +552,7 @@ _EOT_
 					0, $pathType, $fileName, \$resp);
 			if ($rc != kFPNoErr) {
 				print "Sorry, file/directory was not found\n";
-				next;
+				return 1;
 			}
 			print "ACL for \"", $fname, "\":\n";
 			print Dumper($resp);
@@ -561,7 +569,7 @@ _EOT_
 					$fileName, \$resp);
 			if ($rc != kFPNoErr) {
 				print "Sorry, file/directory was not found\n";
-				next;
+				return;
 			}
 			print "Comment for \"", $fname, "\":\n", $resp, "\n";
 		}
@@ -749,7 +757,7 @@ exit(0);
 sub doAFPConnection {
 	my($host, $port, $user, $password, $uam, $srvinf_r) = @_;
 	my $srvInfo;
-	my $rc = Net::AFP::Connection::TCP->GetStatus($host, $port, \$srvInfo);
+	my $rc = Net::AFP::TCP->GetStatus($host, $port, \$srvInfo);
 	if ($rc != kFPNoErr) {
 		print "Could not issue GetStatus on ", $host, "\n";
 		exit(1);
@@ -759,8 +767,8 @@ sub doAFPConnection {
 		$$srvinf_r = $srvInfo;
 	}
 
-	my $session = new Net::AFP::Connection::TCP($host, $port);
-	unless (ref($session) ne '' and $session->isa('Net::AFP::Connection')) {
+	my $session = new Net::AFP::TCP($host, $port);
+	unless (ref($session) ne '' and $session->isa('Net::AFP')) {
 		print "Could not connect via AFP to ", $host, "\n";
 		exit(1);
 	}
