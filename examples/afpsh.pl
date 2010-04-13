@@ -34,6 +34,7 @@ if ($@) {
 
 use strict;
 use warnings;
+use diagnostics;
 
 my $has_Text__Glob = 1;
 eval { require Text::Glob; };

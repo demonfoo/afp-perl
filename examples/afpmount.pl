@@ -3,6 +3,7 @@
 # imports {{{1
 use strict;
 use warnings;
+use diagnostics;
 use Fuse qw(:xattr);			# preferably use Fuse 0.09_3 (or later), for
 								# decent support of files >= 2**31 bytes long
 use Net::AFP::TCP;				# the class which actually sets up and
