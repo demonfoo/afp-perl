@@ -16,7 +16,7 @@ sub Authenticate {
 
 	# Ensure that we've been handed an appropriate object.
 	die("Object MUST be of type Net::AFP!")
-			unless ref($session) ne '' and $session->isa('Net::AFP');
+			unless ref($session) and $session->isa('Net::AFP');
 	
 	die('Password callback MUST be a subroutine ref')
 			unless ref($pw_cb) eq 'CODE';
@@ -42,7 +42,7 @@ sub ChangePassword {
 
 	# Ensure that we've been handed an appropriate object.
 	die('Object MUST be of type Net::AFP!')
-			unless ref($session) ne '' and $session->isa('Net::AFP');
+			unless ref($session) and $session->isa('Net::AFP');
 
 	if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
 			kFPVerAtLeast)) {

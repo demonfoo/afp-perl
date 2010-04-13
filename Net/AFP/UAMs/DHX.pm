@@ -47,7 +47,7 @@ sub Authenticate {
 
 	# Ensure that we've been handed an appropriate object.
 	die('Object MUST be of type Net::AFP!')
-			unless ref($session) ne '' and $session->isa('Net::AFP');
+			unless ref($session) and $session->isa('Net::AFP');
 
 	die('Password callback MUST be a subroutine ref')
 			unless ref($pw_cb) eq 'CODE';
@@ -177,7 +177,7 @@ sub ChangePassword {
 
 	# Ensure that we've been handed an appropriate object.
 	die('Object MUST be of type Net::AFP!')
-			unless ref($session) ne '' and $session->isa('Net::AFP');
+			unless ref($session) and $session->isa('Net::AFP');
 
 	# Moving these into the functions, to make Math::BigInt::GMP happy.
 	my $p = new Math::BigInt('0x' . unpack('H*', pack('C*', @p_bytes)));

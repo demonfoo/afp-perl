@@ -21,7 +21,7 @@ sub Authenticate {
 
 	# Ensure that we've been handed an appropriate object.
 	die('Object MUST be of type Net::AFP!')
-			unless ref($session) ne '' and $session->isa('Net::AFP');
+			unless ref($session) and $session->isa('Net::AFP');
 
 	die('Password callback MUST be a subroutine ref')
 			unless ref($pw_cb) eq 'CODE';
@@ -67,7 +67,7 @@ sub ChangePassword {
 
 	# Ensure that we've been handed an appropriate object.
 	die('Object MUST be of type Net::AFP!')
-			unless ref($session) ne '' and $session->isa('Net::AFP');
+			unless ref($session) and $session->isa('Net::AFP');
 
 	# Establish encryption contexts for each of the supplied passwords. Then
 	# pack the old password encrypted with the new one, and the new password

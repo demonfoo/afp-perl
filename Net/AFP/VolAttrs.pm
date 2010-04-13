@@ -48,8 +48,7 @@ use constant kSupportsFileIDs			=> 0x0004;
 =item kSupportsCatSearch
 
 If set, the volume supports the L<Net::AFP/FPCatSearch> and
-L<Net::AFP/FPCatSearchExt> commands. Support for
-L<Net::AFP/FPCatSearch> and
+L<Net::AFP/FPCatSearchExt> commands. Support for L<Net::AFP/FPCatSearch> and
 L<Net::AFP/FPCatSearchExt> is optional. This bit allows the
 server to make this capability available on a per-volume basis.
 

@@ -18,7 +18,7 @@ sub Authenticate {
 
 	# Ensure that we've been handed an appropriate object.
 	die("Object MUST be of type Net::AFP!")
-			unless ref($session) ne '' and $session->isa('Net::AFP');
+			unless ref($session) and $session->isa('Net::AFP');
 	
 	my $rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, '', 3, '');
 	print 'FPLoginExt() completed with result code ', $rc, "\n"
