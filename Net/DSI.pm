@@ -75,8 +75,8 @@ sub session_thread { # {{{1
 	}
 
 	$$shared{'conn_fd'} = fileno($conn);
-	$$shared{'conn_sem'}->up();
 	$$shared{'running'} = 1;
+	$$shared{'conn_sem'}->up();
 	$$shared{'sockaddr'} = $conn->sockaddr();
 	$$shared{'sockport'} = $conn->sockport();
 	$$shared{'peeraddr'} = $conn->peeraddr();
@@ -199,7 +199,9 @@ sub new { # {{{1
 	$$obj{'Dispatcher'} = $thread;
 	$$shared{'conn_sem'}->down();
 	$$obj{'Conn'} = new IO::Handle;
-	$$obj{'Conn'}->fdopen($$shared{'conn_fd'}, 'w');
+	if ($$shared{'running'} == 1) {
+		$$obj{'Conn'}->fdopen($$shared{'conn_fd'}, 'w');
+	}
 	$$shared{'conn_sem'}->up();
 
 	return $obj;
