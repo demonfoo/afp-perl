@@ -1,6 +1,7 @@
 package Net::AFP::UAMs;
 
 use Net::AFP::TokenTypes;
+use Net::AFP::Result;
 
 =head1 NAME
 

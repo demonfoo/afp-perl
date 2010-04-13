@@ -1,7 +1,7 @@
 # Implementation of a subclass that implements the necessary virtual methods
 # for handling an AFP session over TCP protocol.
 package Net::AFP::TCP;
-use Net::DSI::Session;
+use Net::DSI;
 use Net::AFP;
 use Net::AFP::Parsers;
 use Net::AFP::Result;
@@ -95,7 +95,7 @@ sub new { # {{{1
 	my $obj = {};
 	bless $obj, $class;
 
-	$$obj{'DSISession'} = new Net::DSI::Session($host, $port);
+	$$obj{'DSISession'} = new Net::DSI($host, $port);
 	my $rc = $$obj{'DSISession'}->DSIOpenSession();
 	return $rc unless $rc == kFPNoErr;
 	return $obj;
@@ -199,14 +199,14 @@ the remote server upon success.
 =cut
 sub GetStatus { # {{{1
 	my ($class, $host, $port, $resp_r) = @_;
-	if (ref($class) ne '') {
+	if (ref($class)) {
 		die('GetStatus() should NEVER be called against an active object');
 		return -1;
 	}
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	my $resp;
-	my $rc = Net::DSI::Session->DSIGetStatus($host, $port, \$resp);
+	my $rc = Net::DSI->DSIGetStatus($host, $port, \$resp);
 	return $rc unless $rc == kFPNoErr;
 
 	$$resp_r = Net::AFP::Parsers::_ParseSrvrInfo($resp);

@@ -1,9 +1,9 @@
-# This is Net::DSI::Session. It is an implementation of the DSI shim
+# This is Net::DSI. It is an implementation of the DSI shim
 # protocol that acts as a mid-layer between AFP and TCP protocols. This
 # implementation is fairly complete; it doesn't properly handle server
 # notifications, but otherwise it handles pretty much everything worth
 # caring about.
-package Net::DSI::Session;
+package Net::DSI;
 
 my $has_IO__Socket__INET6 = 1;
 eval { require IO::Socket::INET6; };
@@ -166,8 +166,8 @@ sub session_thread { # {{{1
 
 # Arguments:
 #	$class: The class we're being called against. This class has to be
-#			instantiated like 'new Net::DSI::Session' or
-#			'Net::DSI::Session->new' because of this.
+#			instantiated like 'new Net::DSI' or
+#			'Net::DSI->new' because of this.
 #	$host: Currently an IP address (a DNS name should work too, though)
 #		   indicating the DSI server (AFP over TCP server) that we wish
 #		   to attach to.
@@ -213,7 +213,7 @@ sub close { # {{{1
 } # }}}1
 
 # Arguments:
-#	$self:		A Net::DSI::Session instance.
+#	$self:		A Net::DSI instance.
 #	$cmd:		The numeric opcode of the command we wish to issue to the DSI
 #		 		server.
 #	$message:	The message payload, if any, to send with the command. Many
@@ -253,6 +253,7 @@ sub SendMessage { # {{{1
 	my $reqId = $$self{'Shared'}{'requestid'}++ % 65536;
 
 	if ($$self{'Shared'}{'running'} == -1) {
+		$$sem_r->up() if defined $sem_r;
 		return kFPNoServer;
 	}
 	# Assemble the message header to be sent to the AFP over TCP server.
@@ -314,7 +315,7 @@ sub DSICommand { # {{{1
 
 sub DSIGetStatus { # {{{1
 	my ($class, $host, $port, $resp_r) = @_;
-	if (ref($class) ne '') {
+	if (ref($class)) {
 		warn("DSIGetStatus() should NEVER be called against an open DSI context");
 		return -1;
 	}
@@ -325,14 +326,14 @@ sub DSIGetStatus { # {{{1
 	die('$resp_r must be a scalar ref')
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 	my $obj = $class->new($host, $port);
-	return ($obj) unless ref($obj) ne '' and $obj->isa('Net::DSI::Session');
+	return ($obj) unless ref($obj) and $obj->isa(__PACKAGE__);
 	my $sem = undef;
 	my $rc = undef;
 	my $reqId = $obj->SendMessage(OP_DSI_GETSTATUS, undef, undef, \$sem,
 			$resp_r, \$rc);
-	return $reqId if $reqId < 0;
 	$sem->down();
 	$obj->close();
+	return $reqId if $reqId < 0;
 
 	return $rc;
 } # }}}1
