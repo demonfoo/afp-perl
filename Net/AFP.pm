@@ -267,11 +267,13 @@ sub PackagePath { # {{{1
 
 	if ($PathType == 1 or $PathType == 2) {
 		return pack('CC/a*', $PathType, encode('MacRoman', $Pathname));
-	} elsif ($PathType == 3) {
+	}
+	elsif ($PathType == 3) {
 		my $encodedPath = encode_utf8($Pathname);
 		if ($NoEncType) {
 			return pack('Cn/a*', $PathType, $encodedPath);
-		} else {
+		}
+		else {
 			return pack('CNn/a*', $PathType, 0, $encodedPath);
 		}
 	}
@@ -1782,7 +1784,8 @@ sub FPEnumerate { # {{{1
 		if ($IsFileDir == 0x80) {
 			# This child is a directory
 			push(@results, _ParseDirParms($DirectoryBitmap, $OffspringParameters));
-		} else {
+		}
+		else {
 			# This child is a file
 			push(@results, _ParseFileParms($FileBitmap, $OffspringParameters));
 		}
@@ -1940,7 +1943,8 @@ sub FPEnumerateExt { # {{{1
 		my ($IsFileDir, $OffspringParameters) = unpack('xxCxa*', $Entry);
 		if ($IsFileDir == 0x80) { # This child is a directory
 			push(@results, _ParseDirParms($DirectoryBitmap, $OffspringParameters));
-		} else { # This child is a file
+		}
+		else { # This child is a file
 			push(@results, _ParseFileParms($FileBitmap, $OffspringParameters));
 		}
 	}
@@ -2095,7 +2099,8 @@ sub FPEnumerateExt2 { # {{{1
 		my ($IsFileDir, $OffspringParameters) = unpack('x[2]Cxa*', $Entry);
 		if ($IsFileDir == 0x80) { # This child is a directory
 			push(@results, _ParseDirParms($DirectoryBitmap, $OffspringParameters));
-		} else { # This child is a file
+		}
+		else { # This child is a file
 			push(@results, _ParseFileParms($FileBitmap, $OffspringParameters));
 		}
 	}
@@ -2732,7 +2737,8 @@ sub FPGetExtAttr { # {{{1
 	$$resp_r = {};
 	if ($MaxReplySize > 0) {
 		@{$$resp_r}{'Bitmap', 'AttributeData'} = unpack('nN/a*', $resp);
-	} else {
+	}
+	else {
 		@{$$resp_r}{'Bitmap', 'DataLength'} = unpack('nN', $resp);
 	}
 	return $rc;
@@ -3242,7 +3248,8 @@ sub FPGetSrvrMsg { # {{{1
 		($Length, $MessageType, $MessageBitmap, $ServerMessage) =
 				unpack('nnna*', $resp);
 		$ServerMessage = decode_utf8($ServerMessage);
-	} else { # not UTF8, just a plain pstring (?)
+	}
+	else { # not UTF8, just a plain pstring (?)
 		($MessageType, $MessageBitmap, $ServerMessage) =
 				unpack('nnC/a', $resp);
 		$Length = length($ServerMessage);
@@ -3609,7 +3616,8 @@ sub FPListExtAttrs { # {{{1
 		($$resp_r->{'Bitmap'}, $names) = unpack('nN/a*', $resp);
 		$$resp_r->{'AttributeNames'} =
 				[ map { decode_utf8($_) } unpack('(Z*)*', $names) ];
-	} else {
+	}
+	else {
 		@{$$resp_r}{'Bitmap', 'DataLength'} = unpack('nN', $resp);
 	}
 	return $rc;
@@ -3811,7 +3819,10 @@ sub FPLoginCont { # {{{1
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	unless (ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF') {
-		$resp_r = \'';
+		# Hm, was getting "Modification of a read-only value attempted" later
+		# in this call apparently because of using \'' to generate a bogus
+		# anon scalar. Never got that before.
+		$resp_r = *foo{SCALAR};
 	}
 
 	unless (defined $UserAuthInfo) {
@@ -4083,7 +4094,8 @@ sub FPMapID { # {{{1
 			$Subfunction == kGroupUUIDToUTF8Name) {
 		$pack_mask .= 'a[16]';
 		$ID = uuid_pack($ID);
-	} else {
+	}
+	else {
 		$pack_mask .= 'N';
 	}
 	push(@pack_args, $ID);
@@ -4096,7 +4108,8 @@ sub FPMapID { # {{{1
 		@{$$resp_r}{'Bitmap', 'NumericID', 'UTF8Name'} =
 				unpack('NNn/a', $resp);
 		$$$resp_r{'UTF8Name'} = decode_utf8($$$resp_r{'UTF8Name'});
-	} else {
+	}
+	else {
 		($$resp_r) = unpack('C/a', $resp);
 	}
 	return $rc;
@@ -4161,7 +4174,8 @@ sub FPMapName { # {{{1
 			$Subfunction == kUTF8NameToGroupUUID) {
 		$pack_mask .= 'n/a';
 		$Name = encode_utf8($Name);
-	} else {
+	}
+	else {
 		$pack_mask .= 'C/a';
 	}
 	my $msg = pack($pack_mask, kFPMapName, $Subfunction, $Name);
@@ -4170,7 +4184,8 @@ sub FPMapName { # {{{1
 	if ($Subfunction == kUTF8NameToUserUUID ||
 			$Subfunction == kUTF8NameToGroupUUID) {
 		$$resp_r = uuid_unpack($resp);
-	} else {
+	}
+	else {
 		($$resp_r) = unpack('N', $resp);
 	}
 	return $rc;
@@ -6005,7 +6020,8 @@ sub FPSetForkParms { # {{{1
 	if (($Bitmap & kFPDataForkLenBit) or
 		($Bitmap & kFPRsrcForkLenBit)) {
 		$packed = pack('N', $ForkLen);
-	} elsif (($Bitmap & kFPExtDataForkLenBit) or
+	}
+	elsif (($Bitmap & kFPExtDataForkLenBit) or
 			 ($Bitmap & kFPExtRsrcForkLenBit)) {
 		$packed = pack('NN', ll_convert($ForkLen));
 	}

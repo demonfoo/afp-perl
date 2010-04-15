@@ -53,12 +53,12 @@ foreach my $incpath (@INC) {
 # impair our ability to continue on.
 foreach my $uampath (@uampaths) {
 	eval { require $uampath; };
-	if ($@) {
-		print STDERR 'Couldn\'t include ', $uampath, ":\n";
-		print STDERR '-' x 15, ' start error text ', '-' x 15, "\n", $@;
-		print STDERR '-' x 16, ' end error text ', '-' x 16, "\n";
-		print STDERR "This error is not fatal; other UAMs will be tried.\n\n";
-	}
+#	if ($@) {
+#		print STDERR 'Couldn\'t include ', $uampath, ":\n";
+#		print STDERR '-' x 15, ' start error text ', '-' x 15, "\n", $@;
+#		print STDERR '-' x 16, ' end error text ', '-' x 16, "\n";
+#		print STDERR "This error is not fatal; other UAMs will be tried.\n\n";
+#	}
 }
 
 =head1 FUNCTIONS
