@@ -1,8 +1,12 @@
 #!/usr/bin/perl
 
-# set the proper library path for AFP over TCP
-#use lib qw(/home/demon/libafp);
+# Enables a nice call trace on warning events.
+use Carp ();
+local $SIG{'__WARN__'} = \&Carp::cluck;
 
+# Pull in all the AFP packages that we need, for the connection object
+# itself and return code symbols, helper functions for version handling
+# and UAMs, etc.
 use Net::AFP::TCP;
 use Net::AFP::Result;
 use Net::AFP::VolParms;
@@ -61,7 +65,21 @@ GetOptions( 'debug-afp' => sub { $__AFP_DEBUG = 1; },
 			'debug-dsi' => sub { $__DSI_DEBUG = 1; } );
 
 my($path) = @ARGV;
-my $afp_url_pattern = qr/^(afps?):\/(at)?\/(?:([^:\@\/;]*)(?:;AUTH=([^:\@\/;]+))?(?::([^:\@\/;]*))?\@)?([^:\/\@;]+)(?::([^:\/\@;]+))?(?:\/(?:([^:\/\@;]+)(\/.*)?)?)?$/;
+my $afp_url_pattern = qr|^
+                          (afps?):/		    # protocol specific prefix
+						  (at)?/            # optionally specify atalk transport
+						  (?:               # authentication info block
+						      ([^:\@\/;]*)  # capture username
+							  (?:;AUTH=([^:\@\/;]+))? # capture uam name
+							  (?::([^:\@\/;]*))?      # capture password
+							  \@)?          # closure of auth info capture
+                          ([^:\/\@;]+)      # capture target host
+						  (?::([^:\/\@;]+))? # capture optional port
+						  (?:\/(?:          # start path capture
+							  ([^:\/\@;]+)  # first path element is vol name
+							  (\/.*)?       # rest of path is local subpath
+                          )?)?              # closure of path capture
+						 $|x;
 my @args = ('protocol', 'atalk_transport', 'username', 'UAM', 'password', 'host', 'port', 'volume', 'subpath');
 my %values;
 
@@ -105,7 +123,6 @@ unless ($rc == kFPNoErr) {
 	$session->close();
 	exit(1);
 }
-#print Dumper($volInfo);
 
 my $volID = $$volInfo{'ID'};
 my $DT_ID;
@@ -155,7 +172,8 @@ if (defined $values{'subpath'}) {
 			$values{'subpath'});
 	if (defined $fileName or !defined $newDirId) {
 		print "path ", $values{'subpath'}, " is not accessible, defaulting to volume root\n";
-	} else {
+	}
+	else {
 		$curdirnode = $newDirId;
 	}
 }
@@ -199,7 +217,8 @@ my %commands = (
 				if ($rc == kFPNoErr) {
 					push(@records, $resp);
 				}
-			} else {
+			}
+			else {
 				my $offset = 1;
 				do {
 					$results = undef;
@@ -247,7 +266,8 @@ my %commands = (
 				if ($UseExtOps) {
 					$rc = $session->FPReadExt($$resp{'OForkRefNum'}, $pos,
 							1024, \$data);
-				} else {
+				}
+				else {
 					$rc = $session->FPRead($$resp{'OForkRefNum'}, $pos, 1024,
 							undef, undef, \$data);
 				}
@@ -269,9 +289,11 @@ my %commands = (
 		my $path;
 		if (scalar(@words) == 1) {
 			$path = '/';
-		} elsif (scalar(@words) == 2) {
+		}
+		elsif (scalar(@words) == 2) {
 			$path = $words[1];
-		} else {
+		}
+		else {
 			print "Incorrect number of arguments\n";
 			return 1;
 		}
@@ -338,7 +360,8 @@ _EOT_
 			if ($UseExtOps) {
 				$rc = $session->FPReadExt($$resp{'OForkRefNum'}, $pos,
 						131072, \$data);
-			} else {
+			}
+			else {
 				$rc = $session->FPRead($$resp{'OForkRefNum'}, $pos, 131072,
 						undef, undef, \$data);
 			}
@@ -430,7 +453,8 @@ _EOT_
 			if ($UseExtOps) {
 				$rc = $session->FPWriteExt(0x80, $$resp{'OForkRefNum'}, 0,
 						length($data), \$data, \$sresp);
-			} else {
+			}
+			else {
 				$rc = $session->FPWrite(0x80, $$resp{'OForkRefNum'}, 0,
 						length($data), \$data, \$sresp);
 			}
@@ -592,7 +616,8 @@ while (1) {
 	if (exists $commands{$words[0]}) {
 		my $rv = &{$commands{$words[0]}}(@words);
 		last unless $rv;
-	} else {
+	}
+	else {
 		print "Sorry, unknown command\n";
 	}
 }
@@ -636,7 +661,8 @@ sub do_listentries {
 				my $idtype;
 				if ($$name{'Bitmap'} == kFileSec_UUID) {
 					$idtype = 'user';
-				} elsif ($$name{'Bitmap'} == kFileSec_GRPUUID) {
+				}
+				elsif ($$name{'Bitmap'} == kFileSec_GRPUUID) {
 					$idtype = 'group';
 				}
 
@@ -644,7 +670,8 @@ sub do_listentries {
 				my $kind = 'unknown';
 				if ($acl_kind == KAUTH_ACE_PERMIT) {
 					$kind = 'allow';
-				} elsif ($acl_kind == KAUTH_ACE_DENY) {
+				}
+				elsif ($acl_kind == KAUTH_ACE_DENY) {
 					$kind = 'deny';
 				}
 
@@ -738,7 +765,8 @@ sub resolve_path {
 			if ($i == $#pathElements) {
 				$fileName = $elem;
 				last;
-			} else {
+			}
+			else {
 				return(undef);
 			}
 		}
@@ -763,7 +791,6 @@ sub doAFPConnection {
 		print "Could not issue GetStatus on ", $host, "\n";
 		exit(1);
 	}
-#	print Dumper($srvInfo);
 	if (ref($srvinf_r) eq 'SCALAR') {
 		$$srvinf_r = $srvInfo;
 	}
@@ -804,7 +831,8 @@ sub doAFPConnection {
 			$session->close();
 			exit(1);
 		}
-	} else {
+	}
+	else {
 		my $rc = Net::AFP::UAMs::GuestAuth($session, $commonVersion);
 		unless ($rc == kFPNoErr) {
 			print "Anonymous authentication failed\n";
@@ -812,17 +840,6 @@ sub doAFPConnection {
 			exit(1);
 		}
 	}
-	#print Dumper($session);
-#	my $addr;
-#	my $peeraddr = $$session{'DSISession'}{'Shared'}{'peeraddr'};
-#	my $peerport = $$session{'DSISession'}{'Shared'}{'peerport'};
-#	my $family = $$session{'DSISession'}{'Shared'}{'sockdomain'};
-#	if ($has_Socket6) {
-#		$addr = Socket6::inet_ntop($family, $peeraddr);
-#	} else {
-#		$addr = inet_ntoa($peeraddr);
-#	}
-#	print "connected to host ", $addr, ", port ", $peerport, "\n";
 	return $session;
 }
 
