@@ -130,6 +130,49 @@ sub close { # {{{1
 	$$self{'DSISession'}->close();
 } # }}}1
 
+=item CheckAttnQueue()
+
+=cut
+sub CheckAttnQueue() {
+	my ($self) = @_;
+
+	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
+	my $attnq = $$self{'DSISession'}{'Shared'}{'attnq'};
+	my $vol_update_checked;
+	while (my $msg = shift(@$attnq)) {
+		if ($msg & 0x8000) {	# server says it's shutting down
+			print "CheckAttnQueue(): Received notification of server intent to shut down\n";
+			print "Shutdown in ", ($msg & 0xFFF), " minutes\n";
+			if ($msg & 0x2000) { # server also has a message for us
+				my $MsgData;
+				$self->FPGetSrvrMsg(1, 3, \$MsgData);
+				if ($$MsgData{'ServerMessage'} ne '') {
+					print "Shut down message: \"", $$MsgData{'ServerMessage'}, "\"\n";
+				}
+			}
+		}
+		elsif ($msg & 0x4000) { # server says it's crashing
+			print "CheckAttnQueue(): Received notification server is crashing; should really attempt reconnection, I suppose...\n";
+		}
+		elsif ($msg & 0x2000) { # server message?
+			if ($msg & 0x1001) { # server notification
+				if ($msg & 0x1) {
+					next if $vol_update_checked;
+					print "CheckAttnQueue(): ModDate updated on an attached volume, should do FPGetVolParms() to recheck\n";
+					$vol_update_checked = 1;
+				}
+			}
+			else { # server message
+				my $MsgData;
+				$self->FPGetSrvrMsg(1, 3, \$MsgData);
+				if ($$MsgData{'ServerMessage'} ne '') {
+					print "Server message: \"", $$MsgData{'ServerMessage'}, "\"\n";
+				}
+			}
+		}
+	}
+}
+
 =item SendAFPMessage()
 
 Private method, used internally by Net::AFP for dispatching
@@ -142,6 +185,7 @@ sub SendAFPMessage { # {{{1
 	my($self, $payload, $resp_r) = @_;
 	
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
+	$self->CheckAttnQueue();
 	my $rc = $$self{'DSISession'}->DSICommand($payload, $resp_r);
 	return $rc;
 } # }}}1
@@ -158,6 +202,7 @@ sub SendAFPWrite { # {{{1
 	my($self, $payload, $data_r, $resp_r) = @_;
 	
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
+	$self->CheckAttnQueue();
 	my $rc = $$self{'DSISession'}->DSIWrite($payload, $data_r, $resp_r);
 	return $rc;
 } # }}}1
@@ -205,8 +250,10 @@ sub GetStatus { # {{{1
 	}
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
+	my $obj = new Net::DSI($host, $port);
 	my $resp;
-	my $rc = Net::DSI->DSIGetStatus($host, $port, \$resp);
+	my $rc = $obj->DSIGetStatus(\$resp);
+	$obj->close();
 	return $rc unless $rc == kFPNoErr;
 
 	$$resp_r = Net::AFP::Parsers::_ParseSrvrInfo($resp);

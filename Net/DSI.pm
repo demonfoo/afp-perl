@@ -21,13 +21,13 @@ use Thread::Semaphore;
 use strict;
 use warnings;
 
-use constant OP_DSI_CLOSESESSION	=> 1;
-use constant OP_DSI_COMMAND			=> 2;
-use constant OP_DSI_GETSTATUS		=> 3;
-use constant OP_DSI_OPENSESSION		=> 4;
-use constant OP_DSI_TICKLE			=> 5;
-use constant OP_DSI_WRITE			=> 6;
-use constant OP_DSI_ATTENTION		=> 8;
+use constant OP_DSI_CLOSESESSION	=> 1;	# to and from server
+use constant OP_DSI_COMMAND			=> 2;	# to server only
+use constant OP_DSI_GETSTATUS		=> 3;	# to server only
+use constant OP_DSI_OPENSESSION		=> 4;	# to server only
+use constant OP_DSI_TICKLE			=> 5;	# to and from server
+use constant OP_DSI_WRITE			=> 6;	# to server only
+use constant OP_DSI_ATTENTION		=> 8;	# from server only
 
 use constant kRequestQuanta			=> 0x00;
 # not sure if this is the canonical name for this option code...
@@ -46,7 +46,7 @@ sub session_thread { # {{{1
 
 	# Set up the connection to the server. Then we need to check that we've
 	# connected successfully.
-	my $conn = undef;
+	my $conn;
 	my %connect_args = ( 'PeerAddr'		=> $host,
 						 'PeerPort'		=> $port,
 						 'HostPort'		=> 0,
@@ -118,6 +118,11 @@ sub session_thread { # {{{1
 				}
 
 				# FIXME: probably should handle OP_DSI_ATTENTION here.
+				elsif ($cmd == OP_DSI_ATTENTION) {
+					my ($userBytes) = unpack('n', $data);
+					# Queue the notification for later processing
+					push(@{$$shared{'attnq'}}, $userBytes);
+				}
 			} else {
 				# Handle negative return codes in the canonical way.
 				if ($errcode & 0x80000000) {
@@ -192,6 +197,9 @@ sub new { # {{{1
 				 'conn_sem'		=> new Thread::Semaphore(0),
 				 # completion handlers are registered here.
 				 'handlers'		=> &share({}),
+				 # server attention messages queued here, should have
+				 # Net::AFP::TCP check these
+				 'attnq'		=> &share([]),
 			   );
 
 	$$obj{'Shared'} = $shared;
@@ -305,36 +313,29 @@ sub DSICommand { # {{{1
 
 	# Require that the caller includes a reference to stuff a reply block
 	# into - issuing a DSICommand generally gets one.
-	my $sem = undef;
-	my $rc = undef;
+	my $sem;
+	my $rc;
 	my $reqId = $self->SendMessage(OP_DSI_COMMAND, $message, undef, \$sem,
 			$resp_r, \$rc);
-	return $reqId if $reqId < 0;
 	$sem->down();
+	return $reqId if $reqId < 0;
 
 	return $rc;
 } # }}}1
 
 sub DSIGetStatus { # {{{1
-	my ($class, $host, $port, $resp_r) = @_;
-	if (ref($class)) {
-		warn("DSIGetStatus() should NEVER be called against an open DSI context");
-		return -1;
-	}
+	my ($self, $resp_r) = @_;
 
 	# Require that the caller provide a ref to stuff the reply block into.
 	# This command is always going to provide a reply block, and the
 	# information it contains is kind of important.
 	die('$resp_r must be a scalar ref')
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
-	my $obj = $class->new($host, $port);
-	return ($obj) unless ref($obj) and $obj->isa(__PACKAGE__);
-	my $sem = undef;
-	my $rc = undef;
-	my $reqId = $obj->SendMessage(OP_DSI_GETSTATUS, undef, undef, \$sem,
+	my $sem;
+	my $rc;
+	my $reqId = $self->SendMessage(OP_DSI_GETSTATUS, undef, undef, \$sem,
 			$resp_r, \$rc);
 	$sem->down();
-	$obj->close();
 	return $reqId if $reqId < 0;
 
 	return $rc;
@@ -362,9 +363,9 @@ sub DSIOpenSession { # {{{1
 		$options_packed .=  pack('CC/a*', $opttype, $optdata);
 	}
 
-	my $sem = undef;
-	my $rc = undef;
-	my $resp = undef;
+	my $sem;
+	my $rc;
+	my $resp;
 	my $reqId = $self->SendMessage(OP_DSI_OPENSESSION, $options_packed, undef,
 			\$sem, \$resp, \$rc);
 	return $reqId if $reqId < 0;
@@ -398,8 +399,8 @@ sub DSIWrite { # {{{1
 	# This should only be used for FPWrite and FPAddIcon
 	my ($self, $message, $data_r, $resp_r) = @_;
 
-	my $sem = undef;
-	my $rc = undef;
+	my $sem;
+	my $rc;
 	my $reqId = $self->SendMessage(OP_DSI_WRITE, $message, $data_r, \$sem,
 			$resp_r, \$rc);
 	return $reqId if $reqId < 0;
