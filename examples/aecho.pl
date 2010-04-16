@@ -20,7 +20,7 @@ my $count = 0;
 my %sockparms = ('Proto' => 'ddp');
 
 GetOptions( 'c=i' => \$count,
-		    'A=s' => sub { $sockparms{'LocalAddr'} = $_[0] } ) || usage();
+		    'A=s' => sub { $sockparms{'LocalAddr'} = $_[1] } ) || usage();
 
 my ($target) = @ARGV;
 usage() unless defined $target;
@@ -66,7 +66,7 @@ while (1) {
 	my $from = recv($sock, $rbuf, DDP_MAXSZ, 0);
 	unless (defined $from) {
 		next if $! == 0; # seems to be what happens when syscall
-				 # gets interrupted...
+						 # gets interrupted...
 		next if $! == EINTR;
 		die "recv failed: $!";
 	}
