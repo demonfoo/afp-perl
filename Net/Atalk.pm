@@ -46,7 +46,7 @@ sub sockaddr_at {
 sub pack_sockaddr_at {
 	my($port, $paddr) = @_;
 
-	return pack('nCxa[3]x[9]', AF_APPLETALK, $port, $paddr);
+	return pack('SCxa[3]x[9]', AF_APPLETALK, $port, $paddr);
 }
 
 sub unpack_sockaddr_at {
