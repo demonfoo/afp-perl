@@ -69,7 +69,7 @@ sub atalk_aton {
 	my($addr) = @_;
 
 	my($net, $node) = $addr =~ /^(\d{1,5})\.(\d{1,3})$/;
-	die() unless defined $net && defined $node;
+	return unless defined $net && defined $node;
 	return pack('nC', $net, $node);
 }
 
