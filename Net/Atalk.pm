@@ -1,11 +1,10 @@
 package Net::Atalk;
 
-use Exporter;
+use Exporter qw(import);
 
 use strict;
 use warnings;
 
-our @ISA = qw(Exporter);
 our @EXPORT = qw(atalk_aton atalk_ntoa pack_sockaddr_at unpack_sockaddr_at
 				 DDPTYPE_RTMPRD DDPTYPE_NBP DDPTYPE_ATP DDPTYPE_AEP
 				 DDPTYPE_RTMPR DDPTYPE_ZIP DDPTYPE_ADSP ATPORT_FIRST
