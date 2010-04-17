@@ -4,8 +4,6 @@ use strict;
 use warnings;
 use diagnostics;
 
-use IO::Socket::DDP;
-use Net::Atalk;
 use Net::Atalk::NBP;
 use Getopt::Long;
 
