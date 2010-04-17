@@ -30,9 +30,9 @@ usage() unless defined $target;
 
 my $paddr = atalk_aton($target);
 unless (defined $paddr) {
-	my $zone;
-	if ($target =~ s/\@(\w+|\*)$//) { $zone = $1; }
-	my @tuples = NBPLookup($target, undef, $zone, undef, 1);
+	$target =~ s/(?::(\w+|=))?(?:\@(\w+|\*))?$//;
+	($type, $zone) = ($1, $2);
+	my @tuples = NBPLookup($target, $type, $zone, exists $sockparms{'LocalAddr'} ? $sockparms{'LocalAddr'} : undef, 1);
 	unless (scalar(@tuples)) {
 		printf(STDERR "Can't resolve \"\%s\"\n", $target);
 		exit(1);
