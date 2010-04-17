@@ -6,13 +6,16 @@ use diagnostics;
 
 use IO::Socket::DDP;
 use Net::Atalk;
+use Net::Atalk::NBP;
 use Time::HiRes qw(gettimeofday setitimer ITIMER_REAL);
 use Errno qw(EINTR);
 use Getopt::Long;
 use constant AEPOP_REQUEST	=> 1;
 use constant AEPOP_REPLY	=> 2;
 
-$| = 1;
+use Carp ();
+local $SIG{'__WARN__'} = \&Carp::cluck;
+
 my $port = getservbyname('echo', 'ddp') || 4;
 
 my ($msec_total, $msec_min, $msec_max, $sent, $rcvd) = (0, -1, -1, 0, 0);
@@ -25,8 +28,20 @@ GetOptions( 'c=i' => \$count,
 my ($target) = @ARGV;
 usage() unless defined $target;
 
+my $paddr = atalk_aton($target);
+unless (defined $paddr) {
+	my $zone;
+	if ($target =~ s/\@(\w+|\*)$//) { $zone = $1; }
+	my @tuples = NBPLookup($target, undef, $zone, undef, 1);
+	unless (scalar(@tuples)) {
+		printf(STDERR "Can't resolve \"\%s\"\n", $target);
+		exit(1);
+	}
+	$target = $tuples[0][0];
+	$paddr = atalk_aton($target);
+}
 my $sock = new IO::Socket::DDP(%sockparms) or die "Can't bind: $@";
-my $dest = pack_sockaddr_at($port, atalk_aton($target));
+my $dest = pack_sockaddr_at($port, $paddr);
 
 sub usage {
 	print "usage:\t", $0, " [-A source address ] [-c count] addr\n";
