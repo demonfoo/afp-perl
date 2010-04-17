@@ -3,6 +3,7 @@ package Net::Atalk::NBP;
 use IO::Socket::DDP;
 use Net::Atalk;
 use IO::Poll qw(POLLIN);
+use Time::HiRes;
 
 use strict;
 use warnings;
