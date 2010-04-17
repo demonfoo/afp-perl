@@ -10,7 +10,7 @@ use warnings;
 
 use Exporter qw(import);
 
-our @EXPORT = qw(NBP_BrRq NBP_LkUp NBP_LkUp_Reply NBP_FwdReq);
+our @EXPORT = qw(NBP_BrRq NBP_FwdReq NBPLookup);
 
 use constant NBP_BrRq		=> 1;
 use constant NBP_LkUp		=> 2;
@@ -60,6 +60,9 @@ sub UnpackTuples {
 	}
 	return(@tuples);
 }
+
+# FIXME: Probably need to handle AppleTalk networks with more than one
+# zone...
 
 # Lookup an NBP name (or possibly more than one).
 sub NBPLookup {
