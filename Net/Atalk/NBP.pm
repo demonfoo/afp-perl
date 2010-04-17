@@ -59,6 +59,7 @@ sub Lookup {
 									'Broadcast'	=> 1 ) || die $!;
 	my $packet = AssemblePacket(NBP_LkUp, $id++,
 			[ $sock->sockhost(), $sock->sockport(), 0, $Obj, $Type, $Zone ]);
+	my $port = getservbyname('nbp', 'ddp');
 	my $dest = pack_sockaddr_at($port, atalk_aton('0.255'));
 	send($sock, $packet, 0, $dest);
 
