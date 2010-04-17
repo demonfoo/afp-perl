@@ -19,6 +19,7 @@ use constant NBP_FwdReq		=> 4;
 
 my $id = 1;
 
+# Construct an NBP packet.
 sub AssemblePacket {
 	my ($Function, $ID, @Tuples) = @_;
 
@@ -27,6 +28,7 @@ sub AssemblePacket {
 				$ID) . join('', map { AssembleTuple(@{$_}) } @Tuples));
 }
 
+# Construct an NBP singleton tuple.
 sub AssembleTuple {
 	my ($NodeAddr, $SockNo, $Enumerator, $Object, $Type, $Zone) = @_;
 
@@ -34,6 +36,7 @@ sub AssembleTuple {
 			$Enumerator, $Object, $Type, $Zone);
 }
 
+# Unpack an NBP packet into its constituent fields.
 sub UnpackPacket {
 	my ($packet) = @_;
 
@@ -44,6 +47,7 @@ sub UnpackPacket {
 	return($Function, $ID, UnpackTuples($tuplecount, $tupledata));
 }
 
+# Unpack a packed set of NBP record tuples.
 sub UnpackTuples {
 	my ($tuplecount, $tupledata) = @_;
 	
@@ -57,7 +61,8 @@ sub UnpackTuples {
 	return(@tuples);
 }
 
-sub Lookup {
+# Lookup an NBP name (or possibly more than one).
+sub NBPLookup {
 	my($Obj, $Type, $Zone, $FromAddr, $maxresps) = @_;
 
 	# Bind a local, broadcast-capable socket for sending out NBP
@@ -92,27 +97,36 @@ RETRY:
 		# Send the query packet to the global broadcast address.
 		send($sock, $packet, 0, $dest);
 
+		# Set up a poll() object to check the socket for incoming packets.
 		my $poll = new IO::Poll();
 		$poll->mask($sock, POLLIN);
 
 		my $timeout = 2.0;
 		while (1) {
 			my ($s_sec, $s_usec) = gettimeofday();
+			# Poll the socket for traffic, and retry the whole damn thing
+			# if we don't see anything at all.
 			next RETRY unless $poll->poll($timeout);
 			my ($e_sec, $e_usec) = gettimeofday();
+			# Compute how long it took us to poll the socket.
 			$timeout -= ($e_sec - $s_sec) + (($e_usec - $s_usec) / 1000000);
 
+			# Read in the packet on the socket.
 			my $rbuf;
 			return unless defined recv($sock, $rbuf, DDP_MAXSZ, 0);
 
+			# Unpack the NBP packet.
 			my ($fn, $r_id, @tuples) = UnpackPacket($rbuf);
 
-			next unless $fn == NBP_LkUp_Reply;
+			# If the packet wasn't a lookup-reply packet, just ignore it.
+			next unless defined $fn and $fn == NBP_LkUp_Reply;
 
+			# Do some duplicate checking, then add the tuples to the set
+			# to be returned to the caller.
 			foreach my $tuple (@tuples) {
 				my $key = join('|', @$tuple[3,4]);
 				next if exists $rset{$key};
-				last RETRY if $maxresps && scalar(keys %rset) >= $maxresps;
+				last RETRY if $maxresps and scalar(keys %rset) >= $maxresps;
 				$rset{$key} = $tuple;
 				push(@records, $tuple);
 			}
