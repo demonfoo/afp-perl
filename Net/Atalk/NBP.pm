@@ -3,7 +3,7 @@ package Net::Atalk::NBP;
 use IO::Socket::DDP;
 use Net::Atalk;
 use IO::Poll qw(POLLIN);
-use Time::HiRes;
+use Time::HiRes qw(gettimeofday);
 
 use strict;
 use warnings;
@@ -112,7 +112,7 @@ RETRY:
 			foreach my $tuple (@tuples) {
 				my $key = join('|', @$tuple[3,4]);
 				next if exists $rset{$key};
-				last RETRY if scalar(keys %rset) >= $maxresps;
+				last RETRY if $maxresps && scalar(keys %rset) >= $maxresps;
 				$rset{$key} = $tuple;
 				push(@records, $tuple);
 			}
