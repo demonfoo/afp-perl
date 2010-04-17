@@ -12,6 +12,24 @@ use Exporter qw(import);
 
 our @EXPORT = qw(NBP_BrRq NBP_FwdReq NBPLookup);
 
+=head1 NAME
+
+Net::Atalk::NBP - Convenience functions for NBP operations
+
+=head1 SYNOPSIS
+
+    use Net::Atalk::NBP;
+
+=head1 DESCRIPTION
+
+C<Net::Atalk::NBP> provides (currently) one convenience function for
+resolving NBP (Name Binding Protocol) host, zone and service name
+groups into AppleTalk host addresses and ports.
+
+=over
+
+=cut
+
 use constant NBP_BrRq		=> 1;
 use constant NBP_LkUp		=> 2;
 use constant NBP_LkUp_Reply	=> 3;
@@ -65,6 +83,15 @@ sub UnpackTuples {
 # zone...
 
 # Lookup an NBP name (or possibly more than one).
+=item NBPLookup (OBJ, TYPE, ZONE, FROMADDR, MAXRESPS)
+
+Implements NBP Lookup request issuing and fetching. All arguments are
+optional. Object name, type (service name) and AppleTalk zone can be
+specified, and will be included in the request if given. An explicit
+source address can be specified, as well as a maximum number of
+tuples to fetch as part of the request.
+
+=cut
 sub NBPLookup {
 	my($Obj, $Type, $Zone, $FromAddr, $maxresps) = @_;
 
@@ -138,5 +165,11 @@ RETRY:
 
 	return(@records);
 }
+=back
 
+=head1 SEE ALSO
+
+L<Net::Atalk>, L<IO::Socket::DDP>
+
+=cut
 1;
