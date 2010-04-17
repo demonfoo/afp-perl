@@ -35,7 +35,7 @@ use constant NBP_LkUp		=> 2;
 use constant NBP_LkUp_Reply	=> 3;
 use constant NBP_FwdReq		=> 4;
 
-my $id = 1;
+our $id = 1;
 
 # Construct an NBP packet.
 sub AssemblePacket {
@@ -59,7 +59,7 @@ sub UnpackPacket {
 	my ($packet) = @_;
 
 	my ($pkttype, $fn_cnt, $ID, $tupledata) = unpack('CCCa*', $packet);
-	die() unless $pkttype == DDPTYPE_NBP;
+	return unless $pkttype == DDPTYPE_NBP;
 	my $Function = ($fn_cnt >> 4) & 0x0F;
 	my $tuplecount = $fn_cnt & 0x0F;
 	return($Function, $ID, UnpackTuples($tuplecount, $tupledata));
@@ -148,7 +148,8 @@ RETRY:
 			# Unpack the NBP packet.
 			my ($fn, $r_id, @tuples) = UnpackPacket($rbuf);
 
-			# If the packet wasn't a lookup-reply packet, just ignore it.
+			# If the packet wasn't a lookup-reply packet (or an NBP packet,
+			# if $fn is undef), just ignore it.
 			next unless defined $fn and $fn == NBP_LkUp_Reply;
 
 			# Do some duplicate checking, then add the tuples to the set
