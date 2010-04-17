@@ -215,11 +215,13 @@ sub _sock_info {
     $proto = _get_proto_number($serv[3]) if @serv && !$proto;
   }
 
-  my @tuples = NBPLookup($addr, $port, $zone);
-  if (scalar(@tuples > 0)) {
-    warn("Hm, more than one answer, assuming first") if scalar(@tuples) > 1;
-    if (defined $addr) { $addr = $tuples[0][0] }
-    if (defined $port) { $addr = $tuples[0][1] }
+  if ($addr !~ /^\d{1,5}\.\d{1,3}$/) {
+    my @tuples = NBPLookup($addr, $port, $zone);
+    if (scalar(@tuples > 0)) {
+      warn("Hm, more than one answer, assuming first") if scalar(@tuples) > 1;
+      if (defined $addr) { $addr = $tuples[0][0] }
+      if (defined $port) { $addr = $tuples[0][1] }
+    }
   }
 
  return ($addr || undef,
