@@ -6,7 +6,6 @@ use strict;
 our(@ISA, $VERSION);
 use IO::Socket;
 use Net::Atalk;
-use Net::Atalk::NBP;
 use Carp;
 use Exporter;
 use Errno;
@@ -41,7 +40,6 @@ arguments; these arguments are presented as key/value pairs.
     PeerAddr    Remote host address
     PeerHost    Synonym for PeerAddr
     PeerPort    Remote port or service
-    PeerZone    AppleTalk zone of target host
     LocalAddr   Local host bind address
     LocalHost   Synonym for LocalAddr
     LocalPort   Local host bind port
@@ -181,12 +179,10 @@ sub _get_proto_name {
 }
 
 sub _sock_info {
-  my($addr,$port,$proto,$zone) = @_;
+  my($addr,$port,$proto) = @_;
   my $origport = $port;
   my @serv = ();
 
-  $zone = $1
-    if defined $addr && $addr =~ s|@(\w+)$||;
   $port = $1
 	if(defined $addr && $addr =~ s,:([\w\(\)/]+)$,,);
 
@@ -215,15 +211,6 @@ sub _sock_info {
     $proto = _get_proto_number($serv[3]) if @serv && !$proto;
   }
 
-  if (defined($addr) && $addr !~ /^\d{1,5}\.\d{1,3}$/) {
-    my @tuples = NBPLookup($addr, $port, $zone);
-    if (scalar(@tuples > 0)) {
-      warn("Hm, more than one answer, assuming first") if scalar(@tuples) > 1;
-      if (defined $addr) { $addr = $tuples[0][0] }
-      if (defined $port) { $addr = $tuples[0][1] }
-    }
-  }
-
  return ($addr || undef,
 	 $port || undef,
 	 $proto || undef
@@ -245,16 +232,9 @@ sub _error {
 }
 
 sub _get_addr {
-    my($sock, $addr_str, $multi) = @_;
+    my($sock,$addr_str, $multi) = @_;
     my @addr;
-#    if ($addr_str !~ /^\d{1,5}\.\d{1,3}$/) {
-#		my @tuples = NBPLookup($addr_str, $svc_str, $zone_str);
-#		push(@addr, map {} @tuples);
-#	} else {
-		my $h = atalk_aton($addr_str);
-		push(@addr, $h) if defined $h;
-#	}
-    @addr;
+    atalk_aton($addr_str);
 }
 
 sub configure {
@@ -281,8 +261,7 @@ sub configure {
     unless(exists $arg->{Listen}) {
 	($raddr,$rport,$proto) = _sock_info($arg->{PeerAddr},
 					    $arg->{PeerPort},
-					    $proto,
-						$arg->{PeerZone})
+					    $proto)
 			or return _error($sock, $!, $@);
     }
 
