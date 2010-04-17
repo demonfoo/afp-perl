@@ -13,6 +13,124 @@ use Errno;
 @ISA = qw(IO::Socket);
 $VERSION = "0.50";
 
+=head1 NAME
+
+IO::Socket::DDP - Object interface for AF_APPLETALK domain sockets
+
+=head1 SYNOPSIS
+
+    use IO::Socket::DDP;
+
+=head1 DESCRIPTION
+
+C<IO::Socket::DDP> provices an object-based interface to creating and using
+sockets in the AF_APPLETALK domain. It is built upon the L<IO::Socket>
+interface and inherits all the methods defined by L<IO::Socket>.
+
+=head1 CONSTRUCTOR
+
+=over
+
+=item new ( [ARGS] )
+
+Creates an C<IO::Socket::DDP> object, which is a reference to a newly
+created symbol (see the C<Symbol> package). C<new> optionally takes
+arguments; these arguments are presented as key/value pairs.
+
+    PeerAddr    Remote host address
+    PeerHost    Synonym for PeerAddr
+    PeerPort    Remote port or service
+    LocalAddr   Local host bind address
+    LocalHost   Synonym for LocalAddr
+    LocalPort   Local host bind port
+    Proto       Protocol name (or number)
+    Type        Socket type
+    Listen      Queue size for listen
+    ReuseAddr   Set SO_REUSEADDR before binding
+    Reuse       Set SO_REUSEADDR before binding (deprecated, prefer ReuseAddr)
+    ReusePort   Set SO_REUSEPORT before binding
+    Broadcast   Set SO_BROADCAST before binding
+    Timeout     Timeout value for some operations
+    MultiHomed  Try all addresses for multi-homed hosts
+    Blocking    Determine if connection will be blocking mode
+
+if C<Listen> is defined then a listen socket is created, otherwise if
+the socket type, which is derived from the protocol, is SOCK_STREAM then
+connect() is called.
+
+Although it is not illegal, the use of C<MultiHomed> on a socket
+which is in non-blocking mode is of little use. This is because the
+first connect will never fail with a timeout as the connect call
+will not block.
+
+The C<PeerAddr> can be an Appletalk host address in the "xxxxx.xxx"
+format. Support will eventually be added for resolving NBP station names,
+but is not currently available.
+
+If C<Proto> is not given and you specify a symbolic C<PeerPort> port,
+then the constructor will try to derive  C<Proto> from the service name.
+As a loast reort, C<Proto> "ddp" is assumed. The C<Type> parameter
+will be deduced from C<Proto> if not specified.
+
+If the constructor is only passed a single argument, it is assumed to
+be a C<PeerAddr> specification.
+
+If C<Blocking> is set to 0, the socket will be in nonblocking mode. If
+not specified it defaults to 1 (blocking mode).
+
+ NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+
+As of VERSION 1.18 all IO::Socket objects have autoflush turned on
+by default. This was not the case with earlier releases.
+
+ NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+
+=back
+
+=head2 METHODS
+
+=over
+
+=item sockaddr ()
+
+Returns the address part of the sockaddr structure for the socket.
+
+=item sockport ()
+
+Returns the port number that the socket is using on the local host.
+
+=item sockhost ()
+
+Returns the address part of the sockaddr structure for the socket in a
+text form xxxxx.xxx.
+
+=item peeraddr ()
+
+Return the address part of the sockaddr structure for the socket on
+the peer host.
+
+=item peerport ()
+
+Return the port number for the socket on the peer host.
+
+=item peerhost ()
+
+Return the address part of the sockaddr structure for the socket on the
+peer host in a text form xxxxx.xxx.
+
+=back
+
+=head1 SEE ALSO
+
+L<Net::Atalk>, L<IO::Socket>
+
+=head1 AUTHOR
+
+Derrik Pates <demon@devrandom.net>, based on code written by Graham
+Barr and maintained by the Perl Porters.
+
+=cut
+
 my $EINVAL = exists(&Errno::EINVAL) ? Errno::EINVAL() : 1;
 
 IO::Socket::DDP->register_domain( AF_APPLETALK );
