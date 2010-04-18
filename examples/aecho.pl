@@ -25,13 +25,13 @@ my %sockparms = ('Proto' => 'ddp');
 GetOptions( 'c=i' => \$count,
 		    'A=s' => sub { $sockparms{'LocalAddr'} = $_[1] } ) || usage();
 
+usage() unless scalar(@ARGV) == 1;
 my ($target) = @ARGV;
-usage() unless defined $target;
 
 my $paddr = atalk_aton($target);
 unless (defined $paddr) {
 	$target =~ s/(?::(\w+|=))?(?:\@(\w+|\*))?$//;
-	($type, $zone) = ($1, $2);
+	my ($type, $zone) = ($1, $2);
 	my @tuples = NBPLookup($target, $type, $zone, exists $sockparms{'LocalAddr'} ? $sockparms{'LocalAddr'} : undef, 1);
 	unless (scalar(@tuples)) {
 		printf(STDERR "Can't resolve \"\%s\"\n", $target);
