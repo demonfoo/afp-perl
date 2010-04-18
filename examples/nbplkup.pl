@@ -11,7 +11,7 @@ my $maxents;
 my $localaddr;
 
 sub usage {
-	print "Usage:\t", $0, " [ -A address ] [ -r responses] [ obj:type\@zone ]\n";
+	print "Usage:\t", $0, " [ -A address ] [ -r responses ] [ obj:type\@zone ]\n";
 	exit(1);
 }
 
@@ -20,6 +20,7 @@ GetOptions('A=s' => \$localaddr,
 
 my ($type, $zone);
 
+usage() if scalar(@ARGV) > 1;
 my ($host) = @ARGV;
 if (defined $host) {
 	my ($type, $zone) = $host =~ s/(?::(\w+|=))?(?:\@(\w+|\*))?$//;
