@@ -44,7 +44,7 @@ my $sock = new IO::Socket::DDP(%sockparms) or die "Can't bind: $@";
 my $dest = pack_sockaddr_at($port, $paddr);
 
 sub usage {
-	print "usage:\t", $0, " [-A source address ] [-c count] addr\n";
+	print "usage:\t", $0, " [-A source address ] [-c count] ( addr | nbpname )\n";
 	exit(1);
 }
 
