@@ -8,6 +8,12 @@ our @EXPORT = qw(kFPAttributeBit kFPParentDirIDBit kFPCreateDateBit
 				 kFPOffspringCountBit kFPOwnerIDBit kFPGroupIDBit
 				 kFPAccessRightsBit kFPProDOSInfoBit kFPUTF8NameBit
 				 kFPUnixPrivsBit kFPUUID);
+our %EXPORT_TAGS = (
+	'common' => [qw(kFPAttributeBit kFPParentDirIDBit kFPCreateDateBit
+                    kFPModDateBit kFPBackupDateBit kFPFinderInfoBit
+                    kFPLongNameBit kFPShortNameBit kFPNodeIDBit
+                    kFPUTF8NameBit kFPUnixPrivsBit)],
+);
 
 use constant kFPAttributeBit		=> 0x00001;
 use constant kFPParentDirIDBit		=> 0x00002;

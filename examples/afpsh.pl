@@ -4,6 +4,10 @@
 use Carp ();
 local $SIG{'__WARN__'} = \&Carp::cluck;
 
+use strict;
+use warnings;
+use diagnostics;
+
 # Pull in all the AFP packages that we need, for the connection object
 # itself and return code symbols, helper functions for version handling
 # and UAMs, etc.
@@ -15,7 +19,7 @@ use Net::AFP::UAMs;
 use Net::AFP::ACL;
 use Net::AFP::MapParms;
 use Net::AFP::Versions;
-use Net::AFP::FileParms;
+use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 
 use Term::ReadLine;		# for reading input from user
@@ -35,10 +39,6 @@ eval { require Socket6; };
 if ($@) {
 	$has_Socket6 = 0;
 }
-
-use strict;
-use warnings;
-use diagnostics;
 
 my $has_Text__Glob = 1;
 eval { require Text::Glob; };
@@ -80,7 +80,8 @@ my $afp_url_pattern = qr|^
 							  (\/.*)?       # rest of path is local subpath
                           )?)?              # closure of path capture
 						 $|x;
-my @args = ('protocol', 'atalk_transport', 'username', 'UAM', 'password', 'host', 'port', 'volume', 'subpath');
+my @args = ('protocol', 'atalk_transport', 'username', 'UAM', 'password',
+		'host', 'port', 'volume', 'subpath');
 my %values;
 
 unless (@values{@args} = $path =~ $afp_url_pattern) {

@@ -1,6 +1,6 @@
 package Net::AFP::Parsers;
 
-use Net::AFP::DirParms;
+use Net::AFP::DirParms qw(:DEFAULT !:common);
 use Net::AFP::FileParms;
 use Net::AFP::VolParms;
 use Net::AFP::SrvParms;

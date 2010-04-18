@@ -71,7 +71,7 @@ use Net::AFP::Parsers;
 use Net::AFP::TokenTypes;
 use Net::AFP::ACL;
 use Net::AFP::ExtAttrs;
-use Net::AFP::FileParms;
+use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 use Net::AFP::MapParms;
 use Encode;

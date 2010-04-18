@@ -1,9 +1,14 @@
 #!/usr/bin/env perl
 
 # imports {{{1
+# Enables a nice call trace on warning events.
+use Carp ();
+local $SIG{'__WARN__'} = \&Carp::cluck;
+
 use strict;
 use warnings;
 use diagnostics;
+
 use Fuse qw(:xattr);			# preferably use Fuse 0.09_3 (or later), for
 								# decent support of files >= 2**31 bytes long
 use Net::AFP::TCP;				# the class which actually sets up and
@@ -15,7 +20,7 @@ use Net::AFP::VolParms;			# parameters for FPOpenVol()
 use Net::AFP::UAMs;				# User Auth Method helper code
 use Net::AFP::Versions;			# version checking/agreement helper code
 use Net::AFP::MapParms;			# mapping function operation codes
-use Net::AFP::FileParms;
+use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 use Net::AFP::ExtAttrs;
 use Net::AFP::ACL;
@@ -102,7 +107,21 @@ my @ipv6_patterns = (
 #my $ipv6_pattern = join('|', @ipv6_patterns);
 
 # FIXME: need to add IPv6 address handling to the AFP URL stuff...
-my $afp_url_pattern = qr/^(afp):\/(at)?\/(?:([^:\@\/;]*)(?:;AUTH=([^:\@\/;]+))?(?::([^:\@\/;]*))?\@)?([^:\/\@;]+)(?::([^:\/\@;]+))?(?:\/(?:([^:\/\@;]+)(\/.*)?)?)?$/;
+my $afp_url_pattern = qr|^
+                          (afps?):/		    # protocol specific prefix
+						  (at)?/            # optionally specify atalk transport
+						  (?:               # authentication info block
+						      ([^:\@\/;]*)  # capture username
+							  (?:;AUTH=([^:\@\/;]+))? # capture uam name
+							  (?::([^:\@\/;]*))?      # capture password
+							  \@)?          # closure of auth info capture
+                          ([^:\/\@;]+)      # capture target host
+						  (?::([^:\/\@;]+))? # capture optional port
+						  (?:\/(?:          # start path capture
+							  ([^:\/\@;]+)  # first path element is vol name
+							  (\/.*)?       # rest of path is local subpath
+                          )?)?              # closure of path capture
+						 $|x;
 my @args = ('protocol', 'atalk_transport', 'username', 'UAM', 'password',
 		'host', 'port', 'volume', 'subpath');
 # }}}1

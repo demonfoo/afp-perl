@@ -3,11 +3,17 @@ package Net::AFP::FileParms;
 use Exporter qw(import);
 
 our @EXPORT = qw(kFPAttributeBit kFPParentDirIDBit kFPCreateDateBit
-				 kPModDateBit kFPBackupDateBit kFPFinderInfoBit
+				 kFPModDateBit kFPBackupDateBit kFPFinderInfoBit
 				 kFPLongNameBit kFPShortNameBit kFPNodeIDBit
 				 kFPDataForkLenBit kFPRsrcForkLenBit kFPExtDataForkLenBit
 				 kFPLaunchLimitBit kFPUTF8NameBit kFPExtRsrcForkLenBit
 				 kFPUnixPrivsBit);
+our %EXPORT_TAGS = (
+	'common' => [qw(kFPAttributeBit kFPParentDirIDBit kFPCreateDateBit
+                    kFPModDateBit kFPBackupDateBit kFPFinderInfoBit
+                    kFPLongNameBit kFPShortNameBit kFPNodeIDBit
+                    kFPUTF8NameBit kFPUnixPrivsBit)],
+);
 
 use constant kFPAttributeBit		=> 0x0001;
 use constant kFPParentDirIDBit		=> 0x0002;
