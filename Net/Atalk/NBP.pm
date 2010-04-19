@@ -101,6 +101,8 @@ sub NBPLookup {
 					  'Broadcast'	=> 1 );
 	if (defined $FromAddr) { $sockparms{'LocalAddr'} = $FromAddr }
 	my $sock = new IO::Socket::DDP(%sockparms) || die $!;
+	die("Can't get local socket address, possibly atalk stack out of order")
+			unless defined $sock->sockhost();
 
 	# If the lookup properties are undef, assume wildcards were intended.
 	unless (defined $Obj) { $Obj = '=' }
