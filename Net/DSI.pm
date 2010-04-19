@@ -76,7 +76,6 @@ sub session_thread { # {{{1
 
 	$$shared{'conn_fd'} = fileno($conn);
 	$$shared{'running'} = 1;
-	$$shared{'conn_sem'}->up();
 	$$shared{'sockaddr'} = $conn->sockaddr();
 	$$shared{'sockport'} = $conn->sockport();
 	$$shared{'peeraddr'} = $conn->peeraddr();
@@ -85,16 +84,16 @@ sub session_thread { # {{{1
 	if (ref($conn) eq 'IO::Socket::INET6') {
 		$$shared{'sockdomain'} = $conn->sockdomain();
 	}
+	$$shared{'conn_sem'}->up();
 
-	# Get the FD number for use with select(), and assign a few other
-	# important values. Also preallocate several variables which will be
-	# used in the main loop.
+	# Set up a poll object for checking out our socket. Also preallocate
+	# several variables which will be used in the main loop.
 	my $poll = new IO::Poll;
 	$poll->mask($conn, POLLRDNORM);
 	my($data, $real_length, $resp);
 	my($type, $cmd, $id, $errcode, $length, $reserved);
 	while ($$shared{'exit'} == 0) {
-		if ($poll->poll(30) > 0) {
+		if ($poll->poll(30)) {
 			# Try to get a message from the server.
 			my $rsz = sysread($conn, $resp, 16);
 			last unless defined $rsz;
@@ -155,7 +154,7 @@ sub session_thread { # {{{1
 		$$shared{'conn_sem'}->up();
 	}
 	$$shared{'running'} = -1;
-	undef $$shared{'Conn'};
+	undef $$shared{'conn_fd'};
 	close($conn);
 
 	# Return kFPNoServer to any still-waiting callers. (Sort of a hack to
@@ -181,8 +180,7 @@ sub new { # {{{1
 	unless (defined $port) {
 		$port = 548;
 	}
-	my $obj = {};
-	bless $obj, $class;
+	my $obj = bless {}, $class;
 
 	my $shared = &share({});
 	%$shared = (
