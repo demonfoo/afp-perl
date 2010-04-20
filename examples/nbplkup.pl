@@ -28,5 +28,5 @@ if (defined $host) {
 }
 
 foreach my $tuple (NBPLookup($host, $type, $zone, $localaddr, $maxents)) {
-	printf("\%31s:\%-32s \%9s:\%-3d\n", @$tuple[3,4,0,1]);
+	printf("\%31s:\%-34s \%s:\%u\n", @$tuple[3,4,0,1]);
 }
