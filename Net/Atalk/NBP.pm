@@ -104,10 +104,11 @@ sub NBPLookup {
 	die("Can't get local socket address, possibly atalk stack out of order")
 			unless defined $sock->sockhost();
 
-	# If the lookup properties are undef, assume wildcards were intended.
-	unless (defined $Obj) { $Obj = '=' }
-	unless (defined $Type) { $Type = '=' }
-	unless (defined $Zone) { $Zone = '*' }
+	# If the lookup properties are undef (or empty strings), assume
+	# wildcards were intended.
+	unless (defined $Obj && $Obj ne '') { $Obj = '=' }
+	unless (defined $Type && $Type ne '') { $Type = '=' }
+	unless (defined $Zone && $Zone ne '') { $Zone = '*' }
 
 	# Construct a lookup packet with a single tuple, requesting the given
 	# entity name, service type and zone.
