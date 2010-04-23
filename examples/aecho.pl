@@ -54,9 +54,7 @@ sub send_echo {
 	my $orig_err = $!;
 	my $msg = pack('CCLLL', DDPTYPE_AEP, AEPOP_REQUEST, $sent++,
 			gettimeofday());
-	unless (defined send($sock, $msg, 0, $dest)) {
-		die "send() failed: $!";
-	}
+	die "send() failed: $!" unless defined send($sock, $msg, 0, $dest);
 	if ($count && $sent > $count) { finish() }
 	$SIG{'ALRM'} = \&send_echo;
 	# And restore $! before we go...
