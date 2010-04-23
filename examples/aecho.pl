@@ -22,8 +22,9 @@ my ($msec_total, $msec_min, $msec_max, $sent, $rcvd) = (0, -1, -1, 0, 0);
 my $count = 0;
 my %sockparms = ('Proto' => 'ddp');
 
-GetOptions( 'c=i' => \$count,
-		    'A=s' => sub { $sockparms{'LocalAddr'} = $_[1] } ) || usage();
+GetOptions( 'c=i'	=> \$count,
+		    'A=s'	=> sub { $sockparms{'LocalAddr'} = $_[1] },
+			'b'		=> sub { $sockparms{'Broadcast'} = 1 } ) || usage();
 
 usage() unless scalar(@ARGV) == 1;
 my ($target) = @ARGV;
@@ -44,18 +45,22 @@ my $sock = new IO::Socket::DDP(%sockparms) or die "Can't bind: $@";
 my $dest = pack_sockaddr_at($port, $paddr);
 
 sub usage {
-	print "usage:\t", $0, " [-A source address ] [-c count] ( addr | nbpname )\n";
+	print "usage:\t", $0, " [-A source address ] [-c count] [-b] ( addr | nbpname )\n";
 	exit(1);
 }
 
 sub send_echo {
+	# Have to save $!, because we happily stomp all over it with our crap.
+	my $orig_err = $!;
 	my $msg = pack('CCLLL', DDPTYPE_AEP, AEPOP_REQUEST, $sent++,
 			gettimeofday());
-	if (send($sock, $msg, 0, $dest) < 0) {
+	unless (defined send($sock, $msg, 0, $dest)) {
 		die "send() failed: $!";
 	}
 	if ($count && $sent > $count) { finish() }
 	$SIG{'ALRM'} = \&send_echo;
+	# And restore $! before we go...
+	$! = $orig_err;
 }
 
 sub finish {
@@ -80,8 +85,6 @@ while (1) {
 	my $rbuf;
 	my $from = recv($sock, $rbuf, DDP_MAXSZ, 0);
 	unless (defined $from) {
-		next if $! == 0; # seems to be what happens when syscall
-						 # gets interrupted...
 		next if $! == EINTR;
 		die "recv failed: $!";
 	}
