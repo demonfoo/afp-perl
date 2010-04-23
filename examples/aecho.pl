@@ -18,7 +18,8 @@ local $SIG{'__WARN__'} = \&Carp::cluck;
 
 my $port = getservbyname('echo', 'ddp') || 4;
 
-my ($msec_total, $msec_min, $msec_max, $sent, $rcvd) = (0, -1, -1, 0, 0);
+my ($msec_total, $msec_min, $msec_max, $sent, $rcvd, $dups) =
+		(0, -1, -1, 0, 0, 0);
 my $count = 0;
 my %sockparms = ('Proto' => 'ddp');
 
@@ -64,11 +65,12 @@ sub send_echo {
 sub finish {
 	if ($sent) {
 		printf("\n---- \%s AEP Statistics ----\n", $target);
-		printf("\%d packets sent, \%d packets received, \%d\%\% packet loss\n",
-			 $sent, $rcvd, ($sent - $rcvd) * 100 / $sent);
+		printf("\%d packets sent, \%d packets received\%s, \%d\%\% packet loss\n",
+			 $sent, $rcvd, $dups ? sprintf(', +%u duplicates', $dups) : '',
+			 ($sent - $rcvd) * 100 / $sent);
 		if ($rcvd) {
 			printf("round trip (msec) min/avg/max: \%.3f/\%.3f/\%.3f\n",
-				$msec_min, $msec_total / $rcvd, $msec_max);
+				$msec_min, $msec_total / ($rcvd + $dups), $msec_max);
 		}
 	}
 	exit(0);
@@ -86,7 +88,7 @@ while (1) {
 		next if $! == EINTR;
 		die "recv failed: $!";
 	}
-	$rcvd++;
+	if ($rcvd < $sent) { $rcvd++ } else { $dups++ }
 	my ($now_sec, $now_usec) = gettimeofday();
 	my ($ddptype, $aeptype, $seqno, $t_sec, $t_usec) =
 		 unpack('CCLLL', $rbuf);
