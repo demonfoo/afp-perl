@@ -14,7 +14,7 @@ our @EXPORT = qw(NBP_BrRq NBP_FwdReq NBPLookup);
 
 =head1 NAME
 
-Net::Atalk::NBP - Convenience functions for NBP operations
+Net::Atalk::NBP - AppleTalk Name Binding Protocol operations
 
 =head1 SYNOPSIS
 
@@ -22,9 +22,9 @@ Net::Atalk::NBP - Convenience functions for NBP operations
 
 =head1 DESCRIPTION
 
-C<Net::Atalk::NBP> provides (currently) one convenience function for
-resolving NBP (Name Binding Protocol) host, zone and service name
-groups into AppleTalk host addresses and ports.
+C<Net::Atalk::NBP> provides (currently) one function for resolving NBP
+(Name Binding Protocol) host, zone and service name groups into
+AppleTalk host addresses and ports.
 
 =over
 
