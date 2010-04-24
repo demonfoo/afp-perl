@@ -118,7 +118,7 @@ sub thread_core {
 	$poll->mask($conn, POLLIN);
 	my ($id, $TxCB, $sec, $usec, $delta, $from, $msg, %msgdata, $msgtype,
 		$wants_sts, $is_eom, $seqno, $RqCB, $is_xo, $xo_tmout, $RspCB, $seq,
-		$resp_r, $ctl_byte);
+		$pktdata, $ctl_byte);
 
 	my $atp_header = 'CCCna[4]a*';
 	my @atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
@@ -204,22 +204,15 @@ MAINLOOP:
 				if (exists $$shared{'RspCB_list'}{$id}) {
 					$RspCB = $$shared{'RspCB_list'}{$id};
 					$RqCB = $$RspCB{'RqCB'};
-					$resp_r = $$RspCB{'RespData'};
+					$pktdata = $$RspCB{'RespData'};
 					print "thread: txid $id has a response callback block associated, will attempt resend of indicated packets\n";
 
-					# FIXME: Could probably save the precooked packets instead
-					# of generating them here again...
-					for (my $seq = 0; $seq < scalar(@$resp_r); $seq++) {
+					for (my $seq = 0; $seq < scalar(@$pktdata); $seq++) {
 						next unless $$RqCB{'seq_bmp'} & (1 << $seq);
 						print "thread: Resending packet $seq to requester\n";
 
-						$ctl_byte = ATP_TResp | ATP_CTL_XOBIT |
-								$$RqCB{'xo_tmout_bits'};
-						if ($seq == $#$resp_r) { $ctl_byte |= ATP_CTL_EOMBIT }
-						$msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq,
-								$id, @{$$resp_r[$seq]}{'userbytes', 'payload'});
 						$$shared{'conn_sem'}->down();
-						send($conn, $msg, 0, $$RqCB{'sockaddr'});
+						send($conn, $$pktdata[$seq], 0, $$RqCB{'sockaddr'});
 						$$shared{'conn_sem'}->up();
 						print "thread: Response packet $seq resent\n";
 					}
@@ -323,8 +316,6 @@ MAINLOOP:
 	CORE::close($conn);
 }
 
-# FIXME: Think I need to handle a situation where a transaction is
-# dispatched but no response is expected...
 # FIXME: Also need to handle infinite tries, currently don't think it'd
 # work right/at all.
 sub SendTransaction {
@@ -336,7 +327,8 @@ sub SendTransaction {
 	return if $rlen > 8;
 	return if length($user_bytes) > 4;
 	die('$rdata_r must be a scalar ref')
-			unless ref($rdata_r) eq 'SCALAR' or ref($rdata_r) eq 'REF';
+			unless ref($rdata_r) eq 'SCALAR' or ref($rdata_r) eq 'REF'
+				or $rlen == 0;
 	die('$sflag_r must be a scalar ref')
 			unless ref($sflag_r) eq 'SCALAR' or ref($sflag_r) eq 'REF';
 
@@ -349,6 +341,10 @@ sub SendTransaction {
 	my $txid = ++$$self{'Shared'}{'last_txid'} % (2 ** 16);
 	my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq_bmp, $txid,
 			$user_bytes, $data);
+
+	# Don't register a transaction control block if the sender says the
+	# response length is 0.
+	return($txid, undef) if $rlen == 0;
 
 	# Set up the transaction control block.
 	my $TxCB = &share({});
@@ -408,10 +404,8 @@ sub RespondTransaction {
 	my $RqCB = $$self{'Shared'}{'RqCB_list'}{$txid};
 	print "RespondTransaction(): Found transaction block for txid $txid\n";
 
+	my $pktdata = &share([]);
 	for (my $seq = 0; $seq < scalar(@$resp_r); $seq++) {
-		next unless $$RqCB{'seq_bmp'} & (1 << $seq);
-		print "RespondTransaction(): Sending packet $seq to requester\n";
-		
 		die('$resp_r element ' . $seq . ' was not a hash ref')
 				unless ref($$resp_r[$seq]) eq 'HASH';
 		my $ctl_byte = ATP_TResp;
@@ -423,6 +417,11 @@ sub RespondTransaction {
 		if ($seq == $#$resp_r) { $ctl_byte |= ATP_CTL_EOMBIT }
 		my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq, $txid,
 				@{$$resp_r[$seq]}{'userbytes', 'payload'});
+		$$pktdata[$seq] = $msg;
+
+		next unless $$RqCB{'seq_bmp'} & (1 << $seq);
+		print "RespondTransaction(): Sending packet $seq to requester\n";
+		
 		$$self{'Shared'}{'conn_sem'}->down();
 		send($$self{'Conn'}, $msg, 0, $$RqCB{'sockaddr'});
 		$$self{'Shared'}{'conn_sem'}->up();
@@ -434,7 +433,7 @@ sub RespondTransaction {
 		foreach (@$resp_r) { &share($_) }
 		$$self{'Shared'}{'RspCB_list'}{$txid} = {
 			'RqCB'		=> $RqCB,
-			'RespData'	=> $resp_r,
+			'RespData'	=> $pktdata,
 			'stamp'		=> [ gettimeofday() ],
 			'tmout'		=> $$RqCB{'xo_tmout'},
 		};
