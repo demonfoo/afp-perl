@@ -39,8 +39,12 @@ use constant ATP_TREL_8MIN		=> 0x04;
 # The maximum length of the ATP message body.
 use constant ATP_MAXLEN			=> 578;
 
+my $atp_header = 'CCCna[4]a*';
+my @atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
+		'payload');
+
 sub new {
-	my ($class, $host, $port) = @_;
+	my ($class, %sockopts) = @_;
 
 	my $obj = bless {}, $class;
 
@@ -57,7 +61,7 @@ sub new {
 				 'RspCB_list'	=> &share({}),
 			   );
 	$$obj{'Shared'} = $shared;
-	my $thread = threads->create(\&thread_core, $shared, $host, $port
+	my $thread = threads->create(\&thread_core, $shared, %sockopts);
 	$$obj{'Dispatcher'} = $thread;
 	$$shared{'conn_sem'}->down();
 	$$obj{'Conn'} = new IO::Handle;
@@ -75,15 +79,14 @@ sub new {
 # number of times, it might be better to just hand it off to it in the
 # first place. I'll see where things go.
 sub thread_core {
-	my ($shared, $host, $port) = @_;
+	my ($shared, %sockopts) = @_;
 
 	# Set up the datagram socket to the target host. There's no connection
 	# status per-se, since DDP is datagram-oriented, not connection-oriented
 	# like TCP is.
-	my %connect_args = ( 'PeerAddr'		=> $host,
-						 'PeerPort'		=> $port,
-						 'Proto'		=> 'ddp',
-						 'Type'			=> SOCK_DGRAM );
+	my %connect_args = ( 'Proto'		=> 'ddp',
+						 'Type'			=> SOCK_DGRAM,
+						 %sockopts );
 	my $conn = new IO::Socket::DDP(%connect_args);
 	$$shared{'running'} = 1;
 
@@ -104,7 +107,8 @@ sub thread_core {
 	my $poll = new IO::Poll();
 	$poll->mask($conn, POLLIN);
 	my ($id, $TxCB, $sec, $usec, $delta, $from, $msg, %msgdata, $msgtype,
-		$wants_sts, $is_eom, $seqno, $RqCB, $is_xo, $xo_tmout);
+		$wants_sts, $is_eom, $seqno, $RqCB, $is_xo, $xo_tmout, $RspCB, $seq,
+		$resp_r, $ctl_byte);
 
 	my $atp_header = 'CCCna[4]a*';
 	my @atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
@@ -123,13 +127,13 @@ MAINLOOP:
 		# Okay, now we need to check existing outbound transactions for
 		# status, resends, cleanups, etc...
 		print "thread: checking pending transaction list\n";
+		($sec, $usec) = gettimeofday();
 		foreach $id (keys %{$$shared{'TxCB_list'}}) {
 			print "thread: txid ", $id, " pending\n";
 			$TxCB = $$shared{'TxCB_list'}{$id};
-			($sec, $usec) = gettimeofday();
 			$delta = ($sec - $$TxCB{'sec'}) +
 					(($usec - $$TxCB{'usec'}) / 1000000);
-			if ($delta >= $tmout) {
+			if ($delta >= $$TxCB{'tmout'}) {
 				print "thread: transaction is past expire\n";
 				# okay, packet data needs to be resent; sequence mask
 				# will be updated in-place elsewhere, so just need to
@@ -153,6 +157,18 @@ MAINLOOP:
 				}
 			}
 		}
+
+		print "thread: checking exactly-once transaction list\n";
+		foreach $id (keys %{$$shared{'RspCB_list'}}) {
+			print "thread: txid ", $id, " XO response block pending\n";
+			$RspCB = $$shared{'RspCB_list'}{$id};
+			$delta = ($sec - $$RspCB{'stamp'}[0]) +
+					(($usec - $$RspCB{'stamp'}[1]) / 1000000);
+			if ($delta >= $$RspCB{'tmout'}) {
+				print "thread: XO response block for txid $id too old, pruning\n";
+				delete $$shared{'RspCB_list'}{$id};
+			}
+		}
 		if ($poll->poll(1)) {
 			$$shared{'conn_sem'}->down();
 			$from = recv($conn, $msg, DDP_MAXSZ, 0);
@@ -165,19 +181,45 @@ MAINLOOP:
 				next MAINLOOP;
 			}
 			$msgtype = $msgdata{'ctl'} & ATP_CTL_FNCODE;
-			$id = $$msgdata{'tid'};
+			$id = $msgdata{'tid'};
 			if ($msgtype == ATP_TReq) {
 				print "thread: received a transaction request\n";
-				$is_xo = $msgdata{'ctl'} & ATL_CTL_XOBIT;
+				$is_xo = $msgdata{'ctl'} & ATP_CTL_XOBIT;
 				$xo_tmout = $msgdata{'ctl'} & ATP_CTL_TREL_TMOUT;
 
 				if (exists $$shared{'RqCB_list'}{$id}) {
 					print "thread: transaction request already exists for txid ", $id, ", ignoring\n";
 					next MAINLOOP;
 				}
+				if (exists $$shared{'RspCB_list'}{$id}) {
+					$RspCB = $$shared{'RspCB_list'}{$id};
+					$RqCB = $$RspCB{'RqCB'};
+					$resp_r = $$RspCB{'RespData'};
+					print "thread: txid $id has a response callback block associated, will attempt resend of indicated packets\n";
+
+					# FIXME: Could probably save the precooked packets instead
+					# of generating them here again...
+					for (my $seq = 0; $seq < scalar(@$resp_r); $seq++) {
+						next unless $$RqCB{'seq_bmp'} & (1 << $seq);
+						print "thread: Resending packet $seq to requester\n";
+
+						$ctl_byte = ATP_TResp | ATP_CTL_XOBIT |
+								$$RqCB{'xo_tmout_bits'};
+						if ($seq == $#$resp_r) { $ctl_byte |= ATP_CTL_EOMBIT }
+						$msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq,
+								$id, @{$$resp_r[$seq]}{'userbytes', 'payload'});
+						$$shared{'conn_sem'}->down();
+						send($conn, $msg, 0, $$RqCB{'sockaddr'});
+						$$shared{'conn_sem'}->up();
+						print "thread: Response packet $seq resent\n";
+					}
+					@{$$RspCB{'stamp'}} = gettimeofday();
+					next MAINLOOP;
+				}
 				$RqCB = {
 						  'txid'		=> $id,
 						  'is_xo'		=> $is_xo,
+						  'xo_tmout_bits' => $xo_tmout,
 						  'xo_tmout'	=> $xo_timeouts{$xo_tmout},
 						  'seq_bmp'		=> $msgdata{'bmp_seq'},
 						  'userbytes'	=> $msgdata{'userbytes'},
@@ -198,19 +240,20 @@ MAINLOOP:
 				$TxCB = $$shared{'TxCB_list'}{$id};
 				$is_eom = $msgdata{'ctl'} & ATP_CTL_EOMBIT;
 				$wants_sts = $msgdata{'ctl'} & ATP_CTL_STSBIT;
-				$seqno = $$msgdata{'bmp_seq'};
+				$seqno = $msgdata{'bmp_seq'};
 
 				if ($is_eom) {
-					print "thread: server says this packet is last in sequence, fixing up seq bitmap\n"
+					print "thread: server says this packet is last in sequence, fixing up seq bitmap\n";
 					$$TxCB{'seq_bmp'} &= 0xFF >> (7 - $seqno);
 				}
 				if ($wants_sts) {
 					print "thread: server wants us to send back transaction status\n";
 				}
-				if ($$TxCB{'seq_bmp'} & (1 << $seqno) {
+				if ($$TxCB{'seq_bmp'} & (1 << $seqno)) {
 					print "thread: received packet with seq no ", $seqno, ", appears not to be a dup\n";
 					# put data into the array of stored payloads
-					$$TxCB{'payloads'}[$seqno] = $msgdata{'payload'};
+					$$TxCB{'response'}[$seqno] =
+							[ @msgdata{'userbytes', 'payload'} ];
 					# clear the bit in the sequence bitmap
 					$$TxCB{'seq_bmp'} &= ~(1 << $seqno) & 0xFF;
 					# update packet data with new sequence bitmap
@@ -244,7 +287,8 @@ MAINLOOP:
 				# if the server wants an STS, or the sequence number is
 				# high enough that it's not going up further but there are
 				# still packets we need, then resend the request packet.
-				if ($wants_sts || ($seq_bmp && ($seq_bmp >> $seqno))) {
+				if ($wants_sts || ($$TxCB{'seq_bmp'} &&
+						($$TxCB{'seq_bmp'} >> $seqno))) {
 					print "thread: resending request packet for STS or to satisfy missing chunks\n";
 					$$shared{'conn_sem'}->down();
 					send($conn, $$TxCB{'msg'}, 0);
@@ -254,6 +298,10 @@ MAINLOOP:
 			}
 			elsif ($msgtype == ATP_TRel) {
 				print "thread: received a transaction release\n";
+				if (exists $$shared{'RqCB_list'}{$id}) {
+					print "thread: RspCB for txid $id found, removing\n";
+					delete $$shared{'RqCB_list'}{$id};
+				}
 			}
 		}
 	}
@@ -263,8 +311,8 @@ MAINLOOP:
 }
 
 sub SendTransaction {
-	my ($self, $is_xo, $data, $user_bytes, $rlen, $rdata_r, $tmout, $ntries,
-			$xo_tmout, $sflag_r) = @_;
+	my ($self, $is_xo, $target, $data, $user_bytes, $rlen, $rdata_r, $tmout,
+			$ntries, $xo_tmout, $sflag_r) = @_;
 
 	# Check a few parameters before we proceed.
 	return if length($data) > ATP_MAXLEN;
@@ -278,8 +326,7 @@ sub SendTransaction {
 	# Set up the outgoing transaction request packet.
 	my $ctl_byte = ATP_TReq;
 	if ($is_xo) {
-		$ctl_byte |= ATP_CTL_XOBIT;
-		$ctl_byte |= $xo_tmout;
+		$ctl_byte |= ATP_CTL_XOBIT | $xo_tmout;
 	}
 	my $seq_bmp = 0xFF >> (8 - $rlen);
 	my $txid = ++$$self{'last_txid'};
@@ -291,7 +338,7 @@ sub SendTransaction {
 				 'msg'		=> $msg,
 				 'ntries'	=> $ntries - 1, # one less, since this is
 											# already try number one...
-				 'payloads'	=> &share([]),
+				 'response'	=> &share([]),
 				 'ctl_byte'	=> $ctl_byte,
 				 'seq_bmp'	=> $seq_bmp,
 				 'is_xo'	=> $is_xo,
@@ -299,9 +346,9 @@ sub SendTransaction {
 				 'sec'		=> undef,
 				 'usec'		=> undef,
 				 'sem'		=> new Thread::Semaphore(0),
-				 'sflag'	=> ,
+				 'sflag'	=> &share($sflag_r),
 			   };
-	$$rdata_r = $$TxCB{'payloads'};
+	$$rdata_r = $$TxCB{'response'};
 	# Register our transaction control block so the thread can see it,
 	# since we have no idea how soon the response will come back from
 	# who we're talking to.
@@ -309,7 +356,7 @@ sub SendTransaction {
 	print "SendTransaction(): Queued transaction block as txid ", $txid, "\n";
 
 	$$self{'Shared'}{'conn_sem'}->down();
-	send($$shared{'Conn'}, $msg, 0);
+	send($$self{'Shared'}{'Conn'}, $msg, 0, $target);
 	$$self{'Shared'}{'conn_sem'}->up();
 	print "SendTransaction(): Sent request packet to server\n";
 	# indicate this as when the transaction has started
@@ -328,6 +375,54 @@ sub GetTransaction {
 	my $txid = shift(@{$$self{'Shared'}{'RqCB_txidq'}});
 	print "GetTransaction(): Returning transaction request block for txid ", $txid, "\n";
 	return $$self{'Shared'}{'RqCB_list'}{$txid};
+}
+
+sub RespondTransaction {
+	my ($self, $txid, $resp_r) = @_;
+	
+	die('$resp_r must be an array') unless ref($resp_r) eq 'ARRAY';
+
+	die('Ridiculous number of response packets supplied')
+			if scalar(@$resp_r) > 8 or scalar(@$resp_r) < 1;
+
+	die() unless exists $$self{'Shared'}{'RqCB_list'}{$txid};
+	my $RqCB = $$self{'Shared'}{'RqCB_list'}{$txid};
+	print "RespondTransaction(): Found transaction block for txid $txid\n";
+
+	for (my $seq = 0; $seq < scalar(@$resp_r); $seq++) {
+		next unless $$RqCB{'seq_bmp'} & (1 << $seq);
+		print "RespondTransaction(): Sending packet $seq to requester\n";
+		
+		die('$resp_r element ' . $seq . ' was not a hash ref')
+				unless ref($$resp_r[$seq]) eq 'HASH';
+		my $ctl_byte = ATP_TResp;
+		if ($$RqCB{'is_xo'}) {
+			$ctl_byte |= ATP_CTL_XOBIT | $$RqCB{'xo_tmout_bits'};
+		}
+		# last packet in provided set, so tell the requester that this is
+		# end of message...
+		if ($seq == $#$resp_r) { $ctl_byte |= ATP_CTL_EOMBIT }
+		my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq, $txid,
+				@{$$resp_r[$seq]}{'userbytes', 'payload'});
+		$$self{'Shared'}{'conn_sem'}->down();
+		send($$self{'Shared'}{'Conn'}, $msg, 0, $$RqCB{'sockaddr'});
+		$$self{'Shared'}{'conn_sem'}->up();
+		print "RespondTransaction(): Response packet $seq sent\n";
+	}
+	# Now must hand off to XO protection layer if 'is_xo' is true...
+	if ($$RqCB{'is_xo'}) {
+		&share($resp_r);
+		foreach (@$resp_r) { &share($_) }
+		$$self{'Shared'}{'RspCB_list'}{$txid} = {
+			'RqCB'		=> $RqCB,
+			'RespData'	=> $resp_r,
+			'stamp'		=> [ gettimeofday() ],
+			'tmout'		=> $$RqCB{'xo_tmout'},
+		};
+	}
+
+	# Remove the transaction from the stored list.
+	delete $$self{'Shared'}{'RqCB_list'}{$txid};
 }
 
 1;
