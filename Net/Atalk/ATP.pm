@@ -11,6 +11,7 @@ use IO::Handle;
 use threads;
 use threads::shared;
 use Thread::Semaphore;
+use Data::Dumper;
 
 # ATP message types.
 use constant ATP_TReq			=> (0x1 << 6);	# Transaction request
@@ -63,7 +64,9 @@ sub new {
 	$$obj{'Shared'} = $shared;
 	my $thread = threads->create(\&thread_core, $shared, %sockopts);
 	$$obj{'Dispatcher'} = $thread;
+	print "new(): calling sem down op to wait for thread startup completion\n";
 	$$shared{'conn_sem'}->down();
+	print "new(): sem down completed\n";
 	$$obj{'Conn'} = new IO::Handle;
 	if ($$shared{'running'} == 1) {
 		$$obj{'Conn'}->fdopen($$shared{'conn_fd'}, 'w');
@@ -72,6 +75,12 @@ sub new {
 
 	return $obj;
 }
+
+sub close { # {{{1
+	my ($self) = @_;
+	$$self{'Shared'}{'exit'} = 1;
+	$$self{'Dispatcher'}->join();
+} # }}}1
 
 # This function is the body of the thread. Similar to DSI, but I haven't
 # yet decided between fully-dispatched and hybrid dispatched models;
@@ -100,6 +109,7 @@ sub thread_core {
 	$$shared{'peeraddr'} = $conn->peeraddr();
 	$$shared{'peerport'} = $conn->peerport();
 	$$shared{'sockdomain'} = AF_APPLETALK;
+	print "thread: calling sem up op to indicate completion\n";
 	$$shared{'conn_sem'}->up();
 
 	# Set up a poll object for checking out our socket. Also preallocate
@@ -252,8 +262,9 @@ MAINLOOP:
 				if ($$TxCB{'seq_bmp'} & (1 << $seqno)) {
 					print "thread: received packet with seq no ", $seqno, ", appears not to be a dup\n";
 					# put data into the array of stored payloads
-					$$TxCB{'response'}[$seqno] =
-							[ @msgdata{'userbytes', 'payload'} ];
+					$$TxCB{'response'}[$seqno] = &share([]);
+					@{$$TxCB{'response'}[$seqno]} = 
+							@msgdata{'userbytes', 'payload'};
 					# clear the bit in the sequence bitmap
 					$$TxCB{'seq_bmp'} &= ~(1 << $seqno) & 0xFF;
 					# update packet data with new sequence bitmap
@@ -307,7 +318,7 @@ MAINLOOP:
 	}
 	$$shared{'running'} = -1;
 	undef $$shared{'conn_fd'};
-	close($conn);
+	CORE::close($conn);
 }
 
 sub SendTransaction {
@@ -334,7 +345,8 @@ sub SendTransaction {
 			$user_bytes, $data);
 
 	# Set up the transaction control block.
-	my $TxCB = {
+	my $TxCB = &share({});
+	%$TxCB = (
 				 'msg'		=> $msg,
 				 'ntries'	=> $ntries - 1, # one less, since this is
 											# already try number one...
@@ -347,7 +359,7 @@ sub SendTransaction {
 				 'usec'		=> undef,
 				 'sem'		=> new Thread::Semaphore(0),
 				 'sflag'	=> &share($sflag_r),
-			   };
+			   );
 	$$rdata_r = $$TxCB{'response'};
 	# Register our transaction control block so the thread can see it,
 	# since we have no idea how soon the response will come back from
@@ -355,12 +367,13 @@ sub SendTransaction {
 	$$self{'Shared'}{'TxCB_list'}{$txid} = $TxCB;
 	print "SendTransaction(): Queued transaction block as txid ", $txid, "\n";
 
-	$$self{'Shared'}{'conn_sem'}->down();
-	send($$self{'Shared'}{'Conn'}, $msg, 0, $target);
-	$$self{'Shared'}{'conn_sem'}->up();
-	print "SendTransaction(): Sent request packet to server\n";
 	# indicate this as when the transaction has started
 	@$TxCB{'start_sec', 'start_usec'} = gettimeofday();
+
+	$$self{'Shared'}{'conn_sem'}->down();
+	send($$self{'Conn'}, $msg, 0, $target);
+	$$self{'Shared'}{'conn_sem'}->up();
+	print "SendTransaction(): Sent request packet to server\n";
 
 	return($txid, $$TxCB{'sem'});
 }
@@ -405,7 +418,7 @@ sub RespondTransaction {
 		my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq, $txid,
 				@{$$resp_r[$seq]}{'userbytes', 'payload'});
 		$$self{'Shared'}{'conn_sem'}->down();
-		send($$self{'Shared'}{'Conn'}, $msg, 0, $$RqCB{'sockaddr'});
+		send($$self{'Conn'}, $msg, 0, $$RqCB{'sockaddr'});
 		$$self{'Shared'}{'conn_sem'}->up();
 		print "RespondTransaction(): Response packet $seq sent\n";
 	}
