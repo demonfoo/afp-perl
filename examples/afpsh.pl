@@ -32,19 +32,13 @@ use POSIX;				# for POSIX time handling
 use File::Basename;
 use Term::ReadPassword;
 use Time::HiRes qw(gettimeofday);
+use Text::Glob qw(match_glob);
 
 use Socket;
 my $has_Socket6 = 1;
 eval { require Socket6; };
 if ($@) {
 	$has_Socket6 = 0;
-}
-
-my $has_Text__Glob = 1;
-eval { require Text::Glob; };
-if ($@) {
-	print "Sorry, Text::Glob not available.\n";
-	$has_Text__Glob = 0;
 }
 
 my $has_Archive__Tar = 1;
@@ -66,19 +60,20 @@ GetOptions( 'debug-afp' => sub { $__AFP_DEBUG = 1; },
 
 my($path) = @ARGV;
 my $afp_url_pattern = qr|^
-                          (afps?):/		    # protocol specific prefix
-						  (at)?/            # optionally specify atalk transport
-						  (?:               # authentication info block
-						      ([^:\@\/;]*)  # capture username
+                          (afps?):/		     # protocol specific prefix
+						  (at)?/             # optionally specify atalk
+                                             # transport
+						  (?:                # authentication info block
+						      ([^:\@\/;]*)   # capture username
 							  (?:;AUTH=([^:\@\/;]+))? # capture uam name
 							  (?::([^:\@\/;]*))?      # capture password
-							  \@)?          # closure of auth info capture
-                          ([^:\/\@;]+)      # capture target host
+						  \@)?               # closure of auth info capture
+                          ([^:\/\@;]+)       # capture target host
 						  (?::([^:\/\@;]+))? # capture optional port
-						  (?:\/(?:          # start path capture
-							  ([^:\/\@;]+)  # first path element is vol name
-							  (\/.*)?       # rest of path is local subpath
-                          )?)?              # closure of path capture
+						  (?:\/(?:           # start path capture
+							  ([^:\/\@;]+)   # first path element is vol name
+							  (\/.*)?        # rest of path is local subpath
+                          )?)?               # closure of path capture
 						 $|x;
 my @args = ('protocol', 'atalk_transport', 'username', 'UAM', 'password',
 		'host', 'port', 'volume', 'subpath');
@@ -169,7 +164,7 @@ if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
 }
 
 if (defined $values{'subpath'}) {
-	my ($newDirId, $fileName) = resolve_path($session, $volID,
+	my ($newDirId, $fileName) = resolve_path($session, $volID, $curdirnode,
 			$values{'subpath'});
 	if (defined $fileName or !defined $newDirId) {
 		print "path ", $values{'subpath'}, " is not accessible, defaulting to volume root\n";
@@ -206,7 +201,8 @@ my %commands = (
 			my $results;
 			my @records;
 			my $rc;
-			my ($dirId, $fileName) = resolve_path($session, $volID, $item);
+			my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
+					$item);
 			unless (defined $dirId) {
 				print "Sorry, couldn't find named entry \"", $item, "\"\n";
 				next;
@@ -253,7 +249,8 @@ my %commands = (
 	'cat'	=> sub {
 		my @words = @_;
 		foreach my $fname (@words[1..$#words]) {
-			my ($dirId, $fileName) = resolve_path($session, $volID, $fname);
+			my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
+					$fname);
 			my $resp = '';
 			my $rc = $session->FPOpenFork(0, $volID, $dirId, 0, 0x1,
 					$pathType, $fileName, \$resp);
@@ -298,7 +295,7 @@ my %commands = (
 			print "Incorrect number of arguments\n";
 			return 1;
 		}
-		my ($newDirId, $fileName) = resolve_path($session, $volID,
+		my ($newDirId, $fileName) = resolve_path($session, $volID, $curdirnode,
 				$words[1]);
 		if (defined $fileName or !defined $newDirId) {
 			print "sorry, couldn't change directory\n";
@@ -318,7 +315,7 @@ for spaces or special characters).
 _EOT_
 			return 1;
 		}
-		my ($dirId, $fileName) = resolve_path($session, $volID,
+		my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
 				$words[1]);
 		unless (defined $dirId) {
 			print <<'_EOT_';
@@ -409,7 +406,7 @@ _EOT_
 
 		my $srcFileName = basename($words[1]);
 		my $targetFile = (scalar(@words) == 2 ? $srcFileName : $words[2]);
-		my ($dirID, $fileName) = resolve_path($session, $volID,
+		my ($dirID, $fileName) = resolve_path($session, $volID, $curdirnode,
 				$targetFile, 0, 1);
 		unless (defined $dirID) {
 			print <<'_EOT_';
@@ -528,8 +525,8 @@ _EOT_
 		# FIXME: need to resolve the provided path, but path resolver needs
 		# to be modified to handle the "final element of split path doesn't
 		# exist yet" condition.
-		my ($dirID, $fileName) = resolve_path($session, $volID, $words[1],
-				1, 0);
+		my ($dirID, $fileName) = resolve_path($session, $volID, $curdirnode,
+				$words[1], 1, 0);
 		unless (defined $dirID) {
 			print <<'_EOT_';
 Error: Couldn't resolve path; possibly no such file?
@@ -570,7 +567,7 @@ _EOT_
 	'get_acl'	=> sub {
 		my @words = @_;
 		foreach my $fname (@words[1..$#words]) {
-			my ($dirId, $fileName) = resolve_path($session, $volID,
+			my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
 					$fname);
 			my $resp = undef;
 			my $rc = $session->FPGetACL($volID, $dirId,
@@ -588,7 +585,8 @@ _EOT_
 	'get_comment'	=> sub {
 		my @words = @_;
 		foreach my $fname (@words[1..$#words]) {
-			my ($dirId, $fileName) = resolve_path($session, $volID, $fname);
+			my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
+					$fname);
 			my $resp = undef;
 			next unless defined $DT_ID;
 			my $rc = $session->FPGetComment($DT_ID, $dirId, $pathType,
@@ -601,10 +599,28 @@ _EOT_
 		}
 		return 1;
 	},
+	'globtest'	=> sub {
+		my @words = @_;
+		print Dumper(expand_globbed_path($session, $volID, $curdirnode, $words[1]));
+
+		return 1;
+	},
 );
 $commands{'dir'} = $commands{'ls'};
 $commands{'delete'} = $commands{'rm'};
 $commands{'quit'} = $commands{'exit'};
+
+binmode STDOUT, ':utf8';
+binmode STDIN, ':utf8';
+
+$SIG{'INT'} = sub {
+	print "\nCtrl-C received, exiting\n";
+	$session->FPCloseDT($DT_ID) if defined $DT_ID;
+	$session->FPCloseVol($volID);
+	$session->FPLogout();
+	$session->close();
+	exit(0);
+};
 
 while (1) {
 	my $line = $term->readline('afpsh$ ');
@@ -632,7 +648,13 @@ sub do_listentries {
 		if (time() - $fmodtime < 6 * 30 * 24 * 60 * 60) {
 			$tfmt = '%b %e %H:%M';
 		}
-		my $up = $$ent{'UnixPerms'};
+		my $up;
+		if (exists $$ent{'UnixPerms'}) {
+			$up = $$ent{'UnixPerms'};
+		}
+		else {
+			$up = $$ent{'FileIsDir'} ? 0755 : 0644;
+		}
 		printf('%s%s%s%s%s%s%s%s%s%s %3d %5d %5d %8s %-11s %s' . "\n",
 			($$ent{'FileIsDir'} == 1 ? 'd' : '-'),
 			($up & 0400 ? 'r' : '-'),
@@ -645,7 +667,7 @@ sub do_listentries {
 			($up & 0002 ? 'w' : '-'),
 			($up & 01000 ? ($up & 0001 ? 't' : 'T') : ($up & 0001 ? 'x' : '-')),
 			($$ent{'FileIsDir'} == 1 ? $$ent{'OffspringCount'} + 2 : 1),
-			$$ent{'UnixUID'}, $$ent{'UnixGID'},
+			$$ent{'UnixUID'} || 0, $$ent{'UnixGID'} || 0,
 			($$ent{'FileIsDir'} == 1 ? 0 : $$ent{$DForkLenKey}),
 			strftime($tfmt, localtime($fmodtime)),
 			$$ent{$pathkey});
@@ -725,12 +747,93 @@ sub do_listentries {
 	}
 }
 
+sub expand_globbed_path {
+	my ($session, $volid, $dirid, $path) = @_;
+
+	my $dirBmp = kFPNodeIDBit | kFPParentDirIDBit | $pathFlag;
+	my $fileBmp = $dirBmp;
+	my $fileName = undef;
+	my @pathElements = split('/', $path);
+	my $curNode = $dirid;
+
+	my @nameParts;
+
+	if (!defined($pathElements[0]) || ($pathElements[0] eq '')) {
+		$curNode = 2;
+		shift(@pathElements);
+	}
+	else {
+		my $entry = undef;
+		my $searchID = $curNode;
+		while ($searchID != $topDirID) {
+			my $dirbits = kFPParentDirIDBit | $pathFlag;
+			my $rc = $session->FPGetFileDirParms($volID, $searchID, 0,
+					$dirbits, $pathType, '', \$entry);
+			unshift(@nameParts, $$entry{$pathkey});
+			$searchID = $$entry{'ParentDirID'};
+		}
+	}
+	my @expanded_paths = ( [ $curNode, '', @nameParts ] );
+	my $pathElem = shift(@pathElements);
+	while (defined $pathElem) {
+		my (@newpaths);
+		next if $pathElem eq '' or $pathElem eq '.';
+		if ($pathElem eq '..') {
+			# use unique keyspace temporarily for duplicate checking, since
+			# I think this is really the only point where it's a serious
+			# concern (so far).
+			my %dupchk;
+			foreach my $expath (@expanded_paths) {
+				next if $$expath[1] ne '';
+				my $resp;
+				my $rc = $session->FPGetFileDirParms($volid, $$expath[0], 0,
+						kFPParentDirIDBit, $pathType, '', \$resp);
+				next if $rc != kFPNoErr;
+				next if exists $dupchk{$$resp{'ParentDirID'}};
+				push(@newpaths, [ $$resp{'ParentDirID'}, '', @$expath[3 .. $#$expath] ]);
+				$dupchk{$$resp{'ParentDirID'}} = 1;
+			}
+			@expanded_paths = @newpaths;
+			$pathElem = shift(@pathElements);
+			next;
+		}
+		foreach my $expath (@expanded_paths) {
+			my ($rc, $resp, %entries, $elem);
+			do {
+				$rc = $session->FPEnumerateExt2($volid, $$expath[0], $fileBmp,
+						$dirBmp, 256, scalar(keys %entries) + 1, 65536,
+						$pathType, $$expath[1], \$resp);
+				if ($rc == kFPNoErr || $rc == kFPObjectNotFound) {
+					foreach $elem (@$resp) {
+						$entries{$$elem{$pathkey}} = $elem;
+					}
+				}
+			} while ($rc == kFPNoErr);
+			my @matches = match_glob($pathElem, keys(%entries));
+			foreach my $match (@matches) {
+				my $nelem = [];
+				if ($entries{$match}{'FileIsDir'}) {
+					@$nelem = ($entries{$match}{'NodeID'}, '', $match, @$expath[2 .. $#$expath]);
+				} else {
+					@$nelem = ($$expath[0], $match, @$expath[2 .. $#$expath]);
+				}
+				push(@newpaths, $nelem);
+			}
+		}
+		@expanded_paths = @newpaths;
+
+		$pathElem = shift(@pathElements);
+	}
+
+	return [ @expanded_paths ];
+}
+
 # $lastIfDir - the last element can be a directory; needed for removing
 # directories, like for FPRemove
 # $lastNoExist - the last element might not exist, like for FPCreateFile (i.e.,
 # for use as part of the "put" command)
 sub resolve_path {
-	my ($session, $volid, $path, $lastIfDir, $lastNoExist) = @_;
+	my ($session, $volid, $dirid, $path, $lastIfDir, $lastNoExist) = @_;
 
 	if (!defined($lastIfDir)) {
 		$lastIfDir = 0;
@@ -744,7 +847,7 @@ sub resolve_path {
 	my $fileName = undef;
 
 	my @pathElements = split('/', $path);
-	my $curNode = $curdirnode;
+	my $curNode = $dirid;
 	if (!defined($pathElements[0]) || ($pathElements[0] eq '')) {
 		$curNode = 2;
 		shift(@pathElements);
