@@ -11,6 +11,7 @@ use IO::Handle;
 use threads;
 use threads::shared;
 use Thread::Semaphore;
+use Exporter qw(import);
 use Data::Dumper;
 
 # ATP message types.
@@ -40,8 +41,12 @@ use constant ATP_TREL_8MIN		=> 0x04;
 # The maximum length of the ATP message body.
 use constant ATP_MAXLEN			=> 578;
 
-my $atp_header = 'CCCna[4]a*';
-my @atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
+# symbols to export
+our @EXPORT = qw(ATP_TREL_30SEC ATP_TREL_1MIN ATP_TREL_2MIN ATP_TREL_4MIN
+		ATP_TREL_8MIN ATP_MAXLEN);
+
+our $atp_header = 'CCCna[4]a*';
+our @atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
 		'payload');
 
 sub new {
@@ -149,9 +154,11 @@ MAINLOOP:
 				# will be updated in-place elsewhere, so just need to
 				# send again, decrement the retry counter, and update
 				# the start timer.
-				if ($$TxCB{'ntries'} > -1) {
+				if ($$TxCB{'ntries'} != 0) {
 					print "thread: transaction still has tries left, resending for another shot...\n";
-					$$TxCB{'ntries'}--;
+					# -1 is special, it means "just keep trying forever"
+					if ($$TxCB{'ntries'} != -1) { $$TxCB{'ntries'}-- }
+
 					$$shared{'conn_sem'}->down();
 					send($conn, $$TxCB{'msg'}, 0);
 					@$TxCB{'sec', 'usec'} = ($sec, $usec); # close enough
@@ -316,8 +323,6 @@ MAINLOOP:
 	CORE::close($conn);
 }
 
-# FIXME: Also need to handle infinite tries, currently don't think it'd
-# work right/at all.
 sub SendTransaction {
 	my ($self, $is_xo, $target, $data, $user_bytes, $rlen, $rdata_r, $tmout,
 			$ntries, $xo_tmout, $sflag_r) = @_;
@@ -350,8 +355,7 @@ sub SendTransaction {
 	my $TxCB = &share({});
 	%$TxCB = (
 				 'msg'		=> $msg,
-				 'ntries'	=> $ntries - 1, # one less, since this is
-											# already try number one...
+				 'ntries'	=> $ntries == -1 ? $ntries : ($ntries - 1),
 				 'response'	=> &share([]),
 				 'ctl_byte'	=> $ctl_byte,
 				 'seq_bmp'	=> $seq_bmp,
