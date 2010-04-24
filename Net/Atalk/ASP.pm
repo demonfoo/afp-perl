@@ -11,6 +11,7 @@ use Net::AFP::Result;
 use threads;
 use threads::shared;
 use Thread::Semaphore;
+use Exporter qw(import);
 use strict;
 use warnings;
 
@@ -27,6 +28,23 @@ use constant OP_SP_WRITE			=> 6;
 use constant OP_SP_WRITECONTINUE	=> 7;
 use constant OP_SP_ATTENTION		=> 8;
 
+use constant SPNoError				=> 0;
+use constant SPBadVersNum			=> -1066;
+use constant SPBufTooSmall			=> -1067;
+use constant SPNoMoreSessions		=> -1068;
+use constant SPNoServers			=> -1069;
+use constant SPParamErr				=> -1070;
+use constant SPServerBusy			=> -1071;
+use constant SPSessClosed			=> -1072;
+use constant SPSizeErr				=> -1073;
+use constant SPTooManyClients		=> -1074;
+use constant SPNoAck				=> -1075;
+
+our @EXPORT = qw(SPNoError SPBadVersNum SPBufTooSmall SPNoMoreSessions
+		SPNoServers SPParamErr SPServerBusy SPSessClosed SPSizeErr
+		SPTooManyClients SPNoAck);
+
+# FIXME: Gotta figure out how to implement this...
 sub SPGetParms {
 	my ($self, $resp_r) = @_;
 
@@ -34,37 +52,112 @@ sub SPGetParms {
 }
 
 sub SPGetStatus {
-	my ($self, $SLSEntityIdentifier, $StatusBuffer, $resp_r) = @_;
+	my ($self, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
-	my $msg = pack('CCn', OP_SP_GETSTATUS, 0, 0);
+	die('$resp_r must be a scalar ref')
+			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+
+	my ($rdata, $success);
+	my $msg = pack('Cx[3]', OP_SP_GETSTATUS);
+	my $sa = pack_sockaddr_at( , atalk_aton( ));
+	my ($txid, $sem) = $atpsess->SendTransaction(0, $sa, '', $msg, 1, \$rdata,
+			2, 3, 0, \$success);
+	$sem->down();
+	unless ($success) { return SPNoServers; }
+	$$resp_r = $$rdata[0][1];
+	return SPNoErr;
 }
 
 sub SPOpenSession {
 	my ($self, $SLSEntityIdentifier, $AttnRoutine, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
-	my $wss = 0;	# FIXME: Needs to get local socket number
+	# FIXME: Should probably have a getter method for this...
+	my $wss = $$self{'atpsess'}{'Shared'}{'sockport'};
 	my $msg = pack('CCn', OP_SP_OPENSESS, $wss, SP_VERSION);
+	my $sa = pack_sockaddr_at( , atalk_aton( ));
+	my ($rdata, $success);
+	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, '', $msg,
+			1, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
+	$sem->down();
+	unless ($success) { return SPNoServers; }
+	my ($srv_sockno, $sessionid, $errno) = unpack('CCn', $$rdata[0][0]);
+	@$self{'sess_sockno', 'sessionid'} = ($srv_sockno, $sessionid);
+	$$self{'seqno'} = 0;
+	$errno = ($errno & 0x8000) ? -((~$errno & 0xFFFF) + 1) : $errno;
+	return $errno;
 }
 
 sub SPCloseSession {
 	my ($self, $SessRefNum) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
-	my $msg = pack('CCn', OP_SP_CLOSESESS, $SessRefNum, 0);
+	my $msg = pack('CCx[2]', OP_SP_CLOSESESS, $$self{'sessionid'});
+	my $sa = pack_sockaddr_at( , atalk_aton( ));
+	my ($rdata, $success);
+	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
+			1, \$rdata, 2, 3, 0, \$success);
+	$sem->down();
+	unless ($success) { return SPNoServers; }
+	# No actual data is returned, just a packet with 4 zero'd UserBytes.
+	return SPNoErr;
 }
 
 sub SPCommand {
-	my ($self, $SessRefNum, $CmdBlock, $ReplyBuffer, $resp_r) = @_;
+	my ($self, $message, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
+	die('$resp_r must be a scalar ref')
+			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+
+	my $seqno = $$self{'seqno'}++;
+	# this will take an ATP_MSGLEN sized chunk of the message data and
+	# send it to the server, to be 
+	my $ub = pack('CCn', OP_SP_COMMAND, $$self{'sessionid'}, $seqno);
+	my $sa = pack_sockaddr_at( , atalk_aton( ));
+	my ($rdata, $success);
+	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
+			$ub, 8, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
+	$sem->down();
+	unless ($success) { return SPNoServers; }
+	print (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
+	# string the response bodies back together
+	$$resp_r = join('', map { $$_[1]; } @$rdata);
+	# user bytes from the first response packet are the only ones that
+	# are relevant...
+	my ($errno) = unpack('N', $$rdata[0][0]);
+	$errno = ($errno & 0x80000000) ? -((~$errno & 0xFFFFFFFF) + 1) : $errno;
+	return $errno;
 }
 
 sub SPWrite {
-	my ($self, $SessRefNum, $CmdBlock, $WriteData, $ReplyBuffer, $resp_r) = @_;
+	my ($self, $message, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
+	die('$resp_r must be a scalar ref')
+			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+
+	my $seqno = $$self{'seqno'}++;
+	# this will take an ATP_MSGLEN sized chunk of the message data and
+	# send it to the server, to be 
+	my $ub = pack('CCn', OP_SP_WRITE, $$self{'sessionid'}, $seqno);
+	my $sa = pack_sockaddr_at( , atalk_aton( ));
+	my ($rdata, $success);
+	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
+			$ub, 8, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
+	$sem->down();
+	unless ($success) { return SPNoServers; }
+	print (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
+	# string the response bodies back together
+	$$resp_r = join('', map { $$_[1]; } @$rdata);
+	# user bytes from the first response packet are the only ones that
+	# are relevant...
+	my ($errno) = unpack('N', $$rdata[0][0]);
+	$errno = ($errno & 0x80000000) ? -((~$errno & 0xFFFFFFFF) + 1) : $errno;
+
+	# FIXME: Now have to check for SPWriteContinue requests from the server...
+	return $errno;
 }
 
 
