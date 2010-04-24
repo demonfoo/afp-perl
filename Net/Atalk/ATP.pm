@@ -53,7 +53,7 @@ sub new {
 	%$shared = (
 				 'running'		=> 0,
 				 'exit'			=> 0,
-				 'last_txid'	=> 0,
+				 'last_txid'	=> int(rand(2 ** 16)),
 				 'conn_fd'		=> undef,
 				 'conn_sem'		=> new Thread::Semaphore(0),
 				 'TxCB_list'	=> &share({}),
@@ -136,7 +136,7 @@ MAINLOOP:
 	while ($$shared{'exit'} == 0) {
 		# Okay, now we need to check existing outbound transactions for
 		# status, resends, cleanups, etc...
-		print "thread: checking pending transaction list\n";
+		print "thread: scanning pending transaction list\n";
 		($sec, $usec) = gettimeofday();
 		foreach $id (keys %{$$shared{'TxCB_list'}}) {
 			print "thread: txid ", $id, " pending\n";
@@ -168,7 +168,7 @@ MAINLOOP:
 			}
 		}
 
-		print "thread: checking exactly-once transaction list\n";
+		print "thread: scanning exactly-once transaction list\n";
 		foreach $id (keys %{$$shared{'RspCB_list'}}) {
 			print "thread: txid ", $id, " XO response block pending\n";
 			$RspCB = $$shared{'RspCB_list'}{$id};
@@ -241,7 +241,7 @@ MAINLOOP:
 				print "thread: set up request callback for transaction request with txid ", $id, "\n";
 			}
 			elsif ($msgtype == ATP_TResp) {
-				print "thread: received a transaction response packet, let's see who it belongs to\n";
+				print "thread: received a transaction response packet for txid ", $id, ", let's see who it belongs to\n";
 				unless (exists $$shared{'TxCB_list'}{$id}) {
 					print "thread: txid is ", $id, " but no corresponding TxCB was found, moving on\n";
 					next MAINLOOP;
@@ -254,7 +254,9 @@ MAINLOOP:
 
 				if ($is_eom) {
 					print "thread: server says this packet is last in sequence, fixing up seq bitmap\n";
+					printf("thread: seq bmp was 0x\%02x for txid %u\n", $$TxCB{'seq_bmp'}, $id);
 					$$TxCB{'seq_bmp'} &= 0xFF >> (7 - $seqno);
+					printf("thread: seq bmp is now 0x\%02x for txid %u\n", $$TxCB{'seq_bmp'}, $id);
 				}
 				if ($wants_sts) {
 					print "thread: server wants us to send back transaction status\n";
@@ -321,6 +323,10 @@ MAINLOOP:
 	CORE::close($conn);
 }
 
+# FIXME: Think I need to handle a situation where a transaction is
+# dispatched but no response is expected...
+# FIXME: Also need to handle infinite tries, currently don't think it'd
+# work right/at all.
 sub SendTransaction {
 	my ($self, $is_xo, $target, $data, $user_bytes, $rlen, $rdata_r, $tmout,
 			$ntries, $xo_tmout, $sflag_r) = @_;
@@ -340,7 +346,7 @@ sub SendTransaction {
 		$ctl_byte |= ATP_CTL_XOBIT | $xo_tmout;
 	}
 	my $seq_bmp = 0xFF >> (8 - $rlen);
-	my $txid = ++$$self{'last_txid'};
+	my $txid = ++$$self{'Shared'}{'last_txid'} % (2 ** 16);
 	my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq_bmp, $txid,
 			$user_bytes, $data);
 
