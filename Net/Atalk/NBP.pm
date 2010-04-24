@@ -160,9 +160,9 @@ RETRY:
 			foreach my $tuple (@tuples) {
 				my $key = join('|', @$tuple[3,4]);
 				next if exists $rset{$key};
-				last RETRY if $maxresps and scalar(keys %rset) >= $maxresps;
 				$rset{$key} = $tuple;
 				push(@records, $tuple);
+				last RETRY if $maxresps and scalar(@records) >= $maxresps;
 			}
 		}
 	}
