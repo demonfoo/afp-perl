@@ -156,17 +156,17 @@ MAINLOOP:
 				# send again, decrement the retry counter, and update
 				# the start timer.
 				if ($$TxCB{'ntries'} != 0) {
-					#print '', (caller(0))[3], ": transaction still has tries left, resending for another shot, ntries is ", $$TxCB{'ntries'}, "...\n";
+					#print '', (caller(0))[3], ": transaction $id still has tries left, resending for another shot, ntries is ", $$TxCB{'ntries'}, "...\n";
 					# -1 is special, it means "just keep trying forever"
 					if ($$TxCB{'ntries'} != -1) { $$TxCB{'ntries'}-- }
 
 					$$shared{'conn_sem'}->down();
-					send($conn, $$TxCB{'msg'}, 0);
+					send($conn, $$TxCB{'msg'}, 0, $$TxCB{'target'});
 					@$TxCB{'sec', 'usec'} = ($sec, $usec); # close enough
 					$$shared{'conn_sem'}->up();
 				}
 				else {
-					#print '', (caller(0))[3], ": okay, transaction has no more tries, closing it out\n";
+					#print '', (caller(0))[3], ": okay, transaction $id has no more tries, closing it out\n";
 					# Okay, you've had enough go-arounds. Time to put
 					# this dog down.
 					${$$TxCB{'sflag'}} = 0;
@@ -178,7 +178,7 @@ MAINLOOP:
 
 		#print '', (caller(0))[3], ": scanning exactly-once inbound transaction list\n";
 		foreach $id (keys %{$$shared{'RspCB_list'}}) {
-			print '', (caller(0))[3], ": txid ", $id, " XO response block pending\n";
+			#print '', (caller(0))[3], ": txid ", $id, " XO response block pending\n";
 			$RspCB = $$shared{'RspCB_list'}{$id};
 			$delta = ($sec - $$RspCB{'stamp'}[0]) +
 					(($usec - $$RspCB{'stamp'}[1]) / 1000000);
@@ -277,7 +277,7 @@ MAINLOOP:
 				$$shared{'RqCB_list'}{$id} = $RqCB;
 				push(@{$$shared{'RqCB_txq'}}, $RqCB);
 				$$shared{'RqCB_sem'}->up();
-				print '', (caller(0))[3], ": set up request callback for transaction request with txid ", $id, "\n";
+				#print '', (caller(0))[3], ": set up request callback for transaction request with txid ", $id, "\n";
 			}
 			elsif ($msgtype == ATP_TResp) {
 				#print '', (caller(0))[3], ": received a transaction response packet for txid ", $id, ", checking for transaction info\n";
@@ -347,9 +347,9 @@ MAINLOOP:
 				}
 			}
 			elsif ($msgtype == ATP_TRel) {
-				print '', (caller(0))[3], ": received a transaction release\n";
+				#print '', (caller(0))[3], ": received a transaction release\n";
 				if (exists $$shared{'RspCB_list'}{$id}) {
-					print '', (caller(0))[3], ": RspCB for txid $id found, removing\n";
+					#print '', (caller(0))[3], ": RspCB for txid $id found, removing\n";
 					delete $$shared{'RspCB_list'}{$id};
 				}
 			}
@@ -357,6 +357,11 @@ MAINLOOP:
 	}
 	# FIXME: Should probably notify any pending transaction waiters that
 	# they won't be getting a response.
+	foreach my $txid (keys %{$$shared{'TxCB_list'}}) {
+		my $TxCB = $$shared{'TxCB_list'}{$txid};
+		${$$TxCB{'sflag'}} = 0;
+		$$TxCB{'sem'}->up();
+	}
 	$$shared{'running'} = -1;
 	undef $$shared{'conn_fd'};
 	CORE::close($conn);
@@ -404,6 +409,7 @@ sub SendTransaction {
 				 'usec'		=> undef,
 				 'sem'		=> new Thread::Semaphore(0),
 				 'sflag'	=> &share($sflag_r),
+				 'target'	=> $target,
 			   );
 	$$rdata_r = $$TxCB{'response'};
 
@@ -435,7 +441,7 @@ sub GetTransaction {
 	for (my $i = 0; $i < scalar(@$RqCB_queue); $i++) {
 		if (!defined($filter) || &$filter($$RqCB_queue[$i])) {
 			my $RqCB = $$RqCB_queue[$i];
-			print "GetTransaction(): Returning transaction request block for txid ", $$RqCB{'txid'}, "\n";
+			#print '', (caller(0))[3], ": Returning transaction request block for txid ", $$RqCB{'txid'}, "\n";
 			@$RqCB_queue = @$RqCB_queue[0 .. ($i - 1),
 					($i + 1) .. $#$RqCB_queue];
 			if ($do_block) {
@@ -447,7 +453,7 @@ sub GetTransaction {
 		}
 		if ($do_block) { $$self{'Shared'}{'RqCB_sem'}->down() }
 	}
-	print '', (caller(0))[3], ": No unchecked incoming transactions to return, returning undef\n";
+	#print '', (caller(0))[3], ": No unchecked incoming transactions to return, returning undef\n";
 	return undef;
 }
 
@@ -461,7 +467,7 @@ sub RespondTransaction {
 
 	die() unless exists $$self{'Shared'}{'RqCB_list'}{$txid};
 	my $RqCB = $$self{'Shared'}{'RqCB_list'}{$txid};
-	print '', (caller(0))[3], ": Found transaction block for txid $txid\n";
+	#print '', (caller(0))[3], ": Found transaction block for txid $txid\n";
 
 	my $pktdata = &share([]);
 	for (my $seq = 0; $seq < scalar(@$resp_r); $seq++) {
@@ -479,23 +485,27 @@ sub RespondTransaction {
 		$$pktdata[$seq] = $msg;
 
 		next unless $$RqCB{'seq_bmp'} & (1 << $seq);
-		print '', (caller(0))[3], ": Sending packet $seq to requester\n";
+		#print '', (caller(0))[3], ": Sending packet $seq to requester\n";
 		
 		$$self{'Shared'}{'conn_sem'}->down();
 		send($$self{'Conn'}, $msg, 0, $$RqCB{'sockaddr'});
 		$$self{'Shared'}{'conn_sem'}->up();
-		print '', (caller(0))[3], ": Response packet $seq sent\n";
+		#print '', (caller(0))[3], ": Response packet $seq sent\n";
 	}
 	# Now must hand off to XO protection layer if 'is_xo' is true...
 	if ($$RqCB{'is_xo'}) {
 		&share($resp_r);
 		foreach (@$resp_r) { &share($_) }
-		$$self{'Shared'}{'RspCB_list'}{$txid} = {
+		my $RspCB = &share({});
+		my $stamp = &share([]);
+		@$stamp = gettimeofday();
+		%$RspCB = (
 			'RqCB'		=> $RqCB,
 			'RespData'	=> $pktdata,
-			'stamp'		=> [ gettimeofday() ],
+			'stamp'		=> $stamp,
 			'tmout'		=> $$RqCB{'xo_tmout'},
-		};
+		);
+		$$self{'Shared'}{'RspCB_list'}{$txid} = $RspCB;
 	}
 
 	# Remove the transaction from the stored list.
