@@ -224,7 +224,8 @@ MAINLOOP:
 					@{$$RspCB{'stamp'}} = gettimeofday();
 					next MAINLOOP;
 				}
-				$RqCB = {
+				$RqCB = &share({});
+				%$RqCB = (
 						  'txid'		=> $id,
 						  'is_xo'		=> $is_xo,
 						  'xo_tmout_bits' => $xo_tmout,
@@ -233,7 +234,7 @@ MAINLOOP:
 						  'userbytes'	=> $msgdata{'userbytes'},
 						  'payload'		=> $msgdata{'payload'},
 						  'sockaddr'	=> $from,
-						};
+						);
 				# FIXME: Perhaps the transaction queuing should be keyed on
 				# a combination of the originator's address and port plus
 				# the transaction ID? Seems like having just the txid could
