@@ -218,6 +218,7 @@ sub SPTickle {
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
 			1, \$rdata, $ntries, $interval, 0, \$success);
+	print '', (caller(0))[3], ": Transaction ID is ", $txid, "\n";
 }
 
 1;
