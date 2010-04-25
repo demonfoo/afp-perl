@@ -214,7 +214,7 @@ sub SPTickle {
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 	my $msg = pack('CCx[2]', OP_SP_TICKLE, $$self{'sessionid'});
-	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
+	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
 			1, \$rdata, $interval, $ntries, 0, \$success);
