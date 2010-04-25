@@ -374,7 +374,7 @@ sub SendTransaction {
 
 	# indicate this as when the transaction has started (have to do this
 	# before we queue the TxCB)...
-	@$TxCB{'start_sec', 'start_usec'} = gettimeofday();
+	@$TxCB{'sec', 'usec'} = gettimeofday();
 
 	# Register our transaction control block so the thread can see it,
 	# since we have no idea how soon the response will come back from
