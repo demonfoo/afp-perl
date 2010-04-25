@@ -139,7 +139,7 @@ sub SPCommand {
 			$ub, 8, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
 	$sem->down();
 	unless ($success) { return SPNoServers; }
-	print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
+	#print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
 	# string the response bodies back together
 	$$resp_r = join('', map { $$_[1]; } @$rdata);
 	# user bytes from the first response packet are the only ones that
