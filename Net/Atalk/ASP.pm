@@ -58,7 +58,7 @@ sub new {
 sub close {
 	my ($self) = @_;
 
-	$self->close();
+	$$self{'atpsess'}->close();
 }
 
 # FIXME: Gotta figure out how to implement this...
