@@ -371,6 +371,8 @@ sub SendTransaction {
 				 'sem'		=> new Thread::Semaphore(0),
 				 'sflag'	=> &share($sflag_r),
 			   );
+	print '', (caller(0))[3], ": transaction $txid has ntries $ntries\n";
+	print '', (caller(0))[3], ": transaction $txid has ", $$TxCB{'ntries'}, " tries according to TxCB\n";
 	$$rdata_r = $$TxCB{'response'};
 
 	# indicate this as when the transaction has started (have to do this
