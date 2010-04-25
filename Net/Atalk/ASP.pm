@@ -114,9 +114,9 @@ sub SPCloseSession {
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
-			1, \$rdata, 2, 3, 0, \$success);
-	$sem->down();
-	unless ($success) { return SPNoServers; }
+			1, \$rdata, 1, 1, 0, \$success);
+	#$sem->down();
+	#unless ($success) { return SPNoServers; }
 	# No actual data is returned, just a packet with 4 zero'd UserBytes.
 	delete $$self{'sessionid'};
 	return SPNoError;
