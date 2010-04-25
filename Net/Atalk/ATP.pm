@@ -142,7 +142,7 @@ MAINLOOP:
 		#print '', (caller(0))[3], ": scanning pending outbound transaction list\n";
 		($sec, $usec) = gettimeofday();
 		foreach $id (keys %{$$shared{'TxCB_list'}}) {
-			print '', (caller(0))[3], ": txid ", $id, " pending\n";
+			#print '', (caller(0))[3], ": txid ", $id, " pending\n";
 			$TxCB = $$shared{'TxCB_list'}{$id};
 			$delta = ($sec - $$TxCB{'sec'}) +
 					(($usec - $$TxCB{'usec'}) / 1000000);
