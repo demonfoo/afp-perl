@@ -252,7 +252,7 @@ MAINLOOP:
 							}
 							# last packet in provided set, so tell the
 							# requester that this is end of message...
-							if ($seq == $#$resp_r) {
+							if ($seq == $#$rv) {
 								$ctl_byte |= ATP_CTL_EOMBIT;
 							}
 							$msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte,
@@ -264,7 +264,7 @@ MAINLOOP:
 		
 							$$shared{'conn_sem'}->down();
 							send($conn, $msg, 0, $$RqCB{'sockaddr'});
-							$$self{'Shared'}{'conn_sem'}->up();
+							$$shared{'conn_sem'}->up();
 						}
 						next MAINLOOP;
 					}
@@ -508,7 +508,7 @@ sub RespondTransaction {
 sub AddTransactionFilter {
 	my ($self, $filter) = @_;
 
-	push(@{$$self{'RqFilters'}, $filter;
+	push(@{$$self{'RqFilters'}, $filter);
 }
 
 1;
