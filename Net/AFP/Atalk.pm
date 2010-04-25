@@ -30,26 +30,36 @@ sub new {
 	# required to the thread.
 	$$obj{'ASPSession'}->SPTickle(30, -1);
 	# Ignore incoming Tickle requests.
-	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter( sub {
-		my ($RqCB) = @_;
-		my ($txtype) = unpack('C', $$RqCB{'userbytes'});
-		if ($txtype == 5) { return [] }
-		return undef;
-	} );
+	my $filter = &share([]);
+	@$filter = ( 'Net::AFP::Atalk::_TickleFilter' );
+	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter($filter);
 	# Handle incoming Attention requests.
 	$$obj{'attnq'} = &share([]);
-	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter( sub {
-		my ($RqCB) = @_;
-		my ($txtype) = unpack('CC', $$RqCB{'userbytes'});
-		if ($txtype == 8 && $sessid == $$self{'ASPSession'}{'sessionid'}) {
-			return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
-		}
-		return undef;
-	} );
+	$filter = &share([]);
+	@$filter = ( 'Net::AFP::Atalk::_AttnFilter', $$obj{'sessionid'}, $$obj{'attnq'} );
+	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter($filter);
 	return $rc unless $rc == SPNoError;
 	return $obj;
 }
 
+sub _TickleFilter {
+	print 'called ', (caller(0))[3], "\n";
+	my ($RqCB) = @_;
+	my ($txtype) = unpack('C', $$RqCB{'userbytes'});
+	if ($txtype == 5) { return [] }
+	return undef;
+}
+
+sub _AttnFilter {
+	print 'called ', (caller(0))[3], "\n";
+	my ($sid, $attnq_r, $RqCB) = @_;
+	my ($txtype, $sessid, $attncode) = unpack('CCn', $$RqCB{'userbytes'});
+	if ($txtype == 8 && $sessid == $sid) {
+		push(@$attnq_r, $attncode);
+		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
+	}
+	return undef;
+}
 
 sub close {
 	my ($self) = @_;

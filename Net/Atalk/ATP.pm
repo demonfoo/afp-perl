@@ -240,7 +240,7 @@ MAINLOOP:
 						);
 
 				foreach $filter (@{$$shared{'RqFilters'}}) {
-					$rv = &$filter($RqCB);
+					$rv = &{$$filter[0]}(@$filter[1 .. $#$filter], $RqCB);
 					if ($rv) {
 						$pktdata = [];
 						for ($seq = 0; $seq < scalar(@$rv); $seq++) {
@@ -508,7 +508,7 @@ sub RespondTransaction {
 sub AddTransactionFilter {
 	my ($self, $filter) = @_;
 
-	push(@{$$self{'RqFilters'}, $filter);
+	push(@{$$self{'Shared'}{'RqFilters'}}, $filter);
 }
 
 1;
