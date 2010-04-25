@@ -162,13 +162,43 @@ sub SPWrite {
 	my $ub = pack('CCn', OP_SP_WRITE, $$self{'sessionid'}, $seqno);
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	print '', (caller(0))[3], ": Sending SPWrite transaction to server\n";
+	#print '', (caller(0))[3], ": Sending SPWrite transaction to server\n";
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
 			$ub, 8, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
-	print '', (caller(0))[3], ": Blocking on sem to wait for completion\n";
+
+	# Try getting an SPWriteContinue transaction request from the server
+	#print '', (caller(0))[3], ": Waiting for an SPWriteContinue transaction from server\n";
+	my $RqCB = $$self{'atpsess'}->GetTransaction(1, sub {
+		my ($txtype, $sessid, $pseq) = unpack('CCn', $_[0]{'userbytes'});
+		return($txtype == OP_SP_WRITECONTINUE && $sessid == $$self{'sessionid'} && $seqno == $pseq);
+	} );
+	my $bufsize = unpack('n', $$RqCB{'payload'});
+	#print '', (caller(0))[3], ": Server buffer size is ", $bufsize, "\n";
+
+	my $resp = &share([]);
+
+	my $sendsize = 0;
+	my $totalsend = 0;
+	for (my $i = 0; $i < 8; $i++) {
+		last if $totalsend > length($$data_r);
+		$sendsize = ATP_MAXLEN;
+		if ($bufsize - $totalsend < ATP_MAXLEN) {
+			$sendsize = $bufsize - $totalsend;
+		}
+		my $elem = &share({});
+		%$elem = ( 'userbytes'	=> pack('x[4]'),
+				   'payload'	=> substr($$data_r, $totalsend, $sendsize) );
+		push(@$resp, $elem);
+		$totalsend += $sendsize;
+	}
+
+	#print '', (caller(0))[3], ": Sending WriteContinue transaction response\n";
+	$$self{'atpsess'}->RespondTransaction($$RqCB{'txid'}, $resp);
+
+	#print '', (caller(0))[3], ": Blocking on sem to wait for completion\n";
 	$sem->down();
-	print '', (caller(0))[3], ": Transaction completed\n";
-	unless ($success) { return SPNoServers; }
+	#print '', (caller(0))[3], ": Transaction completed\n";
+	#unless ($success) { return SPNoServers; }
 	#print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
 	# string the response bodies back together
 	$$resp_r = join('', map { $$_[1]; } @$rdata);
@@ -177,35 +207,6 @@ sub SPWrite {
 	my ($errno) = unpack('N', $$rdata[0][0]);
 	$errno = ($errno & 0x80000000) ? -((~$errno & 0xFFFFFFFF) + 1) : $errno;
 
-	my $count = 0;
-	do {
-		# Try getting an SPWriteContinue transaction request from the server
-		print '', (caller(0))[3], ": Waiting for an SPWriteContinue transaction from server\n";
-		my $RqCB = $$self{'atpsess'}->GetTransaction(1, sub {
-			my ($txtype, $sessid, $pseq) = unpack('CCn', $_[0]{'userbytes'});
-			return($txtype == OP_SP_WRITECONTINUE && $sessid == $$self{'sessionid'} && $seqno == $pseq);
-		} );
-		my $bufsize = unpack('n', $$RqCB{'payload'});
-		print '', (caller(0))[3], ": Server buffer size is ", $bufsize, "\n";
-
-		my @resp;
-
-		my $sendsize = 0;
-		my $totalsend = 0;
-		for (my $i = 0; $i < 8; $i++) {
-			$sendsize = ATP_MAXLEN;
-			if ($bufsize - $totalsend < ATP_MAXLEN) {
-				$sendsize = $bufsize - $totalsend;
-			}
-			push(@resp, { 'userbytes'	=> pack('x[4]'),
-						  'payload'		=> substr($$data_r, $count + $totalsend, $sendsize) } );
-			$totalsend += $sendsize;
-		}
-		$count += $totalsend;
-
-		print '', (caller(0))[3], ": Sending WriteContinue transaction response\n";
-		$$self{'atpsess'}->RespondTransaction($$RqCB{'txid'}, \@resp);
-	} while (length($$data_r) > $count);
 	return $errno;
 }
 
@@ -218,7 +219,6 @@ sub SPTickle {
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
 			1, \$rdata, $interval, $ntries, 0, \$success);
-	print '', (caller(0))[3], ": Transaction ID is ", $txid, "\n";
 }
 
 1;
