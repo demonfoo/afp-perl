@@ -253,7 +253,7 @@ sub GetStatus { # {{{1
 	$obj->close();
 	return $rc unless $rc == kFPNoErr;
 
-	$$resp_r = Net::AFP::Parsers::_ParseSrvrInfo($resp);
+	$$resp_r = _ParseSrvrInfo($resp);
 	return $rc;
 } # }}}1
 
