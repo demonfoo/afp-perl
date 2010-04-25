@@ -49,6 +49,7 @@ sub CheckAttnQueue {
 		my ($txtype, $sessid) = unpack('CC', $_[0]{'userbytes'});
 		return($txtype == 8 && $sessid == $$self{'ASPSession'}{'sessionid'}); # OP_SP_ATTENTION
 	} );
+	return unless defined $RqCB;
 	my ($attncode) = unpack('x[2]n', $$RqCB{'userbytes'});
 	$$self{'ASPSession'}{'atpsess'}->RespondTransaction($$RqCB{'txid'}, [ { userbytes => pack('x[4]'), payload => '' } ]);
 	print '', (caller(0))[3], ": AttnCode is $attncode\n";
