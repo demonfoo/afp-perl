@@ -69,9 +69,7 @@ sub new {
 	$$obj{'Shared'} = $shared;
 	my $thread = threads->create(\&thread_core, $shared, %sockopts);
 	$$obj{'Dispatcher'} = $thread;
-	print "new(): calling sem down op to wait for thread startup completion\n";
 	$$shared{'conn_sem'}->down();
-	print "new(): sem down completed\n";
 	$$obj{'Conn'} = new IO::Handle;
 	if ($$shared{'running'} == 1) {
 		$$obj{'Conn'}->fdopen($$shared{'conn_fd'}, 'w');
@@ -114,7 +112,6 @@ sub thread_core {
 	$$shared{'peeraddr'} = $conn->peeraddr();
 	$$shared{'peerport'} = $conn->peerport();
 	$$shared{'sockdomain'} = AF_APPLETALK;
-	print "thread: calling sem up op to indicate completion\n";
 	$$shared{'conn_sem'}->up();
 
 	# Set up a poll object for checking out our socket. Also preallocate
@@ -141,7 +138,7 @@ MAINLOOP:
 	while ($$shared{'exit'} == 0) {
 		# Okay, now we need to check existing outbound transactions for
 		# status, resends, cleanups, etc...
-		print "thread: scanning pending transaction list\n";
+		print "thread: scanning pending outbound transaction list\n";
 		($sec, $usec) = gettimeofday();
 		foreach $id (keys %{$$shared{'TxCB_list'}}) {
 			print "thread: txid ", $id, " pending\n";
@@ -175,7 +172,7 @@ MAINLOOP:
 			}
 		}
 
-		print "thread: scanning exactly-once transaction list\n";
+		print "thread: scanning exactly-once inbound transaction list\n";
 		foreach $id (keys %{$$shared{'RspCB_list'}}) {
 			print "thread: txid ", $id, " XO response block pending\n";
 			$RspCB = $$shared{'RspCB_list'}{$id};
@@ -241,7 +238,7 @@ MAINLOOP:
 				print "thread: set up request callback for transaction request with txid ", $id, "\n";
 			}
 			elsif ($msgtype == ATP_TResp) {
-				print "thread: received a transaction response packet for txid ", $id, ", let's see who it belongs to\n";
+				print "thread: received a transaction response packet for txid ", $id, ", checking for transaction info\n";
 				unless (exists $$shared{'TxCB_list'}{$id}) {
 					print "thread: txid is ", $id, " but no corresponding TxCB was found, moving on\n";
 					next MAINLOOP;
@@ -254,9 +251,7 @@ MAINLOOP:
 
 				if ($is_eom) {
 					print "thread: server says this packet is last in sequence, fixing up seq bitmap\n";
-					printf("thread: seq bmp was 0x\%02x for txid %u\n", $$TxCB{'seq_bmp'}, $id);
 					$$TxCB{'seq_bmp'} &= 0xFF >> (7 - $seqno);
-					printf("thread: seq bmp is now 0x\%02x for txid %u\n", $$TxCB{'seq_bmp'}, $id);
 				}
 				if ($wants_sts) {
 					print "thread: server wants us to send back transaction status\n";
@@ -274,6 +269,7 @@ MAINLOOP:
 				}
 				else {
 					print "thread: received packet with seq no ", $seqno, ", already received, ignoring\n";
+					next MAINLOOP;
 				}
 
 				unless ($$TxCB{'seq_bmp'}) {
@@ -311,9 +307,9 @@ MAINLOOP:
 			}
 			elsif ($msgtype == ATP_TRel) {
 				print "thread: received a transaction release\n";
-				if (exists $$shared{'RqCB_list'}{$id}) {
+				if (exists $$shared{'RspCB_list'}{$id}) {
 					print "thread: RspCB for txid $id found, removing\n";
-					delete $$shared{'RqCB_list'}{$id};
+					delete $$shared{'RspCB_list'}{$id};
 				}
 			}
 		}
