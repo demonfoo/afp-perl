@@ -146,6 +146,7 @@ MAINLOOP:
 			$TxCB = $$shared{'TxCB_list'}{$id};
 			$delta = ($sec - $$TxCB{'sec'}) +
 					(($usec - $$TxCB{'usec'}) / 1000000);
+			print '', (caller(0))[3], ": txid ", $id, " delta is ", $delta, "\n";
 			if ($delta >= $$TxCB{'tmout'}) {
 				print '', (caller(0))[3], ": transaction is past expire\n";
 				# okay, packet data needs to be resent; sequence mask
@@ -153,7 +154,7 @@ MAINLOOP:
 				# send again, decrement the retry counter, and update
 				# the start timer.
 				if ($$TxCB{'ntries'} != 0) {
-					print '', (caller(0))[3], ": transaction still has tries left, resending for another shot...\n";
+					print '', (caller(0))[3], ": transaction still has tries left, resending for another shot, ntries is ", $$TxCB{'ntries'}, "...\n";
 					# -1 is special, it means "just keep trying forever"
 					if ($$TxCB{'ntries'} != -1) { $$TxCB{'ntries'}-- }
 
