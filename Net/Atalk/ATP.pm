@@ -260,7 +260,7 @@ MAINLOOP:
 							$$pktdata[$seq] = $msg;
 
 							next unless $$RqCB{'seq_bmp'} & (1 << $seq);
-							print '', (caller(0))[3], ": Sending packet $seq to requester\n";
+							#print '', (caller(0))[3], ": Sending packet $seq to requester\n";
 		
 							$$shared{'conn_sem'}->down();
 							send($conn, $msg, 0, $$RqCB{'sockaddr'});
