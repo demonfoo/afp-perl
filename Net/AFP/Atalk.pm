@@ -31,19 +31,21 @@ sub new {
 	$$obj{'ASPSession'}->SPTickle(30, -1);
 	# Ignore incoming Tickle requests.
 	my $filter = &share([]);
+	# We have to pass the fully qualified subroutine name because we can't
+	# pass subroutine refs from thread to thread.
 	@$filter = ( 'Net::AFP::Atalk::_TickleFilter' );
 	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter($filter);
 	# Handle incoming Attention requests.
 	$$obj{'attnq'} = &share([]);
 	$filter = &share([]);
-	@$filter = ( 'Net::AFP::Atalk::_AttnFilter', $$obj{'sessionid'}, $$obj{'attnq'} );
+	@$filter = ( 'Net::AFP::Atalk::_AttnFilter',
+			$$obj{'ASPSession'}{'sessionid'}, $$obj{'attnq'} );
 	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter($filter);
 	return $rc unless $rc == SPNoError;
 	return $obj;
 }
 
 sub _TickleFilter {
-	print 'called ', (caller(0))[3], "\n";
 	my ($RqCB) = @_;
 	my ($txtype) = unpack('C', $$RqCB{'userbytes'});
 	if ($txtype == 5) { return [] }
