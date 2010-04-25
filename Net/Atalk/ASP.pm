@@ -5,6 +5,7 @@
 package Net::Atalk::ASP;
 
 use Net::Atalk::ATP;
+use Net::Atalk;
 use IO::Poll qw(POLLRDNORM POLLWRNORM POLLIN POLLHUP);
 use IO::Handle;
 use Net::AFP::Result;
