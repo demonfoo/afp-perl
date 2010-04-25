@@ -198,7 +198,7 @@ MAINLOOP:
 			$msgtype = $msgdata{'ctl'} & ATP_CTL_FNCODE;
 			$id = $msgdata{'tid'};
 			if ($msgtype == ATP_TReq) {
-				print '', (caller(0))[3], ": received a transaction request\n";
+				#print '', (caller(0))[3], ": received a transaction request\n";
 				$is_xo = $msgdata{'ctl'} & ATP_CTL_XOBIT;
 				$xo_tmout = $msgdata{'ctl'} & ATP_CTL_TREL_TMOUT;
 
@@ -304,7 +304,7 @@ MAINLOOP:
 				# still packets we need, then resend the request packet.
 				if ($wants_sts || ($$TxCB{'seq_bmp'} &&
 						($$TxCB{'seq_bmp'} >> $seqno))) {
-					print '', (caller(0))[3], ": resending request packet for STS or to satisfy missing chunks\n";
+					#print '', (caller(0))[3], ": resending request packet for STS or to satisfy missing chunks\n";
 					$$shared{'conn_sem'}->down();
 					send($conn, $$TxCB{'msg'}, 0);
 					@$TxCB{'sec', 'usec'} = gettimeofday();
