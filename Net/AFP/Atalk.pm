@@ -41,6 +41,11 @@ sub new {
 	@$filter = ( 'Net::AFP::Atalk::_AttnFilter',
 			$$obj{'ASPSession'}{'sessionid'}, $$obj{'attnq'} );
 	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter($filter);
+	$filter = &share([]);
+	@$filter = ( 'Net::AFP::Atalk::_CloseFilter',
+			$$obj{'ASPSession'}{'sessionid'},
+			$$obj{'ASPSession'}{'atpsess'}{'Shared'});
+	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter($filter);
 	return $rc unless $rc == SPNoError;
 	return $obj;
 }
@@ -53,11 +58,20 @@ sub _TickleFilter {
 }
 
 sub _AttnFilter {
-	print 'called ', (caller(0))[3], "\n";
 	my ($sid, $attnq_r, $RqCB) = @_;
 	my ($txtype, $sessid, $attncode) = unpack('CCn', $$RqCB{'userbytes'});
 	if ($txtype == 8 && $sessid == $sid) {
 		push(@$attnq_r, $attncode);
+		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
+	}
+	return undef;
+}
+
+sub _CloseFilter {
+	my ($sid, $shared, $RqCB) = @_;
+	my ($txtype, $sessid) = unpack('CCx[2]', $$RqCB{'userbytes'});
+	if ($txtype == 1 && $sessid == $sid) {
+		$$shared{'exit'} = 1;
 		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
 	}
 	return undef;
@@ -75,16 +89,16 @@ sub CheckAttnQueue {
 	my ($self) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
-	my $RqCB = $$self{'ASPSession'}{'atpsess'}->GetTransaction(0, sub {
-		my ($txtype, $sessid) = unpack('CC', $_[0]{'userbytes'});
-		print "in check fn: txtype is $txtype, sessid is $sessid\n";
-		print "in check fn: our session id is ", $$self{'ASPSession'}{'sessionid'}, "\n";
-		return($txtype == 8 && $sessid == $$self{'ASPSession'}{'sessionid'}); # OP_SP_ATTENTION
-	} );
-	return unless defined $RqCB;
-	my ($attncode) = unpack('x[2]n', $$RqCB{'userbytes'});
-	$$self{'ASPSession'}{'atpsess'}->RespondTransaction($$RqCB{'txid'}, [ { userbytes => pack('x[4]'), payload => '' } ]);
-	print '', (caller(0))[3], ": AttnCode is $attncode\n";
+#	my $RqCB = $$self{'ASPSession'}{'atpsess'}->GetTransaction(0, sub {
+#		my ($txtype, $sessid) = unpack('CC', $_[0]{'userbytes'});
+#		print "in check fn: txtype is $txtype, sessid is $sessid\n";
+#		print "in check fn: our session id is ", $$self{'ASPSession'}{'sessionid'}, "\n";
+#		return($txtype == 8 && $sessid == $$self{'ASPSession'}{'sessionid'}); # OP_SP_ATTENTION
+#	} );
+#	return unless defined $RqCB;
+#	my ($attncode) = unpack('x[2]n', $$RqCB{'userbytes'});
+#	$$self{'ASPSession'}{'atpsess'}->RespondTransaction($$RqCB{'txid'}, [ { userbytes => pack('x[4]'), payload => '' } ]);
+#	print '', (caller(0))[3], ": AttnCode is $attncode\n";
 }
 
 sub SendAFPMessage {
