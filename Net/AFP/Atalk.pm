@@ -44,7 +44,14 @@ sub close {
 sub CheckAttnQueue {
 	my ($self) = @_;
 
-	print '', (caller(0))[3], ": stub\n";
+	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
+	my $RqCB = $$self{'ASPSession'}{'atpsess'}->GetTransaction(0, sub {
+		my ($txtype, $sessid) = unpack('CC', $_[0]{'userbytes'});
+		return($txtype == 8 && $sessid == $$self{'ASPSession'}{'sessionid'}); # OP_SP_ATTENTION
+	} );
+	my ($attncode) = unpack('x[2]n', $$RqCB{'userbytes'});
+	$$self{'ASPSession'}{'atpsess'}->RespondTransaction($$RqCB{'txid'}, [ { userbytes => pack('x[4]'), payload => '' } ]);
+	print '', (caller(0))[3], ": AttnCode is $attncode\n";
 }
 
 sub SendAFPMessage {
