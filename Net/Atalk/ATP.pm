@@ -287,7 +287,7 @@ MAINLOOP:
 					$$TxCB{'sem'}->up();
 					# if it was an XO transaction, we should send a TRel here
 					if ($$TxCB{'is_xo'}) {
-						print '', (caller(0))[3], ": transaction is XO, so will send TRel to server\n";
+						#print '', (caller(0))[3], ": transaction is XO, so will send TRel to server\n";
 						$$TxCB{'ctl_byte'} &= ~ATP_CTL_FNCODE & 0xFF;
 						$$TxCB{'ctl_byte'} |= ATP_TRel;
 						substr($$TxCB{'msg'}, 1, 1,

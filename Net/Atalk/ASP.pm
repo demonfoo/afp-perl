@@ -169,7 +169,7 @@ sub SPWrite {
 	$sem->down();
 	print '', (caller(0))[3], ": Transaction completed\n";
 	unless ($success) { return SPNoServers; }
-	print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
+	#print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
 	# string the response bodies back together
 	$$resp_r = join('', map { $$_[1]; } @$rdata);
 	# user bytes from the first response packet are the only ones that
