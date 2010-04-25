@@ -5,6 +5,7 @@ use Net::AFP;
 use Net::AFP::Parsers;
 use Net::AFP::Result;
 use Net::Atalk::ASP;
+use threads::shared;
 use Exporter;
 
 use strict;
@@ -28,6 +29,23 @@ sub new {
 	# tickle request to keep going automatically, with no extra additions
 	# required to the thread.
 	$$obj{'ASPSession'}->SPTickle(30, -1);
+	# Ignore incoming Tickle requests.
+	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter( sub {
+		my ($RqCB) = @_;
+		my ($txtype) = unpack('C', $$RqCB{'userbytes'});
+		if ($txtype == 5) { return [] }
+		return undef;
+	} );
+	# Handle incoming Attention requests.
+	$$obj{'attnq'} = &share([]);
+	$$obj{'ASPSession'}{'atpsess'}->AddTransactionFilter( sub {
+		my ($RqCB) = @_;
+		my ($txtype) = unpack('CC', $$RqCB{'userbytes'});
+		if ($txtype == 8 && $sessid == $$self{'ASPSession'}{'sessionid'}) {
+			return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
+		}
+		return undef;
+	} );
 	return $rc unless $rc == SPNoError;
 	return $obj;
 }

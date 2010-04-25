@@ -3,6 +3,8 @@ package Net::Atalk::ATP;
 use strict;
 use warnings;
 
+no strict qw(refs);
+
 use IO::Socket::DDP;
 use Net::Atalk;
 use Time::HiRes qw(gettimeofday);
@@ -65,6 +67,7 @@ sub new {
 				 'RqCB_list'	=> &share({}),
 				 'RqCB_txq'		=> &share([]),
 				 'RqCB_sem'		=> new Thread::Semaphore(0),
+				 'RqFilters'	=> &share([]),
 				 'RspCB_list'	=> &share({}),
 			   );
 	$$obj{'Shared'} = $shared;
@@ -121,7 +124,7 @@ sub thread_core {
 	$poll->mask($conn, POLLIN);
 	my ($id, $TxCB, $sec, $usec, $delta, $from, $msg, %msgdata, $msgtype,
 		$wants_sts, $is_eom, $seqno, $RqCB, $is_xo, $xo_tmout, $RspCB, $seq,
-		$pktdata, $ctl_byte);
+		$pktdata, $ctl_byte, $filter, $rv, $item);
 
 	my $atp_header = 'CCCna[4]a*';
 	my @atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
@@ -235,6 +238,38 @@ MAINLOOP:
 						  'payload'		=> $msgdata{'payload'},
 						  'sockaddr'	=> $from,
 						);
+
+				foreach $filter (@{$$shared{'RqFilters'}}) {
+					$rv = &$filter($RqCB);
+					if ($rv) {
+						$pktdata = [];
+						for ($seq = 0; $seq < scalar(@$rv); $seq++) {
+							$item = $$rv[$seq];
+							$ctl_byte = ATP_TResp;
+							if ($$RqCB{'is_xo'}) {
+								$ctl_byte |= ATP_CTL_XOBIT |
+										$$RqCB{'xo_tmout_bits'};
+							}
+							# last packet in provided set, so tell the
+							# requester that this is end of message...
+							if ($seq == $#$resp_r) {
+								$ctl_byte |= ATP_CTL_EOMBIT;
+							}
+							$msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte,
+									$seq, $id, @$item{'userbytes', 'payload'});
+							$$pktdata[$seq] = $msg;
+
+							next unless $$RqCB{'seq_bmp'} & (1 << $seq);
+							print '', (caller(0))[3], ": Sending packet $seq to requester\n";
+		
+							$$shared{'conn_sem'}->down();
+							send($conn, $msg, 0, $$RqCB{'sockaddr'});
+							$$self{'Shared'}{'conn_sem'}->up();
+						}
+						next MAINLOOP;
+					}
+				}
+
 				# FIXME: Perhaps the transaction queuing should be keyed on
 				# a combination of the originator's address and port plus
 				# the transaction ID? Seems like having just the txid could
@@ -465,6 +500,15 @@ sub RespondTransaction {
 
 	# Remove the transaction from the stored list.
 	delete $$self{'Shared'}{'RqCB_list'}{$txid};
+}
+
+# The idea here is to be able to pass a subroutine that looks at the
+# transaction block and, if it's known, handle the transaction without
+# passing it on to transaction queue at all.
+sub AddTransactionFilter {
+	my ($self, $filter) = @_;
+
+	push(@{$$self{'RqFilters'}, $filter;
 }
 
 1;
