@@ -51,6 +51,7 @@ sub new {
 	$$obj{'atpsess'} = new Net::Atalk::ATP();
 	$$obj{'host'} = $host;
 	$$obj{'svcport'} = $port;
+	return $obj;
 }
 
 sub close {
