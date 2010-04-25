@@ -12,6 +12,7 @@ use diagnostics;
 # itself and return code symbols, helper functions for version handling
 # and UAMs, etc.
 use Net::AFP::TCP;
+use Net::AFP::Atalk;
 use Net::AFP::Result;
 use Net::AFP::VolParms;
 use Net::AFP::VolAttrs;
@@ -21,6 +22,8 @@ use Net::AFP::MapParms;
 use Net::AFP::Versions;
 use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
+
+use Net::Atalk::NBP;
 
 use Term::ReadLine;		# for reading input from user
 
@@ -87,10 +90,8 @@ foreach (keys(%values)) { $values{$_} = urldecode($values{$_}); }
 
 my($host, $volume) = @values{'host', 'volume'};
 
-die("Appletalk transport not available") if defined $values{'atalk_transport'};
-
 my $srvInfo;
-my $session = doAFPConnection(@values{'host', 'port', 'username', 'password', 'UAM'}, \$srvInfo);
+my $session = doAFPConnection(@values{'host', 'port', 'username', 'password', 'UAM', 'atalk_transport'}, \$srvInfo);
 
 # If no volume was named, contact the server and find out the volumes
 # it knows, and spit those out in a friendly format.
@@ -888,9 +889,20 @@ $session->close();
 exit(0);
 
 sub doAFPConnection {
-	my($host, $port, $user, $password, $uam, $srvinf_r) = @_;
+	my($host, $port, $user, $password, $uam, $as_atalk, $srvinf_r) = @_;
 	my $srvInfo;
-	my $rc = Net::AFP::TCP->GetStatus($host, $port, \$srvInfo);
+	my $rc;
+	if ($as_atalk) {
+		# at least for now we have to resolve the NBP name ourselves
+		my @records = NBPLookup($host, 'AFPServer', $port, undef, 1);
+		die() unless scalar(@records);
+		($host, $port) = @{$records[0]}[0,1];
+
+		$rc = Net::AFP::Atalk->GetStatus($host, $port, \$srvInfo);
+	}
+	else {
+		$rc = Net::AFP::TCP->GetStatus($host, $port, \$srvInfo);
+	}
 	if ($rc != kFPNoErr) {
 		print "Could not issue GetStatus on ", $host, "\n";
 		exit(1);
@@ -899,7 +911,13 @@ sub doAFPConnection {
 		$$srvinf_r = $srvInfo;
 	}
 
-	my $session = new Net::AFP::TCP($host, $port);
+	my $session;
+	if ($as_atalk) {
+		$session = new Net::AFP::Atalk($host, $port);
+	}
+	else {
+		$session = new Net::AFP::TCP($host, $port);
+	}
 	unless (ref($session) ne '' and $session->isa('Net::AFP')) {
 		print "Could not connect via AFP to ", $host, "\n";
 		exit(1);
