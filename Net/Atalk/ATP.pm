@@ -371,14 +371,17 @@ sub SendTransaction {
 				 'sflag'	=> &share($sflag_r),
 			   );
 	$$rdata_r = $$TxCB{'response'};
+
+	# indicate this as when the transaction has started (have to do this
+	# before we queue the TxCB)...
+	@$TxCB{'start_sec', 'start_usec'} = gettimeofday();
+
 	# Register our transaction control block so the thread can see it,
 	# since we have no idea how soon the response will come back from
 	# who we're talking to.
 	$$self{'Shared'}{'TxCB_list'}{$txid} = $TxCB;
 	print '', (caller(0))[3], ": Queued transaction block as txid ", $txid, "\n";
 
-	# indicate this as when the transaction has started
-	@$TxCB{'start_sec', 'start_usec'} = gettimeofday();
 
 	$$self{'Shared'}{'conn_sem'}->down();
 	send($$self{'Conn'}, $msg, 0, $target);
