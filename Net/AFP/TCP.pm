@@ -97,8 +97,7 @@ sub new { # {{{1
 
 	$$obj{'DSISession'} = new Net::DSI($host, $port);
 	my $rc = $$obj{'DSISession'}->DSIOpenSession();
-	return $rc unless $rc == kFPNoErr;
-	return $obj;
+	return($rc == kFPNoErr ? $obj : $rc);
 } # }}}1
 
 =item close()
@@ -154,7 +153,7 @@ sub CheckAttnQueue {
 			print "CheckAttnQueue(): Received notification server is crashing; should really attempt reconnection, I suppose...\n";
 		}
 		elsif ($msg & 0x2000) { # server message?
-			if ($msg & 0x1001) { # server notification
+			if ($msg & 0x1000) { # server notification
 				if ($msg & 0x1) {
 					next if $vol_update_checked;
 					print "CheckAttnQueue(): ModDate updated on an attached volume, should do FPGetVolParms() to recheck\n";
