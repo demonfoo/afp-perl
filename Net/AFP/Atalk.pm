@@ -48,6 +48,7 @@ sub CheckAttnQueue {
 	my $RqCB = $$self{'ASPSession'}{'atpsess'}->GetTransaction(0, sub {
 		my ($txtype, $sessid) = unpack('CC', $_[0]{'userbytes'});
 		print "in check fn: txtype is $txtype, sessid is $sessid\n";
+		print "in check fn: our session id is ", $$self{'ASPSession'}{'sessionid'}, "\n";
 		return($txtype == 8 && $sessid == $$self{'ASPSession'}{'sessionid'}); # OP_SP_ATTENTION
 	} );
 	return unless defined $RqCB;
