@@ -146,7 +146,6 @@ MAINLOOP:
 			$TxCB = $$shared{'TxCB_list'}{$id};
 			$delta = ($sec - $$TxCB{'sec'}) +
 					(($usec - $$TxCB{'usec'}) / 1000000);
-			print '', (caller(0))[3], ": txid ", $id, " delta is ", $delta, "\n";
 			if ($delta >= $$TxCB{'tmout'}) {
 				print '', (caller(0))[3], ": transaction is past expire\n";
 				# okay, packet data needs to be resent; sequence mask
@@ -371,8 +370,6 @@ sub SendTransaction {
 				 'sem'		=> new Thread::Semaphore(0),
 				 'sflag'	=> &share($sflag_r),
 			   );
-	print '', (caller(0))[3], ": transaction $txid has ntries $ntries\n";
-	print '', (caller(0))[3], ": transaction $txid has ", $$TxCB{'ntries'}, " tries according to TxCB\n";
 	$$rdata_r = $$TxCB{'response'};
 
 	# indicate this as when the transaction has started (have to do this
