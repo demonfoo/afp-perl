@@ -15,7 +15,7 @@ use Exporter qw(import);
 use strict;
 use warnings;
 
-our $::__ASP_DEBUG = 1;
+$::__ASP_DEBUG = 1;
 
 use constant SP_VERSION				=> 0x0100;
 
@@ -44,6 +44,21 @@ our @EXPORT = qw(SPNoError SPBadVersNum SPBufTooSmall SPNoMoreSessions
 		SPNoServers SPParamErr SPServerBusy SPSessClosed SPSizeErr
 		SPTooManyClients SPNoAck);
 
+sub new {
+	my ($class, $host, $port) = @_;
+
+	my $obj = bless {}, $class;
+	$$obj{'atpsess'} = new Net::Atalk::ATP();
+	$$obj{'host'} = $host;
+	$$obj{'svcport'} = $port;
+}
+
+sub close {
+	my ($self) = @_;
+
+	$self->close();
+}
+
 # FIXME: Gotta figure out how to implement this...
 sub SPGetParms {
 	my ($self, $resp_r) = @_;
@@ -60,48 +75,49 @@ sub SPGetStatus {
 
 	my ($rdata, $success);
 	my $msg = pack('Cx[3]', OP_SP_GETSTATUS);
-	my $sa = pack_sockaddr_at( , atalk_aton( ));
-	my ($txid, $sem) = $atpsess->SendTransaction(0, $sa, '', $msg, 1, \$rdata,
-			2, 3, 0, \$success);
+	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
+	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg, 1,
+			\$rdata, 2, 3, 0, \$success);
 	$sem->down();
 	unless ($success) { return SPNoServers; }
 	$$resp_r = $$rdata[0][1];
-	return SPNoErr;
+	return SPNoError;
 }
 
 sub SPOpenSession {
-	my ($self, $SLSEntityIdentifier, $AttnRoutine, $resp_r) = @_;
+	my ($self) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 	# FIXME: Should probably have a getter method for this...
 	my $wss = $$self{'atpsess'}{'Shared'}{'sockport'};
 	my $msg = pack('CCn', OP_SP_OPENSESS, $wss, SP_VERSION);
-	my $sa = pack_sockaddr_at( , atalk_aton( ));
+	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, '', $msg,
 			1, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
 	$sem->down();
 	unless ($success) { return SPNoServers; }
 	my ($srv_sockno, $sessionid, $errno) = unpack('CCn', $$rdata[0][0]);
-	@$self{'sess_sockno', 'sessionid'} = ($srv_sockno, $sessionid);
+	@$self{'sessport', 'sessionid'} = ($srv_sockno, $sessionid);
 	$$self{'seqno'} = 0;
 	$errno = ($errno & 0x8000) ? -((~$errno & 0xFFFF) + 1) : $errno;
 	return $errno;
 }
 
 sub SPCloseSession {
-	my ($self, $SessRefNum) = @_;
+	my ($self) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 	my $msg = pack('CCx[2]', OP_SP_CLOSESESS, $$self{'sessionid'});
-	my $sa = pack_sockaddr_at( , atalk_aton( ));
+	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
 			1, \$rdata, 2, 3, 0, \$success);
 	$sem->down();
 	unless ($success) { return SPNoServers; }
 	# No actual data is returned, just a packet with 4 zero'd UserBytes.
-	return SPNoErr;
+	delete $$self{'sessionid'};
+	return SPNoError;
 }
 
 sub SPCommand {
@@ -115,13 +131,13 @@ sub SPCommand {
 	# this will take an ATP_MSGLEN sized chunk of the message data and
 	# send it to the server, to be 
 	my $ub = pack('CCn', OP_SP_COMMAND, $$self{'sessionid'}, $seqno);
-	my $sa = pack_sockaddr_at( , atalk_aton( ));
+	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
 			$ub, 8, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
 	$sem->down();
 	unless ($success) { return SPNoServers; }
-	print (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
+	print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
 	# string the response bodies back together
 	$$resp_r = join('', map { $$_[1]; } @$rdata);
 	# user bytes from the first response packet are the only ones that
@@ -132,7 +148,7 @@ sub SPCommand {
 }
 
 sub SPWrite {
-	my ($self, $message, $resp_r) = @_;
+	my ($self, $message, $data_r, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 	die('$resp_r must be a scalar ref')
@@ -142,13 +158,16 @@ sub SPWrite {
 	# this will take an ATP_MSGLEN sized chunk of the message data and
 	# send it to the server, to be 
 	my $ub = pack('CCn', OP_SP_WRITE, $$self{'sessionid'}, $seqno);
-	my $sa = pack_sockaddr_at( , atalk_aton( ));
+	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
+	print '', (caller(0))[3], ": Sending SPWrite transaction to server\n";
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
 			$ub, 8, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
+	print '', (caller(0))[3], ": Blocking on sem to wait for completion\n";
 	$sem->down();
+	print '', (caller(0))[3], ": Transaction completed\n";
 	unless ($success) { return SPNoServers; }
-	print (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
+	print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
 	# string the response bodies back together
 	$$resp_r = join('', map { $$_[1]; } @$rdata);
 	# user bytes from the first response packet are the only ones that
@@ -156,13 +175,48 @@ sub SPWrite {
 	my ($errno) = unpack('N', $$rdata[0][0]);
 	$errno = ($errno & 0x80000000) ? -((~$errno & 0xFFFFFFFF) + 1) : $errno;
 
-	# FIXME: Now have to check for SPWriteContinue requests from the server...
+	my $count = 0;
+	do {
+		# Try getting an SPWriteContinue transaction request from the server
+		print '', (caller(0))[3], ": Waiting for an SPWriteContinue transaction from server\n";
+		my $RqCB = $$self{'atpsess'}->GetTransaction(1, sub {
+			my ($txtype, $sessid, $pseq) = unpack('CCn', $_[0]{'userbytes'});
+			return($txtype == OP_SP_WRITECONTINUE && $sessid == $$self{'sessionid'} && $seqno == $pseq);
+		} );
+		my $bufsize = unpack('n', $$RqCB{'payload'});
+		print '', (caller(0))[3], ": Server buffer size is ", $bufsize, "\n";
+
+		my @resp;
+
+		my $sendsize = 0;
+		my $totalsend = 0;
+		for (my $i = 0; $i < 8; $i++) {
+			$sendsize = ATP_MAXLEN;
+			if ($bufsize - $totalsend < ATP_MAXLEN) {
+				$sendsize = $bufsize - $totalsend;
+			}
+			push(@resp, { 'userbytes'	=> pack('x[4]'),
+						  'payload'		=> substr($$data_r, $count + $totalsend, $sendsize) } );
+			$totalsend += $sendsize;
+		}
+		$count += $totalsend;
+
+		print '', (caller(0))[3], ": Sending WriteContinue transaction response\n";
+		$$self{'atpsess'}->RespondTransaction($$RqCB{'txid'}, \@resp);
+	} while (length($$data_r) > $count);
 	return $errno;
 }
 
+sub SPTickle {
+	my ($self, $interval, $ntries) = @_;
 
-
-
+	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
+	my $msg = pack('CCx[2]', OP_SP_TICKLE, $$self{'sessionid'});
+	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
+	my ($rdata, $success);
+	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
+			1, \$rdata, $ntries, $interval, 0, \$success);
+}
 
 1;
 # vim: ts=4 fdm=marker
