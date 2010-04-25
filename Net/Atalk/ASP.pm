@@ -16,7 +16,7 @@ use Exporter qw(import);
 use strict;
 use warnings;
 
-$::__ASP_DEBUG = 1;
+#$::__ASP_DEBUG = 1;
 
 use constant SP_VERSION				=> 0x0100;
 

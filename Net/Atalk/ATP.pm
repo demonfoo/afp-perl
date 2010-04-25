@@ -147,13 +147,13 @@ MAINLOOP:
 			$delta = ($sec - $$TxCB{'sec'}) +
 					(($usec - $$TxCB{'usec'}) / 1000000);
 			if ($delta >= $$TxCB{'tmout'}) {
-				print '', (caller(0))[3], ": transaction is past expire\n";
+				#print '', (caller(0))[3], ": transaction is past expire\n";
 				# okay, packet data needs to be resent; sequence mask
 				# will be updated in-place elsewhere, so just need to
 				# send again, decrement the retry counter, and update
 				# the start timer.
 				if ($$TxCB{'ntries'} != 0) {
-					print '', (caller(0))[3], ": transaction still has tries left, resending for another shot, ntries is ", $$TxCB{'ntries'}, "...\n";
+					#print '', (caller(0))[3], ": transaction still has tries left, resending for another shot, ntries is ", $$TxCB{'ntries'}, "...\n";
 					# -1 is special, it means "just keep trying forever"
 					if ($$TxCB{'ntries'} != -1) { $$TxCB{'ntries'}-- }
 
@@ -163,7 +163,7 @@ MAINLOOP:
 					$$shared{'conn_sem'}->up();
 				}
 				else {
-					print '', (caller(0))[3], ": okay, transaction has no more tries, closing it out\n";
+					#print '', (caller(0))[3], ": okay, transaction has no more tries, closing it out\n";
 					# Okay, you've had enough go-arounds. Time to put
 					# this dog down.
 					${$$TxCB{'sflag'}} = 0;
