@@ -139,7 +139,7 @@ MAINLOOP:
 	while ($$shared{'exit'} == 0) {
 		# Okay, now we need to check existing outbound transactions for
 		# status, resends, cleanups, etc...
-		print '', (caller(0))[3], ": scanning pending outbound transaction list\n";
+		#print '', (caller(0))[3], ": scanning pending outbound transaction list\n";
 		($sec, $usec) = gettimeofday();
 		foreach $id (keys %{$$shared{'TxCB_list'}}) {
 			print '', (caller(0))[3], ": txid ", $id, " pending\n";
@@ -173,7 +173,7 @@ MAINLOOP:
 			}
 		}
 
-		print '', (caller(0))[3], ": scanning exactly-once inbound transaction list\n";
+		#print '', (caller(0))[3], ": scanning exactly-once inbound transaction list\n";
 		foreach $id (keys %{$$shared{'RspCB_list'}}) {
 			print '', (caller(0))[3], ": txid ", $id, " XO response block pending\n";
 			$RspCB = $$shared{'RspCB_list'}{$id};
@@ -184,7 +184,7 @@ MAINLOOP:
 				delete $$shared{'RspCB_list'}{$id};
 			}
 		}
-		if ($poll->poll(1)) {
+		if ($poll->poll(0.25)) {
 			$$shared{'conn_sem'}->down();
 			$from = recv($conn, $msg, DDP_MAXSZ, 0);
 			$$shared{'conn_sem'}->up();
@@ -245,7 +245,7 @@ MAINLOOP:
 				print '', (caller(0))[3], ": set up request callback for transaction request with txid ", $id, "\n";
 			}
 			elsif ($msgtype == ATP_TResp) {
-				print '', (caller(0))[3], ": received a transaction response packet for txid ", $id, ", checking for transaction info\n";
+				#print '', (caller(0))[3], ": received a transaction response packet for txid ", $id, ", checking for transaction info\n";
 				unless (exists $$shared{'TxCB_list'}{$id}) {
 					print '', (caller(0))[3], ": txid is ", $id, " but no corresponding TxCB was found, moving on\n";
 					next MAINLOOP;
@@ -263,7 +263,7 @@ MAINLOOP:
 					print '', (caller(0))[3], ": server wants us to send back transaction status\n";
 				}
 				if ($$TxCB{'seq_bmp'} & (1 << $seqno)) {
-					print '', (caller(0))[3], ": received packet with seq no ", $seqno, ", appears not to be a dup\n";
+					#print '', (caller(0))[3], ": received packet with seq no ", $seqno, ", appears not to be a dup\n";
 					# put data into the array of stored payloads
 					$$TxCB{'response'}[$seqno] = &share([]);
 					@{$$TxCB{'response'}[$seqno]} = 
@@ -279,7 +279,7 @@ MAINLOOP:
 				}
 
 				unless ($$TxCB{'seq_bmp'}) {
-					print '', (caller(0))[3], ": okay, appears transaction is complete, indicating success and notifying caller\n";
+					#print '', (caller(0))[3], ": okay, appears transaction is complete, indicating success and notifying caller\n";
 					# if this is the case, we've received everything we're
 					# expecting from the server side, so we've succeeded...
 					${$$TxCB{'sflag'}} = 1;
@@ -380,13 +380,13 @@ sub SendTransaction {
 	# since we have no idea how soon the response will come back from
 	# who we're talking to.
 	$$self{'Shared'}{'TxCB_list'}{$txid} = $TxCB;
-	print '', (caller(0))[3], ": Queued transaction block as txid ", $txid, "\n";
+	#print '', (caller(0))[3], ": Queued transaction block as txid ", $txid, "\n";
 
 
 	$$self{'Shared'}{'conn_sem'}->down();
 	send($$self{'Conn'}, $msg, 0, $target);
 	$$self{'Shared'}{'conn_sem'}->up();
-	print '', (caller(0))[3], ": Sent request packet to server\n";
+	#print '', (caller(0))[3], ": Sent request packet to server\n";
 
 	return($txid, $$TxCB{'sem'});
 }
