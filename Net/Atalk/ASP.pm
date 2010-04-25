@@ -127,7 +127,7 @@ sub SPCommand {
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 
-	$resp_r = defined($resp_r) ? $resp_r : \'';
+	$resp_r = defined($resp_r) ? $resp_r : *foo{SCALAR};
 
 	my $seqno = $$self{'seqno'}++;
 	# this will take an ATP_MSGLEN sized chunk of the message data and
