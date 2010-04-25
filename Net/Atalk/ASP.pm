@@ -52,7 +52,52 @@ sub new {
 	$$obj{'atpsess'} = new Net::Atalk::ATP();
 	$$obj{'host'} = $host;
 	$$obj{'svcport'} = $port;
+
+	my $filter = &share([]);
+	# We have to pass the fully qualified subroutine name because we can't
+	# pass subroutine refs from thread to thread.
+	@$filter = ( __PACKAGE__ . '::_TickleFilter' );
+	$$obj{'atpsess'}->AddTransactionFilter($filter);
+	# Handle incoming Attention requests.
+	$$obj{'attnq'} = &share([]);
+	$filter = &share([]);
+	@$filter = ( __PACKAGE__ . '::_AttnFilter', $$obj{'sessionid'},
+			$$obj{'attnq'} );
+	$$obj{'atpsess'}->AddTransactionFilter($filter);
+	# Handle CloseSession requests from the server.
+	$filter = &share([]);
+	@$filter = ( __PACKAGE__ . '::_CloseFilter', $$obj{'sessionid'},
+			$$obj{'atpsess'}{'Shared'});
+	$$obj{'atpsess'}->AddTransactionFilter($filter);
+
 	return $obj;
+}
+
+sub _TickleFilter {
+	my ($RqCB) = @_;
+	my ($txtype) = unpack('C', $$RqCB{'userbytes'});
+	if ($txtype == 5) { return [] }
+	return undef;
+}
+
+sub _AttnFilter {
+	my ($sid, $attnq_r, $RqCB) = @_;
+	my ($txtype, $sessid, $attncode) = unpack('CCn', $$RqCB{'userbytes'});
+	if ($txtype == 8 && $sessid == $sid) {
+		push(@$attnq_r, $attncode);
+		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
+	}
+	return undef;
+}
+
+sub _CloseFilter {
+	my ($sid, $shared, $RqCB) = @_;
+	my ($txtype, $sessid) = unpack('CCx[2]', $$RqCB{'userbytes'});
+	if ($txtype == 1 && $sessid == $sid) {
+		$$shared{'exit'} = 1;
+		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
+	}
+	return undef;
 }
 
 sub close {
@@ -103,6 +148,14 @@ sub SPOpenSession {
 	@$self{'sessport', 'sessionid'} = ($srv_sockno, $sessionid);
 	$$self{'seqno'} = 0;
 	$errno = ($errno & 0x8000) ? -((~$errno & 0xFFFF) + 1) : $errno;
+	if ($errno == SPNoError) {
+		# This will cause the client code to send an SPTickle, and resend
+		# it every 30 seconds, forever. The server never actually sends
+		# back a "response" to the pending transaction, thus forcing the
+		# tickle request to keep going automatically, with no extra additions
+		# required to the thread.
+		$$self->SPTickle(30, -1);
+	}
 	return $errno;
 }
 
