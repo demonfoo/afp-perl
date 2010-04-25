@@ -126,8 +126,8 @@ sub SPCommand {
 	my ($self, $message, $resp_r) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
-	die('$resp_r must be a scalar ref')
-			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+
+	$resp_r = defined($resp_r) ? $resp_r : \'';
 
 	my $seqno = $$self{'seqno'}++;
 	# this will take an ATP_MSGLEN sized chunk of the message data and
