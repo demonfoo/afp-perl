@@ -47,6 +47,7 @@ sub CheckAttnQueue {
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	my $RqCB = $$self{'ASPSession'}{'atpsess'}->GetTransaction(0, sub {
 		my ($txtype, $sessid) = unpack('CC', $_[0]{'userbytes'});
+		print "in check fn: txtype is $txtype, sessid is $sessid\n";
 		return($txtype == 8 && $sessid == $$self{'ASPSession'}{'sessionid'}); # OP_SP_ATTENTION
 	} );
 	return unless defined $RqCB;
