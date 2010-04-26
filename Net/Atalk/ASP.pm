@@ -183,7 +183,7 @@ sub SPCommand {
 
 	$resp_r = defined($resp_r) ? $resp_r : *foo{SCALAR};
 
-	my $seqno = $$self{'seqno'}++;
+	my $seqno = $$self{'seqno'}++ % 65536;
 	# this will take an ATP_MSGLEN sized chunk of the message data and
 	# send it to the server, to be 
 	my $ub = pack('CCn', OP_SP_COMMAND, $$self{'sessionid'}, $seqno);
@@ -210,7 +210,7 @@ sub SPWrite {
 	die('$resp_r must be a scalar ref')
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 
-	my $seqno = $$self{'seqno'}++;
+	my $seqno = $$self{'seqno'}++ % 65536;
 	# this will take an ATP_MSGLEN sized chunk of the message data and
 	# send it to the server, to be 
 	my $ub = pack('CCn', OP_SP_WRITE, $$self{'sessionid'}, $seqno);
