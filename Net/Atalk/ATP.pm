@@ -195,7 +195,7 @@ MAINLOOP:
 
 			@msgdata{@atp_header_fields} = unpack($atp_header, $msg);
 			unless ($msgdata{'ddp_type'} == DDPTYPE_ATP) {
-				print '', (caller(0))[3], ": packet received, but type was not DDPTYPE_ATP, ignoring\n";
+				#print '', (caller(0))[3], ": packet received, but type was not DDPTYPE_ATP, ignoring\n";
 				next MAINLOOP;
 			}
 			$msgtype = $msgdata{'ctl'} & ATP_CTL_FNCODE;
@@ -328,7 +328,7 @@ MAINLOOP:
 						substr($$TxCB{'msg'}, 1, 1,
 								pack('C', $$TxCB{'ctl_byte'}));
 						$$shared{'conn_sem'}->down();
-						send($conn, $$TxCB{'msg'}, 0);
+						send($conn, $$TxCB{'msg'}, 0, $$TxCB{'target'});
 						$$shared{'conn_sem'}->up();
 					}
 					next MAINLOOP;
@@ -341,7 +341,7 @@ MAINLOOP:
 						($$TxCB{'seq_bmp'} >> $seqno))) {
 					#print '', (caller(0))[3], ": resending request packet for STS or to satisfy missing chunks\n";
 					$$shared{'conn_sem'}->down();
-					send($conn, $$TxCB{'msg'}, 0);
+					send($conn, $$TxCB{'msg'}, 0, $$TxCB{'target'});
 					@$TxCB{'sec', 'usec'} = gettimeofday();
 					$$shared{'conn_sem'}->up();
 				}
