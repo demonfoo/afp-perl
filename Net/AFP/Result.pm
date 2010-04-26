@@ -2,15 +2,16 @@ package Net::AFP::Result;
 
 use Exporter qw(import);
 
-our @EXPORT = qw(kFPNoErr kASPSessionClosed kFPAccessDenied kFPAuthContinue
-				 kFPBadUAM kFPBadVersNum kFPBitmapErr kFPCantMove
-				 kFPDenyConflict kFPDirNotEmpty kFPDiskFull kFPEOFErr
-				 kFPFileBusy kFPFlatVol kFPItemNotFound kFPLockErr kFPMiscErr
-				 kFPNoMoreLocks kFPNoServer kFPObjectExists kFPObjectNotFound
-				 kFPParamErr kFPRangeNotLocked kFPRangeOverlap kFPSessClosed
-				 kFPUserNotAuth kFPCallNotSupported kFPObjectTypeErr
-				 kFPTooManyFilesOpen kFPServerGoingDown kFPCantRename
-				 kFPDirNotFound kFPIconTypeErr kFPVolLocked kFPObjectLocked
+our @EXPORT = qw(kFPNoErr  kFPNoMoreSessions kASPSessClosed kFPAccessDenied
+				 kFPAuthContinue kFPBadUAM kFPBadVersNum kFPBitmapErr
+				 kFPCantMove kFPDenyConflict kFPDirNotEmpty kFPDiskFull
+				 kFPEOFErr kFPFileBusy kFPFlatVol kFPItemNotFound kFPLockErr
+				 kFPMiscErr kFPNoMoreLocks kFPNoServer kFPObjectExists
+				 kFPObjectNotFound kFPParamErr kFPRangeNotLocked
+				 kFPRangeOverlap kFPSessClosed kFPUserNotAuth
+				 kFPCallNotSupported kFPObjectTypeErr kFPTooManyFilesOpen
+				 kFPServerGoingDown kFPCantRename kFPDirNotFound
+				 kFPIconTypeErr kFPVolLocked kFPObjectLocked
 				 kFPContainsSharedErr kFPIDNotFound kPIDExists
 				 kFPCatalogChanged kFPSameObjectErr kFPBadIDErr
 				 kFPPwdSameErr kFPPwdTooShortErr kFPPwdExpiredErr
@@ -18,7 +19,8 @@ our @EXPORT = qw(kFPNoErr kASPSessionClosed kFPAccessDenied kFPAuthContinue
 				 kFPPwdPolicyErr kFPDiskQuotaExceeded);
 
 use constant kFPNoErr				 => 0;
-use constant kASPSessionClosed		 => -1072;
+use constant kFPNoMoreSessions		 => -1068;
+use constant kASPSessClosed			 => -1072;
 use constant kFPAccessDenied		 => -5000;
 use constant kFPAuthContinue		 => -5001;
 use constant kFPBadUAM				 => -5002;
@@ -70,6 +72,7 @@ use constant kFPDiskQuotaExceeded	 => -5047;
 
 my %errorcodes = (
 	0		=> 'No error occurred',
+	-1068	=> 'No more sessions can be started',
 	-1072	=> 'ASP session closed',
 	-5000	=> 'Insufficient privileges',
 	-5001	=> 'Authentication is not yet complete',
