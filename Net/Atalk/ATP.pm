@@ -47,9 +47,20 @@ use constant ATP_MAXLEN			=> 578;
 our @EXPORT = qw(ATP_TREL_30SEC ATP_TREL_1MIN ATP_TREL_2MIN ATP_TREL_4MIN
 		ATP_TREL_8MIN ATP_MAXLEN);
 
-our $atp_header = 'CCCna[4]a*';
-our @atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
+my $atp_header :shared;
+$atp_header = 'CCCna[4]a*';
+my @atp_header_fields :shared;
+@atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
 		'payload');
+my %xo_timeouts :shared;
+%xo_timeouts = (
+				 &ATP_TREL_30SEC	=> 30,
+				 &ATP_TREL_1MIN		=> 60,
+				 &ATP_TREL_2MIN		=> 120,
+				 &ATP_TREL_4MIN		=> 240,
+				 &ATP_TREL_8MIN		=> 480,
+			   );
+
 
 sub new {
 	my ($class, %sockopts) = @_;
@@ -126,23 +137,10 @@ sub thread_core {
 		$wants_sts, $is_eom, $seqno, $RqCB, $is_xo, $xo_tmout, $RspCB, $seq,
 		$pktdata, $ctl_byte, $filter, $rv, $item);
 
-	my $atp_header = 'CCCna[4]a*';
-	my @atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
-			'payload');
-
-	my %xo_timeouts = (
-						&ATP_TREL_30SEC	=> 30,
-						&ATP_TREL_1MIN	=> 60,
-						&ATP_TREL_2MIN	=> 120,
-						&ATP_TREL_4MIN	=> 240,
-						&ATP_TREL_8MIN	=> 480,
-					  );
-
 MAINLOOP:
 	while ($$shared{'exit'} == 0) {
 		# Okay, now we need to check existing outbound transactions for
 		# status, resends, cleanups, etc...
-		#print '', (caller(0))[3], ": scanning pending outbound transaction list\n";
 		($sec, $usec) = gettimeofday();
 		foreach $id (keys %{$$shared{'TxCB_list'}}) {
 			#print '', (caller(0))[3], ": txid ", $id, " pending\n";
