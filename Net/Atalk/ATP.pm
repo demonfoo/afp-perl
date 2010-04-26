@@ -404,7 +404,12 @@ sub SendTransaction {
 		$ctl_byte |= ATP_CTL_XOBIT | $xo_tmout;
 	}
 	my $seq_bmp = 0xFF >> (8 - $rlen);
-	my $txid = ++$$self{'Shared'}{'last_txid'} % (2 ** 16);
+	my $txid;
+	# Okay, have to handle potential transaction ID collisions due to
+	# wrapping...
+	do {
+		$txid = ++$$self{'Shared'}{'last_txid'} % (2 ** 16);
+	} while (exists $$self{'Shared'}{'TxCB_list'}{$txid});
 	my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq_bmp, $txid,
 			$user_bytes, $data);
 
@@ -487,6 +492,7 @@ sub RespondTransaction {
 	#print '', (caller(0))[3], ": Found transaction block for txid $txid\n";
 
 	my $pktdata = &share([]);
+
 	for (my $seq = 0; $seq < scalar(@$resp_r); $seq++) {
 		die('$resp_r element ' . $seq . ' was not a hash ref')
 				unless ref($$resp_r[$seq]) eq 'HASH';
@@ -503,26 +509,26 @@ sub RespondTransaction {
 
 		next unless $$RqCB{'seq_bmp'} & (1 << $seq);
 		#print '', (caller(0))[3], ": Sending packet $seq to requester\n";
-		
+
+		# Okay, let's try registering the RspCB just before the last packet
+		# posts to the server...
+		if ($$RqCB{'is_xo'} && $seq == $#$resp_r) {
+			my $RspCB = &share({});
+			my $stamp = &share([]);
+			@$stamp = gettimeofday();
+			%$RspCB = (
+				'RqCB'		=> $RqCB,
+				'RespData'	=> $pktdata,
+				'stamp'		=> $stamp,
+				'tmout'		=> $$RqCB{'xo_tmout'},
+			);
+			$$self{'Shared'}{'RspCB_list'}{$txid} = $RspCB;
+		}
+
 		$$self{'Shared'}{'conn_sem'}->down();
 		send($$self{'Conn'}, $msg, 0, $$RqCB{'sockaddr'});
 		$$self{'Shared'}{'conn_sem'}->up();
 		#print '', (caller(0))[3], ": Response packet $seq sent\n";
-	}
-	# Now must hand off to XO protection layer if 'is_xo' is true...
-	if ($$RqCB{'is_xo'}) {
-		&share($resp_r);
-		foreach (@$resp_r) { &share($_) }
-		my $RspCB = &share({});
-		my $stamp = &share([]);
-		@$stamp = gettimeofday();
-		%$RspCB = (
-			'RqCB'		=> $RqCB,
-			'RespData'	=> $pktdata,
-			'stamp'		=> $stamp,
-			'tmout'		=> $$RqCB{'xo_tmout'},
-		);
-		$$self{'Shared'}{'RspCB_list'}{$txid} = $RspCB;
 	}
 
 	# Remove the transaction from the stored list.
