@@ -58,17 +58,6 @@ sub new {
 	# pass subroutine refs from thread to thread.
 	@$filter = ( __PACKAGE__ . '::_TickleFilter' );
 	$$obj{'atpsess'}->AddTransactionFilter($filter);
-	# Handle incoming Attention requests.
-	$$obj{'attnq'} = &share([]);
-	$filter = &share([]);
-	@$filter = ( __PACKAGE__ . '::_AttnFilter', $$obj{'sessionid'},
-			$$obj{'attnq'} );
-	$$obj{'atpsess'}->AddTransactionFilter($filter);
-	# Handle CloseSession requests from the server.
-	$filter = &share([]);
-	@$filter = ( __PACKAGE__ . '::_CloseFilter', $$obj{'sessionid'},
-			$$obj{'atpsess'}{'Shared'});
-	$$obj{'atpsess'}->AddTransactionFilter($filter);
 
 	return $obj;
 }
@@ -155,6 +144,18 @@ sub SPOpenSession {
 		# tickle request to keep going automatically, with no extra additions
 		# required to the thread.
 		$self->SPTickle(30, -1);
+
+		# Handle incoming Attention requests.
+		$$self{'attnq'} = &share([]);
+		$filter = &share([]);
+		@$filter = ( __PACKAGE__ . '::_AttnFilter', $$self{'sessionid'},
+				$$self{'attnq'} );
+		$$self{'atpsess'}->AddTransactionFilter($filter);
+		# Handle CloseSession requests from the server.
+		$filter = &share([]);
+		@$filter = ( __PACKAGE__ . '::_CloseFilter', $$self{'sessionid'},
+				$$self{'atpsess'}{'Shared'});
+		$$self{'atpsess'}->AddTransactionFilter($filter);
 	}
 	return $errno;
 }
