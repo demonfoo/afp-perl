@@ -355,8 +355,6 @@ MAINLOOP:
 			}
 		}
 	}
-	# FIXME: Should probably notify any pending transaction waiters that
-	# they won't be getting a response.
 	foreach my $txid (keys %{$$shared{'TxCB_list'}}) {
 		my $TxCB = $$shared{'TxCB_list'}{$txid};
 		${$$TxCB{'sflag'}} = 0;
