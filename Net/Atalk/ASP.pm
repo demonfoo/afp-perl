@@ -76,14 +76,14 @@ sub new {
 sub _TickleFilter {
 	my ($RqCB) = @_;
 	my ($txtype) = unpack('C', $$RqCB{'userbytes'});
-	if ($txtype == 5) { return [] }
+	if ($txtype == OP_SP_TICKLE) { return [] }
 	return undef;
 }
 
 sub _AttnFilter {
 	my ($sid, $attnq_r, $RqCB) = @_;
 	my ($txtype, $sessid, $attncode) = unpack('CCn', $$RqCB{'userbytes'});
-	if ($txtype == 8 && $sessid == $sid) {
+	if ($txtype == OP_SP_ATTENTION && $sessid == $sid) {
 		push(@$attnq_r, $attncode);
 		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
 	}
@@ -93,7 +93,7 @@ sub _AttnFilter {
 sub _CloseFilter {
 	my ($sid, $shared, $RqCB) = @_;
 	my ($txtype, $sessid) = unpack('CCx[2]', $$RqCB{'userbytes'});
-	if ($txtype == 1 && $sessid == $sid) {
+	if ($txtype == OP_SP_CLOSESESS && $sessid == $sid) {
 		$$shared{'exit'} = 1;
 		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
 	}
@@ -189,7 +189,7 @@ sub SPCommand {
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
-			$ub, 8, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
+			$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
 	$sem->down();
 	unless ($success) { return SPNoServers; }
 	#print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
@@ -217,7 +217,7 @@ sub SPWrite {
 	my ($rdata, $success);
 	#print '', (caller(0))[3], ": Sending SPWrite transaction to server\n";
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
-			$ub, 8, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
+			$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
 
 	# Try getting an SPWriteContinue transaction request from the server
 	#print '', (caller(0))[3], ": Waiting for an SPWriteContinue transaction from server\n";
