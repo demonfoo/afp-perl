@@ -147,7 +147,7 @@ sub SPOpenSession {
 
 		# Handle incoming Attention requests.
 		$$self{'attnq'} = &share([]);
-		$filter = &share([]);
+		my $filter = &share([]);
 		@$filter = ( __PACKAGE__ . '::_AttnFilter', $$self{'sessionid'},
 				$$self{'attnq'} );
 		$$self{'atpsess'}->AddTransactionFilter($filter);
