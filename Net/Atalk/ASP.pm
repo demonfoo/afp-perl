@@ -154,7 +154,7 @@ sub SPOpenSession {
 		# back a "response" to the pending transaction, thus forcing the
 		# tickle request to keep going automatically, with no extra additions
 		# required to the thread.
-		$$self->SPTickle(30, -1);
+		$self->SPTickle(30, -1);
 	}
 	return $errno;
 }
