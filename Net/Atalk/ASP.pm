@@ -56,23 +56,27 @@ sub new {
 	my $filter = &share([]);
 	# We have to pass the fully qualified subroutine name because we can't
 	# pass subroutine refs from thread to thread.
-	@$filter = ( __PACKAGE__ . '::_TickleFilter' );
+	@$filter = ( __PACKAGE__ . '::_TickleFilter', $port );
 	$$obj{'atpsess'}->AddTransactionFilter($filter);
 
 	return $obj;
 }
 
 sub _TickleFilter {
-	my ($RqCB) = @_;
+	my ($realport, $RqCB) = @_;
 	my ($txtype) = unpack('C', $$RqCB{'userbytes'});
-	if ($txtype == OP_SP_TICKLE) { return [] }
+	my ($portno, $paddr) = unpack_sockaddr_at($$RqCB{'sockaddr'});
+
+	if ($txtype == OP_SP_TICKLE && $portno == $realport) { return [] }
 	return undef;
 }
 
 sub _AttnFilter {
-	my ($sid, $attnq_r, $RqCB) = @_;
+	my ($sid, $attnq_r, $realport, $RqCB) = @_;
 	my ($txtype, $sessid, $attncode) = unpack('CCn', $$RqCB{'userbytes'});
-	if ($txtype == OP_SP_ATTENTION && $sessid == $sid) {
+	my ($portno, $paddr) = unpack_sockaddr_at($$RqCB{'sockaddr'});
+
+	if ($txtype == OP_SP_ATTENTION && $sessid == $sid && $realport == $portno) {
 		push(@$attnq_r, $attncode);
 		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
 	}
@@ -80,9 +84,11 @@ sub _AttnFilter {
 }
 
 sub _CloseFilter {
-	my ($sid, $shared, $RqCB) = @_;
+	my ($sid, $shared, $realport, $RqCB) = @_;
 	my ($txtype, $sessid) = unpack('CCx[2]', $$RqCB{'userbytes'});
-	if ($txtype == OP_SP_CLOSESESS && $sessid == $sid) {
+	my ($portno, $paddr) = unpack_sockaddr_at($$RqCB{'sockaddr'});
+
+	if ($txtype == OP_SP_CLOSESESS && $sessid == $sid && $realport == $portno) {
 		$$shared{'exit'} = 1;
 		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
 	}
@@ -149,12 +155,12 @@ sub SPOpenSession {
 		$$self{'attnq'} = &share([]);
 		my $filter = &share([]);
 		@$filter = ( __PACKAGE__ . '::_AttnFilter', $$self{'sessionid'},
-				$$self{'attnq'} );
+				$$self{'attnq'}, $$self{'sessport'} );
 		$$self{'atpsess'}->AddTransactionFilter($filter);
 		# Handle CloseSession requests from the server.
 		$filter = &share([]);
 		@$filter = ( __PACKAGE__ . '::_CloseFilter', $$self{'sessionid'},
-				$$self{'atpsess'}{'Shared'});
+				$$self{'atpsess'}{'Shared'}, $$self{'sessport'});
 		$$self{'atpsess'}->AddTransactionFilter($filter);
 	}
 	return $errno;
@@ -193,7 +199,6 @@ sub SPCommand {
 			$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
 	$sem->down();
 	unless ($success) { return SPNoServers; }
-	#print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
 	# string the response bodies back together
 	$$resp_r = join('', map { $$_[1]; } @$rdata);
 	# user bytes from the first response packet are the only ones that
@@ -216,18 +221,19 @@ sub SPWrite {
 	my $ub = pack('CCn', OP_SP_WRITE, $$self{'sessionid'}, $seqno);
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	#print '', (caller(0))[3], ": Sending SPWrite transaction to server\n";
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
 			$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
 
 	# Try getting an SPWriteContinue transaction request from the server
-	#print '', (caller(0))[3], ": Waiting for an SPWriteContinue transaction from server\n";
 	my $RqCB = $$self{'atpsess'}->GetTransaction(1, sub {
 		my ($txtype, $sessid, $pseq) = unpack('CCn', $_[0]{'userbytes'});
-		return($txtype == OP_SP_WRITECONTINUE && $sessid == $$self{'sessionid'} && $seqno == $pseq);
+		my ($portno, $paddr) = unpack_sockaddr_at($_[0]{'sockaddr'});
+
+		return($txtype == OP_SP_WRITECONTINUE &&
+				$sessid == $$self{'sessionid'} && $seqno == $pseq &&
+				$portno == $$self{'sessport'});
 	} );
 	my $bufsize = unpack('n', $$RqCB{'payload'});
-	#print '', (caller(0))[3], ": Server buffer size is ", $bufsize, "\n";
 
 	my $resp = &share([]);
 
@@ -246,14 +252,9 @@ sub SPWrite {
 		$totalsend += $sendsize;
 	}
 
-	#print '', (caller(0))[3], ": Sending WriteContinue transaction response\n";
 	$$self{'atpsess'}->RespondTransaction($$RqCB{'txid'}, $resp);
 
-	#print '', (caller(0))[3], ": Blocking on sem to wait for completion\n";
 	$sem->down();
-	#print '', (caller(0))[3], ": Transaction completed\n";
-	#unless ($success) { return SPNoServers; }
-	#print '', (caller(0))[3], ": response contains ", scalar(@$rdata), " response packets, assembling\n";
 	# string the response bodies back together
 	$$resp_r = join('', map { $$_[1]; } @$rdata);
 	# user bytes from the first response packet are the only ones that
