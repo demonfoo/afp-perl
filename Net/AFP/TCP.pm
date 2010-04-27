@@ -1,11 +1,12 @@
 # Implementation of a subclass that implements the necessary virtual methods
 # for handling an AFP session over TCP protocol.
 package Net::AFP::TCP;
-use Net::DSI;
 use Net::AFP;
 use Net::AFP::Parsers;
 use Net::AFP::Result;
+use Net::DSI;
 use Exporter qw(import);
+
 use strict;
 use warnings;
 
@@ -95,8 +96,8 @@ sub new { # {{{1
 	my $obj = {};
 	bless $obj, $class;
 
-	$$obj{'DSISession'} = new Net::DSI($host, $port);
-	my $rc = $$obj{'DSISession'}->DSIOpenSession();
+	$$obj{'Session'} = new Net::DSI($host, $port);
+	my $rc = $$obj{'Session'}->DSIOpenSession();
 	return($rc == kFPNoErr ? $obj : $rc);
 } # }}}1
 
@@ -124,18 +125,15 @@ sub close { # {{{1
 	my ($self) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
-#	$$self{'DSISession'}->DSICloseSession();
-	$$self{'DSISession'}->close();
+#	$$self{'Session'}->DSICloseSession();
+	$$self{'Session'}->close();
 } # }}}1
 
-=item CheckAttnQueue()
-
-=cut
-sub CheckAttnQueue {
+sub CheckAttnQueue { # {{{1
 	my ($self) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
-	my $attnq = $$self{'DSISession'}{'Shared'}{'attnq'};
+	my $attnq = $$self{'Session'}{'Shared'}{'attnq'};
 	my $vol_update_checked;
 	while (my $msg = shift(@$attnq)) {
 		if ($msg & 0x8000) {	# server says it's shutting down
@@ -169,7 +167,7 @@ sub CheckAttnQueue {
 			}
 		}
 	}
-}
+} # }}}1
 
 =item SendAFPMessage()
 
@@ -181,10 +179,10 @@ AFP requests. Do not use.
 # Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
 	my ($self, $payload, $resp_r) = @_;
-	
+
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	$self->CheckAttnQueue();
-	return $$self{'DSISession'}->DSICommand($payload, $resp_r);
+	return $$self{'Session'}->DSICommand($payload, $resp_r);
 } # }}}1
 
 =item SendAFPWrite()
@@ -200,7 +198,7 @@ sub SendAFPWrite { # {{{1
 	
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	$self->CheckAttnQueue();
-	return $$self{'DSISession'}->DSIWrite($payload, $data_r, $resp_r);
+	return $$self{'Session'}->DSIWrite($payload, $data_r, $resp_r);
 } # }}}1
 
 =item GetStatus()
