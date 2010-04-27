@@ -3,6 +3,9 @@ package Net::Atalk::ATP;
 use strict;
 use warnings;
 
+# Disabling strict refs because for the installable transaction filters
+# to work, I have to be able to have some way to deref the subroutines,
+# and we can't pass SUB refs from thread to thread.
 no strict qw(refs);
 
 use IO::Socket::DDP;
@@ -117,9 +120,6 @@ sub thread_core {
 	my $conn = new IO::Socket::DDP(%connect_args);
 	$$shared{'running'} = 1;
 
-	# FIXME: any kind of session failure connection I can do from here?
-	# thinking no, but we'll see.
-	
 	$$shared{'conn_fd'} = fileno($conn);
 	$$shared{'running'} = 1;
 	$$shared{'sockaddr'} = $conn->sockaddr();
@@ -181,7 +181,7 @@ MAINLOOP:
 			$delta = ($sec - $$RspCB{'stamp'}[0]) +
 					(($usec - $$RspCB{'stamp'}[1]) / 1000000);
 			if ($delta >= $$RspCB{'tmout'}) {
-				print '', (caller(0))[3], ": XO response block for txid $id too old, pruning\n";
+				print STDERR '', (caller(0))[3], ": XO response block for txid $id too old, pruning\n";
 				delete $$shared{'RspCB_list'}{$id};
 			}
 		}
@@ -219,18 +219,18 @@ MAINLOOP:
 					$RspCB = $$shared{'RspCB_list'}{$id};
 					$RqCB = $$RspCB{'RqCB'};
 					$pktdata = $$RspCB{'RespData'};
-					print '', (caller(0))[3], ": txid $id has a response callback block associated, will attempt resend of indicated packets\n";
+					print STDERR '', (caller(0))[3], ": txid $id has a response callback block associated, will attempt resend of indicated packets\n";
 
 					for (my $seq = 0; $seq < scalar(@$pktdata); $seq++) {
 						# Check if the sequence mask bit corresponding to
 						# the sequence number is set.
 						next unless $$RqCB{'seq_bmp'} & (1 << $seq);
-						print '', (caller(0))[3], ": Resending packet $seq to requester\n";
+						print STDERR '', (caller(0))[3], ": Resending packet $seq to requester\n";
 
 						$$shared{'conn_sem'}->down();
 						send($conn, $$pktdata[$seq], 0, $$RqCB{'sockaddr'});
 						$$shared{'conn_sem'}->up();
-						print '', (caller(0))[3], ": Response packet $seq resent\n";
+						print STDERR '', (caller(0))[3], ": Response packet $seq resent\n";
 					}
 					@{$$RspCB{'stamp'}} = gettimeofday();
 					next MAINLOOP;
@@ -257,7 +257,7 @@ MAINLOOP:
 					# it is (well, should be) an array ref containing
 					# ATP user byte and payload blocks.
 					if ($rv) {
-						$pktdata = [];
+						$pktdata = &share([]);
 						for ($seq = 0; $seq < scalar(@$rv); $seq++) {
 							$item = $$rv[$seq];
 							$ctl_byte = ATP_TResp;
@@ -275,12 +275,25 @@ MAINLOOP:
 							$$pktdata[$seq] = $msg;
 
 							next unless $$RqCB{'seq_bmp'} & (1 << $seq);
-		
+
+							# Okay, let's try registering the RspCB just
+							# before the last packet posts to the server...
+							if ($$RqCB{'is_xo'} && $seq == $#$rv) {
+								$RspCB = &share({});
+								my $stamp = &share([]);
+								@$stamp = gettimeofday();
+								%$RspCB = (
+									'RqCB'		=> $RqCB,
+									'RespData'	=> $pktdata,
+									'stamp'		=> $stamp,
+									'tmout'		=> $$RqCB{'xo_tmout'},
+								);
+								$$shared{'RspCB_list'}{$id} = $RspCB;
+							}
+
 							$$shared{'conn_sem'}->down();
 							send($conn, $msg, 0, $$RqCB{'sockaddr'});
 							$$shared{'conn_sem'}->up();
-							# FIXME: If this request was XO, register an
-							# RspCB...
 						}
 						next MAINLOOP;
 					}
@@ -301,7 +314,7 @@ MAINLOOP:
 				# know, either because we didn't initiate it, or because we
 				# tried it enough times and gave up.
 				unless (exists $$shared{'TxCB_list'}{$id}) {
-					print '', (caller(0))[3], ": txid is ", $id, " but no corresponding TxCB was found, moving on\n";
+					print STDERR '', (caller(0))[3], ": txid is ", $id, " but no corresponding TxCB was found, moving on\n";
 					next MAINLOOP;
 				}
 
@@ -319,7 +332,7 @@ MAINLOOP:
 				# If the sequence bit for this packet is already cleared,
 				# just quietly move on.
 				unless ($$TxCB{'seq_bmp'} & (1 << $seqno)) {
-					print '', (caller(0))[3], ": received packet with seq no ", $seqno, ", already received, ignoring\n";
+					print STDERR '', (caller(0))[3], ": received packet with seq no ", $seqno, ", already received, ignoring\n";
 					next MAINLOOP;
 				}
 
