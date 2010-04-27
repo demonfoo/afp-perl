@@ -7,16 +7,12 @@ package Net::Atalk::ASP;
 use Net::Atalk::ATP;
 use Net::Atalk;
 use IO::Poll qw(POLLRDNORM POLLWRNORM POLLIN POLLHUP);
-use IO::Handle;
 use Net::AFP::Result;
 use threads;
 use threads::shared;
-use Thread::Semaphore;
 use Exporter qw(import);
 use strict;
 use warnings;
-
-#$::__ASP_DEBUG = 1;
 
 use constant SP_VERSION				=> 0x0100;
 
@@ -105,13 +101,11 @@ sub close {
 sub SPGetParms {
 	my ($self, $resp_r) = @_;
 
-	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 }
 
 sub SPGetStatus {
 	my ($self, $resp_r) = @_;
 
-	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 	die('$resp_r must be a scalar ref')
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 
@@ -129,7 +123,6 @@ sub SPGetStatus {
 sub SPOpenSession {
 	my ($self) = @_;
 
-	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 	# FIXME: Should probably have a getter method for this...
 	my $wss = $$self{'atpsess'}{'Shared'}{'sockport'};
 	my $msg = pack('CCn', OP_SP_OPENSESS, $wss, SP_VERSION);
@@ -169,15 +162,11 @@ sub SPOpenSession {
 sub SPCloseSession {
 	my ($self) = @_;
 
-	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 	my $msg = pack('CCx[2]', OP_SP_CLOSESESS, $$self{'sessionid'});
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
 			1, \$rdata, 1, 1, 0, \$success);
-	#$sem->down();
-	#unless ($success) { return SPNoServers; }
-	# No actual data is returned, just a packet with 4 zero'd UserBytes.
 	delete $$self{'sessionid'};
 	return SPNoError;
 }
@@ -185,13 +174,11 @@ sub SPCloseSession {
 sub SPCommand {
 	my ($self, $message, $resp_r) = @_;
 
-	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
-
 	$resp_r = defined($resp_r) ? $resp_r : *foo{SCALAR};
 
 	my $seqno = $$self{'seqno'}++ % 65536;
 	# this will take an ATP_MSGLEN sized chunk of the message data and
-	# send it to the server, to be 
+	# send it to the server, to be processed as part of the request.
 	my $ub = pack('CCn', OP_SP_COMMAND, $$self{'sessionid'}, $seqno);
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
@@ -211,13 +198,12 @@ sub SPCommand {
 sub SPWrite {
 	my ($self, $message, $data_r, $resp_r) = @_;
 
-	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 	die('$resp_r must be a scalar ref')
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 
 	my $seqno = $$self{'seqno'}++ % 65536;
 	# this will take an ATP_MSGLEN sized chunk of the message data and
-	# send it to the server, to be 
+	# send it to the server, to be processed as part of the request.
 	my $ub = pack('CCn', OP_SP_WRITE, $$self{'sessionid'}, $seqno);
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
@@ -268,7 +254,6 @@ sub SPWrite {
 sub SPTickle {
 	my ($self, $interval, $ntries) = @_;
 
-	print 'called ', (caller(0))[3], "\n" if defined $::__ASP_DEBUG;
 	my $msg = pack('CCx[2]', OP_SP_TICKLE, $$self{'sessionid'});
 	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
