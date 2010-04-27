@@ -1,3 +1,7 @@
+# This is Net::Atalk::ATP. It implements (mostly correctly) the ATP
+# (AppleTalk Transaction Protocol) layer of the AppleTalk protocol
+# family, which adds a transactional request/response layer over the
+# DDP datagram protocol.
 package Net::Atalk::ATP;
 
 use strict;
@@ -64,7 +68,7 @@ my %xo_timeouts :shared;
 			   );
 
 
-sub new {
+sub new { # {{{1
 	my ($class, %sockopts) = @_;
 
 	my $obj = bless {}, $class;
@@ -94,7 +98,7 @@ sub new {
 	$$shared{'conn_sem'}->up();
 
 	return $obj;
-}
+} # }}}1
 
 sub close { # {{{1
 	my ($self) = @_;
@@ -102,12 +106,11 @@ sub close { # {{{1
 	$$self{'Dispatcher'}->join();
 } # }}}1
 
-# This function is the body of the thread. Similar to DSI, but I haven't
-# yet decided between fully-dispatched and hybrid dispatched models;
-# since the thread may have to resend the TReq packet an indeterminate
-# number of times, it might be better to just hand it off to it in the
-# first place. I'll see where things go.
-sub thread_core {
+# This function is the body of the thread. Similar to DSI, this is a
+# hybrid-dispatcher arrangement - responses are sent directly from the
+# main thread, but messages coming from the peer are handled in the
+# thread and processed and dispatched from there.
+sub thread_core { # {{{1
 	my ($shared, %sockopts) = @_;
 
 	# Set up the datagram socket to the target host. There's no connection
@@ -120,7 +123,6 @@ sub thread_core {
 	$$shared{'running'} = 1;
 
 	$$shared{'conn_fd'} = fileno($conn);
-	$$shared{'running'} = 1;
 	$$shared{'sockaddr'} = $conn->sockaddr();
 	$$shared{'sockport'} = $conn->sockport();
 	$$shared{'peeraddr'} = $conn->peeraddr();
@@ -137,11 +139,11 @@ sub thread_core {
 		$pktdata, $ctl_byte, $filter, $rv, $item, $stamp);
 
 MAINLOOP:
-	while ($$shared{'exit'} == 0) {
+	while ($$shared{'exit'} == 0) { # {{{2
 		# Okay, now we need to check existing outbound transactions for
 		# status, resends, cleanups, etc...
 		($sec, $usec) = gettimeofday();
-		foreach $id (keys %{$$shared{'TxCB_list'}}) {
+		foreach $id (keys %{$$shared{'TxCB_list'}}) { # {{{3
 			$TxCB = $$shared{'TxCB_list'}{$id};
 			$delta = ($sec - $$TxCB{'sec'}) +
 					(($usec - $$TxCB{'usec'}) / 1000000);
@@ -170,20 +172,20 @@ MAINLOOP:
 					$$TxCB{'sem'}->up();
 				}
 			}
-		}
+		} # }}}3
 
 		# Check the XO transaction completion list as well.
-		foreach $id (keys %{$$shared{'RspCB_list'}}) {
+		foreach $id (keys %{$$shared{'RspCB_list'}}) { # {{{3
 			# If the transaction is past its keep-by, just delete it, nothing
 			# more to be done on our end.
 			$RspCB = $$shared{'RspCB_list'}{$id};
 			$delta = ($sec - $$RspCB{'stamp'}[0]) +
 					(($usec - $$RspCB{'stamp'}[1]) / 1000000);
 			delete $$shared{'RspCB_list'}{$id} if $delta >= $$RspCB{'tmout'};
-		}
+		} # }}}3
 
 		# Check the socket for incoming packets.
-		if ($poll->poll(0.5)) {
+		if ($poll->poll(0.5)) { # {{{3
 			# We've got something. Read in a potential packet. We know it's
 			# never going to be larger than DDP_MAXSZ.
 			$$shared{'conn_sem'}->down();
@@ -199,7 +201,7 @@ MAINLOOP:
 			# Let's see what kind of message we've been sent.
 			$msgtype = $msgdata{'ctl'} & ATP_CTL_FNCODE;
 			$id = $msgdata{'tid'};
-			if ($msgtype == ATP_TReq) {
+			if ($msgtype == ATP_TReq) { # {{{4
 				# Remote is asking to initiate a transaction with us.
 				$is_xo = $msgdata{'ctl'} & ATP_CTL_XOBIT;
 				$xo_tmout = $msgdata{'ctl'} & ATP_CTL_TREL_TMOUT;
@@ -209,7 +211,7 @@ MAINLOOP:
 
 				# If there's an XO completion handler in place, then resend
 				# whatever packets the peer indicates it wants.
-				if (exists $$shared{'RspCB_list'}{$id}) {
+				if (exists $$shared{'RspCB_list'}{$id}) { # {{{5
 					$RspCB = $$shared{'RspCB_list'}{$id};
 					$RqCB = $$RspCB{'RqCB'};
 					$pktdata = $$RspCB{'RespData'};
@@ -225,7 +227,7 @@ MAINLOOP:
 					}
 					@{$$RspCB{'stamp'}} = gettimeofday();
 					next MAINLOOP;
-				}
+				} # }}}5
 				$RqCB = &share({});
 				# Set up the transaction request block.
 				%$RqCB = (
@@ -242,12 +244,12 @@ MAINLOOP:
 				# Try running the request block through any registered
 				# transaction filter handlers before putting it on the
 				# list for outside processing.
-				foreach $filter (@{$$shared{'RqFilters'}}) {
+				foreach $filter (@{$$shared{'RqFilters'}}) { # {{{5
 					$rv = &{$$filter[0]}(@$filter[1 .. $#$filter], $RqCB);
 					# If the filter returned something other than undef,
 					# it is (well, should be) an array ref containing
 					# ATP user byte and payload blocks.
-					if ($rv) {
+					if ($rv) { # {{{6
 						$pktdata = &share([]);
 						for ($seq = 0; $seq < scalar(@$rv); $seq++) {
 							$item = $$rv[$seq];
@@ -285,8 +287,8 @@ MAINLOOP:
 							$$shared{'conn_sem'}->up();
 						}
 						next MAINLOOP;
-					}
-				}
+					} # }}}6
+				} # }}}5
 
 				# FIXME: Perhaps the transaction queuing should be keyed on
 				# a combination of the originator's address and port plus
@@ -295,8 +297,8 @@ MAINLOOP:
 				$$shared{'RqCB_list'}{$id} = $RqCB;
 				push(@{$$shared{'RqCB_txq'}}, $RqCB);
 				$$shared{'RqCB_sem'}->up();
-			}
-			elsif ($msgtype == ATP_TResp) {
+			} # }}}4
+			elsif ($msgtype == ATP_TResp) { # {{{4
 				# Remote is responding to a transaction we initiated.
 
 				# Ignore a transaction response to a transaction that we don't
@@ -330,7 +332,7 @@ MAINLOOP:
 
 				# If the sequence bitmap is now 0, then we've received
 				# all the data we're going to.
-				unless ($$TxCB{'seq_bmp'}) {
+				unless ($$TxCB{'seq_bmp'}) { # {{{5
 					${$$TxCB{'sflag'}} = 1;
 					delete $$shared{'TxCB_list'}{$id};
 					$$TxCB{'sem'}->up();
@@ -346,7 +348,7 @@ MAINLOOP:
 						$$shared{'conn_sem'}->up();
 					}
 					next MAINLOOP;
-				}
+				} # }}}5
 
 				# If the server wants an STS, or the sequence number is
 				# high enough that it's not going up further but there are
@@ -358,16 +360,16 @@ MAINLOOP:
 					@$TxCB{'sec', 'usec'} = gettimeofday();
 					$$shared{'conn_sem'}->up();
 				}
-			}
-			elsif ($msgtype == ATP_TRel) {
+			} # }}}4
+			elsif ($msgtype == ATP_TRel) { # {{{4
 				# Peer has sent us a transaction release message, so drop
 				# the pending RspCB if one is present. I think we can
 				# safely delete even if it's not there; saves us the time
 				# of checking.
 				delete $$shared{'RspCB_list'}{$id};
-			}
-		}
-	}
+			} # }}}4
+		} # }}}3
+	} # }}}2
 	# If we reach this point, we're exiting the thread. Notify any pending
 	# waiting calls that they've failed before we go away.
 	foreach $id (keys %{$$shared{'TxCB_list'}}) {
@@ -378,9 +380,9 @@ MAINLOOP:
 	$$shared{'running'} = -1;
 	undef $$shared{'conn_fd'};
 	CORE::close($conn);
-}
+} # }}}1
 
-sub SendTransaction {
+sub SendTransaction { # {{{1
 	my ($self, $is_xo, $target, $data, $user_bytes, $rlen, $rdata_r, $tmout,
 			$ntries, $xo_tmout, $sflag_r) = @_;
 
@@ -449,9 +451,9 @@ sub SendTransaction {
 	$$self{'Shared'}{'conn_sem'}->up();
 
 	return($txid, $$TxCB{'sem'});
-}
+} # }}}1
 
-sub GetTransaction {
+sub GetTransaction { # {{{1
 	my ($self, $do_block, $filter) = @_;
 
 	# Get the ref for the queue of incoming transactions.
@@ -485,9 +487,9 @@ sub GetTransaction {
 	# transactions matched (or none were in the waiting queue), so just
 	# send back an undef.
 	return undef;
-}
+} # }}}1
 
-sub RespondTransaction {
+sub RespondTransaction { # {{{1
 	my ($self, $txid, $resp_r) = @_;
 	
 	die('$resp_r must be an array') unless ref($resp_r) eq 'ARRAY';
@@ -541,15 +543,16 @@ sub RespondTransaction {
 
 	# Remove the transaction from the stored list.
 	delete $$self{'Shared'}{'RqCB_list'}{$txid};
-}
+} # }}}1
 
 # The idea here is to be able to pass a subroutine that looks at the
 # transaction block and, if it's known, handle the transaction without
 # passing it on to transaction queue at all.
-sub AddTransactionFilter {
+sub AddTransactionFilter { # {{{1
 	my ($self, $filter) = @_;
 
 	push(@{$$self{'Shared'}{'RqFilters'}}, $filter);
-}
+} # }}}1
 
 1;
+# vim: ts=4 fdm=marker
