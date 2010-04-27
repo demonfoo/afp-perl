@@ -404,12 +404,15 @@ sub SendTransaction {
 		$ctl_byte |= ATP_CTL_XOBIT | $xo_tmout;
 	}
 	my $seq_bmp = 0xFF >> (8 - $rlen);
+
+	my $TxCB_queue = $$self{'Shared'}{'TxCB_list'};
 	my $txid;
 	# Okay, have to handle potential transaction ID collisions due to
 	# wrapping...
 	do {
 		$txid = ++$$self{'Shared'}{'last_txid'} % (2 ** 16);
-	} while (exists $$self{'Shared'}{'TxCB_list'}{$txid});
+	} while (exists $$TxCB_queue{$txid});
+
 	my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq_bmp, $txid,
 			$user_bytes, $data);
 
@@ -435,21 +438,19 @@ sub SendTransaction {
 			   );
 	$$rdata_r = $$TxCB{'response'};
 
-	# indicate this as when the transaction has started (have to do this
+	# Indicate this as when the transaction has started (have to do this
 	# before we queue the TxCB)...
 	@$TxCB{'sec', 'usec'} = gettimeofday();
 
 	# Register our transaction control block so the thread can see it,
 	# since we have no idea how soon the response will come back from
 	# who we're talking to.
-	$$self{'Shared'}{'TxCB_list'}{$txid} = $TxCB;
-	#print '', (caller(0))[3], ": Queued transaction block as txid ", $txid, "\n";
+	$$TxCB_queue{$txid} = $TxCB;
 
-
+	# Send request packet.
 	$$self{'Shared'}{'conn_sem'}->down();
 	send($$self{'Conn'}, $msg, 0, $target);
 	$$self{'Shared'}{'conn_sem'}->up();
-	#print '', (caller(0))[3], ": Sent request packet to server\n";
 
 	return($txid, $$TxCB{'sem'});
 }
@@ -457,15 +458,22 @@ sub SendTransaction {
 sub GetTransaction {
 	my ($self, $do_block, $filter) = @_;
 
+	# Get the ref for the queue of incoming transactions.
 	my $RqCB_queue = $$self{'Shared'}{'RqCB_txq'};
 
+	# Handle optionally blocking for a new transaction.
 	if ($do_block) { $$self{'Shared'}{'RqCB_sem'}->down() }
+
 	for (my $i = 0; $i < scalar(@$RqCB_queue); $i++) {
+		# If no transaction filter was passed, or the transaction filter
+		# returned true, grab the RqCB out of the queue, remove it from
+		# the pending queue, and return it to the caller.
 		if (!defined($filter) || &$filter($$RqCB_queue[$i])) {
 			my $RqCB = $$RqCB_queue[$i];
-			#print '', (caller(0))[3], ": Returning transaction request block for txid ", $$RqCB{'txid'}, "\n";
 			@$RqCB_queue = @$RqCB_queue[0 .. ($i - 1),
 					($i + 1) .. $#$RqCB_queue];
+			# If the caller asked to block to wait, restore the semaphore
+			# count to where it should be.
 			if ($do_block) {
 				for (my $j = 0; $j < $i - 1; $j++) {
 					$$self{'Shared'}{'RqCB_sem'}->up();
@@ -473,9 +481,13 @@ sub GetTransaction {
 			}
 			return $RqCB;
 		}
+		# Down the sem again, so that if we're at the last, we'll block
+		# until another is enqueued.
 		if ($do_block) { $$self{'Shared'}{'RqCB_sem'}->down() }
 	}
-	#print '', (caller(0))[3], ": No unchecked incoming transactions to return, returning undef\n";
+	# If we reach this point, the caller didn't ask to block *and* no
+	# transactions matched (or none were in the waiting queue), so just
+	# send back an undef.
 	return undef;
 }
 
@@ -484,12 +496,14 @@ sub RespondTransaction {
 	
 	die('$resp_r must be an array') unless ref($resp_r) eq 'ARRAY';
 
+	# If the transaction response is too big/small, just abort the whole
+	# mess now.
 	die('Ridiculous number of response packets supplied')
 			if scalar(@$resp_r) > 8 or scalar(@$resp_r) < 1;
 
+	# Abort if the transaction ID that the caller indicated is unknown to us.
 	die() unless exists $$self{'Shared'}{'RqCB_list'}{$txid};
 	my $RqCB = $$self{'Shared'}{'RqCB_list'}{$txid};
-	#print '', (caller(0))[3], ": Found transaction block for txid $txid\n";
 
 	my $pktdata = &share([]);
 
@@ -508,7 +522,6 @@ sub RespondTransaction {
 		$$pktdata[$seq] = $msg;
 
 		next unless $$RqCB{'seq_bmp'} & (1 << $seq);
-		#print '', (caller(0))[3], ": Sending packet $seq to requester\n";
 
 		# Okay, let's try registering the RspCB just before the last packet
 		# posts to the server...
@@ -528,7 +541,6 @@ sub RespondTransaction {
 		$$self{'Shared'}{'conn_sem'}->down();
 		send($$self{'Conn'}, $msg, 0, $$RqCB{'sockaddr'});
 		$$self{'Shared'}{'conn_sem'}->up();
-		#print '', (caller(0))[3], ": Response packet $seq sent\n";
 	}
 
 	# Remove the transaction from the stored list.
