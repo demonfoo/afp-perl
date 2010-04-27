@@ -17,7 +17,6 @@ use threads;
 use threads::shared;
 use Thread::Semaphore;
 use Exporter qw(import);
-use Data::Dumper;
 
 # ATP message types.
 use constant ATP_TReq			=> (0x1 << 6);	# Transaction request
@@ -135,7 +134,7 @@ sub thread_core {
 	$poll->mask($conn, POLLIN);
 	my ($id, $TxCB, $sec, $usec, $delta, $from, $msg, %msgdata, $msgtype,
 		$wants_sts, $is_eom, $seqno, $RqCB, $is_xo, $xo_tmout, $RspCB, $seq,
-		$pktdata, $ctl_byte, $filter, $rv, $item);
+		$pktdata, $ctl_byte, $filter, $rv, $item, $stamp);
 
 MAINLOOP:
 	while ($$shared{'exit'} == 0) {
@@ -180,14 +179,11 @@ MAINLOOP:
 			$RspCB = $$shared{'RspCB_list'}{$id};
 			$delta = ($sec - $$RspCB{'stamp'}[0]) +
 					(($usec - $$RspCB{'stamp'}[1]) / 1000000);
-			if ($delta >= $$RspCB{'tmout'}) {
-				print STDERR '', (caller(0))[3], ": XO response block for txid $id too old, pruning\n";
-				delete $$shared{'RspCB_list'}{$id};
-			}
+			delete $$shared{'RspCB_list'}{$id} if $delta >= $$RspCB{'tmout'};
 		}
 
 		# Check the socket for incoming packets.
-		if ($poll->poll(0.25)) {
+		if ($poll->poll(0.5)) {
 			# We've got something. Read in a potential packet. We know it's
 			# never going to be larger than DDP_MAXSZ.
 			$$shared{'conn_sem'}->down();
@@ -198,9 +194,7 @@ MAINLOOP:
 			# Unpack the packet into its constituent fields, and quietly
 			# move on if its DDP type field is wrong.
 			@msgdata{@atp_header_fields} = unpack($atp_header, $msg);
-			unless ($msgdata{'ddp_type'} == DDPTYPE_ATP) {
-				next MAINLOOP;
-			}
+			next MAINLOOP unless $msgdata{'ddp_type'} == DDPTYPE_ATP;
 
 			# Let's see what kind of message we've been sent.
 			$msgtype = $msgdata{'ctl'} & ATP_CTL_FNCODE;
@@ -219,18 +213,15 @@ MAINLOOP:
 					$RspCB = $$shared{'RspCB_list'}{$id};
 					$RqCB = $$RspCB{'RqCB'};
 					$pktdata = $$RspCB{'RespData'};
-					print STDERR '', (caller(0))[3], ": txid $id has a response callback block associated, will attempt resend of indicated packets\n";
 
-					for (my $seq = 0; $seq < scalar(@$pktdata); $seq++) {
+					for ($seq = 0; $seq < scalar(@$pktdata); $seq++) {
 						# Check if the sequence mask bit corresponding to
 						# the sequence number is set.
 						next unless $$RqCB{'seq_bmp'} & (1 << $seq);
-						print STDERR '', (caller(0))[3], ": Resending packet $seq to requester\n";
 
 						$$shared{'conn_sem'}->down();
 						send($conn, $$pktdata[$seq], 0, $$RqCB{'sockaddr'});
 						$$shared{'conn_sem'}->up();
-						print STDERR '', (caller(0))[3], ": Response packet $seq resent\n";
 					}
 					@{$$RspCB{'stamp'}} = gettimeofday();
 					next MAINLOOP;
@@ -267,9 +258,7 @@ MAINLOOP:
 							}
 							# last packet in provided set, so tell the
 							# requester that this is end of message...
-							if ($seq == $#$rv) {
-								$ctl_byte |= ATP_CTL_EOMBIT;
-							}
+							if ($seq == $#$rv) { $ctl_byte |= ATP_CTL_EOMBIT }
 							$msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte,
 									$seq, $id, @$item{'userbytes', 'payload'});
 							$$pktdata[$seq] = $msg;
@@ -280,7 +269,7 @@ MAINLOOP:
 							# before the last packet posts to the server...
 							if ($$RqCB{'is_xo'} && $seq == $#$rv) {
 								$RspCB = &share({});
-								my $stamp = &share([]);
+								$stamp = &share([]);
 								@$stamp = gettimeofday();
 								%$RspCB = (
 									'RqCB'		=> $RqCB,
@@ -313,10 +302,7 @@ MAINLOOP:
 				# Ignore a transaction response to a transaction that we don't
 				# know, either because we didn't initiate it, or because we
 				# tried it enough times and gave up.
-				unless (exists $$shared{'TxCB_list'}{$id}) {
-					print STDERR '', (caller(0))[3], ": txid is ", $id, " but no corresponding TxCB was found, moving on\n";
-					next MAINLOOP;
-				}
+				next MAINLOOP unless exists $$shared{'TxCB_list'}{$id};
 
 				# Get the transaction block, and grab a few bits of info
 				# out of it to keep them at hand.
@@ -331,10 +317,7 @@ MAINLOOP:
 
 				# If the sequence bit for this packet is already cleared,
 				# just quietly move on.
-				unless ($$TxCB{'seq_bmp'} & (1 << $seqno)) {
-					print STDERR '', (caller(0))[3], ": received packet with seq no ", $seqno, ", already received, ignoring\n";
-					next MAINLOOP;
-				}
+				next MAINLOOP unless $$TxCB{'seq_bmp'} & (1 << $seqno);
 
 				# Put data into the array of stored payloads.
 				$$TxCB{'response'}[$seqno] = &share([]);
@@ -387,8 +370,8 @@ MAINLOOP:
 	}
 	# If we reach this point, we're exiting the thread. Notify any pending
 	# waiting calls that they've failed before we go away.
-	foreach my $txid (keys %{$$shared{'TxCB_list'}}) {
-		my $TxCB = $$shared{'TxCB_list'}{$txid};
+	foreach $id (keys %{$$shared{'TxCB_list'}}) {
+		$TxCB = $$shared{'TxCB_list'}{$id};
 		${$$TxCB{'sflag'}} = 0;
 		$$TxCB{'sem'}->up();
 	}
