@@ -1,15 +1,13 @@
-# This is Net::Atalk::ASP. It will eventually implement the ASP (AppleTalk
-# Session Protocol) layer of the AppleTalk protocol family. It should have
-# a programming interface similar to Net::DSI; DSI was designed to layer
-# over TCP/IP in a similar request/response fashion to ASP.
+# This is Net::Atalk::ASP. It implements (mostly correctly) the ASP
+# (AppleTalk Session Protocol) layer of the AppleTalk protocol family.
+# It has a programming interface similar to Net::DSI; DSI was designed
+# to layer over TCP/IP in a similar request/response fashion to ASP.
 package Net::Atalk::ASP;
 
 use Net::Atalk::ATP;
-use Net::Atalk;
-use IO::Poll qw(POLLRDNORM POLLWRNORM POLLIN POLLHUP);
-use Net::AFP::Result;
-use threads;
-use threads::shared;
+use Net::Atalk;			# for pack_sockaddr_at, unpack_sockaddr_at, atalk_aton
+use Net::AFP::Result;	# for kFPNoErr
+use threads::shared;	# for share
 use Exporter qw(import);
 use strict;
 use warnings;
@@ -25,23 +23,19 @@ use constant OP_SP_WRITE			=> 6;
 use constant OP_SP_WRITECONTINUE	=> 7;
 use constant OP_SP_ATTENTION		=> 8;
 
-use constant SPNoError				=> 0;
 use constant SPBadVersNum			=> -1066;
 use constant SPBufTooSmall			=> -1067;
-use constant SPNoMoreSessions		=> -1068;
 use constant SPNoServers			=> -1069;
 use constant SPParamErr				=> -1070;
 use constant SPServerBusy			=> -1071;
-use constant SPSessClosed			=> -1072;
 use constant SPSizeErr				=> -1073;
 use constant SPTooManyClients		=> -1074;
 use constant SPNoAck				=> -1075;
 
-our @EXPORT = qw(SPNoError SPBadVersNum SPBufTooSmall SPNoMoreSessions
-		SPNoServers SPParamErr SPServerBusy SPSessClosed SPSizeErr
-		SPTooManyClients SPNoAck);
+our @EXPORT = qw(SPBadVersNum SPBufTooSmall SPNoServers SPParamErr
+		SPServerBusy SPSizeErr SPTooManyClients SPNoAck);
 
-sub new {
+sub new { # {{{1
 	my ($class, $host, $port) = @_;
 
 	my $obj = bless {}, $class;
@@ -56,18 +50,18 @@ sub new {
 	$$obj{'atpsess'}->AddTransactionFilter($filter);
 
 	return $obj;
-}
+} # }}}1
 
-sub _TickleFilter {
+sub _TickleFilter { # {{{1
 	my ($realport, $RqCB) = @_;
 	my ($txtype) = unpack('C', $$RqCB{'userbytes'});
 	my ($portno, $paddr) = unpack_sockaddr_at($$RqCB{'sockaddr'});
 
 	if ($txtype == OP_SP_TICKLE && $portno == $realport) { return [] }
 	return undef;
-}
+} # }}}1
 
-sub _AttnFilter {
+sub _AttnFilter { # {{{1
 	my ($sid, $attnq_r, $realport, $RqCB) = @_;
 	my ($txtype, $sessid, $attncode) = unpack('CCn', $$RqCB{'userbytes'});
 	my ($portno, $paddr) = unpack_sockaddr_at($$RqCB{'sockaddr'});
@@ -77,9 +71,9 @@ sub _AttnFilter {
 		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
 	}
 	return undef;
-}
+} # }}}1
 
-sub _CloseFilter {
+sub _CloseFilter { # {{{1
 	my ($sid, $shared, $realport, $RqCB) = @_;
 	my ($txtype, $sessid) = unpack('CCx[2]', $$RqCB{'userbytes'});
 	my ($portno, $paddr) = unpack_sockaddr_at($$RqCB{'sockaddr'});
@@ -89,13 +83,13 @@ sub _CloseFilter {
 		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
 	}
 	return undef;
-}
+} # }}}1
 
-sub close {
+sub close { # {{{1
 	my ($self) = @_;
 
 	$$self{'atpsess'}->close();
-}
+} # }}}1
 
 # FIXME: Gotta figure out how to implement this...
 sub SPGetParms {
@@ -103,7 +97,7 @@ sub SPGetParms {
 
 }
 
-sub SPGetStatus {
+sub SPGetStatus { # {{{1
 	my ($self, $resp_r) = @_;
 
 	die('$resp_r must be a scalar ref')
@@ -117,10 +111,10 @@ sub SPGetStatus {
 	$sem->down();
 	unless ($success) { return SPNoServers; }
 	$$resp_r = $$rdata[0][1];
-	return SPNoError;
-}
+	return kFPNoErr;
+} # }}}1
 
-sub SPOpenSession {
+sub SPOpenSession { # {{{1
 	my ($self) = @_;
 
 	# FIXME: Should probably have a getter method for this...
@@ -136,7 +130,7 @@ sub SPOpenSession {
 	@$self{'sessport', 'sessionid'} = ($srv_sockno, $sessionid);
 	$$self{'seqno'} = 0;
 	$errno = ($errno & 0x8000) ? -((~$errno & 0xFFFF) + 1) : $errno;
-	if ($errno == SPNoError) {
+	if ($errno == kFPNoErr) { # {{{2
 		# This will cause the client code to send an SPTickle, and resend
 		# it every 30 seconds, forever. The server never actually sends
 		# back a "response" to the pending transaction, thus forcing the
@@ -155,11 +149,11 @@ sub SPOpenSession {
 		@$filter = ( __PACKAGE__ . '::_CloseFilter', $$self{'sessionid'},
 				$$self{'atpsess'}{'Shared'}, $$self{'sessport'});
 		$$self{'atpsess'}->AddTransactionFilter($filter);
-	}
+	} # }}}2
 	return $errno;
-}
+} # }}}1
 
-sub SPCloseSession {
+sub SPCloseSession { # {{{1
 	my ($self) = @_;
 
 	my $msg = pack('CCx[2]', OP_SP_CLOSESESS, $$self{'sessionid'});
@@ -168,10 +162,10 @@ sub SPCloseSession {
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
 			1, \$rdata, 1, 1, 0, \$success);
 	delete $$self{'sessionid'};
-	return SPNoError;
-}
+	return kFPNoErr;
+} # }}}1
 
-sub SPCommand {
+sub SPCommand { # {{{1
 	my ($self, $message, $resp_r) = @_;
 
 	$resp_r = defined($resp_r) ? $resp_r : *foo{SCALAR};
@@ -193,9 +187,9 @@ sub SPCommand {
 	my ($errno) = unpack('N', $$rdata[0][0]);
 	$errno = ($errno & 0x80000000) ? -((~$errno & 0xFFFFFFFF) + 1) : $errno;
 	return $errno;
-}
+} # }}}1
 
-sub SPWrite {
+sub SPWrite { # {{{1
 	my ($self, $message, $data_r, $resp_r) = @_;
 
 	die('$resp_r must be a scalar ref')
@@ -225,7 +219,7 @@ sub SPWrite {
 
 	my $sendsize = 0;
 	my $totalsend = 0;
-	for (my $i = 0; $i < 8; $i++) {
+	for (my $i = 0; $i < 8; $i++) { # {{{2
 		last if $totalsend > length($$data_r);
 		$sendsize = ATP_MAXLEN;
 		if ($bufsize - $totalsend < ATP_MAXLEN) {
@@ -236,7 +230,7 @@ sub SPWrite {
 				   'payload'	=> substr($$data_r, $totalsend, $sendsize) );
 		push(@$resp, $elem);
 		$totalsend += $sendsize;
-	}
+	} # }}}2
 
 	$$self{'atpsess'}->RespondTransaction($$RqCB{'txid'}, $resp);
 
@@ -249,9 +243,9 @@ sub SPWrite {
 	$errno = ($errno & 0x80000000) ? -((~$errno & 0xFFFFFFFF) + 1) : $errno;
 
 	return $errno;
-}
+} # }}}1
 
-sub SPTickle {
+sub SPTickle { # {{{1
 	my ($self, $interval, $ntries) = @_;
 
 	my $msg = pack('CCx[2]', OP_SP_TICKLE, $$self{'sessionid'});
@@ -259,7 +253,7 @@ sub SPTickle {
 	my ($rdata, $success);
 	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
 			1, \$rdata, $interval, $ntries, 0, \$success);
-}
+} # }}}1
 
 1;
 # vim: ts=4 fdm=marker
