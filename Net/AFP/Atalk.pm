@@ -240,7 +240,7 @@ sub GetStatus { # {{{1
 	my $resp;
 	my $rc = $obj->SPGetStatus(\$resp);
 	$obj->close();
-	return $rc unless $rc == SPNoError;
+	return $rc unless $rc == kFPNoErr;
 
 	$$resp_r = _ParseSrvrInfo($resp);
 	return $rc;
