@@ -92,9 +92,7 @@ sub ZIPGetZoneList {
 	my %sockopts;
 	if ($FromAddr) { $sockopts{'LocalAddr'} = $FromAddr }
 	my $conn = new Net::Atalk::ATP(%sockopts);
-	if (ref($conn) eq '') {
-		die($conn);
-	}
+	return undef unless defined $conn;
 
 	my $port = getservbyname('zip', 'ddp') || 6;
 	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
@@ -130,9 +128,7 @@ sub ZIPGetLocalZones {
 	my %sockopts;
 	if ($FromAddr) { $sockopts{'LocalAddr'} = $FromAddr }
 	my $conn = new Net::Atalk::ATP(%sockopts);
-	if (ref($conn) eq '') {
-		die($conn);
-	}
+	return undef unless defined $conn;
 
 	my $port = getservbyname('zip', 'ddp') || 6;
 	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
@@ -168,9 +164,7 @@ sub ZIPGetMyZone {
 	my %sockopts;
 	if ($FromAddr) { $sockopts{'LocalAddr'} = $FromAddr }
 	my $conn = new Net::Atalk::ATP(%sockopts);
-	if (ref($conn) eq '') {
-		die($conn);
-	}
+	return undef unless defined $conn;
 
 	my $port = getservbyname('zip', 'ddp') || 6;
 	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));

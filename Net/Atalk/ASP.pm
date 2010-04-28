@@ -28,6 +28,7 @@ sub new { # {{{1
 
 	my $obj = bless {}, $class;
 	$$obj{'atpsess'} = new Net::Atalk::ATP();
+	return undef unless defined $$obj{'atpsess'};
 	$$obj{'host'} = $host;
 	$$obj{'svcport'} = $port;
 

@@ -21,6 +21,7 @@ use threads;
 use threads::shared;
 use Thread::Semaphore;
 use Exporter qw(import);
+use Scalar::Util qw(dualvar);
 
 =head1 NAME
 
@@ -184,7 +185,11 @@ sub new { # {{{1
 	}
 	$$shared{'conn_sem'}->up();
 
-	return($$shared{'running'} == 1 ? $obj : $$shared{'error'});
+	if (exists $$shared{'errno'}) {
+		#$! = dualvar @$shared{'errno', 'error'};
+		$! = dualvar $$shared{'errno'}, $$shared{'error'};
+	}
+	return($$shared{'running'} == 1 ? $obj : undef);
 } # }}}1
 =back
 
@@ -223,6 +228,7 @@ sub thread_core { # {{{1
 	unless ($conn && $conn->sockaddr()) {
 		$$shared{'running'} = -1;
 		$$shared{'error'} = $!;
+		$$shared{'errno'} = int($!);
 		$$shared{'conn_sem'}->up();
 		return;
 	}
