@@ -30,54 +30,63 @@ our @versions = (
 		'MajorNumber'	=> 3,
 		'MinorNumber'	=> 3,
 		'Supported'		=> 1,
+		'CanDoAtalk'	=> 0,
 	},
 	{
 		'VersionString'	=> 'AFP3.2',
 		'MajorNumber'	=> 3,
 		'MinorNumber'	=> 2,
 		'Supported'		=> 1,
+		'CanDoAtalk'	=> 0,
 	},
 	{
 		'VersionString'	=> 'AFP3.1',
 		'MajorNumber'	=> 3,
 		'MinorNumber'	=> 1,
 		'Supported'		=> 1,
+		'CanDoAtalk'	=> 0,
 	},
 	{
 		'VersionString'	=> 'AFPX03',
 		'MajorNumber'	=> 3,
 		'MinorNumber'	=> 0,
 		'Supported'		=> 1,
+		'CanDoAtalk'	=> 0,
 	},
 	{
 		'VersionString'	=> 'AFP2.3',
 		'MajorNumber'	=> 2,
 		'MinorNumber'	=> 3,
 		'Supported'		=> 1,
+		'CanDoAtalk'	=> 1,
 	},
 	{
 		'VersionString'	=> 'AFP2.2',
 		'MajorNumber'	=> 2,
 		'MinorNumber'	=> 2,
 		'Supported'		=> 1,
+		'CanDoAtalk'	=> 1,
 	},
 	{
 		'VersionString'	=> 'AFPVersion 2.1',
 		'MajorNumber'	=> 2,
 		'MinorNumber'	=> 1,
 		'Supported'		=> 1,
+		'CanDoAtalk'	=> 1,
 	},
 	{
 		'VersionString'	=> 'AFPVersion 2.0',
 		'MajorNumber'	=> 2,
 		'MinorNumber'	=> 0,
 		'Supported'		=> 0,
+		'CanDoAtalk'	=> 1,
 	},
 	{
 		'VersionString'	=> 'AFPVersion 1.1',
 		'MajorNumber'	=> 1,
 		'MinorNumber'	=> 1,
 		'Supported'		=> 0,
+		'CanDoAtalk'	=> 1,
 	},
 );
 
@@ -217,13 +226,14 @@ it to the caller.
 
 =cut
 sub GetPreferredVersion {
-	my($ver_list) = @_;
+	my($ver_list, $using_atalk) = @_;
 
 	my $best_version;
 
 	foreach my $ver (@$ver_list) {
 		if (exists $versionmap{$ver}) {
 			next unless $versionmap{$ver}{'Supported'};
+			next if $using_atalk and !$versionmap{$ver}{'CanDoAtalk'};
 			unless (defined $best_version) {
 				$best_version = $versionmap{$ver};
 				next;
@@ -250,4 +260,4 @@ sub GetPreferredVersion {
 
 =cut
 1;
-# vim: ts=4
+# vim: ts=4 ai fdm=marker
