@@ -23,18 +23,6 @@ use constant OP_SP_WRITE			=> 6;
 use constant OP_SP_WRITECONTINUE	=> 7;
 use constant OP_SP_ATTENTION		=> 8;
 
-use constant SPBadVersNum			=> -1066;
-use constant SPBufTooSmall			=> -1067;
-use constant SPNoServers			=> -1069;
-use constant SPParamErr				=> -1070;
-use constant SPServerBusy			=> -1071;
-use constant SPSizeErr				=> -1073;
-use constant SPTooManyClients		=> -1074;
-use constant SPNoAck				=> -1075;
-
-our @EXPORT = qw(SPBadVersNum SPBufTooSmall SPNoServers SPParamErr
-		SPServerBusy SPSizeErr SPTooManyClients SPNoAck);
-
 sub new { # {{{1
 	my ($class, $host, $port) = @_;
 
@@ -106,10 +94,19 @@ sub SPGetStatus { # {{{1
 	my ($rdata, $success);
 	my $msg = pack('Cx[3]', OP_SP_GETSTATUS);
 	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
-	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg, 1,
-			\$rdata, 2, 3, 0, \$success);
+	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg, 1,
+	#		\$rdata, 2, 3, 0, \$success);
+	my $sem = $$self{'atpsess'}->SendTransaction(
+		'UserBytes'			=> $msg,
+		'ResponseLength'	=> 1,
+		'ResponseStore'		=> \$rdata,
+		'StatusStore'		=> \$success,
+		'Timeout'			=> 2,
+		'NumTries'			=> 3,
+		'PeerAddr'			=> $sa,
+	);
 	$sem->down();
-	unless ($success) { return SPNoServers; }
+	unless ($success) { return kASPNoServers; }
 	$$resp_r = $$rdata[0][1];
 	return kFPNoErr;
 } # }}}1
@@ -122,10 +119,20 @@ sub SPOpenSession { # {{{1
 	my $msg = pack('CCn', OP_SP_OPENSESS, $wss, SP_VERSION);
 	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, '', $msg,
-			1, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
+	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, '', $msg,
+	#		1, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
+	my $sem = $$self{'atpsess'}->SendTransaction(
+		'UserBytes'			=> $msg,
+		'ResponseLength'	=> 1,
+		'ResponseStore'		=> \$rdata,
+		'StatusStore'		=> \$success,
+		'Timeout'			=> 2,
+		'NumTries'			=> 3,
+		'PeerAddr'			=> $sa,
+		'ExactlyOnce'		=> ATP_TREL_30SEC,
+	);
 	$sem->down();
-	unless ($success) { return SPNoServers; }
+	unless ($success) { return kASPNoServers; }
 	my ($srv_sockno, $sessionid, $errno) = unpack('CCn', $$rdata[0][0]);
 	@$self{'sessport', 'sessionid'} = ($srv_sockno, $sessionid);
 	$$self{'seqno'} = 0;
@@ -159,8 +166,17 @@ sub SPCloseSession { # {{{1
 	my $msg = pack('CCx[2]', OP_SP_CLOSESESS, $$self{'sessionid'});
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
-			1, \$rdata, 1, 1, 0, \$success);
+	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
+	#		1, \$rdata, 1, 1, 0, \$success);
+	my $sem = $$self{'atpsess'}->SendTransaction(
+		'UserBytes'			=> $msg,
+		'ResponseLength'	=> 1,
+		'ResponseStore'		=> \$rdata,
+		'StatusStore'		=> \$success,
+		'Timeout'			=> 1,
+		'NumTries'			=> 1,
+		'PeerAddr'			=> $sa,
+	);
 	delete $$self{'sessionid'};
 	return kFPNoErr;
 } # }}}1
@@ -176,10 +192,20 @@ sub SPCommand { # {{{1
 	my $ub = pack('CCn', OP_SP_COMMAND, $$self{'sessionid'}, $seqno);
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
-			$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
+	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
+	#		$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
+	my $sem = $$self{'atpsess'}->SendTransaction(
+		'UserBytes'			=> $ub,
+		'Data'				=> $message,
+		'ResponseLength'	=> 8,
+		'ResponseStore'		=> \$rdata,
+		'StatusStore'		=> \$success,
+		'Timeout'			=> 5,
+		'PeerAddr'			=> $sa,
+		'ExactlyOnce'		=> ATP_TREL_30SEC
+	);
 	$sem->down();
-	unless ($success) { return SPNoServers; }
+	unless ($success) { return kASPNoServers; }
 	# string the response bodies back together
 	$$resp_r = join('', map { $$_[1]; } @$rdata);
 	# user bytes from the first response packet are the only ones that
@@ -201,8 +227,18 @@ sub SPWrite { # {{{1
 	my $ub = pack('CCn', OP_SP_WRITE, $$self{'sessionid'}, $seqno);
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
-			$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
+	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
+	#		$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
+	my $sem = $$self{'atpsess'}->SendTransaction(
+		'UserBytes'			=> $ub,
+		'Data'				=> $message,
+		'ResponseLength'	=> 8,
+		'ResponseStore'		=> \$rdata,
+		'StatusStore'		=> \$success,
+		'Timeout'			=> 5,
+		'PeerAddr'			=> $sa,
+		'ExactlyOnce'		=> ATP_TREL_30SEC
+	);
 
 	# Try getting an SPWriteContinue transaction request from the server
 	my $RqCB = $$self{'atpsess'}->GetTransaction(1, sub {
@@ -250,9 +286,15 @@ sub SPTickle { # {{{1
 
 	my $msg = pack('CCx[2]', OP_SP_TICKLE, $$self{'sessionid'});
 	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
-	my ($rdata, $success);
-	my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
-			1, \$rdata, $interval, $ntries, 0, \$success);
+	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
+	#		1, \$rdata, $interval, $ntries, 0, \$success);
+	my $sem = $$self{'atpsess'}->SendTransaction(
+		'UserBytes'			=> $msg,
+		'ResponseLength'	=> 1,
+		'Timeout'			=> $interval,
+		'NumTries'			=> $ntries,
+		'PeerAddr'			=> $sa,
+	);
 } # }}}1
 
 1;

@@ -22,6 +22,23 @@ use threads::shared;
 use Thread::Semaphore;
 use Exporter qw(import);
 
+=head1 NAME
+
+Net::Atalk::ATP - Object interface for AppleTalk Transaction Protocol 
+
+=head1 SYNOPSIS
+
+    use Net::Atalk::ATP;
+
+=head1 DESCRIPTION
+
+C<Net::Atalk::ATP> provides an object-based interface to interfacing with
+Appletalk Transaction Protocol-based services. It builds on the
+L<IO::Socket::DDP> interface to construct transactional semantics
+over the datagram socket interface of DDP.
+
+=cut
+
 # ATP message types.
 use constant ATP_TReq			=> (0x1 << 6);	# Transaction request
 use constant ATP_TResp			=> (0x2 << 6);	# Transaction response
@@ -37,17 +54,69 @@ use constant ATP_CTL_STSBIT		=> 0x08;	# send transaction status; upon
 											# TReq packet
 use constant ATP_CTL_TREL_TMOUT	=> 0x07;
 
+=head1 CONSTANTS
+
+=over
+
+=cut
 # TRel timeout periods for XO (exactly-once) transactions. Ignored by
 # AppleTalk Phase1 implementations; I don't think this applies to anything
 # except really, really old stuff.
+=item ATP_TREL_30SEC
+
+For XO (exactly-once) transactions, this constant is used to tell the
+server to maintain transactional state for 30 seconds after initial
+fulfillment of the request.
+
+If the server implements AppleTalk Phase1, this is always the case for
+XO transactions.
+
+=cut
 use constant ATP_TREL_30SEC		=> 0x00;
+=item ATP_TREL_1MIN
+
+For XO (exactly-once) transactions, this constant is used to tell the
+server to maintain transactional state for 1 minute after initial
+fulfillment of the request.
+
+=cut
 use constant ATP_TREL_1MIN		=> 0x01;
+=item ATP_TREL_2MIN
+
+For XO (exactly-once) transactions, this constant is used to tell the
+server to maintain transactional state for 2 minutes after initial
+fulfillment of the request.
+
+=cut
 use constant ATP_TREL_2MIN		=> 0x02;
+=item ATP_TREL_4MIN
+
+For XO (exactly-once) transactions, this constant is used to tell the
+server to maintain transactional state for 4 minutes after initial
+fulfillment of the request.
+
+=cut
 use constant ATP_TREL_4MIN		=> 0x03;
+=item ATP_TREL_8MIN
+
+For XO (exactly-once) transactions, this constant is used to tell the
+server to maintain transactional state for 8 minutes after initial
+fulfillment of the request.
+
+=cut
 use constant ATP_TREL_8MIN		=> 0x04;
 
 # The maximum length of the ATP message body.
+=item ATP_MAXLEN
+
+The maximum length of a single ATP message payload. Transaction responses
+may consist of up to 8 individual response packets.
+
+=cut
 use constant ATP_MAXLEN			=> 578;
+=back
+
+=cut
 
 # symbols to export
 our @EXPORT = qw(ATP_TREL_30SEC ATP_TREL_1MIN ATP_TREL_2MIN ATP_TREL_4MIN
@@ -67,7 +136,22 @@ my %xo_timeouts :shared;
 				 &ATP_TREL_8MIN		=> 480,
 			   );
 
+=head1 CONSTRUCTOR
 
+=over
+
+=item new ( [ARGS] )
+
+Creates a C<Net::Atalk::ATP> object. C<new> optionally takes arguments;
+these are presented as key/value pairs, and passed through to the
+L<IO::Socket::DDP> constructor.
+
+The C<PeerAddr>, C<PeerHost> and C<PeerPort> parameters can be provided,
+but many ATP protocols involve sending transactions to multiple remote
+endpoints, so it's often easier to specify the target endpoint in the
+C<SendTransaction> call.
+
+=cut
 sub new { # {{{1
 	my ($class, %sockopts) = @_;
 
@@ -95,11 +179,27 @@ sub new { # {{{1
 	if ($$shared{'running'} == 1) {
 		$$obj{'Conn'}->fdopen($$shared{'conn_fd'}, 'w');
 	}
+	else {
+		$$obj{'Dispatcher'}->join();
+	}
 	$$shared{'conn_sem'}->up();
 
-	return $obj;
+	return($$shared{'running'} == 1 ? $obj : $$shared{'error'});
 } # }}}1
+=back
 
+=head2 METHODS
+
+=over
+
+=item close
+
+Discontinue an active ATP session. Any pending transactions will be
+aborted, and their callers will be notified of their failure. The
+dispatcher thread will be told to shut down, and the current process
+will block until it has ended.
+
+=cut
 sub close { # {{{1
 	my ($self) = @_;
 	$$self{'Shared'}{'exit'} = 1;
@@ -120,6 +220,12 @@ sub thread_core { # {{{1
 						 'Type'			=> SOCK_DGRAM,
 						 %sockopts );
 	my $conn = new IO::Socket::DDP(%connect_args);
+	unless ($conn && $conn->sockaddr()) {
+		$$shared{'running'} = -1;
+		$$shared{'error'} = $!;
+		$$shared{'conn_sem'}->up();
+		return;
+	}
 	$$shared{'running'} = 1;
 
 	$$shared{'conn_fd'} = fileno($conn);
@@ -382,26 +488,58 @@ MAINLOOP:
 	CORE::close($conn);
 } # }}}1
 
+=item SendTransaction ( IS_XO, TARGET, DATA, USER_BYTES, RLEN, RDATA_R, TMOUT, NTRIES, XO_TMOUT, SFLAG_R )
+
+Initiate a new transaction with a DDP peer socket. Actual reception of
+responses will be managed by the dispatcher thread in the background.
+
+IS_XO: True if the transaction should be XO (exactly-once). Commonly used
+for filesystem operations, and other transactions which should be
+guaranteed to only execute one time.
+
+TARGET: A packed sockaddr_at representing the target host and port for
+the transaction. Can be C<undef> if a peer was explicitly specified
+to the constructor, but
+
+=cut
 sub SendTransaction { # {{{1
-	my ($self, $is_xo, $target, $data, $user_bytes, $rlen, $rdata_r, $tmout,
-			$ntries, $xo_tmout, $sflag_r) = @_;
+	my ($self, %options) = @_;
+
+	die('UserBytes must be provided')
+			unless exists $options{'UserBytes'};
+	unless (exists $options{'Data'}) { $options{'Data'} = '' }
+	die('ResponseLength must be provided')
+			unless exists $options{'ResponseLength'};
+	unless (exists $options{'ResponseStore'}) {
+		$options{'ResponseStore'} = *foo{SCALAR};
+	}
+	die('ResponseStore must be provided and be a scalar ref')
+			unless ref($options{'ResponseStore'}) eq 'SCALAR' or
+				 ref($options{'ResponseStore'}) eq 'REF';
+	unless (exists $options{'StatusStore'}) {
+		$options{'StatusStore'} = *bar{SCALAR};
+	}
+	die('StatusStore must be provided and be a scalar ref')
+			unless ref($options{'StatusStore'}) eq 'SCALAR' or
+				 ref($options{'StatusStore'}) eq 'REF';
+	die('Timeout must be provided') unless exists $options{'Timeout'};
+	unless (exists $options{'NumTries'}) { $options{'NumTries'} = -1 }
+	unless (exists $options{'PeerAddr'}) { $options{'PeerAddr'} = undef }
+
+	#my ($self, $is_xo, $target, $data, $user_bytes, $rlen, $rdata_r, $tmout,
+	#		$ntries, $xo_tmout, $sflag_r) = @_;
 
 	# Check a few parameters before we proceed.
-	return if length($data) > ATP_MAXLEN;
-	return if $rlen > 8;
-	return if length($user_bytes) > 4;
-	die('$rdata_r must be a scalar ref')
-			unless ref($rdata_r) eq 'SCALAR' or ref($rdata_r) eq 'REF'
-				or $rlen == 0;
-	die('$sflag_r must be a scalar ref')
-			unless ref($sflag_r) eq 'SCALAR' or ref($sflag_r) eq 'REF';
+	return if length($options{'Data'}) > ATP_MAXLEN;
+	return if $options{'ResponseLength'} > 8;
+	return if length($options{'UserBytes'}) > 4;
 
 	# Set up the outgoing transaction request packet.
 	my $ctl_byte = ATP_TReq;
-	if ($is_xo) {
-		$ctl_byte |= ATP_CTL_XOBIT | $xo_tmout;
+	if (exists $options{'ExactlyOnce'}) {
+		$ctl_byte |= ATP_CTL_XOBIT | $options{'ExactlyOnce'};
 	}
-	my $seq_bmp = 0xFF >> (8 - $rlen);
+	my $seq_bmp = 0xFF >> (8 - $options{'ResponseLength'});
 
 	my $TxCB_queue = $$self{'Shared'}{'TxCB_list'};
 	my $txid;
@@ -412,13 +550,10 @@ sub SendTransaction { # {{{1
 	} while (exists $$TxCB_queue{$txid});
 
 	my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq_bmp, $txid,
-			$user_bytes, $data);
-
-	# Don't register a transaction control block if the sender says the
-	# response length is 0.
-	return($txid, undef) if $rlen == 0;
+			$options{'UserBytes'}, $options{'Data'});
 
 	# Set up the transaction control block.
+	my $ntries = $options{'NumTries'};
 	my $TxCB = &share({});
 	%$TxCB = (
 				 'msg'		=> $msg,
@@ -426,15 +561,15 @@ sub SendTransaction { # {{{1
 				 'response'	=> &share([]),
 				 'ctl_byte'	=> $ctl_byte,
 				 'seq_bmp'	=> $seq_bmp,
-				 'is_xo'	=> $is_xo,
-				 'tmout'	=> $tmout,
+				 'is_xo'	=> exists $options{'ExactlyOnce'},
+				 'tmout'	=> $options{'Timeout'},
 				 'sec'		=> undef,
 				 'usec'		=> undef,
 				 'sem'		=> new Thread::Semaphore(0),
-				 'sflag'	=> &share($sflag_r),
-				 'target'	=> $target,
+				 'sflag'	=> &share($options{'StatusStore'}),
+				 'target'	=> $options{'PeerAddr'},
 			   );
-	$$rdata_r = $$TxCB{'response'};
+	${$options{'ResponseStore'}} = $$TxCB{'response'};
 
 	# Indicate this as when the transaction has started (have to do this
 	# before we queue the TxCB)...
@@ -447,12 +582,15 @@ sub SendTransaction { # {{{1
 
 	# Send request packet.
 	$$self{'Shared'}{'conn_sem'}->down();
-	send($$self{'Conn'}, $msg, 0, $target);
+	send($$self{'Conn'}, $msg, 0, $options{'PeerAddr'});
 	$$self{'Shared'}{'conn_sem'}->up();
 
-	return($txid, $$TxCB{'sem'});
+	return $$TxCB{'sem'};
 } # }}}1
 
+=item GetTransaction ( )
+
+=cut
 sub GetTransaction { # {{{1
 	my ($self, $do_block, $filter) = @_;
 
@@ -489,6 +627,9 @@ sub GetTransaction { # {{{1
 	return undef;
 } # }}}1
 
+=item RespondTransaction
+
+=cut
 sub RespondTransaction { # {{{1
 	my ($self, $txid, $resp_r) = @_;
 	
@@ -548,6 +689,9 @@ sub RespondTransaction { # {{{1
 # The idea here is to be able to pass a subroutine that looks at the
 # transaction block and, if it's known, handle the transaction without
 # passing it on to transaction queue at all.
+=item AddTransactionFilter
+
+=cut
 sub AddTransactionFilter { # {{{1
 	my ($self, $filter) = @_;
 

@@ -4,6 +4,7 @@ use IO::Socket::DDP;
 use Net::Atalk;
 use Net::Atalk::ATP;
 use IO::Poll qw(POLLIN);
+use POSIX qw(ETIMEDOUT);
 use Exporter qw(import);
 
 =head1 NAME
@@ -87,16 +88,31 @@ sub ZIPQuery {
 }
 
 sub ZIPGetZoneList {
-	my ($ToAddr, $StartIndex) = @_;
-	my $conn = new Net::Atalk::ATP();
+	my ($FromAddr, $StartIndex) = @_;
+	my %sockopts;
+	if ($FromAddr) { $sockopts{'LocalAddr'} = $FromAddr }
+	my $conn = new Net::Atalk::ATP(%sockopts);
+	if (ref($conn) eq '') {
+		die($conn);
+	}
+
 	my $port = getservbyname('zip', 'ddp') || 6;
-	my $dest = pack_sockaddr_at($port, atalk_aton($ToAddr || '0.0'));
+	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
 
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetZoneList, $StartIndex);
 	my $rdata;
 	my $success;
-	my ($txid, $sem) = $conn->SendTransaction(0, $dest, '', $user_bytes, 1,
-			\$rdata, 2, 2, 0, \$success);
+	#my ($txid, $sem) = $conn->SendTransaction(0, $dest, '', $user_bytes, 1,
+	#		\$rdata, 2, 2, 0, \$success);
+	my $sem = $conn->SendTransaction(
+		'UserBytes'			=> $user_bytes,
+		'ResponseLength'	=> 1,
+		'ResponseStore'		=> \$rdata,
+		'StatusStore'		=> \$success,
+		'Timeout'			=> 2,
+		'NumTries'			=> 5,
+		'PeerAddr'			=> $dest,
+	);
 	# block on the semaphore until the thread tells us we're done
 	$sem->down();
 	$conn->close();
@@ -105,20 +121,36 @@ sub ZIPGetZoneList {
 		my @zonenames = unpack('C/a*' x $count, $$rdata[0]{'payload'});
 		return wantarray() ? ([@zonenames], $LastFlag) : [@zonenames];
 	}
+	$! = ETIMEDOUT;
 	return undef;
 }
 
 sub ZIPGetLocalZones {
-	my ($ToAddr, $StartIndex) = @_;
-	my $conn = new Net::Atalk::ATP();
+	my ($FromAddr, $StartIndex) = @_;
+	my %sockopts;
+	if ($FromAddr) { $sockopts{'LocalAddr'} = $FromAddr }
+	my $conn = new Net::Atalk::ATP(%sockopts);
+	if (ref($conn) eq '') {
+		die($conn);
+	}
+
 	my $port = getservbyname('zip', 'ddp') || 6;
-	my $dest = pack_sockaddr_at($port, atalk_aton($ToAddr || '0.0'));
+	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
 
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetLocalZones, $StartIndex);
 	my $rdata;
 	my $success;
-	my ($txid, $sem) = $conn->SendTransaction(0, $dest, '', $user_bytes, 1,
-			\$rdata, 2, 2, 0, \$success);
+	#my ($txid, $sem) = $conn->SendTransaction(0, $dest, '', $user_bytes, 1,
+	#		\$rdata, 2, 2, 0, \$success);
+	my $sem = $conn->SendTransaction(
+		'UserBytes'			=> $user_bytes,
+		'ResponseLength'	=> 1,
+		'ResponseStore'		=> \$rdata,
+		'StatusStore'		=> \$success,
+		'Timeout'			=> 2,
+		'NumTries'			=> 5,
+		'PeerAddr'			=> $dest,
+	);
 	# block on the semaphore until the thread tells us we're done
 	$sem->down();
 	$conn->close();
@@ -127,20 +159,36 @@ sub ZIPGetLocalZones {
 		my @zonenames = unpack('C/a*' x $count, $$rdata[0]{'payload'});
 		return wantarray() ? ([@zonenames], $LastFlag) : [@zonenames];
 	}
+	$! = ETIMEDOUT;
 	return undef;
 }
 
 sub ZIPGetMyZone {
-	my ($ToAddr) = @_;
-	my $conn = new Net::Atalk::ATP();
+	my ($FromAddr) = @_;
+	my %sockopts;
+	if ($FromAddr) { $sockopts{'LocalAddr'} = $FromAddr }
+	my $conn = new Net::Atalk::ATP(%sockopts);
+	if (ref($conn) eq '') {
+		die($conn);
+	}
+
 	my $port = getservbyname('zip', 'ddp') || 6;
-	my $dest = pack_sockaddr_at($port, atalk_aton($ToAddr || '0.0'));
+	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
 
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetMyZone, 0);
 	my $rdata;
 	my $success;
-	my ($txid, $sem) = $conn->SendTransaction(0, $dest, '', $user_bytes, 1,
-			\$rdata, 2, 2, 0, \$success);
+	#my ($txid, $sem) = $conn->SendTransaction(0, $dest, '', $user_bytes, 1,
+	#		\$rdata, 2, 2, 0, \$success);
+	my $sem = $conn->SendTransaction(
+		'UserBytes'			=> $user_bytes,
+		'ResponseLength'	=> 1,
+		'ResponseStore'		=> \$rdata,
+		'StatusStore'		=> \$success,
+		'Timeout'			=> 2,
+		'NumTries'			=> 5,
+		'PeerAddr'			=> $dest,
+	);
 	# block on the semaphore until the thread tells us we're done
 	$sem->down();
 	$conn->close();
@@ -150,6 +198,7 @@ sub ZIPGetMyZone {
 		my ($zonename) = unpack('C/a*', $$rdata[0]{'payload'});
 		return $zonename;
 	}
+	$! = ETIMEDOUT;
 	return undef;
 }
 
