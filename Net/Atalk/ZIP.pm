@@ -4,6 +4,7 @@ use IO::Socket::DDP;
 use Net::Atalk;
 use Net::Atalk::ATP;
 use IO::Poll qw(POLLIN);
+use Exporter qw(import);
 
 =head1 NAME
 
@@ -37,6 +38,9 @@ use constant ZIP_GNI_ZoneInvalid	=> 0x80;
 use constant ZIP_GNI_UseBroadcast	=> 0x40;
 use constant ZIP_GNI_OnlyOneZone	=> 0x20;
 
+our @EXPORT = qw(ZIPQuery ZIPGetZoneList ZIPGetLocalZones ZIPGetMyZone
+		ZIPGetNetInfo);
+
 =item ZIPQuery (NETNUM, ...)
 
 Requests mapping of AppleTalk network numbers to their corresponding
@@ -50,8 +54,7 @@ sub ZIPQuery {
 	# Bind a local, broadcast-capable socket for sending out NBP
 	# packets from (and receiving responses).
 	my %sockparms = ( 'Proto'		=> 'ddp',
-					  'Broadcast'	=> 1,
-					  'LocalPort'	=> $port );
+					  'Broadcast'	=> 1 );
 	my $sock = new IO::Socket::DDP(%sockparms) || die $!;
 	die("Can't get local socket address, possibly atalk stack out of order")
 			unless defined $sock->sockhost();
@@ -84,10 +87,10 @@ sub ZIPQuery {
 }
 
 sub ZIPGetZoneList {
-	my ($StartIndex) = @_;
+	my ($ToAddr, $StartIndex) = @_;
 	my $conn = new Net::Atalk::ATP();
 	my $port = getservbyname('zip', 'ddp') || 6;
-	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
+	my $dest = pack_sockaddr_at($port, atalk_aton($ToAddr || '0.0'));
 
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetZoneList, $StartIndex);
 	my $rdata;
@@ -96,19 +99,20 @@ sub ZIPGetZoneList {
 			\$rdata, 2, 2, 0, \$success);
 	# block on the semaphore until the thread tells us we're done
 	$sem->down();
+	$conn->close();
 	if ($success) {
 		my ($LastFlag, $count) = unpack('Cxn', $$rdata[0]{'userbytes'});
 		my @zonenames = unpack('C/a*' x $count, $$rdata[0]{'payload'});
-		return [@zonenames];
+		return wantarray() ? ([@zonenames], $LastFlag) : [@zonenames];
 	}
 	return undef;
 }
 
 sub ZIPGetLocalZones {
-	my ($StartIndex) = @_;
+	my ($ToAddr, $StartIndex) = @_;
 	my $conn = new Net::Atalk::ATP();
 	my $port = getservbyname('zip', 'ddp') || 6;
-	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
+	my $dest = pack_sockaddr_at($port, atalk_aton($ToAddr || '0.0'));
 
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetLocalZones, $StartIndex);
 	my $rdata;
@@ -117,18 +121,20 @@ sub ZIPGetLocalZones {
 			\$rdata, 2, 2, 0, \$success);
 	# block on the semaphore until the thread tells us we're done
 	$sem->down();
+	$conn->close();
 	if ($success) {
 		my ($LastFlag, $count) = unpack('Cxn', $$rdata[0]{'userbytes'});
 		my @zonenames = unpack('C/a*' x $count, $$rdata[0]{'payload'});
-		return [@zonenames];
+		return wantarray() ? ([@zonenames], $LastFlag) : [@zonenames];
 	}
 	return undef;
 }
 
 sub ZIPGetMyZone {
+	my ($ToAddr) = @_;
 	my $conn = new Net::Atalk::ATP();
 	my $port = getservbyname('zip', 'ddp') || 6;
-	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
+	my $dest = pack_sockaddr_at($port, atalk_aton($ToAddr || '0.0'));
 
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetMyZone, 0);
 	my $rdata;
@@ -137,6 +143,7 @@ sub ZIPGetMyZone {
 			\$rdata, 2, 2, 0, \$success);
 	# block on the semaphore until the thread tells us we're done
 	$sem->down();
+	$conn->close();
 	if ($success) {
 		my ($count) = unpack('xxn', $$rdata[0]{'userbytes'});
 		die() if $count != 1;
@@ -153,8 +160,7 @@ sub ZIPGetNetInfo {
 	# Bind a local, broadcast-capable socket for sending out NBP
 	# packets from (and receiving responses).
 	my %sockparms = ( 'Proto'		=> 'ddp',
-					  'Broadcast'	=> 1,
-					  'LocalPort'	=> $port );
+					  'Broadcast'	=> 1 );
 	my $sock = new IO::Socket::DDP(%sockparms) || die $!;
 	die("Can't get local socket address, possibly atalk stack out of order")
 			unless defined $sock->sockhost();
@@ -186,3 +192,4 @@ sub ZIPGetNetInfo {
 }
 
 1;
+# vim: ts=4 ai
