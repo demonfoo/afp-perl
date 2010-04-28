@@ -246,10 +246,10 @@ sub SendMessage { # {{{1
 		$$sem_r = new Thread::Semaphore(0);
 	}
 
-	$resp_r = defined($resp_r) ? $resp_r : \'';
+	$resp_r = defined($resp_r) ? $resp_r : *foo{SCALAR};
 	$resp_r = &share($resp_r);
 
-	$rc_r = defined($rc_r) ? $rc_r : \'';
+	$rc_r = defined($rc_r) ? $rc_r : *bar{SCALAR};
 	$rc_r = &share($rc_r);
 
 	$message = defined($message) ? $message : '';
