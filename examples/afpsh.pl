@@ -444,19 +444,24 @@ _EOT_
 		my(%time, %lasttime, %starttime);
 		@time{'sec', 'usec'} = gettimeofday();
 		%starttime = %time;
+		my $total = 0;
+		my $wcount = 0;
 		while (1) {
-			my $data = '';
+			my $data;
 			my $rcnt = read($srcFile, $data, 131072);
 			last if $rcnt == 0;
-			my $sresp = '';
-			if ($UseExtOps) {
-				$rc = $session->FPWriteExt(0x80, $$resp{'OForkRefNum'}, 0,
-						length($data), \$data, \$sresp);
+			while ($wcount < ($total + $rcnt)) {
+				my $dchunk = substr($data, $wcount - $total, $total + $rcnt - $wcount);
+				if ($UseExtOps) {
+					$rc = $session->FPWriteExt(0x80, $$resp{'OForkRefNum'}, 0,
+							length($dchunk), \$dchunk, \$wcount);
+				}
+				else {
+					$rc = $session->FPWrite(0x80, $$resp{'OForkRefNum'}, 0,
+							length($dchunk), \$dchunk, \$wcount);
+				}
 			}
-			else {
-				$rc = $session->FPWrite(0x80, $$resp{'OForkRefNum'}, 0,
-						length($data), \$data, \$sresp);
-			}
+			$total += $rcnt;
 			#if ($hashmarks_enabled == 1) {
 #			my $pcnt = ($pos + length($data)) * 100 / $fileLen;
 #			printf(' %3d%%  |%-25s|  %-.42s' . "\r", $pcnt, '*' x ($pcnt * 25 / 100), $srcFileName);
@@ -923,7 +928,7 @@ sub doAFPConnection {
 		exit(1);
 	}
 
-	my $commonVersion = Net::AFP::Versions::GetPreferredVersion($$srvInfo{'AFPVersions'});
+	my $commonVersion = Net::AFP::Versions::GetPreferredVersion($$srvInfo{'AFPVersions'}, $as_atalk);
 	unless (defined $commonVersion) {
 		print "Couldn't agree on an AFP protocol version with the server\n";
 		$session->close();
