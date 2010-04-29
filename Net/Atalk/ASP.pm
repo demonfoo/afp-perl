@@ -57,7 +57,7 @@ sub _AttnFilter { # {{{1
 
 	if ($txtype == OP_SP_ATTENTION && $sessid == $sid && $realport == $portno) {
 		push(@$attnq_r, $attncode);
-		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
+		return [ { 'userbytes' => pack('x[4]'), 'data' => ''} ];
 	}
 	return undef;
 } # }}}1
@@ -69,7 +69,7 @@ sub _CloseFilter { # {{{1
 
 	if ($txtype == OP_SP_CLOSESESS && $sessid == $sid && $realport == $portno) {
 		$$shared{'exit'} = 1;
-		return [ { 'userbytes' => pack('x[4]'), 'payload' => ''} ];
+		return [ { 'userbytes' => pack('x[4]'), 'data' => ''} ];
 	}
 	return undef;
 } # }}}1
@@ -95,8 +95,6 @@ sub SPGetStatus { # {{{1
 	my ($rdata, $success);
 	my $msg = pack('Cx[3]', OP_SP_GETSTATUS);
 	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
-	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg, 1,
-	#		\$rdata, 2, 3, 0, \$success);
 	my $sem = $$self{'atpsess'}->SendTransaction(
 		'UserBytes'			=> $msg,
 		'ResponseLength'	=> 1,
@@ -120,8 +118,6 @@ sub SPOpenSession { # {{{1
 	my $msg = pack('CCn', OP_SP_OPENSESS, $wss, SP_VERSION);
 	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, '', $msg,
-	#		1, \$rdata, 2, 3, ATP_TREL_30SEC, \$success);
 	my $sem = $$self{'atpsess'}->SendTransaction(
 		'UserBytes'			=> $msg,
 		'ResponseLength'	=> 1,
@@ -167,8 +163,6 @@ sub SPCloseSession { # {{{1
 	my $msg = pack('CCx[2]', OP_SP_CLOSESESS, $$self{'sessionid'});
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
-	#		1, \$rdata, 1, 1, 0, \$success);
 	my $sem = $$self{'atpsess'}->SendTransaction(
 		'UserBytes'			=> $msg,
 		'ResponseLength'	=> 1,
@@ -187,14 +181,12 @@ sub SPCommand { # {{{1
 
 	$resp_r = defined($resp_r) ? $resp_r : *foo{SCALAR};
 
-	my $seqno = $$self{'seqno'}++ % 65536;
+	my $seqno = $$self{'seqno'}++ % (2 ** 16);
 	# this will take an ATP_MSGLEN sized chunk of the message data and
 	# send it to the server, to be processed as part of the request.
 	my $ub = pack('CCn', OP_SP_COMMAND, $$self{'sessionid'}, $seqno);
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
-	#		$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
 	my $sem = $$self{'atpsess'}->SendTransaction(
 		'UserBytes'			=> $ub,
 		'Data'				=> $message,
@@ -222,14 +214,12 @@ sub SPWrite { # {{{1
 	die('$resp_r must be a scalar ref')
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 
-	my $seqno = $$self{'seqno'}++ % 65536;
+	my $seqno = $$self{'seqno'}++ % (2 ** 16);
 	# this will take an ATP_MSGLEN sized chunk of the message data and
 	# send it to the server, to be processed as part of the request.
 	my $ub = pack('CCn', OP_SP_WRITE, $$self{'sessionid'}, $seqno);
 	my $sa = pack_sockaddr_at($$self{'sessport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);
-	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(1, $sa, $message,
-	#		$ub, 8, \$rdata, 5, -1, ATP_TREL_30SEC, \$success);
 	my $sem = $$self{'atpsess'}->SendTransaction(
 		'UserBytes'			=> $ub,
 		'Data'				=> $message,
@@ -250,7 +240,7 @@ sub SPWrite { # {{{1
 				$sessid == $$self{'sessionid'} && $seqno == $pseq &&
 				$portno == $$self{'sessport'});
 	} );
-	my $bufsize = unpack('n', $$RqCB{'payload'});
+	my $bufsize = unpack('n', $$RqCB{'data'});
 
 	my $resp = &share([]);
 
@@ -264,7 +254,7 @@ sub SPWrite { # {{{1
 		}
 		my $elem = &share({});
 		%$elem = ( 'userbytes'	=> pack('x[4]'),
-				   'payload'	=> substr($$data_r, $totalsend, $sendsize) );
+				   'data'	=> substr($$data_r, $totalsend, $sendsize) );
 		push(@$resp, $elem);
 		$totalsend += $sendsize;
 	} # }}}2
@@ -287,8 +277,6 @@ sub SPTickle { # {{{1
 
 	my $msg = pack('CCx[2]', OP_SP_TICKLE, $$self{'sessionid'});
 	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
-	#my ($txid, $sem) = $$self{'atpsess'}->SendTransaction(0, $sa, '', $msg,
-	#		1, \$rdata, $interval, $ntries, 0, \$success);
 	my $sem = $$self{'atpsess'}->SendTransaction(
 		'UserBytes'			=> $msg,
 		'ResponseLength'	=> 1,

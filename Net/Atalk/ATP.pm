@@ -127,7 +127,7 @@ my $atp_header :shared;
 $atp_header = 'CCCna[4]a*';
 my @atp_header_fields :shared;
 @atp_header_fields = ('ddp_type', 'ctl', 'bmp_seq', 'tid', 'userbytes',
-		'payload');
+		'data');
 my %xo_timeouts :shared;
 %xo_timeouts = (
 				 &ATP_TREL_30SEC	=> 30,
@@ -246,7 +246,7 @@ sub thread_core { # {{{1
 	# several variables which will be used in the main loop.
 	my $poll = new IO::Poll();
 	$poll->mask($conn, POLLIN);
-	my ($id, $TxCB, $sec, $usec, $delta, $from, $msg, %msgdata, $msgtype,
+	my ($txid, $TxCB, $time, $from, $msg, %msgdata, $msgtype,
 		$wants_sts, $is_eom, $seqno, $RqCB, $is_xo, $xo_tmout, $RspCB, $seq,
 		$pktdata, $ctl_byte, $filter, $rv, $item, $stamp);
 
@@ -254,15 +254,14 @@ MAINLOOP:
 	while ($$shared{'exit'} == 0) { # {{{2
 		# Okay, now we need to check existing outbound transactions for
 		# status, resends, cleanups, etc...
-		($sec, $usec) = gettimeofday();
-		foreach $id (keys %{$$shared{'TxCB_list'}}) { # {{{3
-			$TxCB = $$shared{'TxCB_list'}{$id};
-			$delta = ($sec - $$TxCB{'sec'}) +
-					(($usec - $$TxCB{'usec'}) / 1000000);
-			if ($delta >= $$TxCB{'tmout'}) {
+		$time = gettimeofday();
+		#while (($txid, $TxCB) = each(%{$$shared{'TxCB_list'}})) {
+		foreach $txid (keys %{$$shared{'TxCB_list'}}) { # {{{3
+			$TxCB = $$shared{'TxCB_list'}{$txid};
+			if (($time - $$TxCB{'stamp'}) >= $$TxCB{'tmout'}) {
 				# We're past the indicated timeout duration for the
 				# transaction, so now we have to decide its fate.
-				if ($$TxCB{'ntries'} != 0) {
+				if ($$TxCB{'ntries'}) {
 					# Packet data needs to be resent; sequence mask will
 					# be updated in-place elsewhere, so just need to send
 					# again, decrement the retry counter, and update
@@ -271,29 +270,33 @@ MAINLOOP:
 					# -1 is special, it means "just keep trying forever"
 					if ($$TxCB{'ntries'} != -1) { $$TxCB{'ntries'}-- }
 
+					# Update packet data with new sequence bitmap.
+					substr($$TxCB{'msg'}, 2, 1, pack('C', $$TxCB{'seq_bmp'}));
+
 					$$shared{'conn_sem'}->down();
 					send($conn, $$TxCB{'msg'}, 0, $$TxCB{'target'});
-					@$TxCB{'sec', 'usec'} = ($sec, $usec); # close enough
+					$$TxCB{'stamp'} = $time;
 					$$shared{'conn_sem'}->up();
 				}
 				else {
 					# Okay, you've had enough go-arounds. Time to put
 					# this dog down.
 					${$$TxCB{'sflag'}} = 0;
-					delete $$shared{'TxCB_list'}{$id};
+					delete $$shared{'TxCB_list'}{$txid};
 					$$TxCB{'sem'}->up();
 				}
 			}
 		} # }}}3
 
 		# Check the XO transaction completion list as well.
-		foreach $id (keys %{$$shared{'RspCB_list'}}) { # {{{3
+		#while (($txid, $RspCB) = each(%{$$shared{'RspCB_list'}})) {
+		foreach $txid (keys %{$$shared{'RspCB_list'}}) { # {{{3
+			#print STDERR '', (caller(0))[3], ": RspCB txid is $txid\n";
 			# If the transaction is past its keep-by, just delete it, nothing
 			# more to be done on our end.
-			$RspCB = $$shared{'RspCB_list'}{$id};
-			$delta = ($sec - $$RspCB{'stamp'}[0]) +
-					(($usec - $$RspCB{'stamp'}[1]) / 1000000);
-			delete $$shared{'RspCB_list'}{$id} if $delta >= $$RspCB{'tmout'};
+			$RspCB = $$shared{'RspCB_list'}{$txid};
+			delete $$shared{'RspCB_list'}{$txid}
+					if (($time - $$RspCB{'stamp'}) >= $$RspCB{'tmout'});
 		} # }}}3
 
 		# Check the socket for incoming packets.
@@ -312,19 +315,19 @@ MAINLOOP:
 
 			# Let's see what kind of message we've been sent.
 			$msgtype = $msgdata{'ctl'} & ATP_CTL_FNCODE;
-			$id = $msgdata{'tid'};
+			$txid = $msgdata{'tid'};
 			if ($msgtype == ATP_TReq) { # {{{4
 				# Remote is asking to initiate a transaction with us.
 				$is_xo = $msgdata{'ctl'} & ATP_CTL_XOBIT;
 				$xo_tmout = $msgdata{'ctl'} & ATP_CTL_TREL_TMOUT;
 
 				# Ignore a duplicate transaction request.
-				next MAINLOOP if exists $$shared{'RqCB_list'}{$id};
+				next MAINLOOP if exists $$shared{'RqCB_list'}{$txid};
 
 				# If there's an XO completion handler in place, then resend
 				# whatever packets the peer indicates it wants.
-				if (exists $$shared{'RspCB_list'}{$id}) { # {{{5
-					$RspCB = $$shared{'RspCB_list'}{$id};
+				if (exists $$shared{'RspCB_list'}{$txid}) { # {{{5
+					$RspCB = $$shared{'RspCB_list'}{$txid};
 					$RqCB = $$RspCB{'RqCB'};
 					$pktdata = $$RspCB{'RespData'};
 
@@ -337,19 +340,19 @@ MAINLOOP:
 						send($conn, $$pktdata[$seq], 0, $$RqCB{'sockaddr'});
 						$$shared{'conn_sem'}->up();
 					}
-					@{$$RspCB{'stamp'}} = gettimeofday();
+					$$RspCB{'stamp'} = gettimeofday();
 					next MAINLOOP;
 				} # }}}5
 				$RqCB = &share({});
 				# Set up the transaction request block.
 				%$RqCB = (
-						  'txid'		=> $id,
+						  'txid'		=> $txid,
 						  'is_xo'		=> $is_xo,
 						  'xo_tmout_bits' => $xo_tmout,
 						  'xo_tmout'	=> $xo_timeouts{$xo_tmout},
 						  'seq_bmp'		=> $msgdata{'bmp_seq'},
 						  'userbytes'	=> $msgdata{'userbytes'},
-						  'payload'		=> $msgdata{'payload'},
+						  'data'		=> $msgdata{'data'},
 						  'sockaddr'	=> $from,
 						);
 
@@ -374,7 +377,7 @@ MAINLOOP:
 							# requester that this is end of message...
 							if ($seq == $#$rv) { $ctl_byte |= ATP_CTL_EOMBIT }
 							$msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte,
-									$seq, $id, @$item{'userbytes', 'payload'});
+									$seq, $txid, @$item{'userbytes', 'data'});
 							$$pktdata[$seq] = $msg;
 
 							next unless $$RqCB{'seq_bmp'} & (1 << $seq);
@@ -383,15 +386,13 @@ MAINLOOP:
 							# before the last packet posts to the server...
 							if ($$RqCB{'is_xo'} && $seq == $#$rv) {
 								$RspCB = &share({});
-								$stamp = &share([]);
-								@$stamp = gettimeofday();
 								%$RspCB = (
 									'RqCB'		=> $RqCB,
 									'RespData'	=> $pktdata,
-									'stamp'		=> $stamp,
 									'tmout'		=> $$RqCB{'xo_tmout'},
 								);
-								$$shared{'RspCB_list'}{$id} = $RspCB;
+								$$RspCB{'stamp'} = gettimeofday();
+								$$shared{'RspCB_list'}{$txid} = $RspCB;
 							}
 
 							$$shared{'conn_sem'}->down();
@@ -406,7 +407,7 @@ MAINLOOP:
 				# a combination of the originator's address and port plus
 				# the transaction ID? Seems like having just the txid could
 				# end up causing conflicts...
-				$$shared{'RqCB_list'}{$id} = $RqCB;
+				$$shared{'RqCB_list'}{$txid} = $RqCB;
 				push(@{$$shared{'RqCB_txq'}}, $RqCB);
 				$$shared{'RqCB_sem'}->up();
 			} # }}}4
@@ -416,11 +417,11 @@ MAINLOOP:
 				# Ignore a transaction response to a transaction that we don't
 				# know, either because we didn't initiate it, or because we
 				# tried it enough times and gave up.
-				next MAINLOOP unless exists $$shared{'TxCB_list'}{$id};
+				next MAINLOOP unless exists $$shared{'TxCB_list'}{$txid};
 
 				# Get the transaction block, and grab a few bits of info
 				# out of it to keep them at hand.
-				$TxCB = $$shared{'TxCB_list'}{$id};
+				$TxCB = $$shared{'TxCB_list'}{$txid};
 				$is_eom = $msgdata{'ctl'} & ATP_CTL_EOMBIT;
 				$wants_sts = $msgdata{'ctl'} & ATP_CTL_STSBIT;
 				$seqno = $msgdata{'bmp_seq'};
@@ -436,17 +437,15 @@ MAINLOOP:
 				# Put data into the array of stored payloads.
 				$$TxCB{'response'}[$seqno] = &share([]);
 				@{$$TxCB{'response'}[$seqno]} = 
-						@msgdata{'userbytes', 'payload'};
+						@msgdata{'userbytes', 'data'};
 				# Clear the corresponding bit in the sequence bitmap.
 				$$TxCB{'seq_bmp'} &= ~(1 << $seqno) & 0xFF;
-				# Update packet data with new sequence bitmap.
-				substr($$TxCB{'msg'}, 2, 1, pack('C', $$TxCB{'seq_bmp'}));
 
 				# If the sequence bitmap is now 0, then we've received
 				# all the data we're going to.
 				unless ($$TxCB{'seq_bmp'}) { # {{{5
 					${$$TxCB{'sflag'}} = 1;
-					delete $$shared{'TxCB_list'}{$id};
+					delete $$shared{'TxCB_list'}{$txid};
 					$$TxCB{'sem'}->up();
 
 					# If it was an XO transaction, we should send a TRel here.
@@ -467,9 +466,12 @@ MAINLOOP:
 				# still packets we need, then resend the request packet.
 				if ($wants_sts || ($$TxCB{'seq_bmp'} &&
 						!($$TxCB{'seq_bmp'} >> $seqno))) {
+					# Update packet data with new sequence bitmap.
+					substr($$TxCB{'msg'}, 2, 1, pack('C', $$TxCB{'seq_bmp'}));
+
 					$$shared{'conn_sem'}->down();
 					send($conn, $$TxCB{'msg'}, 0, $$TxCB{'target'});
-					@$TxCB{'sec', 'usec'} = gettimeofday();
+					$$TxCB{'stamp'} = gettimeofday();
 					$$shared{'conn_sem'}->up();
 				}
 			} # }}}4
@@ -478,17 +480,20 @@ MAINLOOP:
 				# the pending RspCB if one is present. I think we can
 				# safely delete even if it's not there; saves us the time
 				# of checking.
-				delete $$shared{'RspCB_list'}{$id};
+				delete $$shared{'RspCB_list'}{$txid};
 			} # }}}4
 		} # }}}3
 	} # }}}2
 	# If we reach this point, we're exiting the thread. Notify any pending
 	# waiting calls that they've failed before we go away.
-	foreach $id (keys %{$$shared{'TxCB_list'}}) {
-		$TxCB = $$shared{'TxCB_list'}{$id};
+	foreach $TxCB (values %{$$shared{'TxCB_list'}}) {
 		${$$TxCB{'sflag'}} = 0;
 		$$TxCB{'sem'}->up();
 	}
+	# If someone's blocking in GetTransaction(), this will snap them out
+	# of it...
+	$$shared{'RqCB_sem'}->up();
+
 	$$shared{'running'} = -1;
 	undef $$shared{'conn_fd'};
 	CORE::close($conn);
@@ -513,27 +518,20 @@ sub SendTransaction { # {{{1
 
 	die('UserBytes must be provided')
 			unless exists $options{'UserBytes'};
-	unless (exists $options{'Data'}) { $options{'Data'} = '' }
+	$options{'Data'} ||= '';
 	die('ResponseLength must be provided')
 			unless exists $options{'ResponseLength'};
-	unless (exists $options{'ResponseStore'}) {
-		$options{'ResponseStore'} = *foo{SCALAR};
-	}
+	$options{'ResponseStore'} ||= *foo{SCALAR};
 	die('ResponseStore must be provided and be a scalar ref')
 			unless ref($options{'ResponseStore'}) eq 'SCALAR' or
 				 ref($options{'ResponseStore'}) eq 'REF';
-	unless (exists $options{'StatusStore'}) {
-		$options{'StatusStore'} = *bar{SCALAR};
-	}
+	$options{'StatusStore'} ||= *bar{SCALAR};
 	die('StatusStore must be provided and be a scalar ref')
 			unless ref($options{'StatusStore'}) eq 'SCALAR' or
 				 ref($options{'StatusStore'}) eq 'REF';
 	die('Timeout must be provided') unless exists $options{'Timeout'};
-	unless (exists $options{'NumTries'}) { $options{'NumTries'} = -1 }
-	unless (exists $options{'PeerAddr'}) { $options{'PeerAddr'} = undef }
-
-	#my ($self, $is_xo, $target, $data, $user_bytes, $rlen, $rdata_r, $tmout,
-	#		$ntries, $xo_tmout, $sflag_r) = @_;
+	$options{'NumTries'} ||= -1;
+	$options{'PeerAddr'} ||= undef;
 
 	# Check a few parameters before we proceed.
 	return if length($options{'Data'}) > ATP_MAXLEN;
@@ -569,8 +567,6 @@ sub SendTransaction { # {{{1
 				 'seq_bmp'	=> $seq_bmp,
 				 'is_xo'	=> exists $options{'ExactlyOnce'},
 				 'tmout'	=> $options{'Timeout'},
-				 'sec'		=> undef,
-				 'usec'		=> undef,
 				 'sem'		=> new Thread::Semaphore(0),
 				 'sflag'	=> &share($options{'StatusStore'}),
 				 'target'	=> $options{'PeerAddr'},
@@ -579,7 +575,7 @@ sub SendTransaction { # {{{1
 
 	# Indicate this as when the transaction has started (have to do this
 	# before we queue the TxCB)...
-	@$TxCB{'sec', 'usec'} = gettimeofday();
+	$$TxCB{'stamp'} = gettimeofday();
 
 	# Register our transaction control block so the thread can see it,
 	# since we have no idea how soon the response will come back from
@@ -663,7 +659,7 @@ sub RespondTransaction { # {{{1
 		# end of message...
 		if ($seq == $#$resp_r) { $ctl_byte |= ATP_CTL_EOMBIT }
 		my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq, $txid,
-				@{$$resp_r[$seq]}{'userbytes', 'payload'});
+				@{$$resp_r[$seq]}{'userbytes', 'data'});
 		$$pktdata[$seq] = $msg;
 
 		next unless $$RqCB{'seq_bmp'} & (1 << $seq);
@@ -672,14 +668,12 @@ sub RespondTransaction { # {{{1
 		# posts to the server...
 		if ($$RqCB{'is_xo'} && $seq == $#$resp_r) {
 			my $RspCB = &share({});
-			my $stamp = &share([]);
-			@$stamp = gettimeofday();
 			%$RspCB = (
 				'RqCB'		=> $RqCB,
 				'RespData'	=> $pktdata,
-				'stamp'		=> $stamp,
 				'tmout'		=> $$RqCB{'xo_tmout'},
 			);
+			$$RspCB{'stamp'} = gettimeofday();
 			$$self{'Shared'}{'RspCB_list'}{$txid} = $RspCB;
 		}
 
