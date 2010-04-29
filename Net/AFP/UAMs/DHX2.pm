@@ -483,7 +483,7 @@ sub ChangePassword {
 	undef $ciphertext;
 
 	# Send the response back to the server, and hope we did this right.
-	$rc = $session->FPChangePassword('DHX', $username, $message);
+	$rc = $session->FPChangePassword(UAMNAME, $username, $message);
 	undef $message;
 	print 'FPChangePassword() completed with result code ', $rc, "\n"
 			if defined $::__AFP_DEBUG;
