@@ -446,20 +446,21 @@ _EOT_
 		%starttime = %time;
 		my $total = 0;
 		my $wcount = 0;
+		my $write_fn = \&Net::AFP::FPWrite;
+		if ($UseExtOps) { $write_fn = \&Net::AFP::FPWriteExt }
 		while (1) {
 			my $data;
 			my $rcnt = read($srcFile, $data, 131072);
 			last if $rcnt == 0;
+			# try a direct write, and see how far we get; zero-copy is
+			# preferred if possible.
+			$rc = &$write_fn($session, 0x80, $$resp{'OForkRefNum'}, 0,
+					length($data), \$data, \$wcount);
+
 			while ($wcount < ($total + $rcnt)) {
 				my $dchunk = substr($data, $wcount - $total, $total + $rcnt - $wcount);
-				if ($UseExtOps) {
-					$rc = $session->FPWriteExt(0x80, $$resp{'OForkRefNum'}, 0,
-							length($dchunk), \$dchunk, \$wcount);
-				}
-				else {
-					$rc = $session->FPWrite(0x80, $$resp{'OForkRefNum'}, 0,
-							length($dchunk), \$dchunk, \$wcount);
-				}
+				$rc = &$write_fn($session, 0x80, $$resp{'OForkRefNum'}, 0,
+						length($dchunk), \$dchunk, \$wcount);
 			}
 			$total += $rcnt;
 			#if ($hashmarks_enabled == 1) {
@@ -934,7 +935,6 @@ sub doAFPConnection {
 		$session->close();
 		exit(1);
 	}
-#	print "determined commonVersion should be '", $commonVersion, "'\n";
 
 	if (defined $user) {
 #		my $term = new Term::ReadLine 'afpsh';
