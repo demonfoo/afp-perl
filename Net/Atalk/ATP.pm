@@ -33,7 +33,7 @@ Net::Atalk::ATP - Object interface for AppleTalk Transaction Protocol
 
 =head1 DESCRIPTION
 
-C<Net::Atalk::ATP> provides an object-based interface to interfacing with
+C<Net::Atalk::ATP> provides an object-based interface to interacting with
 Appletalk Transaction Protocol-based services. It builds on the
 L<IO::Socket::DDP> interface to construct transactional semantics
 over the datagram socket interface of DDP.
@@ -141,7 +141,7 @@ my %xo_timeouts :shared;
 
 =over
 
-=item new ( [ARGS] )
+=item new ([ARGS])
 
 Creates a C<Net::Atalk::ATP> object. C<new> optionally takes arguments;
 these are presented as key/value pairs, and passed through to the
@@ -499,18 +499,76 @@ MAINLOOP:
 	CORE::close($conn);
 } # }}}1
 
-=item SendTransaction ( IS_XO, TARGET, DATA, USER_BYTES, RLEN, RDATA_R, TMOUT, NTRIES, XO_TMOUT, SFLAG_R )
+=item SendTransaction (ARGS)
 
 Initiate a new transaction with a DDP peer socket. Actual reception of
 responses will be managed by the dispatcher thread in the background.
 
-IS_XO: True if the transaction should be XO (exactly-once). Commonly used
-for filesystem operations, and other transactions which should be
-guaranteed to only execute one time.
+Upon success, returns a C<Thread::Semaphore> object, which can be used
+to block pending completion of the sent request.
 
-TARGET: A packed sockaddr_at representing the target host and port for
-the transaction. Can be C<undef> if a peer was explicitly specified
-to the constructor, but
+Options are to be passed as a hash, in name/value form. The available
+options are as follows:
+
+=over
+
+=item ExactlyOnce
+
+This option should be passed if the transaction should be XO
+(exactly-once). Commonly used for filesystem operations, and other
+transactions which should be guaranteed to only execute one time.
+
+The value of this option should be one of the C<ATP_TREL_*> constants
+noted above, depending upon the desired transaction time window.
+
+=item PeerAddr
+
+A packed sockaddr_at representing the target host and port for the
+transaction. Optional. Should be specified if not explicitly indicated
+in the constructor.
+
+=item UserBytes
+
+Up to 4 bytes to be inserted into the "user bytes" field of the request
+packet. Must be specified, as all requests depend at minimum on this
+data to indicate to the server request type and certain other
+parameter data.
+
+=item Data
+
+Up to ATP_MAXLEN bytes of data, to be included in the request packet.
+Optional. Many requests do not use the data field.
+
+=item ResponseLength
+
+The number of packets of (up to) ATP_MAXLEN bytes expected in the
+response from the peer. Must be no less than 1, and no more than 8.
+Required.
+
+=item ResponseStore
+
+A scalar reference which will be used to contain an array reference
+with the user bytes and data fields of the response packets. Optional,
+but generally desirable.
+
+=item StatusStore
+
+A scalar reference which will be used to contain the success or
+failure indicator for the transaction. Optional, but generally desirable.
+
+=item Timeout
+
+An integer indicating the number of seconds to wait before either
+resending the request, or considering it expired. Required.
+
+=item NumTries
+
+An integer indicating the number of times to resend a request if
+a response has not been received, or between individual packets in
+the response. -1 means keep trying as long as the session exists.
+Optional. Default is -1.
+
+=back
 
 =cut
 sub SendTransaction { # {{{1
@@ -590,7 +648,16 @@ sub SendTransaction { # {{{1
 	return $$TxCB{'sem'};
 } # }}}1
 
-=item GetTransaction ( )
+=item GetTransaction ([DO_BLOCK], [FILTER])
+
+Get a transaction from the peer. If DO_BLOCK is true, this call will
+block until a new transaction is received. Otherwise, if a transaction
+has been queued, its request control block will be returned, or
+C<undef> if none are currently queued. Will also return C<undef> if
+the connection is closed while blocking.
+
+FILTER is an optional subroutine ref to be used to match specific
+transactions in the queue.
 
 =cut
 sub GetTransaction { # {{{1
@@ -629,7 +696,18 @@ sub GetTransaction { # {{{1
 	return undef;
 } # }}}1
 
-=item RespondTransaction
+=item RespondTransaction (TXID, RESP_R)
+
+Used to send a response to a pending transaction request returned by the
+C<GetTransaction> method above.
+
+TXID is the numeric transaction ID from the request block returned by
+C<GetTransaction>.
+
+RESP_R is an array reference containing hash references, each of which
+must contain C<data> and C<userbytes> elements. There must be at least
+one, and no more than 8, such elements in the array. These are the
+serialized binary packet data to be sent to the transaction requester.
 
 =cut
 sub RespondTransaction { # {{{1
@@ -689,7 +767,22 @@ sub RespondTransaction { # {{{1
 # The idea here is to be able to pass a subroutine that looks at the
 # transaction block and, if it's known, handle the transaction without
 # passing it on to transaction queue at all.
-=item AddTransactionFilter
+=item AddTransactionFilter (FILTER)
+
+Used to install a filter for incoming transactions to be processed
+automatically upon reception, short-circuiting the normal transaction
+queue.
+
+FILTER is an array reference, containing as its first argument the
+fully qualified (with complete package name prefixed) handler
+function name, with any additional desired arguments included as
+subsequent elements. The additional arguments will be passed to the
+function upon calling, along with the request control block as the
+last argument. If the function can handle the request, it should
+return an array reference containing an ordered list of hash
+references, with C<userbytes> and C<data> elements for each, containing
+the response data; if it cannot handle the request, it should return
+C<undef>.
 
 =cut
 sub AddTransactionFilter { # {{{1
@@ -697,6 +790,18 @@ sub AddTransactionFilter { # {{{1
 
 	push(@{$$self{'Shared'}{'RqFilters'}}, $filter);
 } # }}}1
+
+=back
+
+=head1 SEE ALSO
+
+C<IO::Socket::DDP>, C<Net::Atalk>
+
+=head1 AUTHOR
+
+Derrik Pates <demon@devrandom.net>
+
+=cut
 
 1;
 # vim: ts=4 fdm=marker
