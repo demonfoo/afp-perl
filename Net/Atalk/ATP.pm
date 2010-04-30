@@ -657,7 +657,9 @@ C<undef> if none are currently queued. Will also return C<undef> if
 the connection is closed while blocking.
 
 FILTER is an optional subroutine ref to be used to match specific
-transactions in the queue.
+transactions in the queue. When it is called, it will be passed a
+request block as its only argument. If the request block matches its
+criteria, it should return a true value, or a false value otherwise.
 
 =cut
 sub GetTransaction { # {{{1

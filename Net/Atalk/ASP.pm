@@ -80,10 +80,16 @@ sub close { # {{{1
 	$$self{'atpsess'}->close();
 } # }}}1
 
-# FIXME: Gotta figure out how to implement this...
+# Apparently this just returns these fixed values always...
 sub SPGetParms {
 	my ($self, $resp_r) = @_;
 
+	$$resp_r = {
+				 'MaxCmdSize'	=> ATP_MAXLEN,
+				 'QuantumSize'	=> ATP_MAXLEN * 8,
+			   };
+
+	return kFPNoErr;
 }
 
 sub SPGetStatus { # {{{1

@@ -87,6 +87,13 @@ sub ZIPQuery {
 	return { %namedata };
 }
 
+=item ZIPGetZoneList (FROMADDR, STARTINDEX)
+
+Get a list of known zones, starting at the given offset. Optionally specify
+the local address to issue the queries from; C<undef> otherwise. Upon
+success, returns an array reference containing the zone list.
+
+=cut
 sub ZIPGetZoneList {
 	my ($FromAddr, $StartIndex) = @_;
 	my %sockopts;
@@ -100,8 +107,6 @@ sub ZIPGetZoneList {
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetZoneList, $StartIndex);
 	my $rdata;
 	my $success;
-	#my ($txid, $sem) = $conn->SendTransaction(0, $dest, '', $user_bytes, 1,
-	#		\$rdata, 2, 2, 0, \$success);
 	my $sem = $conn->SendTransaction(
 		'UserBytes'			=> $user_bytes,
 		'ResponseLength'	=> 1,
@@ -123,6 +128,14 @@ sub ZIPGetZoneList {
 	return undef;
 }
 
+=item ZIPGetLocalZones (FROMADDR, STARTINDEX)
+
+Get a list of known zones for the local network segment, starting at
+the given offset. Optionally specify the local address to issue the
+queries from; C<undef> otherwise. Upon success, returns an array
+reference containing the list of local zones.
+
+=cut
 sub ZIPGetLocalZones {
 	my ($FromAddr, $StartIndex) = @_;
 	my %sockopts;
@@ -136,8 +149,6 @@ sub ZIPGetLocalZones {
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetLocalZones, $StartIndex);
 	my $rdata;
 	my $success;
-	#my ($txid, $sem) = $conn->SendTransaction(0, $dest, '', $user_bytes, 1,
-	#		\$rdata, 2, 2, 0, \$success);
 	my $sem = $conn->SendTransaction(
 		'UserBytes'			=> $user_bytes,
 		'ResponseLength'	=> 1,
@@ -159,6 +170,13 @@ sub ZIPGetLocalZones {
 	return undef;
 }
 
+=item ZIPGetMyZone (FROMADDR)
+
+Get the zone the local machine is associated with. Optionally specify
+the local address to issue the queries from; C<undef> otherwise. Upon
+success, returns the name of the current host's assigned zone.
+
+=cut
 sub ZIPGetMyZone {
 	my ($FromAddr) = @_;
 	my %sockopts;
@@ -172,8 +190,6 @@ sub ZIPGetMyZone {
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetMyZone, 0);
 	my $rdata;
 	my $success;
-	#my ($txid, $sem) = $conn->SendTransaction(0, $dest, '', $user_bytes, 1,
-	#		\$rdata, 2, 2, 0, \$success);
 	my $sem = $conn->SendTransaction(
 		'UserBytes'			=> $user_bytes,
 		'ResponseLength'	=> 1,
@@ -196,6 +212,9 @@ sub ZIPGetMyZone {
 	return undef;
 }
 
+=item ZIPGetNetInfo (ZONENAME) 
+
+=cut
 sub ZIPGetNetInfo {
 	my ($zonename) = @_;
 
@@ -234,5 +253,8 @@ sub ZIPGetNetInfo {
 	return { %zoneinfo };
 }
 
+=back
+
+=cut
 1;
-# vim: ts=4 ai
+# vim: ts=4 ai fdm=marker
