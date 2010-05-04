@@ -8,9 +8,24 @@ use Net::Atalk::ATP;
 use Net::Atalk;			# for pack_sockaddr_at, unpack_sockaddr_at, atalk_aton
 use Net::AFP::Result;	# for kFPNoErr
 use threads::shared;	# for share
-use Exporter qw(import);
 use strict;
 use warnings;
+
+=head1 NAME
+
+Net::Atalk::ASP - Object interfacce for AppleTalk Session Protocol
+
+=head1 SYNOPSIS
+
+    use Net::Atalk::ASP;
+
+=head1 DESCRIPTION
+
+C<Net::Atalk::ATP> provides an object-based interface to interacting with
+AppleTalk Session Protocol-based services, specifically AFP. It builds on
+the L<Net::Atalk::ATP> interface to implement the command semantics.
+
+=cut
 
 use constant SP_VERSION				=> 0x0100;
 
@@ -23,6 +38,16 @@ use constant OP_SP_WRITE			=> 6;
 use constant OP_SP_WRITECONTINUE	=> 7;
 use constant OP_SP_ATTENTION		=> 8;
 
+=head1 CONSTRUCTOR
+
+=over
+
+=item new (HOST, PORT)
+
+Creates a C<Net::Atalk::ASP> object. Requires an AppleTalk host address
+and DDP port number.
+
+=cut
 sub new { # {{{1
 	my ($class, $host, $port) = @_;
 
@@ -40,7 +65,9 @@ sub new { # {{{1
 
 	return $obj;
 } # }}}1
+=back
 
+=cut
 sub _TickleFilter { # {{{1
 	my ($realport, $RqCB) = @_;
 	my ($txtype) = unpack('C', $$RqCB{'userbytes'});
@@ -74,6 +101,15 @@ sub _CloseFilter { # {{{1
 	return undef;
 } # }}}1
 
+=head2 METHODS
+
+=over
+
+=item close ()
+
+Discontinue an active ASP session.
+
+=cut
 sub close { # {{{1
 	my ($self) = @_;
 
@@ -81,7 +117,14 @@ sub close { # {{{1
 } # }}}1
 
 # Apparently this just returns these fixed values always...
-sub SPGetParms {
+=item SPGetParms (RESP_R)
+
+Get request size limit information about the current session. RESP_R must
+be a scalar ref which will contain a hash ref with the size bound
+information.
+
+=cut
+sub SPGetParms { # {{{1
 	my ($self, $resp_r) = @_;
 
 	$$resp_r = {
@@ -90,7 +133,7 @@ sub SPGetParms {
 			   };
 
 	return kFPNoErr;
-}
+} # }}}1
 
 sub SPGetStatus { # {{{1
 	my ($self, $resp_r) = @_;
