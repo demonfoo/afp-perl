@@ -14,6 +14,8 @@ use Fuse qw(:xattr);			# preferably use Fuse 0.09_3 (or later), for
 use Net::AFP::TCP;				# the class which actually sets up and
 								# handles the guts of talking to an AFP
 								# server via TCP/IP
+use Net::AFP::Atalk;			# The class to connect to an AppleTalk server
+								# via AppleTalk protocol.
 use Net::AFP::Result;			# AFP result codes
 use Net::AFP::VolAttrs;			# volume attribute definitions
 use Net::AFP::VolParms;			# parameters for FPOpenVol()
@@ -24,6 +26,7 @@ use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 use Net::AFP::ExtAttrs;
 use Net::AFP::ACL;
+use Net::Atalk::NBP;
 use Encode;						# handle encoding/decoding strings
 use Socket;						# for socket related constants for
 								# parent/child IPC code
@@ -234,8 +237,6 @@ print Dumper(\%values) if defined $::_DEBUG;
 # Check the necessary arguments to make sure we can actually do something.
 die('Unable to extract host from AFP URL') unless defined $values{'host'};
 die('Unable to extract volume from AFP URL') unless defined $values{'volume'};
-die('AppleTalk transport not currently supported')
-		if defined $values{'atalk_transport'};
 
 # scrub arguments {{{1
 my $scrubbed_url = $values{'protocol'} . '://';
@@ -338,8 +339,19 @@ close(CHILD);
 # use later in the connection process.
 # get server information {{{1
 my $srvInfo;
-my $rc = Net::AFP::TCP->GetStatus(@values{'host', 'port'},
-		\$srvInfo);
+my $rc;
+if ($values{'atalk_transport'}) {
+	my @records = NBPLookup($values{'host'}, 'AFPServer', $values{'port'},
+			undef, 1);
+	die() unless scalar(@records);
+	@values{'host', 'port'} = @{$records[0]}[0,1];
+
+	$rc = Net::AFP::Atalk->GetStatus(@values{'host', 'port'}, \$srvInfo);
+}
+else {
+	$rc = Net::AFP::TCP->GetStatus(@values{'host', 'port'},
+			\$srvInfo);
+}
 if ($rc != kFPNoErr) {
 	print "Could not issue GetStatus on ", $values{'host'}, "\n";
 	syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, &ENODEV));
@@ -350,7 +362,12 @@ print Dumper($srvInfo) if defined $::_DEBUG;
 
 # Actually open a session to the server.
 # open server connection {{{1
-$afpSession = new Net::AFP::TCP(@values{'host', 'port'});
+if ($values{'atalk_transport'}) {
+	$afpSession = new Net::AFP::Atalk(@values{'host', 'port'});
+}
+else {
+	$afpSession = new Net::AFP::TCP(@values{'host', 'port'});
+}
 unless (ref($afpSession) ne '' and $afpSession->isa('Net::AFP')) {
 	print "Could not connect via AFP to ", $values{'host'}, "\n";
 	syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, &ENODEV));
@@ -374,7 +391,7 @@ sub END {
 # Abort if (by chance) we can't come to an agreement.
 # version agreement {{{1
 my $commonVersion = Net::AFP::Versions::GetPreferredVersion(
-		$$srvInfo{'AFPVersions'});
+		$$srvInfo{'AFPVersions'}, $values{'atalk_transport'});
 if (!defined $commonVersion) {
 	print "Couldn't agree on an AFP protocol version with the server\n";
 	syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, &ENODEV));
