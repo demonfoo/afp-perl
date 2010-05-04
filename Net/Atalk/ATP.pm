@@ -34,7 +34,7 @@ Net::Atalk::ATP - Object interface for AppleTalk Transaction Protocol
 =head1 DESCRIPTION
 
 C<Net::Atalk::ATP> provides an object-based interface to interacting with
-Appletalk Transaction Protocol-based services. It builds on the
+AppleTalk Transaction Protocol-based services. It builds on the
 L<IO::Socket::DDP> interface to construct transactional semantics
 over the datagram socket interface of DDP.
 
@@ -197,7 +197,7 @@ sub new { # {{{1
 
 =over
 
-=item close
+=item close ()
 
 Discontinue an active ATP session. Any pending transactions will be
 aborted, and their callers will be notified of their failure. The
