@@ -1362,7 +1362,7 @@ sub afp_write { # {{{1
                 $data_r, \$lastWritten);
 	}
 	
-	return $dlen         if $rc == kFPNoErr;
+	return($lastWritten - $offset) if $rc == kFPNoErr;
 	return -&EACCES		 if $rc == kFPAccessDenied;
 	return -&ENOSPC		 if $rc == kFPDiskFull;
 	return -&ETXTBSY	 if $rc == kFPLockErr;
@@ -1433,16 +1433,18 @@ sub afp_flush { # {{{1
 			}
 			my $lastwr;
 			my $rc;
-			if ($UseExtOps) {
-				$rc = $afpSession->FPWriteExt(0, $forkID, $offset, $len,
-                        $data_ref, \$lastwr);
-			} else {
-				$rc = $afpSession->FPWrite(0, $forkID, $offset, $len,
-                        $data_ref, \$lastwr);
-			}
-			if ($lastwr < $offset + $len) {
-				print "afp_flush(): truncated write in flush? wtf?\n";
-				return -&EIO;
+			my $write_fn = \&Net::AFP::FPWrite;
+			if ($UseExtOps) { $write_fn = \&Net::AFP::FPWriteExt }
+
+			# Try to zero-copy whenever possible...
+			$rc = &$write_fn($afpSession, 0, $forkID, $offset, $len, $data_ref,
+					\$lastwr);
+			# Continue writing if needed.
+			while ($lastwr < ($offset + $len) && $rc == kFPNoErr) {
+				my $dchunk = substr($$data_ref, $lastwr - $offset,
+						$offset + $len - $lastwr);
+				$rc = &$write_fn($afpSession, 0, $forkID, $lastwr,
+						length($dchunk), \$dchunk, \$lastwr);
 			}
 			undef $ofilecache{$fileName}{'coalesce_offset'};
 		}
