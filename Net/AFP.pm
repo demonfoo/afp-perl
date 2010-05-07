@@ -22,24 +22,11 @@
 #
 # http://developer.apple.com/mac/library/documentation/Networking/Reference/AFP_Reference/Reference/reference.html
 #
-#	I also (due to vagueness or errors in the AFP 3.1 documentation; also,
-#	for a description of the DSI shim protocol) referred to the AFP 2.1/2.2
-#	documentation, as well as the PDF version of "Inside AppleTalk", which
-#	are available at the following URLs:
-#
-# http://developer.apple.com/documentation/macos8/pdf/ASAppleTalkFiling2.1_2.2.pdf
-#
-# http://developer.apple.com/MacOs/opentransport/docs/dev/Inside_AppleTalk.pdf
-#
 #	In writing this module, I have used identifiers, error descriptions, and
 #	other materials from the documentation provided by Apple. Any such
 #	material (identifiers, function and error descriptions, etc.) copied from
 #	Apple's documentation is Copyright (c) Apple Computer, Inc.
 #
-#	Some documentation of OS X's ACL internals was taken from:
-#
-# http://fxr.watson.org/fxr/source/bsd/sys/kauth.h?v=xnu-1228
-
 # This is a superclass that implements (most of) the necessary methods for
 # higher-level handling of an AFP session.
 

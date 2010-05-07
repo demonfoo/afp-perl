@@ -795,6 +795,15 @@ sub AddTransactionFilter { # {{{1
 
 =back
 
+=head1 REFERENCES
+
+The AppleTalk Transaction Protocol implementation contained herein is based
+on the protocol description as provided by Apple, in the book "Inside
+AppleTalk", chapter 9. "Inside AppleTalk" is available freely via the
+Internet in PDF form, at:
+
+L<http://developer.apple.com/MacOs/opentransport/docs/dev/Inside_AppleTalk.pdf>
+
 =head1 SEE ALSO
 
 C<IO::Socket::DDP>, C<Net::Atalk>

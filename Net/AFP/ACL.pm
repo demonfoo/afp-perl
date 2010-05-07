@@ -281,6 +281,12 @@ is used only with the L<Net::AFP/FPSetACL> command.
 use constant kFileSec_Inherit				=> 0x10;
 =back
 
+=head1 REFERENCES
+
+Some documentation of OS X's ACL internals was taken from:
+
+L<http://fxr.watson.org/fxr/source/bsd/sys/kauth.h?v=xnu-1228>
+
 =cut
 
 1;

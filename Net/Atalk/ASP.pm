@@ -13,7 +13,7 @@ use warnings;
 
 =head1 NAME
 
-Net::Atalk::ASP - Object interfacce for AppleTalk Session Protocol
+Net::Atalk::ASP - Object interface for AppleTalk Session Protocol
 
 =head1 SYNOPSIS
 
@@ -135,6 +135,9 @@ sub SPGetParms { # {{{1
 	return kFPNoErr;
 } # }}}1
 
+=item SPGetStatus
+
+=cut
 sub SPGetStatus { # {{{1
 	my ($self, $resp_r) = @_;
 
@@ -159,6 +162,9 @@ sub SPGetStatus { # {{{1
 	return kFPNoErr;
 } # }}}1
 
+=item SPOpenSession
+
+=cut
 sub SPOpenSession { # {{{1
 	my ($self) = @_;
 
@@ -206,6 +212,9 @@ sub SPOpenSession { # {{{1
 	return $errno;
 } # }}}1
 
+=item SPCloseSession
+
+=cut
 sub SPCloseSession { # {{{1
 	my ($self) = @_;
 
@@ -225,6 +234,9 @@ sub SPCloseSession { # {{{1
 	return kFPNoErr;
 } # }}}1
 
+=item SPCommand
+
+=cut
 sub SPCommand { # {{{1
 	my ($self, $message, $resp_r) = @_;
 
@@ -257,6 +269,9 @@ sub SPCommand { # {{{1
 	return $errno;
 } # }}}1
 
+=item SPWrite
+
+=cut
 sub SPWrite { # {{{1
 	my ($self, $message, $data_r, $resp_r) = @_;
 
@@ -321,6 +336,9 @@ sub SPWrite { # {{{1
 	return $errno;
 } # }}}1
 
+=item SPTickle
+
+=cut
 sub SPTickle { # {{{1
 	my ($self, $interval, $ntries) = @_;
 
@@ -335,5 +353,17 @@ sub SPTickle { # {{{1
 	);
 } # }}}1
 
+=back
+
+=head1 REFERENCES
+
+The AppleTalk Session Protocol implementation contained herein is based
+on the protocol description as provided by Apple, in the book "Inside
+AppleTalk", chapter 11. "Inside AppleTalk" is available freely via the
+Internet in PDF form, at:
+
+L<http://developer.apple.com/MacOs/opentransport/docs/dev/Inside_AppleTalk.pdf>
+
+=cut
 1;
 # vim: ts=4 fdm=marker

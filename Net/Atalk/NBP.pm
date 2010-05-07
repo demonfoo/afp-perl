@@ -171,6 +171,18 @@ RETRY:
 }
 =back
 
+=head1 REFERENCES
+
+The Name Binding Protocol implementation contained herein is based on the
+protocol description as provided by Apple, in the book "Inside AppleTalk",
+chapter 7. "Inside AppleTalk" is available freely via the Internet in
+PDF form, at:
+
+L<http://developer.apple.com/MacOs/opentransport/docs/dev/Inside_AppleTalk.pdf>
+
+Also, netatalk's libatalk and nbplkup tool were used as source references
+for development (see L<http://netatalk.sourceforge.net/>).
+
 =head1 SEE ALSO
 
 L<Net::Atalk>, L<IO::Socket::DDP>
