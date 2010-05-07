@@ -21,6 +21,23 @@ use Thread::Semaphore;
 use strict;
 use warnings;
 
+=head1 NAME
+
+Net::DSI - Object interface for Apple Data Stream Interface protocol
+
+=head1 SYNOPSIS
+
+    use Net::DSI;
+
+=head1 DESCRIPTION
+
+C<Net::DSI> provides an object-based interface to interacting with
+Data Stream Interface-based services, specifically AFP over TCP. The
+protocol acts as a mid-layer between the bidirectional stream semantics
+provided by TCP, and the transactional interface AFP requires.
+
+=cut
+
 use constant OP_DSI_CLOSESESSION	=> 1;	# to and from server
 use constant OP_DSI_COMMAND			=> 2;	# to server only
 use constant OP_DSI_GETSTATUS		=> 3;	# to server only
@@ -168,13 +185,18 @@ sub session_thread { # {{{1
 	}
 } # }}}1
 
-# Arguments:
-#	$class: The class we're being called against. This class has to be
-#			instantiated like 'new Net::DSI' or
-#			'Net::DSI->new' because of this.
-#	$host: Currently an IP address (a DNS name should work too, though)
-#		   indicating the DSI server (AFP over TCP server) that we wish
-#		   to attach to.
+=head1 CONSTRUCTOR
+
+=over
+
+=item new (CLASS, HOST[, PORT])
+
+Create a new DSI session object which will connect to the indicated host,
+and (optionally) the indicated port. If no port is specified, the default
+TCP port will be used for the connection. The host may be an IPv4 or
+IPv6 (if L<IO::Socket::INET6> is present) address, or a DNS name.
+
+=cut
 sub new { # {{{1
 	my ($class, $host, $port) = @_;
 	unless (defined $port) {
@@ -212,14 +234,22 @@ sub new { # {{{1
 
 	return $obj;
 } # }}}1
+=back
 
-# Need to implement this.
+=head2 METHODS
+
+=over
+
+=item close
+
+=cut
 sub close { # {{{1
 	my ($self) = @_;
 	$$self{'Shared'}{'exit'} = 1;
 	$$self{'Dispatcher'}->join();
 } # }}}1
 
+=item SendMessage (CMD, MESSAGE, DATA_R, SEM_R, RC_R, RESP_R)
 # Arguments:
 #	$self:		A Net::DSI instance.
 #	$cmd:		The numeric opcode of the command we wish to issue to the DSI
@@ -235,6 +265,7 @@ sub close { # {{{1
 #				receive the response when one is received. If no response is
 #				expected, this should be undef.
 #	$rc_r:		A reference to a scalar,
+=cut
 sub SendMessage { # {{{1
 	my ($self, $cmd, $message, $data_r, $sem_r, $resp_r, $rc_r) = @_;
 
@@ -297,6 +328,9 @@ sub SendMessage { # {{{1
 	return $reqId;
 } # }}}1
 
+=item DSICloseSession
+
+=cut
 sub DSICloseSession { # {{{1
 	my ($self) = @_;
 
@@ -306,6 +340,9 @@ sub DSICloseSession { # {{{1
 	return undef;
 } # }}}1
 
+=item DSICommand
+
+=cut
 sub DSICommand { # {{{1
 	my ($self, $message, $resp_r) = @_;
 
@@ -321,6 +358,9 @@ sub DSICommand { # {{{1
 	return $rc;
 } # }}}1
 
+=item DSIGetStatus
+
+=cut
 sub DSIGetStatus { # {{{1
 	my ($self, $resp_r) = @_;
 
@@ -339,6 +379,9 @@ sub DSIGetStatus { # {{{1
 	return $rc;
 } # }}}1
 
+=item DSIOpenSession
+
+=cut
 sub DSIOpenSession { # {{{1
 	my ($self, %options) = @_;
 
@@ -387,12 +430,18 @@ sub DSIOpenSession { # {{{1
 # This issues a keep-alive message to the server. This really needs to be
 # done on a regular basis - hence why I want to have a separate thread to
 # do dispatch duty, so it can handle things like that.
+=item DSITickle
+
+=cut
 sub DSITickle { # {{{1
 	my ($self) = @_;
 
 	my $reqId = $self->SendMessage(OP_DSI_TICKLE);
 } # }}}1
 
+=item DSIWrite
+
+=cut
 sub DSIWrite { # {{{1
 	# This should only be used for FPWrite and FPAddIcon
 	my ($self, $message, $data_r, $resp_r) = @_;
@@ -406,5 +455,17 @@ sub DSIWrite { # {{{1
 	return $rc;
 } # }}}1
 
+=back
+
+=head1 REFERENCES
+
+The Data Stream Interface protocol implementation contained herein is based
+on the protocol description as provided by Apple, in the "AppleShare IP
+6.3 Developer's Kit". The document is available freely via the Internet
+in PDF form, at:
+
+L<http://developer.apple.com/documentation/macos8/pdf/ASAppleTalkFiling2.1_2.2.pdf>
+
+=cut
 1;
 # vim: ts=4 fdm=marker
