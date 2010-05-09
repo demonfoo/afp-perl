@@ -321,7 +321,7 @@ sub new { # {{{1
 	return $obj;
 } # }}}1
 
-sub disconnect {
+sub disconnect { # {{{1
 	my ($self) = @_;
 
 	if (defined $$self{'afpconn'}) {
@@ -332,7 +332,7 @@ sub disconnect {
 		$$self{'afpconn'}->FPLogout();
 		$$self{'afpconn'}->close();
 	}
-}
+} # }}}1
 
 sub getattr { # {{{1
 	my ($self, $file) = @_;
@@ -941,7 +941,7 @@ sub open { # {{{1
 			$$self{'ofcache'}{$fileName}{'refcount'}++;
 			return 0;
 		}
-		afp_flush($file_u);
+		$self->flush($file_u);
 		$refcount = $$self{'ofcache'}{$fileName}{'refcount'};
 		my $rc = $$self{'afpconn'}->FPCloseFork($$self{'ofcache'}{$fileName}{'refnum'});
 		delete $$self{'ofcache'}{$fileName};
@@ -979,7 +979,7 @@ sub read { # {{{1
 	print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
 			if defined $::_DEBUG;
 
-	afp_fsync($file);
+	$self->fsync($file);
 
 	$file = decode(ENCODING, $file);
 	my $fileName = translate_path($file);
@@ -1041,7 +1041,7 @@ sub write { # {{{1
 	# coalesce writes {{{2
 	if (defined $$of_ent{'coalesce_offset'} &&
 			$$of_ent{'coalesce_len'} >= COALESCE_MAX) {
-		my $rv = afp_flush($file_u);
+		my $rv = $self->flush($file_u);
 		if ($rv != 0) {
 			return $rv;
 		}
@@ -1058,7 +1058,7 @@ sub write { # {{{1
 			$$of_ent{'coalesce_len'} += $dlen;
 			return $dlen;
 		} else {
-			my $rv = afp_flush($file_u);
+			my $rv = $self->flush($file_u);
 			if ($rv != 0) {
 				return $rv;
 			}
@@ -1183,7 +1183,7 @@ sub release { # {{{1
 	if (exists $$self{'ofcache'}{$fileName}) {
 		# If the reference count is not 0, just play along.
 		return(0) if --$$self{'ofcache'}{$fileName}{'refcount'};
-		afp_flush($file_u);
+		$self->flush($file_u);
 		$$self{'afpconn'}->FPCloseFork($$self{'ofcache'}{$fileName}{'refnum'});
 		delete $$self{'ofcache'}{$fileName};
 		return 0;
@@ -1196,7 +1196,7 @@ sub fsync { # {{{1
 	print 'called ', (caller(0))[3], "('", $file, "')\n"
 			if defined $::_DEBUG;
 
-	return afp_flush($file);
+	return $self->flush($file);
 } # }}}1
 
 sub setxattr { # {{{1
@@ -1590,7 +1590,7 @@ sub path_parent { # {{{1
 
 # Helper function to convert a byte-string form ACL from the ACL update client
 # into the structured form to be sent to the server.
-sub acl_from_xattr {
+sub acl_from_xattr { # {{{1
 	my ($self, $raw_xattr, $acl_data) = @_;
 
 	# unpack the ACL from the client, so we can structure it to be handed
@@ -1632,11 +1632,11 @@ sub acl_from_xattr {
 				'acl_flags'	=> $acl_flags,
 			  };
 	return 0;
-}
+} # }}}1
 
 # Helper function to convert an AFP ACL into a format that is consumable
 # by afp_acl.pl (the tool for manipulating ACLs on an AFP share).
-sub acl_to_xattr {
+sub acl_to_xattr { # {{{1
 	my ($self, $acldata) = @_;
 
 	my @acl_parts;
@@ -1655,7 +1655,7 @@ sub acl_to_xattr {
 	# Pack the ACL into a single byte sequence, and push it to
 	# the client.
 	return pack('LS/(a*)', $$acldata{'acl_flags'}, @acl_parts);
-}
+} # }}}1
 
 sub urldecode { # {{{1
 	my ($string) = @_;
