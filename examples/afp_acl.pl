@@ -8,9 +8,7 @@ use Net::AFP::ACL;
 use File::ExtAttr qw(:all);
 use Getopt::Long;
 use Encode;
-use POSIX qw(EINVAL ENOENT EACCES EBADF EPERM EOPNOTSUPP);
-sub ENODATA { return 61; }	# need this error constant for extended
-							# attribute operations
+use Errno qw(:POSIX ENODATA);
 # }}}1
 
 # define constants {{{1
@@ -133,8 +131,28 @@ my @ace_rights_info = ( # {{{1
 	},
 ); # }}}1
 
+my @ace_flags_info = ( # {{{1
+	{
+	  'name'	=> 'file_inherit',
+	  'value'	=> KAUTH_ACE_FILE_INHERIT,
+	},
+	{
+	  'name'	=> 'directory_inherit',
+	  'value'	=> KAUTH_ACE_DIRECTORY_INHERIT,
+	},
+	{
+	  'name'	=> 'limit_inherit',
+	  'value'	=> KAUTH_ACE_LIMIT_INHERIT,
+	},
+	{
+	  'name'	=> 'only_inherit',
+	  'value'	=> KAUTH_ACE_ONLY_INHERIT,
+	},
+); # }}}1
+
 # Assemble the rights descriptions into a hash by name.
 my %ace_rights_byname = map { $$_{'name'}, $_ } @ace_rights_info;
+my %ace_flags_byname = map { $$_{'name'}, $_ } @ace_flags_info;
 
 # Error strings for the errors that we might get...
 my %errors = ( # {{{1
@@ -146,6 +164,8 @@ my %errors = ( # {{{1
 			   &ENODATA		=> 'AFP server does not support ACLs',
 			   &EOPNOTSUPP	=> 'AFP server does not support ACLs',
              ); # }}}1
+
+my($remove, $add, @insert, @replace, $clear, $set_inherited);
 
 # Turn a textual ACE description into a data structure for later packing.
 sub make_ace { # {{{1
@@ -178,21 +198,46 @@ sub make_ace { # {{{1
 	my $rights = shift(@parts);
 	$$ace{'ace_rights'} = 0;
 	foreach my $right (split(/\s*,\s*/, $rights)) {
-		die("Access right " . $right . " is not valid")
-				unless exists $ace_rights_byname{$right};
-		$$ace{'ace_rights'} |= $ace_rights_byname{$right}->{'value'};
+		if (exists $ace_rights_byname{$right}) {
+			$$ace{'ace_rights'} |= $ace_rights_byname{$right}{'value'};
+		}
+		elsif (exists $ace_flags_byname{$right}) {
+			$$ace{'ace_flags'} |= $ace_flags_byname{$right}{'value'};
+		}
+		else {
+			die("Access right " . $right . " is not valid");
+		}
 	}
+	if ($set_inherited) { $$ace{'ace_flags'} |= KAUTH_ACE_INHERITED }
 
 	return $ace;
 } # }}}1
 
-my($remove, $add, @insert, @replace, $clear);
+sub usage {
+	print <<'_EOT_';
+Incorrect usage; use as follows:
 
-GetOptions('remove=s'		=> \$remove,
+Usage: afp_acl.pl [OPTION] [FILE] ...
+List ACL entries for given files, or perform the indicated alterations
+to the ACLs for the given files. Only one of the following actions may
+be performed.
+
+    -a, --add      [ACE]                    Add an ACL entry
+    -r, --remove   [ACE|entry number]       Remove an ACL entry
+    -i, --insert   [entry number] [ACE]     Insert an ACL entry at position
+        --replace  [entry number] [ACE]     Replace an ACL entry at position
+    -c, --clear                             Remove all ACL entries
+
+_EOT_
+	exit(1);
+}
+
+GetOptions('remove|r=s'		=> \$remove,
 		   'add=s'			=> \$add,
-		   'insert=s{2}'	=> \@insert,
+		   'insert|i=s{2}'	=> \@insert,
 		   'replace=s{2}'	=> \@replace,
-		   'clear'			=> \$clear);
+		   'clear'			=> \$clear,
+		   'inherited'		=> \$set_inherited) || usage();
 
 if (defined $remove) { # {{{1
 	my $ace;
@@ -230,8 +275,11 @@ if (defined $remove) { # {{{1
 				}
 				# Make sure the ACE we're looking at modifying indicates
 				# taking the same kind of action.
-				next unless $$ace{'ace_flags'} ==
-						($$entry{'ace_flags'} & KAUTH_ACE_KINDMASK);
+				next unless (($$ace{'ace_flags'} & KAUTH_ACE_KINDMASK) ==
+						($$entry{'ace_flags'} & KAUTH_ACE_KINDMASK));
+
+				next unless (($$ace{'ace_flags'} & KAUTH_ACE_INHERIT_CONTROL_FLAGS) ==
+						($$entry{'ace_flags'} & KAUTH_ACE_INHERIT_CONTROL_FLAGS));
 				# Looks good, add the additional rights we want to the mask.
 				$$entry{'ace_rights'} &= ~$$ace{'ace_rights'};
 			}
@@ -450,9 +498,21 @@ else { # {{{1
 				}
 				push(@actions, $$rinfo{'name'});
 			}
+			my $flags = $$entry{'ace_flags'};
+			foreach my $finfo (@ace_flags_info) {
+				next unless $flags & $$finfo{'value'};
+				if (exists $$finfo{'for_dir'}) {
+					my $is_dir = -d $file;
+					next unless (($is_dir && $$finfo{'for_dir'}) ||
+							(!$is_dir && !$$finfo{'for_dir'}));
+				}
+				push(@actions, $$finfo{'name'});
+			}
+			my $is_inherited = $flags & KAUTH_ACE_INHERITED;
 			# Print out the entry.
-			printf(" \%d: \%s:\%s \%s \%s\n", $i, $idtype,
-					$$entry{'UTF8Name'}, $kind, join(',', @actions));
+			printf(" \%d: \%s:\%s\%s \%s \%s\n", $i, $idtype,
+					$$entry{'UTF8Name'}, $is_inherited ? ' inherited' : '',
+					$kind, join(',', @actions));
 		} # }}}2
 	}
 } # }}}1
