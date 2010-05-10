@@ -80,21 +80,21 @@ my @ipv6_patterns = (
 #my $ipv6_pattern = join('|', @ipv6_patterns);
 
 # FIXME: need to add IPv6 address handling to the AFP URL stuff...
-my $afp_url_pattern = qr|^
-                          (afps?):/		    # protocol specific prefix
-						  (at)?/            # optionally specify atalk transport
-						  (?:               # authentication info block
-						      ([^:\@\/;]*)  # capture username
-							  (?:;AUTH=([^:\@\/;]+))? # capture uam name
-							  (?::([^:\@\/;]*))?      # capture password
-							  \@)?          # closure of auth info capture
-                          ([^:\/\@;]+)      # capture target host
-						  (?::([^:\/\@;]+))? # capture optional port
-						  (?:\/(?:          # start path capture
-							  ([^:\/\@;]+)  # first path element is vol name
-							  (\/.*)?       # rest of path is local subpath
-                          )?)?              # closure of path capture
-						 $|x;
+my $url_rx = qr|^
+                  (afps?):/		        # protocol specific prefix
+                  (at)?/                # optionally specify atalk transport
+                  (?:                   # authentication info block
+                      ([^:\@\/;]*)      # capture username
+                      (?:;AUTH=([^:\@\/;]+))? # capture uam name
+                      (?::([^:\@\/;]*))?      # capture password
+                  \@)?                  # closure of auth info capture
+                  (?\|([^:\/\@\[\]:]+)\|\[([^\]]+)\]) # capture target host
+                  (?::([^:\/\@;]+))?    # capture optional port
+                  (?:\/(?:              # start path capture
+                      ([^:\/\@;]+)      # first path element is vol name
+                      (\/.*)?           # rest of path is local subpath
+                  )?)?                  # closure of path capture
+                  $|x;
 my @args = ('protocol', 'atalk_transport', 'username', 'UAM', 'password',
 		'host', 'port', 'volume', 'subpath');
 
@@ -110,7 +110,7 @@ sub new { # {{{1
 	$$obj{'ofcache'} = {};
 
 	my %urlparms;
-	@urlparms{@args} = $url =~ $afp_url_pattern;
+	@urlparms{@args} = $url =~ $url_rx;
 	die('Unable to extract host from AFP URL')
 			unless defined $urlparms{'host'};
 	die('Unable to extract volume from AFP URL')
