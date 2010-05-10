@@ -12,7 +12,6 @@ my $has_Term_ReadPassword = 1;
 eval { require Term::ReadPassword; };
 if ($@) { $has_Term_ReadPassword = 0; }
 
-
 # define constants {{{1
 use constant MSG_NEEDPASSWORD	=> 1;
 use constant MSG_PASSWORDIS		=> 2;
@@ -21,39 +20,13 @@ use constant MSG_STARTERR		=> 4;
 use constant MSGFORMAT			=> 'CS';
 use constant MSGLEN				=> 3;
 my @msgfields = ('msg', 'payloadlen');
-
 # }}}1
-
-# define globals {{{1
 
 # Handle the command line args.
 my $interactive;
 exit(&EINVAL) unless GetOptions('interactive'	=> \$interactive);
 
 my($path, $mountpoint) = @ARGV;
-
-# Check the necessary arguments to make sure we can actually do something.
-
-# scrub arguments {{{1
-#my $scrubbed_url = $values{'protocol'} . '://';
-#if (defined $values{'username'}) {
-#	$scrubbed_url .= urlencode($values{'username'}) . '@';
-#}
-#$scrubbed_url .= urlencode($values{'host'});
-#if (defined $values{'port'}) {
-#	$scrubbed_url .= ':' . urlencode($values{'port'});
-#}
-#$scrubbed_url .= '/';
-#if (defined $values{'volume'}) {
-#	$scrubbed_url .= urlencode($values{'volume'});
-#	if (defined $values{'subpath'}) {
-#		$scrubbed_url .= urlencode($values{'subpath'});
-#	}
-#}
-#
-#my $script_name = $0;
-#$0 = join(' ', $script_name, $scrubbed_url, $mountpoint);
-# }}}1
 
 unless (-d $mountpoint) {
 	print STDERR "ERROR: attempted to mount to non-directory\n";
@@ -187,8 +160,11 @@ close(PARENT);
 #open(STDOUT, '>', '/dev/null');
 #open(STDERR, '>&', \*STDOUT);
 
+my $script_name = $0;
+$0 = join(' ', $script_name, $path, $mountpoint);
+
 $fuse->main( 'mountpoint'	=> $mountpoint,
-			 'mountopts'	=> 'allow_other');
+			 'mountopts'	=> 'allow_other,fsname=' . $path );
 
 # If we reach this point, the FUSE mountpoint has been released, so exit
 # quietly...
