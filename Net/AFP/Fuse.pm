@@ -129,9 +129,10 @@ sub new { # {{{1
 				$urlparms{'port'}, undef, 1);
 		die("Could not resolve NBP name " . $urlparms{'host'})
 				unless scalar(@records);
-		@urlparms{'host', 'port'} = @{$records[0]}[0,1];
+		@urlparms{'hostaddr', 'sockno'} = @{$records[0]}[0,1];
 	
-		$rc = Net::AFP::Atalk->GetStatus(@urlparms{'host', 'port'}, \$srvInfo);
+		$rc = Net::AFP::Atalk->GetStatus(@urlparms{'hostaddr', 'sockno'},
+				\$srvInfo);
 	}
 	else {
 		$rc = Net::AFP::TCP->GetStatus(@urlparms{'host', 'port'}, \$srvInfo);
@@ -145,7 +146,7 @@ sub new { # {{{1
 	# Actually open a session to the server.
 	# open server connection {{{2
 	if ($urlparms{'atalk_transport'}) {
-		$$obj{'afpconn'} = new Net::AFP::Atalk(@urlparms{'host', 'port'});
+		$$obj{'afpconn'} = new Net::AFP::Atalk(@urlparms{'hostaddr', 'sockno'});
 	}
 	else {
 		$$obj{'afpconn'} = new Net::AFP::TCP(@urlparms{'host', 'port'});
@@ -317,6 +318,25 @@ sub new { # {{{1
 		print "Mount root node ID changed to ", $$obj{'topDirID'}, "\n"
 				if defined $::_DEBUG;
 	} # }}}2
+
+	# purify URL # {{{2
+	my $scrubbed_url = $urlparms{'protocol'} . '://';
+	if (defined $urlparms{'username'}) {
+		$scrubbed_url .= urlencode($urlparms{'username'}) . '@';
+	}
+	$scrubbed_url .= urlencode($urlparms{'host'});
+	if (defined $urlparms{'port'}) {
+		$scrubbed_url .= ':' . urlencode($urlparms{'port'});
+	}
+	$scrubbed_url .= '/';
+	if (defined $urlparms{'volume'}) {
+		$scrubbed_url .= urlencode($urlparms{'volume'});
+		if (defined $urlparms{'subpath'}) {
+			$scrubbed_url .= urlencode($urlparms{'subpath'});
+		}
+	}
+	$_[1] = $scrubbed_url;
+	# }}}2
 
 	return $obj;
 } # }}}1
