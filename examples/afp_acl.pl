@@ -215,8 +215,6 @@ sub make_ace { # {{{1
 
 sub usage {
 	print <<'_EOT_';
-Incorrect usage; use as follows:
-
 Usage: afp_acl.pl [OPTION] [FILE] ...
 List ACL entries for given files, or perform the indicated alterations
 to the ACLs for the given files. Only one of the following actions may
@@ -227,6 +225,12 @@ be performed.
     -i, --insert   [entry number] [ACE]     Insert an ACL entry at position
         --replace  [entry number] [ACE]     Replace an ACL entry at position
     -c, --clear                             Remove all ACL entries
+
+Also, the following option is a modifier:
+
+        --inherited                         Flag an entry as inherited, only
+                                            relevant for --add, --insert, and
+                                            --replace
 
 _EOT_
 	exit(1);
