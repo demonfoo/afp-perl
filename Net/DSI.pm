@@ -249,7 +249,7 @@ sub close { # {{{1
 	$$self{'Dispatcher'}->join();
 } # }}}1
 
-=item SendMessage (CMD, MESSAGE, DATA_R, SEM_R, RC_R, RESP_R)
+=item SendMessage (CMD, MESSAGE, DATA_R, D_LEN, SEM_R, RC_R, RESP_R)
 # Arguments:
 #	$self:		A Net::DSI instance.
 #	$cmd:		The numeric opcode of the command we wish to issue to the DSI
@@ -267,7 +267,7 @@ sub close { # {{{1
 #	$rc_r:		A reference to a scalar,
 =cut
 sub SendMessage { # {{{1
-	my ($self, $cmd, $message, $data_r, $sem_r, $resp_r, $rc_r) = @_;
+	my ($self, $cmd, $message, $data_r, $d_len, $sem_r, $resp_r, $rc_r) = @_;
 
 	if (defined $sem_r) {
 		# Create the Thread::Semaphore object, and initialize it to 0;
@@ -277,15 +277,16 @@ sub SendMessage { # {{{1
 		$$sem_r = new Thread::Semaphore(0);
 	}
 
-	$resp_r = defined($resp_r) ? $resp_r : *foo{SCALAR};
+	$resp_r ||= *foo{SCALAR};
 	$resp_r = &share($resp_r);
 
-	$rc_r = defined($rc_r) ? $rc_r : *bar{SCALAR};
+	$rc_r ||= *bar{SCALAR};
 	$rc_r = &share($rc_r);
 
-	$message = defined($message) ? $message : '';
+	$message ||= '';
 
-	$data_r = defined($data_r) ? $data_r : \'';
+	$data_r ||= \'';
+	$d_len ||= length($$data_r);
 
 	# Cycle the request ID that DSI uses to identify the request/reply
 	# pairing. I'd like to handle that part asynchronously eventually.
@@ -303,10 +304,9 @@ sub SendMessage { # {{{1
 	# 		data offset for DSIWrite messages
 	# Arg 5: long MsgLength
 	# Arg 6: long Reserved: 0
-	my $dlen = length($$data_r);
 	my $msg = pack('CCnNNNa*', 0, $cmd, $reqId,
-			$dlen > 0 ? length($message) : 0,
-			length($message) + $dlen, 0, $message);
+			$d_len > 0 ? length($message) : 0,
+			length($message) + $d_len, 0, $message);
 
 	if (defined $sem_r) {
 		my $handler = &share([]);
@@ -320,8 +320,8 @@ sub SendMessage { # {{{1
 	# Okay, let's try direct dispatch instead of queuing...
 	$$self{'Shared'}{'conn_sem'}->down();
 	syswrite($$self{'Conn'}, $msg);
-	if (length($$data_r)) {
-		syswrite($$self{'Conn'}, $$data_r);
+	if ($d_len) {
+		syswrite($$self{'Conn'}, $$data_r, $d_len);
 	}
 	$$self{'Shared'}{'conn_sem'}->up();
 
@@ -350,8 +350,8 @@ sub DSICommand { # {{{1
 	# into - issuing a DSICommand generally gets one.
 	my $sem;
 	my $rc;
-	my $reqId = $self->SendMessage(OP_DSI_COMMAND, $message, undef, \$sem,
-			$resp_r, \$rc);
+	my $reqId = $self->SendMessage(OP_DSI_COMMAND, $message, undef, undef,
+			\$sem, $resp_r, \$rc);
 	$sem->down();
 	return $reqId if $reqId < 0;
 
@@ -371,8 +371,8 @@ sub DSIGetStatus { # {{{1
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 	my $sem;
 	my $rc;
-	my $reqId = $self->SendMessage(OP_DSI_GETSTATUS, undef, undef, \$sem,
-			$resp_r, \$rc);
+	my $reqId = $self->SendMessage(OP_DSI_GETSTATUS, undef, undef, undef,
+			\$sem, $resp_r, \$rc);
 	$sem->down();
 	return $reqId if $reqId < 0;
 
@@ -408,7 +408,7 @@ sub DSIOpenSession { # {{{1
 	my $rc;
 	my $resp;
 	my $reqId = $self->SendMessage(OP_DSI_OPENSESSION, $options_packed, undef,
-			\$sem, \$resp, \$rc);
+			undef, \$sem, \$resp, \$rc);
 	return $reqId if $reqId < 0;
 	$sem->down();
 	
@@ -444,11 +444,11 @@ sub DSITickle { # {{{1
 =cut
 sub DSIWrite { # {{{1
 	# This should only be used for FPWrite and FPAddIcon
-	my ($self, $message, $data_r, $resp_r) = @_;
+	my ($self, $message, $data_r, $d_len, $resp_r) = @_;
 
 	my $sem;
 	my $rc;
-	my $reqId = $self->SendMessage(OP_DSI_WRITE, $message, $data_r, \$sem,
+	my $reqId = $self->SendMessage(OP_DSI_WRITE, $message, $data_r, $d_len, \$sem,
 			$resp_r, \$rc);
 	return $reqId if $reqId < 0;
 	$sem->down();

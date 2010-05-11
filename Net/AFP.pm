@@ -6252,7 +6252,7 @@ sub FPWrite { # {{{1
 	my $msg = pack('CCnNN', kFPWrite, $Flag, $OForkRefNum, $Offset, $ReqCount);
 
 	my $resp;
-	my $rc = $self->SendAFPWrite($msg, $ForkData_r, \$resp);
+	my $rc = $self->SendAFPWrite($msg, $ForkData_r, $ReqCount, \$resp);
 	if ($rc == kFPNoErr) {
 		$$resp_r = unpack('N', $resp);
 	}
@@ -6348,7 +6348,7 @@ sub FPWriteExt { # {{{1
 			ll_convert($Offset), ll_convert($ReqCount));
 
 	my $resp;
-	my $rc = $self->SendAFPWrite($msg, $ForkData_r, \$resp);
+	my $rc = $self->SendAFPWrite($msg, $ForkData_r, $ReqCount, \$resp);
 	if ($rc == kFPNoErr) {
 		$$resp_r = ll_unconvert(unpack('NN', $resp));
 	}

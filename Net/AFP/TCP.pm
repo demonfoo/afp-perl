@@ -194,11 +194,11 @@ AFP write requests. Do not use.
 # This is a virtual method which is not for public consumption. Only
 # Net::AFP methods should ever call this.
 sub SendAFPWrite { # {{{1
-	my ($self, $payload, $data_r, $resp_r) = @_;
+	my ($self, $payload, $data_r, $d_len, $resp_r) = @_;
 	
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 	$self->CheckAttnQueue();
-	return $$self{'Session'}->DSIWrite($payload, $data_r, $resp_r);
+	return $$self{'Session'}->DSIWrite($payload, $data_r, $d_len, $resp_r);
 } # }}}1
 
 =item GetStatus()

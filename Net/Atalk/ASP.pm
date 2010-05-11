@@ -119,9 +119,23 @@ sub close { # {{{1
 # Apparently this just returns these fixed values always...
 =item SPGetParms (RESP_R)
 
-Get request size limit information about the current session. RESP_R must
-be a scalar ref which will contain a hash ref with the size bound
-information.
+The C<SPGetParms> call retrieves the maximum values of the command block
+size and the quantum size.
+
+RESP_R must be a scalar ref which will contain a hash ref with the size
+bound information. The hash will contain the following:
+
+=over
+
+=item MaxCmdSize
+
+The maximum size of a command block.
+
+=item QuantumSize
+
+The maximum size for a command reply or a write.
+
+=back
 
 =cut
 sub SPGetParms { # {{{1
@@ -136,6 +150,12 @@ sub SPGetParms { # {{{1
 } # }}}1
 
 =item SPGetStatus
+
+The C<SPGetStatus> call is used by a workstation ASP client to obtain
+status information for a particular server.
+
+RESP_R must be a scalar ref which will contain a hash ref with the
+parsed structure data from the SPGetStatus call.
 
 =cut
 sub SPGetStatus { # {{{1
@@ -163,6 +183,13 @@ sub SPGetStatus { # {{{1
 } # }}}1
 
 =item SPOpenSession
+
+The C<SPOpenSession> call is issued by an ASP client after obtaining the
+internet address of the SLS (server listening socket) through an NBPLookup
+call. If a session is successfully opened, then a session reference
+number is returned and stored in the session object, to be used for
+all subsequent calls in this session. If a session cannot be opened,
+an appropriate SPError value is returned.
 
 =cut
 sub SPOpenSession { # {{{1
@@ -214,6 +241,12 @@ sub SPOpenSession { # {{{1
 
 =item SPCloseSession
 
+The C<SPCloseSession> call can be issued at any time by the ASP client to
+close a session previously opened through an C<SPOpenSession> call. As a
+result of the call, the session reference number is invalidated and
+cannot be used for any further calls. In addition, all pending activity
+on the session is immediately canceled.
+
 =cut
 sub SPCloseSession { # {{{1
 	my ($self) = @_;
@@ -234,7 +267,18 @@ sub SPCloseSession { # {{{1
 	return kFPNoErr;
 } # }}}1
 
-=item SPCommand
+=item SPCommand (MESSAGE, RESP_R)
+
+Once a session has been opened, the workstation end client can send a
+command to the server end by issuing an C<SPCommand> call to ASP. A
+command block of maximum size (L<MaxCmdSize>) can be send with the
+command. If the length of MESSAGE is greater than the maximum allowable
+size, the call returns an error of kASPSizeErr; in this case, no effort
+is made to send anything to the server end.
+
+MESSAGE contains the binary data for the outgoing request. RESP_R must
+be a scalar ref that will contain the reassembled response data, if any,
+received from the server in response to the request sent.
 
 =cut
 sub SPCommand { # {{{1
@@ -269,14 +313,39 @@ sub SPCommand { # {{{1
 	return $errno;
 } # }}}1
 
-=item SPWrite
+=item SPWrite (MESSAGE, DATA_R, D_LEN, RESP_R)
+
+The C<SPWrite> call is made by the ASP client in order to write a block
+of data to the server end of the session. The call first delivers the
+command block (no larger than L<MaxCmdSize>) to the server end client
+of the ASP session and, as previously described, the server end can
+then transfer the write data or return an error (delivered in the
+result code field).
+
+Thee actual amount of data sent will be less than or equal to the
+length of the data chunk provided and will never be larger than
+L<QuantumSize>. The amount of write data actually transferred is
+returned in the response block.
+
+In response to an C<SPWrite>, the server end returns two quantities:
+a 4-byte command result code and a variable-length command reply
+that is returned in the reply buffer. Note that this reply can be
+no larger than L<QuantumSize>.
+
+MESSAGE contains the binary data for the outgoing request. DATA_R must
+be a scalar ref to the binary data to be written to the server. RESP_R
+must be a scalar ref that will contain the reassembled response data
+received from the server in response to the request sent.
 
 =cut
 sub SPWrite { # {{{1
-	my ($self, $message, $data_r, $resp_r) = @_;
+	my ($self, $message, $data_r, $d_len, $resp_r) = @_;
 
 	die('$resp_r must be a scalar ref')
 			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+	die('$data_r must be a scalar ref')
+			unless ref($data_r) eq 'SCALAR' or ref($data_r) eq 'REF';
+	$d_len ||= length($$data_r);
 
 	my $seqno = $$self{'seqno'}++ % (2 ** 16);
 	# this will take an ATP_MSGLEN sized chunk of the message data and
@@ -311,10 +380,13 @@ sub SPWrite { # {{{1
 	my $sendsize = 0;
 	my $totalsend = 0;
 	for (my $i = 0; $i < 8; $i++) { # {{{2
-		last if $totalsend > length($$data_r);
+		last if $totalsend >= $d_len;
 		$sendsize = ATP_MAXLEN;
 		if ($bufsize - $totalsend < ATP_MAXLEN) {
 			$sendsize = $bufsize - $totalsend;
+		}
+		if ($d_len - $totalsend < $sendsize) {
+			$sendsize = $d_len - $totalsend;
 		}
 		my $elem = &share({});
 		%$elem = ( 'userbytes'	=> pack('x[4]'),
@@ -336,9 +408,8 @@ sub SPWrite { # {{{1
 	return $errno;
 } # }}}1
 
-=item SPTickle
-
-=cut
+# This call only needs to be used internally; there should be no reason
+# for an ASP client to call this directly.
 sub SPTickle { # {{{1
 	my ($self, $interval, $ntries) = @_;
 
@@ -363,6 +434,14 @@ AppleTalk", chapter 11. "Inside AppleTalk" is available freely via the
 Internet in PDF form, at:
 
 L<http://developer.apple.com/MacOs/opentransport/docs/dev/Inside_AppleTalk.pdf>
+
+=head1 SEE ALSO
+
+C<Net::Atalk::ATP>
+
+=head1 AUTHOR
+
+Derrik Pates <demon@devrandom.net>
 
 =cut
 1;
