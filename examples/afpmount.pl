@@ -25,7 +25,6 @@ my @msgfields = ('msg', 'payloadlen');
 # Handle the command line args.
 my $interactive;
 exit(&EINVAL) unless GetOptions('interactive'	=> \$interactive);
-
 my($path, $mountpoint) = @ARGV;
 
 unless (-d $mountpoint) {
@@ -112,6 +111,7 @@ sub END {
    $fuse->disconnect() if ref($fuse);
 } # }}}1
 
+# instantiate fuse object {{{1
 $fuse = new Net::AFP::Fuse($path, sub {
         my ($username, $hostname, $password) = @_;
 		if (!defined $password && defined $interactive) {
@@ -133,7 +133,7 @@ $fuse = new Net::AFP::Fuse($path, sub {
 			$password = '';
 		}
     	return $password;
-    });
+    }); # }}}1
 
 unless (ref($fuse)) {
     # if this happens, an error code was returned, so pass that back to
@@ -141,7 +141,6 @@ unless (ref($fuse)) {
     syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, $fuse));
     exit(1);
 }
-
 
 # Send a love note to the folks saying "wish you were here, everything's
 # fine".
