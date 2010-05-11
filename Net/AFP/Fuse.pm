@@ -62,24 +62,6 @@ use constant COMMENT_XATTR		=> 'system.comment';
 # }}}1
 
 # Set up the pattern to use for breaking the AFP URL into its components.
-my $ipv4_byte	= qr/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2(?:[0-4][0-9]|5[0-5]))/;
-my $v6grp_p		= qr/[0-9a-f]{1,4}/i;
-my @ipv6_patterns = (
-		qr/(?:$v6grp_p:){7}(?:$v6grp_p)?/,
-		qr/(?:$v6grp_p)?:(?::$v6grp_p){1,6}/,
-		qr/(?:$v6grp_p:){2}(?::$v6grp_p){1,5}/,
-		qr/(?:$v6grp_p:){3}(?::$v6grp_p){1,4}/,
-		qr/(?:$v6grp_p:){4}(?::$v6grp_p){1,3}/,
-		qr/(?:$v6grp_p:){5}(?::$v6grp_p){1,2}/,
-		qr/(?:$v6grp_p:){6}:$v6grp_p/,
-		qr/(?:$v6grp_p:){1,6}:/,
-		# IPv4-in-IPv6 addressing style, with zero-fill
-		qr/(?:0{1,4}:){5}(?:0|ffff):(?:$ipv4_byte\.){3}$ipv4_byte/,
-		# IPv4-in-IPv6 addressing style, without zero-fill
-		qr/::(?:ffff:)?(?:$ipv4_byte\.){3}$ipv4_byte/);
-#my $ipv6_pattern = join('|', @ipv6_patterns);
-
-# FIXME: need to add IPv6 address handling to the AFP URL stuff...
 my $url_rx = qr|^
                   (afps?):/		        # protocol specific prefix
                   (at)?/                # optionally specify atalk transport
@@ -324,9 +306,14 @@ sub new { # {{{1
 	if (defined $urlparms{'username'}) {
 		$scrubbed_url .= urlencode($urlparms{'username'}) . '@';
 	}
-	$scrubbed_url .= urlencode($urlparms{'host'});
+	if ($urlparms{'host'} =~ /:/) {
+		$scrubbed_url .= '[' . $urlparms{'host'} . ']';
+	}
+	else {
+		$scrubbed_url .= urlencode($urlparms{'host'});
+	}
 	if (defined $urlparms{'port'}) {
-		$scrubbed_url .= ':' . urlencode($urlparms{'port'});
+		$scrubbed_url .= ':' . $urlparms{'port'};
 	}
 	$scrubbed_url .= '/';
 	if (defined $urlparms{'volume'}) {
@@ -1166,10 +1153,10 @@ sub flush { # {{{1
 					@{$$self{'ofcache'}{$fileName}}{'refnum', 'coalesce_offset',
 											  'coalesce_len'};
             my $data_ref = \$$self{'ofcache'}{$fileName}{'coalesce_buf'};
-			if ($$self{'ofcache'}{$fileName}{'coalesce_len'} < COALESCE_MAX) {
-				my $data = substr($$data_ref, 0, $$self{'ofcache'}{$fileName}{'coalesce_len'});
-				$data_ref = \$data;
-			}
+#			if ($$self{'ofcache'}{$fileName}{'coalesce_len'} < COALESCE_MAX) {
+#				my $data = substr($$data_ref, 0, $$self{'ofcache'}{$fileName}{'coalesce_len'});
+#				$data_ref = \$data;
+#			}
 			my $lastwr;
 			my $rc;
 			my $write_fn = \&Net::AFP::FPWrite;
