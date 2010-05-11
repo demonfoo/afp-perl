@@ -22,6 +22,7 @@ use threads::shared;
 use Thread::Semaphore;
 use Exporter qw(import);
 use Scalar::Util qw(dualvar);
+use Net::AFP::Result;
 
 =head1 NAME
 
@@ -592,7 +593,7 @@ sub SendTransaction { # {{{1
 	$options{'PeerAddr'} ||= undef;
 
 	# Check a few parameters before we proceed.
-	return if length($options{'Data'}) > ATP_MAXLEN;
+	return kASPSizeErr if length($options{'Data'}) > ATP_MAXLEN;
 	return if $options{'ResponseLength'} > 8;
 	return if length($options{'UserBytes'}) > 4;
 
