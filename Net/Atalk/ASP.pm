@@ -195,8 +195,7 @@ an appropriate SPError value is returned.
 sub SPOpenSession { # {{{1
 	my ($self) = @_;
 
-	# FIXME: Should probably have a getter method for this...
-	my $wss = $$self{'atpsess'}{'Shared'}{'sockport'};
+	my $wss = $$self{'atpsess'}->sockport();;
 	my $msg = pack('CCn', OP_SP_OPENSESS, $wss, SP_VERSION);
 	my $sa = pack_sockaddr_at($$self{'svcport'} , atalk_aton($$self{'host'}));
 	my ($rdata, $success);

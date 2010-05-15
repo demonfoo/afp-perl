@@ -62,27 +62,26 @@ GetOptions( 'debug-afp' => sub { $__AFP_DEBUG = 1; },
 			'debug-dsi' => sub { $__DSI_DEBUG = 1; } );
 
 my($path) = @ARGV;
-my $afp_url_pattern = qr|^
-                          (afps?):/		     # protocol specific prefix
-						  (at)?/             # optionally specify atalk
-                                             # transport
-						  (?:                # authentication info block
-						      ([^:\@\/;]*)   # capture username
-							  (?:;AUTH=([^:\@\/;]+))? # capture uam name
-							  (?::([^:\@\/;]*))?      # capture password
-						  \@)?               # closure of auth info capture
-                          ([^:\/\@;]+)       # capture target host
-						  (?::([^:\/\@;]+))? # capture optional port
-						  (?:\/(?:           # start path capture
-							  ([^:\/\@;]+)   # first path element is vol name
-							  (\/.*)?        # rest of path is local subpath
-                          )?)?               # closure of path capture
-						 $|x;
+my $url_rx = qr|^
+                  (afps?):/             # protocol specific prefix
+                  (at)?/                # optionally specify atalk transport
+                  (?:                   # authentication info block
+                      ([^:\@\/;]*)      # capture username
+                      (?:;AUTH=([^:\@\/;]+))? # capture uam name
+                      (?::([^:\@\/;]*))? # capture password
+                  \@)?                  # closure of auth info capture
+                  (?\|([^:\/\@\[\]:]+)\|\[([^\]]+)\]) # capture target host
+                  (?::([^:\/\@;]+))?    # capture optional port
+                  (?:\/(?:              # start path capture
+                      ([^:\/\@;]+)      # first path element is vol name
+                      (\/.*)?           # rest of path is local subpath
+                  )?)?                  # closure of path capture
+                  $|x;
 my @args = ('protocol', 'atalk_transport', 'username', 'UAM', 'password',
 		'host', 'port', 'volume', 'subpath');
 my %values;
 
-unless (@values{@args} = $path =~ $afp_url_pattern) {
+unless (@values{@args} = $path =~ $url_rx) {
 	print "Volume path ", $path, " is not valid, sorry.\n";
 	exit(1);
 }
@@ -457,8 +456,9 @@ _EOT_
 			$rc = &$write_fn($session, 0x80, $$resp{'OForkRefNum'}, 0,
 					length($data), \$data, \$wcount);
 
-			while ($wcount < ($total + $rcnt)) {
-				my $dchunk = substr($data, $wcount - $total, $total + $rcnt - $wcount);
+			while ($wcount < ($total + $rcnt) && $rc == kFPNoErr) {
+				my $dchunk = substr($data, $wcount - $total,
+						$total + $rcnt - $wcount);
 				$rc = &$write_fn($session, 0x80, $$resp{'OForkRefNum'}, 0,
 						length($dchunk), \$dchunk, \$wcount);
 			}
@@ -510,9 +510,6 @@ Please specify the name of the directory to create.
 _EOT_
 			return 1;
 		}
-		# FIXME: need to resolve the provided path, but path resolver needs
-		# to be modified to handle the "final element of split path doesn't
-		# exist yet" condition.
 		my $newDirID = '';
 		my $rc = $session->FPCreateDir($volID, $curdirnode, $pathType,
 				$words[1], \$newDirID);
@@ -529,9 +526,6 @@ Please specify the name of one or more files or directories to remove.
 _EOT_
 			return 1;
 		}
-		# FIXME: need to resolve the provided path, but path resolver needs
-		# to be modified to handle the "final element of split path doesn't
-		# exist yet" condition.
 		my ($dirID, $fileName) = resolve_path($session, $volID, $curdirnode,
 				$words[1], 1, 0);
 		unless (defined $dirID) {

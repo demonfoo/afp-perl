@@ -63,12 +63,12 @@ use constant COMMENT_XATTR		=> 'system.comment';
 
 # Set up the pattern to use for breaking the AFP URL into its components.
 my $url_rx = qr|^
-                  (afps?):/		        # protocol specific prefix
+                  (afps?):/             # protocol specific prefix
                   (at)?/                # optionally specify atalk transport
                   (?:                   # authentication info block
                       ([^:\@\/;]*)      # capture username
                       (?:;AUTH=([^:\@\/;]+))? # capture uam name
-                      (?::([^:\@\/;]*))?      # capture password
+                      (?::([^:\@\/;]*))? # capture password
                   \@)?                  # closure of auth info capture
                   (?\|([^:\/\@\[\]:]+)\|\[([^\]]+)\]) # capture target host
                   (?::([^:\/\@;]+))?    # capture optional port

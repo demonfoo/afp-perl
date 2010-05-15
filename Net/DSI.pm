@@ -133,7 +133,6 @@ sub session_thread { # {{{1
 					$$shared{'exit'} = 1;
 				}
 
-				# FIXME: probably should handle OP_DSI_ATTENTION here.
 				elsif ($cmd == OP_DSI_ATTENTION) {
 					my ($userBytes) = unpack('n', $data);
 					# Queue the notification for later processing
@@ -199,9 +198,7 @@ IPv6 (if L<IO::Socket::INET6> is present) address, or a DNS name.
 =cut
 sub new { # {{{1
 	my ($class, $host, $port) = @_;
-	unless (defined $port) {
-		$port = 548;
-	}
+	$port ||= 548;
 	my $obj = bless {}, $class;
 
 	my $shared = &share({});

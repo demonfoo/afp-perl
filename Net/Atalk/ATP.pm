@@ -212,6 +212,21 @@ sub close { # {{{1
 	$$self{'Dispatcher'}->join();
 } # }}}1
 
+sub sockaddr {
+	my ($self) = @_;
+	return $$self{'Shared'}{'sockaddr'};
+}
+
+sub sockport {
+	my ($self) = @_;
+	return $$self{'Shared'}{'sockport'};
+}
+
+sub sockdomain {
+	my ($self) = @_;
+	return $$self{'Shared'}{'sockdomain'};
+}
+
 # This function is the body of the thread. Similar to DSI, this is a
 # hybrid-dispatcher arrangement - responses are sent directly from the
 # main thread, but messages coming from the peer are handled in the
@@ -238,8 +253,8 @@ sub thread_core { # {{{1
 	$$shared{'conn_fd'} = fileno($conn);
 	$$shared{'sockaddr'} = $conn->sockaddr();
 	$$shared{'sockport'} = $conn->sockport();
-	$$shared{'peeraddr'} = $conn->peeraddr();
-	$$shared{'peerport'} = $conn->peerport();
+	#$$shared{'peeraddr'} = $conn->peeraddr();
+	#$$shared{'peerport'} = $conn->peerport();
 	$$shared{'sockdomain'} = AF_APPLETALK;
 	$$shared{'conn_sem'}->up();
 

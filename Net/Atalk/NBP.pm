@@ -79,10 +79,6 @@ sub UnpackTuples {
 	return(@tuples);
 }
 
-# FIXME: Probably need to handle AppleTalk networks with more than one
-# zone...
-
-# Lookup an NBP name (or possibly more than one).
 =item NBPLookup (OBJ, TYPE, ZONE, FROMADDR, MAXRESPS)
 
 Implements NBP Lookup request issuing and fetching. All arguments are
