@@ -7,7 +7,6 @@ our(@ISA, $VERSION);
 use IO::Socket;
 use Net::Atalk;
 use Carp;
-use Exporter;
 use Errno;
 use Config;
 

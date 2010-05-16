@@ -2,6 +2,7 @@ package Net::Atalk;
 
 use Exporter qw(import);
 use Config;
+use IO::Socket;				# for AF_APPLETALK
 
 use strict;
 use warnings;
@@ -30,19 +31,7 @@ structure format for AppleTalk socket operations.
 
 =over
 
-=item AF_APPLETALK
-
-Symbolic representation for the AppleTalk address family identifier.
-
 =cut
-sub AF_APPLETALK { return $Config{'osname'} eq 'linux' ? 5 : 16; }
-=item PF_APPLETALK
-
-Symbolic representation for the AppleTalk protocol family identifier.
-
-=cut
-sub PF_APPLETALK { return AF_APPLETALK; }
-
 use constant DDPTYPE_RTMPRD		=> 1;
 use constant DDPTYPE_NBP		=> 2;
 use constant DDPTYPE_ATP		=> 3;
