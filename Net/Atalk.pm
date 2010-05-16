@@ -44,9 +44,7 @@ use constant ATPORT_RESERVED	=> 128;
 use constant ATPORT_LAST		=> 254; # only legal on localtalk
 use constant ATADDR_ANYNET		=> 0;
 use constant ATADDR_ANYNODE		=> 0;
-use constant ATADDR_ANY			=> atalk_aton('0.0');
 use constant ATADDR_ANYPORT		=> 0;
-use constant ATADDR_BCAST		=> atalk_aton('0.255');
 use constant DDP_MAXSZ			=> 587;
 use constant DDP_MAXHOPS		=> 15; # 4 bit hop counter
 
@@ -62,6 +60,9 @@ sub atalk_aton {
 	return unless defined $net && defined $node;
 	return pack('nC', $net, $node);
 }
+
+use constant ATADDR_ANY			=> atalk_aton('0.0');
+use constant ATADDR_BCAST		=> atalk_aton('0.255');
 
 =item atalk_ntoa
 
