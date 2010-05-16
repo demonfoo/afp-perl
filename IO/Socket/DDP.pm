@@ -9,6 +9,7 @@ use Net::Atalk;
 use Carp;
 use Exporter;
 use Errno;
+use Config;
 
 @ISA = qw(IO::Socket);
 $VERSION = "0.50";
@@ -250,7 +251,7 @@ sub configure {
 			or return _error($sock, $!, $@);
 
     $laddr = defined $laddr ? atalk_aton($laddr)
-			    : INADDR_ANY;
+			    : atalk_aton('0.0');
 
     return _error($sock, $EINVAL, "Bad hostname '",$arg->{LocalAddr},"'")
 	unless(defined $laddr);
@@ -279,7 +280,8 @@ sub configure {
 
     while(1) {
 
-	$sock->socket(AF_APPLETALK, $type, $proto) or
+	$sock->socket(AF_APPLETALK, $type,
+		$Config{'osname'} eq 'linux' ? $proto : 0) or
 	    return _error($sock, $!, "$!");
 
         if (defined $arg->{Blocking}) {
@@ -302,7 +304,7 @@ sub configure {
 		    return _error($sock, $!, "$!");
 	}
 
-	if($lport || ($laddr ne INADDR_ANY) || exists $arg->{Listen}) {
+	if($lport || exists $arg->{Listen} || $Config{'osname'} ne 'linux') {
 	    $sock->bind($lport || 0, $laddr) or
 		    return _error($sock, $!, "$!");
 	}
