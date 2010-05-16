@@ -1,7 +1,6 @@
 package Net::Atalk;
 
 use Exporter qw(import);
-use Config;
 use IO::Socket;				# for AF_APPLETALK
 
 use strict;
