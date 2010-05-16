@@ -9,7 +9,7 @@ use warnings;
 
 our @EXPORT = qw(atalk_aton atalk_ntoa pack_sockaddr_at unpack_sockaddr_at
 				 sockaddr_at DDPTYPE_RTMPRD DDPTYPE_NBP DDPTYPE_ATP DDPTYPE_AEP
-				 DDPTYPE_RTMPR DDPTYPE_ZIP DDPTYPE_ADSP ATPORT_FIRST
+				 DDPTYPE_RTMPR DDPTYPE_ZIP DDPTYPE_ADSP ATPORT_FIRST ATADDR_ANY
 				 ATPORT_RESERVED ATPORT_LAST ATADDR_ANYNET ATADDR_ANYNODE
 				 ATADDR_ANYPORT ATADDR_BCAST DDP_MAXSZ DDP_MAXHOPS);
 
@@ -45,8 +45,9 @@ use constant ATPORT_RESERVED	=> 128;
 use constant ATPORT_LAST		=> 254; # only legal on localtalk
 use constant ATADDR_ANYNET		=> 0;
 use constant ATADDR_ANYNODE		=> 0;
+use constant ATADDR_ANY			=> atalk_aton('0.0');
 use constant ATADDR_ANYPORT		=> 0;
-use constant ATADDR_BCAST		=> 255;
+use constant ATADDR_BCAST		=> atalk_aton('0.255');
 use constant DDP_MAXSZ			=> 587;
 use constant DDP_MAXHOPS		=> 15; # 4 bit hop counter
 
