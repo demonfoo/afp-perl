@@ -394,7 +394,7 @@ sub SPWrite { # {{{1
 		$totalsend += $sendsize;
 	} # }}}2
 
-	$$self{'atpsess'}->RespondTransaction($$RqCB{'txid'}, $resp);
+	$$self{'atpsess'}->RespondTransaction($RqCB, $resp);
 
 	$sem->down();
 	# string the response bodies back together

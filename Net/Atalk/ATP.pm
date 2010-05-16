@@ -264,7 +264,8 @@ sub thread_core { # {{{1
 	$poll->mask($conn, POLLIN);
 	my ($txid, $TxCB, $time, $from, $msg, %msgdata, $msgtype,
 		$wants_sts, $is_eom, $seqno, $RqCB, $is_xo, $xo_tmout, $RspCB, $seq,
-		$pktdata, $ctl_byte, $filter, $rv, $item, $stamp);
+		$pktdata, $ctl_byte, $filter, $rv, $item, $stamp, $port, $paddr,
+		$addr, $txkey);
 
 MAINLOOP:
 	while ($$shared{'exit'} == 0) { # {{{2
@@ -306,12 +307,12 @@ MAINLOOP:
 
 		# Check the XO transaction completion list as well.
 		#while (($txid, $RspCB) = each(%{$$shared{'RspCB_list'}})) {
-		foreach $txid (keys %{$$shared{'RspCB_list'}}) { # {{{3
+		foreach $txkey (keys %{$$shared{'RspCB_list'}}) { # {{{3
 			#print STDERR '', (caller(0))[3], ": RspCB txid is $txid\n";
 			# If the transaction is past its keep-by, just delete it, nothing
 			# more to be done on our end.
-			$RspCB = $$shared{'RspCB_list'}{$txid};
-			delete $$shared{'RspCB_list'}{$txid}
+			$RspCB = $$shared{'RspCB_list'}{$txkey};
+			delete $$shared{'RspCB_list'}{$txkey}
 					if (($time - $$RspCB{'stamp'}) >= $$RspCB{'tmout'});
 		} # }}}3
 
@@ -332,18 +333,26 @@ MAINLOOP:
 			# Let's see what kind of message we've been sent.
 			$msgtype = $msgdata{'ctl'} & ATP_CTL_FNCODE;
 			$txid = $msgdata{'tid'};
+
+			# Get the requester source address and port and jam everything
+			# together to make a transaction key, so separate requesters
+			# can't stomp on one another's transaction requests.
+			($port, $paddr) = unpack_sockaddr_at($from);
+			$addr = atalk_ntoa($paddr);
+			$txkey = join('/', $addr, $port, $txid);
+
 			if ($msgtype == ATP_TReq) { # {{{4
 				# Remote is asking to initiate a transaction with us.
 				$is_xo = $msgdata{'ctl'} & ATP_CTL_XOBIT;
 				$xo_tmout = $msgdata{'ctl'} & ATP_CTL_TREL_TMOUT;
 
 				# Ignore a duplicate transaction request.
-				next MAINLOOP if exists $$shared{'RqCB_list'}{$txid};
+				next MAINLOOP if exists $$shared{'RqCB_list'}{$txkey};
 
 				# If there's an XO completion handler in place, then resend
 				# whatever packets the peer indicates it wants.
-				if (exists $$shared{'RspCB_list'}{$txid}) { # {{{5
-					$RspCB = $$shared{'RspCB_list'}{$txid};
+				if (exists $$shared{'RspCB_list'}{$txkey}) { # {{{5
+					$RspCB = $$shared{'RspCB_list'}{$txkey};
 					$RqCB = $$RspCB{'RqCB'};
 					$pktdata = $$RspCB{'RespData'};
 
@@ -408,7 +417,7 @@ MAINLOOP:
 									'tmout'		=> $$RqCB{'xo_tmout'},
 								);
 								$$RspCB{'stamp'} = gettimeofday();
-								$$shared{'RspCB_list'}{$txid} = $RspCB;
+								$$shared{'RspCB_list'}{$txkey} = $RspCB;
 							}
 
 							$$shared{'conn_sem'}->down();
@@ -419,11 +428,7 @@ MAINLOOP:
 					} # }}}6
 				} # }}}5
 
-				# FIXME: Perhaps the transaction queuing should be keyed on
-				# a combination of the originator's address and port plus
-				# the transaction ID? Seems like having just the txid could
-				# end up causing conflicts...
-				$$shared{'RqCB_list'}{$txid} = $RqCB;
+				$$shared{'RqCB_list'}{$txkey} = $RqCB;
 				push(@{$$shared{'RqCB_txq'}}, $RqCB);
 				$$shared{'RqCB_sem'}->up();
 			} # }}}4
@@ -496,7 +501,7 @@ MAINLOOP:
 				# the pending RspCB if one is present. I think we can
 				# safely delete even if it's not there; saves us the time
 				# of checking.
-				delete $$shared{'RspCB_list'}{$txid};
+				delete $$shared{'RspCB_list'}{$txkey};
 			} # }}}4
 		} # }}}3
 	} # }}}2
@@ -714,13 +719,12 @@ sub GetTransaction { # {{{1
 	return undef;
 } # }}}1
 
-=item RespondTransaction (TXID, RESP_R)
+=item RespondTransaction (RQCB, RESP_R)
 
 Used to send a response to a pending transaction request returned by the
 C<GetTransaction> method above.
 
-TXID is the numeric transaction ID from the request block returned by
-C<GetTransaction>.
+RQCB is the request block returned by C<GetTransaction>.
 
 RESP_R is an array reference containing hash references, each of which
 must contain C<data> and C<userbytes> elements. There must be at least
@@ -729,7 +733,7 @@ serialized binary packet data to be sent to the transaction requester.
 
 =cut
 sub RespondTransaction { # {{{1
-	my ($self, $txid, $resp_r) = @_;
+	my ($self, $RqCB, $resp_r) = @_;
 	
 	die('$resp_r must be an array') unless ref($resp_r) eq 'ARRAY';
 
@@ -739,8 +743,12 @@ sub RespondTransaction { # {{{1
 			if scalar(@$resp_r) > 8 or scalar(@$resp_r) < 1;
 
 	# Abort if the transaction ID that the caller indicated is unknown to us.
-	die() unless exists $$self{'Shared'}{'RqCB_list'}{$txid};
-	my $RqCB = $$self{'Shared'}{'RqCB_list'}{$txid};
+	#die() unless exists $$self{'Shared'}{'RqCB_list'}{$txid};
+	#my $RqCB = $$self{'Shared'}{'RqCB_list'}{$txid};
+	my ($port, $paddr) = unpack_sockaddr_at($$RqCB{'sockaddr'});
+	my $addr = atalk_ntoa($paddr);
+	my $txkey = join('/', $addr, $port, $$RqCB{'txid'});
+	die() unless exists $$self{'Shared'}{'RqCB_list'}{$txkey};
 
 	my $pktdata = &share([]);
 
@@ -754,8 +762,8 @@ sub RespondTransaction { # {{{1
 		# last packet in provided set, so tell the requester that this is
 		# end of message...
 		if ($seq == $#$resp_r) { $ctl_byte |= ATP_CTL_EOMBIT }
-		my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq, $txid,
-				@{$$resp_r[$seq]}{'userbytes', 'data'});
+		my $msg = pack($atp_header, DDPTYPE_ATP, $ctl_byte, $seq,
+				$$RqCB{'txid'}, @{$$resp_r[$seq]}{'userbytes', 'data'});
 		$$pktdata[$seq] = $msg;
 
 		next unless $$RqCB{'seq_bmp'} & (1 << $seq);
@@ -770,7 +778,7 @@ sub RespondTransaction { # {{{1
 				'tmout'		=> $$RqCB{'xo_tmout'},
 			);
 			$$RspCB{'stamp'} = gettimeofday();
-			$$self{'Shared'}{'RspCB_list'}{$txid} = $RspCB;
+			$$self{'Shared'}{'RspCB_list'}{$txkey} = $RspCB;
 		}
 
 		$$self{'Shared'}{'conn_sem'}->down();
@@ -779,7 +787,7 @@ sub RespondTransaction { # {{{1
 	}
 
 	# Remove the transaction from the stored list.
-	delete $$self{'Shared'}{'RqCB_list'}{$txid};
+	delete $$self{'Shared'}{'RqCB_list'}{$txkey};
 } # }}}1
 
 # The idea here is to be able to pass a subroutine that looks at the
