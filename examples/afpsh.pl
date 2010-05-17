@@ -37,13 +37,6 @@ use Term::ReadPassword;
 use Time::HiRes qw(gettimeofday);
 use Text::Glob qw(match_glob);
 
-use Socket;
-my $has_Socket6 = 1;
-eval { require Socket6; };
-if ($@) {
-	$has_Socket6 = 0;
-}
-
 my $has_Archive__Tar = 1;
 eval { require Archive::Tar; };
 if ($@) {
