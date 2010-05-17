@@ -8,7 +8,6 @@ use IO::Socket;
 use Net::Atalk;
 use Carp;
 use Errno qw(EINVAL ETIMEDOUT);
-use Config;
 
 @ISA = qw(IO::Socket);
 $VERSION = "0.50";
@@ -278,7 +277,7 @@ sub configure {
     while(1) {
 
 	$sock->socket(AF_APPLETALK, $type,
-		$Config{'osname'} eq 'linux' ? $proto : 0) or
+		$^O eq 'linux' ? $proto : 0) or
 	    return _error($sock, $!, "$!");
 
         if (defined $arg->{Blocking}) {
@@ -301,7 +300,7 @@ sub configure {
 		    return _error($sock, $!, "$!");
 	}
 
-	if($lport || exists $arg->{Listen} || $Config{'osname'} ne 'linux') {
+	if($lport || exists $arg->{Listen} || $^O ne 'linux') {
 	    $sock->bind($lport || 0, $laddr) or
 		    return _error($sock, $!, "$!");
 	}

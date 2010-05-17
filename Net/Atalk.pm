@@ -103,7 +103,11 @@ a packed C<struct sockaddr_at> structure.
 sub pack_sockaddr_at {
 	my($port, $paddr) = @_;
 
-	return pack('SCxa[3]x[9]', AF_APPLETALK, $port, $paddr);
+	my @arglist = (AF_APPLETALK, $port, $paddr);
+	if ($^O ne 'linux') { unshift(@arglist, 16); }
+	# On *BSD, the first byte of sockaddr structs is a byte to indicate
+	# the size of the struct. Linux doesn't do this.
+	return pack($^O eq 'linux' ? 'SCxa[3]x[9]' : 'CCCxa[3]x[9]', @arglist);
 }
 
 =item unpack_sockaddr_at
