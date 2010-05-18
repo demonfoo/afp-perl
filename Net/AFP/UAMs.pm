@@ -41,6 +41,7 @@ sub RegisterUAM {
 # Find the UAM includes, and assemble a list of them.
 my @uampaths = ();
 foreach my $incpath (@INC) {
+	next if $incpath eq '.';
 	my $uamincpath = $incpath . '/Net/AFP/UAMs';
 	if (-d $uamincpath) {
 		opendir(UAMDIR, $uamincpath);
