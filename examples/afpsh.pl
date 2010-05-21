@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # Enables a nice call trace on warning events.
 use Carp ();

@@ -4,6 +4,7 @@ use Net::AFP::Fuse;
 use IO::Poll qw(POLLIN POLLERR);
 use Getopt::Long;				# for parsing command line options
 use Socket;
+use Errno qw(:POSIX);
 
 # Conditionally include Term::ReadPassword; it doesn't need to be present
 # for supplying passwords via the AFP URL directly, but it's needed for
