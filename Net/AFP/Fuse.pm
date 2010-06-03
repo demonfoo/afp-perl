@@ -932,7 +932,11 @@ sub open { # {{{1
 	if (($mode & O_ACCMODE) == O_RDWR) {
 		$accessBitmap = 0x3;
 	} elsif (($mode & O_ACCMODE) == O_WRONLY) {
-		$accessBitmap = 0x2;
+        # HACK: Thanks Apple. Way to, I don't know, know how to IMPLEMENT
+        # YOUR OWN PROTOCOL. Seems if you open the file write-only, and
+        # then, oh, try to WRITE TO IT, the writes then fail. Wow. That
+        # makes so much sense!
+		$accessBitmap = 0x3;
 	} elsif (($mode & O_ACCMODE) == O_RDONLY) {
 		$accessBitmap = 0x1;
 	}

@@ -18,6 +18,7 @@ use Time::HiRes qw(gettimeofday);
 use threads;
 use threads::shared;
 use Thread::Semaphore;
+use Socket qw(TCP_NODELAY IPPROTO_TCP);
 use strict;
 use warnings;
 
@@ -91,6 +92,9 @@ sub session_thread { # {{{1
 		return;
 	}
 
+	# Tell the TCP stack that we don't want Nagle's algorithm; for our
+	# purposes, all it's going to do is screw us up.
+	setsockopt($conn, IPPROTO_TCP, TCP_NODELAY, 1);
 	$$shared{'conn_fd'} = fileno($conn);
 	$$shared{'running'} = 1;
 	$$shared{'sockaddr'} = $conn->sockaddr();
@@ -226,6 +230,7 @@ sub new { # {{{1
 	$$obj{'Conn'} = new IO::Handle;
 	if ($$shared{'running'} == 1) {
 		$$obj{'Conn'}->fdopen($$shared{'conn_fd'}, 'w');
+		$$obj{'Conn'}->autoflush(1);
 	}
 	$$shared{'conn_sem'}->up();
 
