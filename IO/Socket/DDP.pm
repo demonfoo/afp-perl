@@ -276,8 +276,7 @@ sub configure {
 
     while(1) {
 
-	$sock->socket(AF_APPLETALK, $type,
-		$^O eq 'linux' ? $proto : 0) or
+	$sock->socket(AF_APPLETALK, $type, 0) or
 	    return _error($sock, $!, "$!");
 
         if (defined $arg->{Blocking}) {
