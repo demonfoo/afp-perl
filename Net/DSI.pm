@@ -11,7 +11,7 @@ if ($@) {
 	$has_IO__Socket__INET6 = 0;
 }
 use IO::Socket::INET;
-use IO::Poll qw(POLLRDNORM POLLWRNORM POLLIN POLLHUP);
+use IO::Poll qw(POLLIN POLLHUP);
 use IO::Handle;
 use Net::AFP::Result;
 use Time::HiRes qw(gettimeofday);
@@ -52,13 +52,13 @@ use constant kRequestQuanta			=> 0x00;
 use constant kAttentionQuanta		=> 0x01;
 use constant kServerReplayCacheSize	=> 0x02;
 
-# This function is the body of our thread. It's a dispatcher arrangement, and
-# it will also send periodic (~30 second interval) keepalive messages to the
-# server side. $shared will contain a shared data structure with an incoming
-# request queue (from the caller to the server), with data being returned to
-# the client through a reference, and completion notification handled via a
-# Thread::Semaphore object.. It also contains a 'running' flag, to allow
-# potential callers to know if the thread is in play or not.
+# This function is the body of our thread. It's a hybrid dispatcher
+# arrangement, and it will also send periodic (~30 second interval)
+# keepalive messages to the server side. $shared will contain a shared
+# data structure containing completion handler blocks, with references
+# to return data to callers, and completion notifications handled via
+# Thread::Semaphore objects. It also contains a 'running' flag, to
+# allow potential callers to know if the thread is in play or not.
 sub session_thread { # {{{1
 	my($shared, $host, $port) = @_;
 
@@ -110,15 +110,22 @@ sub session_thread { # {{{1
 	# Set up a poll object for checking out our socket. Also preallocate
 	# several variables which will be used in the main loop.
 	my $poll = new IO::Poll;
-	$poll->mask($conn, POLLRDNORM);
-	my($data, $real_length, $resp);
-	my($type, $cmd, $id, $errcode, $length, $reserved);
+	$poll->mask($conn, POLLIN | POLLHUP);
+	my($data, $real_length, $resp, $type, $cmd, $id, $errcode, $length,
+			$reserved, $rsz, $userBytes, $ev);
+MAINLOOP:
 	while ($$shared{'exit'} == 0) {
 		if ($poll->poll(30)) {
+			$ev = $poll->events($conn);
+			if ($ev & POLLHUP) {
+				# If this happens, the socket is (almost certainly) no
+				# longer connected to the peer, so we should bail.
+				last MAINLOOP;
+			}
 			# Try to get a message from the server.
-			my $rsz = sysread($conn, $resp, 16);
-			last unless defined $rsz;
-			next unless $rsz == 16;
+			$rsz = sysread($conn, $resp, 16);
+			last MAINLOOP unless defined $rsz;
+			next MAINLOOP unless $rsz == 16;
 			($type, $cmd, $id, $errcode, $length, $reserved) =
 					unpack('CCnNNN', $resp);
 	
@@ -138,7 +145,7 @@ sub session_thread { # {{{1
 				}
 
 				elsif ($cmd == OP_DSI_ATTENTION) {
-					my ($userBytes) = unpack('n', $data);
+					($userBytes) = unpack('n', $data);
 					# Queue the notification for later processing
 					push(@{$$shared{'attnq'}}, $userBytes);
 				}
@@ -299,13 +306,13 @@ sub SendMessage { # {{{1
 		return kFPNoServer;
 	}
 	# Assemble the message header to be sent to the AFP over TCP server.
-	# Arg 1: byte Flags: 0 for request, 1 for reply
-	# Arg 2: byte Command
+	# Arg 1: byte  Flags: 0 for request, 1 for reply
+	# Arg 2: byte  Command
 	# Arg 3: short RequestID
-	# Arg 4: long ErrCode: should be 0 for requests, should contain the
+	# Arg 4: long  ErrCode: should be 0 for requests, should contain the
 	# 		data offset for DSIWrite messages
-	# Arg 5: long MsgLength
-	# Arg 6: long Reserved: 0
+	# Arg 5: long  MsgLength
+	# Arg 6: long  Reserved: 0
 	my $msg = pack('CCnNNNa*', 0, $cmd, $reqId,
 			$d_len > 0 ? length($message) : 0,
 			length($message) + $d_len, 0, $message);
@@ -316,10 +323,7 @@ sub SendMessage { # {{{1
 		$$self{'Shared'}{'handlers'}{$reqId} = $handler;
 	}
 
-	# Don't send the message until after the handler has been set. Otherwise
-	# we open ourselves up to a race condition which can cause the whole mess
-	# to block forever. :|
-	# Okay, let's try direct dispatch instead of queuing...
+	# Send the request packet to the server.
 	$$self{'Shared'}{'conn_sem'}->down();
 	syswrite($$self{'Conn'}, $msg);
 	if ($d_len) {
