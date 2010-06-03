@@ -363,9 +363,12 @@ sub getattr { # {{{1
 		# permission mask
 		exists($$resp{'UnixPerms'}) ? $$resp{'UnixPerms'} :
 				($$resp{'FileIsDir'} ? 040755 : 0100644),
-		# link count
-		#$$resp{'FileIsDir'} ? $$resp{'OffspringCount'} + 2 : 1,
-		$$resp{'FileIsDir'} ? 2 : 1,
+		# link count; not really technically correct (should just be the
+        # number of subdirs), but there's not a convenient way to get just
+        # that via AFP, other than walking the directory. for what it's
+        # worth, it looks (empirically) like this is what apple's client
+        # does too, instead of walking the dir.
+		$$resp{'FileIsDir'} ? $$resp{'OffspringCount'} + 2 : 1,
 		# UID number
 		exists($$resp{'UnixUID'}) ? $$resp{'UnixUID'} : 0,
 		# GID number
