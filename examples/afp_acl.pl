@@ -8,12 +8,13 @@ use Net::AFP::ACL;
 use File::ExtAttr qw(:all);
 use Getopt::Long;
 use Encode;
-use Errno qw(:POSIX ENODATA);
+use Errno qw(:POSIX);
 # }}}1
 
 # define constants {{{1
 use constant XATTR_NAME		=> 'afp_acl';
 use constant XATTR_NS		=> 'system';
+sub ENODATA { return($^O eq 'freebsd' ? &Errno::ENOATTR : &Errno::ENODATA); }
 # }}}1
 
 # Take a binary packed ACL representation and generate a structured

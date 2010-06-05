@@ -34,10 +34,12 @@ use Socket;						# for socket related constants for
 use Fcntl qw(:mode);			# macros and constants related to symlink
 								# checking code
 use Data::Dumper;				# for diagnostic output when debugging is on
-use Errno qw(:POSIX ENODATA);	# Standard errors codes.
+use Errno qw(:POSIX);	# Standard errors codes.
 # File opening mode macros.
 use Fcntl qw(O_RDONLY O_WRONLY O_RDWR O_ACCMODE);
 use Fuse qw(:xattr);
+
+sub ENODATA { return($^O eq 'freebsd' ? &Errno::ENOATTR : &Errno::ENODATA); }
 
 # We need Data::UUID for a portable means to get a UUID to identify
 # ourselves to the AFP server for FPAccess() calls; if it's there, it's
@@ -634,6 +636,8 @@ sub unlink { # {{{1
 	return -&ENOTEMPTY	if $rc == kFPDirNotEmpty;
 	return -&EBADF;
 } # }}}1
+
+sub rmdir { return Net::AFP::Fuse::unlink(@_); }
 
 # seems OS X 10.4 causes the newly created symlink to be locked, so once
 # you create it, you can't remove it via AFP until you unmount the volume
