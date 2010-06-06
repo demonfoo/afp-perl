@@ -703,9 +703,7 @@ sub GetTransaction { # {{{1
 			# If the caller asked to block to wait, restore the semaphore
 			# count to where it should be.
 			if ($do_block) {
-				for (my $j = 0; $j < $i - 1; $j++) {
-					$$self{'Shared'}{'RqCB_sem'}->up();
-				}
+				$$self{'Shared'}{'RqCB_sem'}->up($i - 1);
 			}
 			return $RqCB;
 		}
