@@ -1,13 +1,12 @@
 # This package implements the 2-Way Random Number Exchange User Authentication
 # Method for AFP. It uses Crypt::DES for the actual DES encryption used
-# as part of the authentication process. It uses IO::File so that /dev/urandom
-# may be used as a random value source.
+# as part of the authentication process.
 
 package Net::AFP::UAMs::Randnum2;
 use constant UAMNAME => '2-Way Randnum exchange';
 
-use IO::File;
 use Crypt::DES;
+use Crypt::CBC;
 use Net::AFP::Result;
 use strict;
 use warnings;
@@ -63,9 +62,7 @@ sub Authenticate {
 	# Get some random bytes to send to the server. It will encrypt its copy
 	# of the password, and send it back to us, to verify that it too has a
 	# copy of the password, and it's not just phishing for hashes.
-	my $randsrc = new IO::File('/dev/urandom', 'r');
-	my $my_randnum = '';
-	die('Random source problem!') unless read($randsrc, $my_randnum, 8) == 8;
+	my $my_randnum = Crypt::CBC->_get_random_bytes(8);
 	print '$my_randnum is 0x', unpack('H*', $my_randnum), "\n"
 			if defined $::__AFP_DEBUG;
 

@@ -17,9 +17,6 @@ use constant S2CIV => 'CJalbert';
 use Crypt::CAST5;
 # Provides the cipher-block chaining layer over the encryption algorithm.
 use Crypt::CBC;
-# Used to read from /dev/urandom for originating random data for the
-# cryptographic exchanges.
-use IO::File;
 # Pull in the module containing all the result code symbols.
 use Net::AFP::Result;
 # Provides large-integer mathematics features, necessary for the
@@ -120,7 +117,6 @@ sub zeropad { return('0' x ($_[1] - length($_[0])) . $_[0]); }
 # +---------+-----------------+----------------------------------------------+
 sub Authenticate {
 	my($session, $AFPVersion, $username, $pw_cb) = @_;
-	my $randsrc = new IO::File('/dev/urandom', 'r');
 
 	# Ensure that we've been handed an appropriate object.
 	die('Object MUST be of type Net::AFP!')
@@ -177,9 +173,7 @@ sub Authenticate {
 
 	# Get random bytes that constitute a large exponent for the random number
 	# exchange we do.
-	my $Ra_binary = '';
-	die('Random source problem!')
-			unless read($randsrc, $Ra_binary, $len) == $len;
+	my $Ra_binary = Crypt::CBC->_get_random_bytes($len);
 	my $Ra = new Math::BigInt('0x' . unpack('H*', $Ra_binary));
 	undef $Ra_binary;
 	print '$Ra is ', $Ra->as_hex(), "\n" if defined $::__AFP_DEBUG;
@@ -205,9 +199,7 @@ sub Authenticate {
 	undef $K_binary;
 
 	# Get our nonce, which we'll send to the server in the ciphertext.
-	my $clientNonce_binary = '';
-	die('Random source problem!')
-			unless read($randsrc, $clientNonce_binary, 16) == 16;
+	my $clientNonce_binary = Crypt::CBC->_get_random_bytes(16);
 	my $clientNonce = new Math::BigInt('0x' .
 			unpack('H*', $clientNonce_binary));
 	print '$clientNonce is ', $clientNonce->as_hex(), "\n"
@@ -309,7 +301,6 @@ sub Authenticate {
 
 sub ChangePassword {
 	my($session, $username, $oldPassword, $newPassword) = @_;
-	my $randsrc = new IO::File('/dev/urandom', 'r');
 
 	# Ensure that we've been handed an appropriate object.
 	die('Object MUST be of type Net::AFP!')
@@ -355,9 +346,7 @@ sub ChangePassword {
 
 	# Get random bytes that constitute a large exponent for the random number
 	# exchange we do.
-	my $Ra_binary = '';
-	die('Random source problem!')
-			unless read($randsrc, $Ra_binary, $len) == $len;
+	my $Ra_binary = Crypt::CBC->_get_random_bytes($len);
 	my $Ra = new Math::BigInt('0x' . unpack('H*', $Ra_binary));
 	undef $Ra_binary;
 	print '$Ra is ', $Ra->as_hex(), "\n" if defined $::__AFP_DEBUG;
@@ -381,9 +370,7 @@ sub ChangePassword {
 	undef $K;
 
 	# Get our nonce, which we'll send to the server in the ciphertext.
-	my $clientNonce_binary = '';
-	die('Random source problem!')
-			unless read($randsrc, $clientNonce_binary, 16) == 16;
+	my $clientNonce_binary = Crypt::CBC->_get_random_bytes(16);
 	my $clientNonce = new Math::BigInt('0x' .
 			unpack('H*', $clientNonce_binary));
 	print '$clientNonce is ', $clientNonce->as_hex(), "\n"
