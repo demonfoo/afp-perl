@@ -111,11 +111,12 @@ sub session_thread { # {{{1
 	# several variables which will be used in the main loop.
 	my $poll = new IO::Poll;
 	$poll->mask($conn, POLLIN | POLLHUP);
-	my($data, $real_length, $resp, $type, $cmd, $id, $errcode, $length,
-			$reserved, $rsz, $userBytes, $ev);
+	my ($data, $real_length, $resp, $type, $cmd, $id, $errcode, $length,
+			$reserved, $rsz, $userBytes, $ev, $now);
+	my $last_tickle = 0;
 MAINLOOP:
 	while ($$shared{'exit'} == 0) {
-		if ($poll->poll(30)) {
+		if ($poll->poll(0.5)) {
 			$ev = $poll->events($conn);
 			if ($ev & POLLHUP) {
 				# If this happens, the socket is (almost certainly) no
@@ -172,13 +173,17 @@ MAINLOOP:
 			}
 		}
 
-		# send a DSITickle to the server
-		# Field 2: Command: DSITickle(5)
-		# Manually queue the DSITickle message.
-		$$shared{'conn_sem'}->down();
-		syswrite($conn, pack('CCnNNN', 0, OP_DSI_TICKLE,
-				$$shared{'requestid'}++ % 65536, 0, 0, 0));
-		$$shared{'conn_sem'}->up();
+		$now = time();
+		if (($now - $last_tickle) >= 30) {
+			# send a DSITickle to the server
+			# Field 2: Command: DSITickle(5)
+			# Manually queue the DSITickle message.
+			$$shared{'conn_sem'}->down();
+			syswrite($conn, pack('CCnNNN', 0, OP_DSI_TICKLE,
+					$$shared{'requestid'}++ % 65536, 0, 0, 0));
+			$$shared{'conn_sem'}->up();
+			$last_tickle = $now;
+		}
 	}
 	$$shared{'running'} = -1;
 	undef $$shared{'conn_fd'};

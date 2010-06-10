@@ -125,7 +125,7 @@ sub close { # {{{1
 	my ($self) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
-#	$$self{'Session'}->DSICloseSession();
+	$$self{'Session'}->DSICloseSession();
 	$$self{'Session'}->close();
 } # }}}1
 
