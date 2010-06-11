@@ -186,7 +186,8 @@ major and minor version number pair, and determine their relationship.
 sub CompareByVersionNum {
 	my ($session, $major, $minor, $cmptype) = @_;
 
-	my $running_ver = $versionmap{$$session{'AFPVersion'}};
+	my $ver_str = ref($session) ? $$session{'AFPVersion'} : $session;
+	my $running_ver = $versionmap{$ver_str};
 	my($r_major, $r_minor) = @$running_ver{'MajorNumber', 'MinorNumber'};
 
 	if ($cmptype == kFPVerNewerThan) {

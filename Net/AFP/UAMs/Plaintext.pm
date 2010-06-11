@@ -22,12 +22,16 @@ sub Authenticate {
 			unless ref($pw_cb) eq 'CODE';
 
 	my $pw_data = pack('a8', &$pw_cb());
-	my $rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, $username, 3, '',
-			$pw_data);
-	print 'FPLoginExt() completed with result code ', $rc, "\n"
-			if defined $::__AFP_DEBUG;
-
-	if ($rc == kFPCallNotSupported) {
+	my $rc;
+	
+	if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
+			kFPVerAtLeast)) {
+		$rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, $username,
+				3, '', $pw_data);
+		print 'FPLoginExt() completed with result code ', $rc, "\n"
+				if defined $::__AFP_DEBUG;
+	}
+	else {
 		my $authinfo = substr(pack('xC/a*x![s]a8', $username, $pw_data), 1);
 		$rc = $session->FPLogin($AFPVersion, UAMNAME, $authinfo);
 		print 'FPLogin() completed with result code ', $rc, "\n"

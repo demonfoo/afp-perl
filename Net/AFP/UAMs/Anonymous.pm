@@ -4,6 +4,7 @@
 package Net::AFP::UAMs::Anonymous;
 use constant UAMNAME => 'No User Authent';
 use Net::AFP::Result;
+use Net::AFP::Versions;
 
 use strict;
 use warnings;
@@ -20,13 +21,18 @@ sub Authenticate {
 	die("Object MUST be of type Net::AFP!")
 			unless ref($session) and $session->isa('Net::AFP');
 	
-	my $rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, '', 3, '');
-	print 'FPLoginExt() completed with result code ', $rc, "\n"
-			if defined $::__AFP_DEBUG;
+	my $rc;
 
-	if ($rc == kFPCallNotSupported) {
+	if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
+			kFPVerAtLeast)) {
+		$rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, '', 3, '');
+		print 'FPLoginExt() completed with result code ', $rc, "\n"
+				if defined $::__AFP_DEBUG;
+	}
+	else {
 		$rc = $session->FPLogin($AFPVersion, UAMNAME, '');
 		print 'FPLogin() completed with result code ', $rc, "\n"
+				if defined $::__AFP_DEBUG;
 	}
 
 	return $rc;

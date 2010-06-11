@@ -133,12 +133,16 @@ sub Authenticate {
 	# start deriving values later.
 	my $resp;
 	# Sending message 1.
-	my $rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, $username, 3, '',
-			undef, \$resp);
-	print 'FPLoginExt() completed with result code ', $rc, "\n"
-			if defined $::__AFP_DEBUG;
-
-	if ($rc == kFPCallNotSupported) {
+	my $rc;
+	
+	if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
+			kFPVerAtLeast)) {
+		$rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, $username,
+				3, '', undef, \$resp);
+		print 'FPLoginExt() completed with result code ', $rc, "\n"
+				if defined $::__AFP_DEBUG;
+	}
+	else {
 		$rc = $session->FPLogin($AFPVersion, UAMNAME,
 				pack('C/a*x![s]', $username), \$resp);
 		print 'FPLogin() completed with result code ', $rc, "\n"

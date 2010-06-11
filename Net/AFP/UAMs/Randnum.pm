@@ -29,12 +29,16 @@ sub Authenticate {
 	# Pack just the username into a Pascal-style string, and send that to
 	# the server.
 	my $resp = undef;
-	my $rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, $username, 3, '',
-			undef, \$resp);
-	print 'FPLoginExt() completed with result code ', $rc, "\n"
-			if defined $::__AFP_DEBUG;
-
-	if ($rc == kFPCallNotSupported) {
+	my $rc;
+	
+	if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
+			kFPVerAtLeast)) {
+		$rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, 3, $username,
+				3, '', undef, \$resp);
+		print 'FPLoginExt() completed with result code ', $rc, "\n"
+				if defined $::__AFP_DEBUG;
+	}
+	else {
 		my $authinfo = pack('C/a*', $username);
 		$rc = $session->FPLogin($AFPVersion, UAMNAME, $authinfo, \$resp);
 		print 'FPLogin() completed with result code ', $rc, "\n"
