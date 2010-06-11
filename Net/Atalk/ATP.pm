@@ -690,7 +690,7 @@ sub GetTransaction { # {{{1
 	my $RqCB_queue = $$self{'Shared'}{'RqCB_txq'};
 
 	# Handle optionally blocking for a new transaction.
-	if ($do_block) { $$self{'Shared'}{'RqCB_sem'}->down() }
+	$$self{'Shared'}{'RqCB_sem'}->down() if $do_block;
 
 	for (my $i = 0; $i < scalar(@$RqCB_queue); $i++) {
 		# If no transaction filter was passed, or the transaction filter
@@ -702,14 +702,12 @@ sub GetTransaction { # {{{1
 					($i + 1) .. $#$RqCB_queue];
 			# If the caller asked to block to wait, restore the semaphore
 			# count to where it should be.
-			if ($do_block) {
-				$$self{'Shared'}{'RqCB_sem'}->up($i - 1);
-			}
+			$$self{'Shared'}{'RqCB_sem'}->up($i - 1) if $do_block;
 			return $RqCB;
 		}
 		# Down the sem again, so that if we're at the last, we'll block
 		# until another is enqueued.
-		if ($do_block) { $$self{'Shared'}{'RqCB_sem'}->down() }
+		$$self{'Shared'}{'RqCB_sem'}->down() if $do_block;
 	}
 	# If we reach this point, the caller didn't ask to block *and* no
 	# transactions matched (or none were in the waiting queue), so just

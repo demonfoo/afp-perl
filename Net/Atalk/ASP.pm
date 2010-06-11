@@ -21,7 +21,7 @@ Net::Atalk::ASP - Object interface for AppleTalk Session Protocol
 
 =head1 DESCRIPTION
 
-C<Net::Atalk::ATP> provides an object-based interface to interacting with
+C<Net::Atalk::ASP> provides an object-based interface to interacting with
 AppleTalk Session Protocol-based services, specifically AFP. It builds on
 the L<Net::Atalk::ATP> interface to implement the command semantics.
 
@@ -149,7 +149,7 @@ sub SPGetParms { # {{{1
 	return kFPNoErr;
 } # }}}1
 
-=item SPGetStatus
+=item SPGetStatus (RESP_R)
 
 The C<SPGetStatus> call is used by a workstation ASP client to obtain
 status information for a particular server.
@@ -389,7 +389,7 @@ sub SPWrite { # {{{1
 		}
 		my $elem = &share({});
 		%$elem = ( 'userbytes'	=> pack('x[4]'),
-				   'data'	=> substr($$data_r, $totalsend, $sendsize) );
+				   'data'		=> substr($$data_r, $totalsend, $sendsize) );
 		push(@$resp, $elem);
 		$totalsend += $sendsize;
 	} # }}}2
