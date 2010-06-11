@@ -124,7 +124,9 @@ MAINLOOP:
 				last MAINLOOP;
 			}
 			# Try to get a message from the server.
+			$$shared{'conn_sem'}->down();
 			$rsz = sysread($conn, $resp, 16);
+			$$shared{'conn_sem'}->up();
 			last MAINLOOP unless defined $rsz;
 			next MAINLOOP unless $rsz == 16;
 			($type, $cmd, $id, $errcode, $length, $reserved) =
@@ -134,8 +136,10 @@ MAINLOOP:
 			# Get any additional data from the server, if the message
 			# indicated that there was a payload.
 			until ($real_length >= $length) {
+				$$shared{'conn_sem'}->down();
 				$real_length += sysread($conn, $data, $length - $real_length,
 						$real_length);
+				$$shared{'conn_sem'}->up();
 			}
 
 			if ($type == 0) {
@@ -264,6 +268,8 @@ sub close { # {{{1
 } # }}}1
 
 =item SendMessage (CMD, MESSAGE, DATA_R, D_LEN, SEM_R, RC_R, RESP_R)
+
+=cut
 # Arguments:
 #	$self:		A Net::DSI instance.
 #	$cmd:		The numeric opcode of the command we wish to issue to the DSI
@@ -279,7 +285,6 @@ sub close { # {{{1
 #				receive the response when one is received. If no response is
 #				expected, this should be undef.
 #	$rc_r:		A reference to a scalar,
-=cut
 sub SendMessage { # {{{1
 	my ($self, $cmd, $message, $data_r, $d_len, $sem_r, $resp_r, $rc_r) = @_;
 
