@@ -112,7 +112,7 @@ sub session_thread { # {{{1
 	my $poll = new IO::Poll;
 	$poll->mask($conn, POLLIN | POLLHUP);
 	my ($data, $real_length, $resp, $type, $cmd, $id, $errcode, $length,
-			$reserved, $rsz, $userBytes, $ev, $now);
+			$reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref);
 	my $last_tickle = 0;
 MAINLOOP:
 	while ($$shared{'exit'} == 0) {
@@ -131,17 +131,9 @@ MAINLOOP:
 			next MAINLOOP unless $rsz == 16;
 			($type, $cmd, $id, $errcode, $length, $reserved) =
 					unpack('CCnNNN', $resp);
-	
-			$real_length = 0;
-			# Get any additional data from the server, if the message
-			# indicated that there was a payload.
-			until ($real_length >= $length) {
-				$$shared{'conn_sem'}->down();
-				$real_length += sysread($conn, $data, $length - $real_length,
-						$real_length);
-				$$shared{'conn_sem'}->up();
-			}
 
+			$rb_ref = *bar{SCALAR};
+			$sem_ref = undef;
 			if ($type == 0) {
 				# DSICloseSession from server; this means the server is
 				# going away (i.e., it's shutting down).
@@ -150,9 +142,13 @@ MAINLOOP:
 				}
 
 				elsif ($cmd == OP_DSI_ATTENTION) {
+					$$shared{'conn_sem'}->down();
+					sysread($conn, $data, $length);
+					$$shared{'conn_sem'}->up();
 					($userBytes) = unpack('n', $data);
 					# Queue the notification for later processing
 					push(@{$$shared{'attnq'}}, $userBytes);
+					next MAINLOOP;
 				}
 			} else {
 				# Handle negative return codes in the canonical way.
@@ -165,16 +161,30 @@ MAINLOOP:
 					$handler = $$shared{'handlers'}{$id};
 					delete $$shared{'handlers'}{$id};
 					# push the data back to the caller
-					${$$handler[1]} = $data;
+					#${$$handler[1]} = ($length ? $data : '');
+					$rb_ref = $$handler[1];
 					# push the return code in the message back to the caller
 					# HACKHACKHACK - compat hack for netatalk
 					${$$handler[2]} = ($errcode > 0) ? 0 : $errcode;
 					# release the semaphore, after which the caller will
 					# continue (if it had a semaphore, it should be blocking
 					# on down())
-					${$$handler[0]}->up();
+					#${$$handler[0]}->up();
+					$sem_ref = $$handler[0];
 				}
 			}
+
+			$real_length = 0;
+			# Get any additional data from the server, if the message
+			# indicated that there was a payload.
+			until ($real_length >= $length) {
+				$$shared{'conn_sem'}->down();
+				$real_length += sysread($conn, $$rb_ref, $length - $real_length,
+						$real_length);
+				$$shared{'conn_sem'}->up();
+			}
+
+			$$sem_ref->up() if defined $sem_ref;
 		}
 
 		$now = time();

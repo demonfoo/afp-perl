@@ -15,8 +15,6 @@ use diagnostics;
 use Net::AFP::TCP;				# the class which actually sets up and
 								# handles the guts of talking to an AFP
 								# server via TCP/IP
-use Net::AFP::Atalk;			# The class to connect to an AppleTalk server
-								# via AppleTalk protocol.
 use Net::AFP::Result;			# AFP result codes
 use Net::AFP::VolAttrs;			# volume attribute definitions
 use Net::AFP::VolParms;			# parameters for FPOpenVol()
@@ -27,26 +25,34 @@ use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 use Net::AFP::ExtAttrs;
 use Net::AFP::ACL;
-use Net::Atalk::NBP;
 use Encode;						# handle encoding/decoding strings
 use Socket;						# for socket related constants for
 								# parent/child IPC code
-use Fcntl qw(:mode);			# macros and constants related to symlink
-								# checking code
+use Fcntl qw(O_RDONLY O_WRONLY O_RDWR O_ACCMODE :mode);
 use Data::Dumper;				# for diagnostic output when debugging is on
-use Errno qw(:POSIX);	# Standard errors codes.
-# File opening mode macros.
-use Fcntl qw(O_RDONLY O_WRONLY O_RDWR O_ACCMODE);
-use Fuse qw(:xattr);
+use Errno qw(:POSIX);			# Standard errors codes.
+use Fuse qw(:xattr);			# Still need this for extended attribute
+								# related macros.
 
 sub ENODATA { return($^O eq 'freebsd' ? &Errno::ENOATTR : &Errno::ENODATA); }
+
+my $has_atalk = 0;
+eval {
+	use Net::AFP::Atalk;		# The class to connect to an AppleTalk server
+								# via AppleTalk protocol.
+	use Net::Atalk::NBP;
+};
+unless ($@) {
+	$has_atalk = 1;
+	Net::Atalk::NBP->import;
+}
 
 # We need Data::UUID for a portable means to get a UUID to identify
 # ourselves to the AFP server for FPAccess() calls; if it's there, it's
 # definitely preferred.
-my $has_Data_UUID = 1;
+my $has_Data__UUID = 0;
 eval { require Data::UUID; };
-if ($@) { $has_Data_UUID = 0; }
+unless ($@) { $has_Data__UUID = 1; }
 
 # How much write data can we buffer locally before flushing to the server?
 use constant COALESCE_MAX		=> 131072;
@@ -107,6 +113,9 @@ sub new { # {{{1
 	my $srvInfo;
 	my $rc;
 	if ($urlparms{'atalk_transport'}) {
+		unless ($has_atalk) {
+			die "AppleTalk support libraries not available";
+		}
 		# Query for one record that will match, and return as soon as we
 		# have it.
 		my @records = NBPLookup($urlparms{'host'}, 'AFPServer',
@@ -248,6 +257,9 @@ sub new { # {{{1
 	$$obj{'DForkLenKey'}	= 'DataForkLen';
 	$$obj{'RForkLenKey'}	= 'RsrcForkLen';
 	$$obj{'UseExtOps'}		= 0;
+	$$obj{'ReadFn'}			= sub { return &Net::AFP::FPRead(@_[0..3], undef, undef, $_[4]); };
+	$$obj{'WriteFn'}		= \&Net::AFP::FPWrite;
+	$$obj{'EnumFn'}			= \&Net::AFP::FPEnumerate;
 	# I *think* large file support entered the picture as of AFP 3.0...
 	if (Net::AFP::Versions::CompareByVersionNum($$obj{'afpconn'}, 3, 0,
 			kFPVerAtLeast)) {
@@ -256,6 +268,12 @@ sub new { # {{{1
 		$$obj{'DForkLenKey'}	= 'ExtDataForkLen';
 		$$obj{'RForkLenKey'}	= 'ExtRsrcForkLen';
 		$$obj{'UseExtOps'}		= 1;
+		$$obj{'ReadFn'}			= \&Net::AFP::FPReadExt;
+		$$obj{'WriteFn'}		= \&Net::AFP::FPWriteExt;
+	}
+	if (Net::AFP::Versions::CompareByVersionNum($$obj{'afpconn'}, 3, 1,
+			kFPVerAtLeast)) {
+		$$obj{'EnumFn'}			= \&Net::AFP::FPEnumerateExt2;
 	}
 
 	# Not checking the return code here. If this fails, $$self{'DTRefNum'} won't be
@@ -264,7 +282,7 @@ sub new { # {{{1
 	$$obj{'afpconn'}->FPOpenDT($$obj{'volID'}, \$$obj{'DTRefNum'});
 
 	if ($$obj{'volAttrs'} & kSupportsACLs) {
-	    if ($has_Data_UUID) {
+	    if ($has_Data__UUID) {
 		    my $uo = new Data::UUID;
 		    $$obj{'client_uuid'} = $uo->create();
 	    } else {
@@ -438,13 +456,8 @@ sub readlink { # {{{1
 		my $pos = 0;
 		do {
 			my $readText;
-			if ($$self{'UseExtOps'}) {
-				$rc = $$self{'afpconn'}->FPReadExt($$sresp{'OForkRefNum'}, $pos,
-						1024, \$readText);
-			} else {
-				$rc = $$self{'afpconn'}->FPRead($$sresp{'OForkRefNum'}, $pos,
-						1024, undef, undef, \$readText);
-			}
+			$rc = &{$$self{'ReadFn'}}($$self{'afpconn'},
+					$$sresp{'OForkRefNum'}, $pos, 1024, \$readText);
 			return -&EACCES if $rc == kFPAccessDenied;
 			return -&EINVAL unless $rc == kFPNoErr or $rc == kFPEOFErr;
 			$linkPath .= $readText;
@@ -478,18 +491,13 @@ sub getdir { # {{{1
 	# directory, extra requests will have to be sent. Larger set sizes
 	# mean less time spent waiting around for responses.
 	my $setsize = 500;
-	my @arglist = ($$self{'volID'}, $$self{'topDirID'}, $$self{'pathFlag'}, $$self{'pathFlag'}, $setsize, 1,
-			32767, $$self{'pathType'}, $fileName, \$resp);
+	my @arglist = ($$self{'volID'}, $$self{'topDirID'}, $$self{'pathFlag'},
+			$$self{'pathFlag'}, $setsize, 1, 32767, $$self{'pathType'},
+			$fileName, \$resp);
 	my $rc = undef;
 	# loop reading entries {{{2
 	while (1) {
-		$rc = $$self{'afpconn'}->FPEnumerateExt2(@arglist);
-		if ($rc == kFPCallNotSupported) {
-			$rc = $$self{'afpconn'}->FPEnumerateExt(@arglist);
-			if ($rc == kFPCallNotSupported) {
-				$rc = $$self{'afpconn'}->FPEnumerate(@arglist);
-			}
-		}
+		$rc = &{$$self{'EnumFn'}}($$self{'afpconn'}, @arglist);
 
 		last unless $rc == kFPNoErr;
 
@@ -685,13 +693,8 @@ sub symlink { # {{{1
 	my $forkID = $$resp{'OForkRefNum'};
 
 	my $lastWritten;
-	if ($$self{'UseExtOps'}) {
-		$rc = $$self{'afpconn'}->FPWriteExt(0, $forkID, 0, length($target),
-				\$target, \$lastWritten);
-	} else {
-		$rc = $$self{'afpconn'}->FPWrite(0, $forkID, 0, length($target),
-				\$target, \$lastWritten);
-	}
+	$rc = &{$$self{'WriteFn'}}($$self{'afpconn'}, 0, $forkID, 0,
+			length($target), \$target, \$lastWritten);
 
 	$$self{'afpconn'}->FPCloseFork($forkID);
 
@@ -1015,15 +1018,11 @@ sub read { # {{{1
 	my $forkID = $$self{'ofcache'}{$fileName}{'refnum'};
 	$$self{'ofcache'}{$fileName}{'astamp'} = time();
 	my $resp;
-	my $rc;
-	if ($$self{'UseExtOps'}) {
-		$rc = $$self{'afpconn'}->FPReadExt($forkID, $off, $len, \$resp);
-	} else {
-		$rc = $$self{'afpconn'}->FPRead($forkID, $off, $len, undef, undef, \$resp);
-	}
+	my $rc = &{$$self{'ReadFn'}}($$self{'afpconn'}, $forkID, $off, $len,
+			\$resp);
 	return $resp     if (($rc == kFPNoErr)
-			|| ($rc == kFPEOFErr && defined($resp)));
-	return -&ESPIPE  if $rc == kFPEOFErr;
+			|| ($rc == kFPEOFErr));
+	#return -&ESPIPE  if $rc == kFPEOFErr;
 	return -&EBADF   if $rc == kFPAccessDenied;
 	return -&ETXTBSY if $rc == kFPLockErr;
 	return -&EINVAL  if $rc == kFPParamErr;
@@ -1089,14 +1088,8 @@ sub write { # {{{1
 	}
 	# }}}2
 	my $lastWritten;
-	my $rc;
-	if ($$self{'UseExtOps'}) {
-		$rc = $$self{'afpconn'}->FPWriteExt(0, $forkID, $offset, $dlen,
-				$data_r, \$lastWritten);
-	} else {
-		$rc = $$self{'afpconn'}->FPWrite(0, $forkID, $offset, $dlen,
-                $data_r, \$lastWritten);
-	}
+	my $rc = &{$$self{'WriteFn'}}($$self{'afpconn'}, 0, $forkID, $offset,
+			$dlen, $data_r, \$lastWritten);
 	
 	return($lastWritten - $offset) if $rc == kFPNoErr;
 	return -&EACCES		 if $rc == kFPAccessDenied;
@@ -1170,18 +1163,16 @@ sub flush { # {{{1
 #			}
 			my $lastwr;
 			my $rc;
-			my $write_fn = \&Net::AFP::FPWrite;
-			if ($$self{'UseExtOps'}) { $write_fn = \&Net::AFP::FPWriteExt }
 
 			# Try to zero-copy whenever possible...
-			$rc = &$write_fn($$self{'afpconn'}, 0, $forkID, $offset, $len,
-					$data_ref, \$lastwr);
+			$rc = &{$$self{'WriteFn'}}($$self{'afpconn'}, 0, $forkID,
+					$offset, $len, $data_ref, \$lastwr);
 			# Continue writing if needed.
 			while ($lastwr < ($offset + $len) && $rc == kFPNoErr) {
 				my $dchunk = substr($$data_ref, $lastwr - $offset,
 						$offset + $len - $lastwr);
-				$rc = &$write_fn($$self{'afpconn'}, 0, $forkID, $lastwr,
-						length($dchunk), \$dchunk, \$lastwr);
+				$rc = &{$$self{'WriteFn'}}($$self{'afpconn'}, 0, $forkID,
+						$lastwr, length($dchunk), \$dchunk, \$lastwr);
 			}
 			undef $$self{'ofcache'}{$fileName}{'coalesce_offset'};
 		}

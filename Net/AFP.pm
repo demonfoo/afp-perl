@@ -3828,8 +3828,8 @@ sub FPLoginCont { # {{{1
 	# the last phase (when it returns kFPNoErr on successful completion).
 	# Thanks, Apple...
 	#### /ERRATA ####
-	if (($rc == kFPAuthContinue or $rc == kFPNoErr)
-			and length($resp) > 0) {
+	if (($rc == kFPAuthContinue || $rc == kFPNoErr)
+			&& defined($resp)) {
 		$$resp_r = {};
 		my $offset = 0;
 		if ($rc == kFPAuthContinue) {

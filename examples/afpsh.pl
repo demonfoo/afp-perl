@@ -36,6 +36,15 @@ use File::Basename;
 use Term::ReadPassword;
 use Time::HiRes qw(gettimeofday);
 use Text::Glob qw(match_glob);
+use Encode;
+use I18N::Langinfo qw(langinfo CODESET);
+
+# Find out the character encoding for the current terminal.
+my $term_enc = langinfo(CODESET);
+
+my $has_Data__UUID = 0;
+eval { require Data::UUID; };
+unless ($@) { $has_Data__UUID = 1; }
 
 my $has_Archive__Tar = 1;
 eval { require Archive::Tar; };
@@ -126,6 +135,17 @@ unless ($rc == kFPNoErr) {
 
 my $volAttrs = $$volInfo{'VolAttribute'};
 
+my $client_uuid;
+if ($volAttrs & kSupportsACLs) {
+	if ($has_Data__UUID) {
+		my $uo = new Data::UUID;
+		$client_uuid = $uo->create();
+	}
+	else {
+	    print "Need Data::UUID class for full ACL functionality, ACL checking disabled\n";
+	}
+}
+
 my $pathType	= kFPLongName;
 my $pathFlag	= kFPLongNameBit;
 my $pathkey		= 'LongName';
@@ -145,7 +165,9 @@ my $DForkLenFlag	= kFPDataForkLenBit;
 my $RForkLenFlag	= kFPRsrcForkLenBit;
 my $DForkLenKey		= 'DataForkLen';
 my $RForkLenKey		= 'RsrcForkLen';
-my $UseExtOps		= 0;
+my $EnumFn			= \&Net::AFP::FPEnumerate;
+my $ReadFn			= sub { return &Net::AFP::FPRead(@_[0..3], undef, undef, $_[4]); };
+my $WriteFn			= \&Net::AFP::FPWrite;
 # I *think* large file support entered the picture as of AFP 3.0...
 if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
 		kFPVerAtLeast)) {
@@ -153,7 +175,13 @@ if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
 	$RForkLenFlag	= kFPExtRsrcForkLenBit;
 	$DForkLenKey	= 'ExtDataForkLen';
 	$RForkLenKey	= 'ExtRsrcForkLen';
-	$UseExtOps		= 1;
+	$ReadFn			= \&Net::AFP::FPReadExt;
+	$WriteFn		= \&Net::AFP::FPWriteExt;
+}
+
+if (Net::AFP::Versions::CompareByVersionNum($session, 3, 1,
+		kFPVerAtLeast)) {
+	$EnumFn			= \&Net::AFP::FPEnumerateExt2;
 }
 
 if (defined $values{'subpath'}) {
@@ -212,15 +240,8 @@ my %commands = (
 				my $offset = 1;
 				do {
 					$results = undef;
-					my @arglist = ($volID, $dirId, $fileBmp, $dirBmp,
+					$rc = &$EnumFn($session, $volID, $dirId, $fileBmp, $dirBmp,
 							1024, $offset, 32767, $pathType, '', \$results);
-					$rc = $session->FPEnumerateExt2(@arglist);
-					if ($rc == kFPCallNotSupported) {
-						$rc = $session->FPEnumerateExt(@arglist);
-					}
-					if ($rc == kFPCallNotSupported) {
-						$rc = $session->FPEnumerate(@arglist);
-					}
 					if (ref($results) eq 'ARRAY') {
 						push(@records, @$results);
 						$offset += scalar(@$results);
@@ -254,19 +275,11 @@ my %commands = (
 			my $pos = 0;
 			while (1) {
 				my $data = '';
-				if ($UseExtOps) {
-					$rc = $session->FPReadExt($$resp{'OForkRefNum'}, $pos,
-							1024, \$data);
-				}
-				else {
-					$rc = $session->FPRead($$resp{'OForkRefNum'}, $pos, 1024,
-							undef, undef, \$data);
-				}
+				$rc = &$ReadFn($session, $$resp{'OForkRefNum'}, $pos,
+						1024, \$data);
 				print $data;
-				if ($rc != kFPNoErr) {
-					last;
-				}
-				$pos += 1024;
+				last if $rc != kFPNoErr || $data eq '';
+				$pos += length($data);
 			}
 			$rc = $session->FPCloseFork($$resp{'OForkRefNum'});
 			if ($rc != kFPNoErr) {
@@ -348,14 +361,8 @@ _EOT_
 		%starttime = %time;
 		while (1) {
 			my $data = '';
-			if ($UseExtOps) {
-				$rc = $session->FPReadExt($$resp{'OForkRefNum'}, $pos,
-						131072, \$data);
-			}
-			else {
-				$rc = $session->FPRead($$resp{'OForkRefNum'}, $pos, 131072,
-						undef, undef, \$data);
-			}
+			$rc = &$ReadFn($session, $$resp{'OForkRefNum'}, $pos,
+					131072, \$data);
 			print $local_fh $data;
 			my $rate = 0;
 			my $delta = (($time{'sec'} - $starttime{'sec'}) + (($time{'usec'} - $starttime{'usec'}) / 1000000.0));
@@ -438,21 +445,19 @@ _EOT_
 		%starttime = %time;
 		my $total = 0;
 		my $wcount = 0;
-		my $write_fn = \&Net::AFP::FPWrite;
-		if ($UseExtOps) { $write_fn = \&Net::AFP::FPWriteExt }
 		while (1) {
 			my $data;
 			my $rcnt = read($srcFile, $data, 131072);
 			last if $rcnt == 0;
 			# try a direct write, and see how far we get; zero-copy is
 			# preferred if possible.
-			$rc = &$write_fn($session, 0x80, $$resp{'OForkRefNum'}, 0,
+			$rc = &$WriteFn($session, 0x80, $$resp{'OForkRefNum'}, 0,
 					length($data), \$data, \$wcount);
 
 			while ($wcount < ($total + $rcnt) && $rc == kFPNoErr) {
 				my $dchunk = substr($data, $wcount - $total,
 						$total + $rcnt - $wcount);
-				$rc = &$write_fn($session, 0x80, $$resp{'OForkRefNum'}, 0,
+				$rc = &$WriteFn($session, 0x80, $$resp{'OForkRefNum'}, 0,
 						length($dchunk), \$dchunk, \$wcount);
 			}
 			$total += $rcnt;
@@ -622,6 +627,7 @@ while (1) {
 		print "\n";
 		last;
 	}
+	$line = decode($term_enc, $line);
 	my @words = shellwords($line);
 	next if (!defined($words[0]) || ($words[0] eq ''));
 	if (exists $commands{$words[0]}) {
@@ -649,6 +655,7 @@ sub do_listentries {
 		else {
 			$up = $$ent{'FileIsDir'} ? 0755 : 0644;
 		}
+		$$ent{$pathkey} =~ tr/\//:/;
 		printf('%s%s%s%s%s%s%s%s%s%s %3d %5d %5d %8s %-11s %s' . "\n",
 			($$ent{'FileIsDir'} == 1 ? 'd' : '-'),
 			($up & 0400 ? 'r' : '-'),
@@ -665,77 +672,79 @@ sub do_listentries {
 			($$ent{'FileIsDir'} == 1 ? 0 : $$ent{$DForkLenKey}),
 			strftime($tfmt, localtime($fmodtime)),
 			$$ent{$pathkey});
-		my $acl_info;
-		my $rc = $session->FPGetACL($volID, $$ent{'ParentDirID'},
-				kFileSec_ACL, 0, $pathType, $$ent{$pathkey}, \$acl_info);
-		if ($rc == kFPNoErr && ($$acl_info{'Bitmap'} & kFileSec_ACL)) {
-			for (my $i = 0; $i <= $#{$$acl_info{'acl_ace'}}; $i++) {
-				my $entry = ${$$acl_info{'acl_ace'}}[$i];
-				my $name;
-				my @args = ();
-				my $rc = $session->FPMapID(kUserUUIDToUTF8Name,
-						$$entry{'ace_applicable'}, \$name);
-				my $idtype;
-				if ($$name{'Bitmap'} == kFileSec_UUID) {
-					$idtype = 'user';
+		if ($client_uuid) {
+			my $acl_info;
+			my $rc = $session->FPGetACL($volID, $$ent{'ParentDirID'},
+					kFileSec_ACL, 0, $pathType, $$ent{$pathkey}, \$acl_info);
+			if ($rc == kFPNoErr && ($$acl_info{'Bitmap'} & kFileSec_ACL)) {
+				for (my $i = 0; $i <= $#{$$acl_info{'acl_ace'}}; $i++) {
+					my $entry = ${$$acl_info{'acl_ace'}}[$i];
+					my $name;
+					my @args = ();
+					my $rc = $session->FPMapID(kUserUUIDToUTF8Name,
+							$$entry{'ace_applicable'}, \$name);
+					my $idtype;
+					if ($$name{'Bitmap'} == kFileSec_UUID) {
+						$idtype = 'user';
+					}
+					elsif ($$name{'Bitmap'} == kFileSec_GRPUUID) {
+						$idtype = 'group';
+					}
+	
+					my $acl_kind = $$entry{'ace_flags'} & KAUTH_ACE_KINDMASK;
+					my $kind = 'unknown';
+					if ($acl_kind == KAUTH_ACE_PERMIT) {
+						$kind = 'allow';
+					}
+					elsif ($acl_kind == KAUTH_ACE_DENY) {
+						$kind = 'deny';
+					}
+	
+					my @actions = ();
+					my $rights = $$entry{'ace_rights'};
+					if ($rights & KAUTH_VNODE_READ_DATA) {
+						push(@actions, $$ent{'FileIsDir'} ? 'list' : 'read');
+					}
+					if ($rights & KAUTH_VNODE_WRITE_DATA) {
+						push(@actions, $$ent{'FileIsDir'} ? 'add_file' : 'write');
+					}
+					if ($rights & KAUTH_VNODE_EXECUTE) {
+						push(@actions, $$ent{'FileIsDir'} ? 'search' : 'execute');
+					}
+					if ($rights & KAUTH_VNODE_DELETE) {
+						push(@actions, 'delete');
+					}
+					if ($rights & KAUTH_VNODE_APPEND_DATA) {
+						push(@actions, $$ent{'FileIsDir'} ? 'add_subdirectory' : 'append');
+					}
+					if ($rights & KAUTH_VNODE_DELETE_CHILD) {
+						push(@actions, 'delete_child');
+					}
+					if ($rights & KAUTH_VNODE_READ_ATTRIBUTES) {
+						push(@actions, 'readattr');
+					}
+					if ($rights & KAUTH_VNODE_WRITE_ATTRIBUTES) {
+						push(@actions, 'writeattr');
+					}
+					if ($rights & KAUTH_VNODE_READ_EXTATTRIBUTES) {
+						push(@actions, 'readextattr');
+					}
+					if ($rights & KAUTH_VNODE_WRITE_EXTATTRIBUTES) {
+						push(@actions, 'writeextattr');
+					}
+					if ($rights & KAUTH_VNODE_READ_SECURITY) {
+						push(@actions, 'readsecurity');
+					}
+					if ($rights & KAUTH_VNODE_WRITE_SECURITY) {
+						push(@actions, 'writesecurity');
+					}
+					if ($rights & KAUTH_VNODE_CHANGE_OWNER) {
+						push(@actions, 'chown');
+					}
+	
+					printf(" \%d: \%s:\%s \%s \%s\n", $i, $idtype,
+							$$name{'UTF8Name'}, $kind, @actions);
 				}
-				elsif ($$name{'Bitmap'} == kFileSec_GRPUUID) {
-					$idtype = 'group';
-				}
-
-				my $acl_kind = $$entry{'ace_flags'} & KAUTH_ACE_KINDMASK;
-				my $kind = 'unknown';
-				if ($acl_kind == KAUTH_ACE_PERMIT) {
-					$kind = 'allow';
-				}
-				elsif ($acl_kind == KAUTH_ACE_DENY) {
-					$kind = 'deny';
-				}
-
-				my @actions = ();
-				my $rights = $$entry{'ace_rights'};
-				if ($rights & KAUTH_VNODE_READ_DATA) {
-					push(@actions, $$ent{'FileIsDir'} ? 'list' : 'read');
-				}
-				if ($rights & KAUTH_VNODE_WRITE_DATA) {
-					push(@actions, $$ent{'FileIsDir'} ? 'add_file' : 'write');
-				}
-				if ($rights & KAUTH_VNODE_EXECUTE) {
-					push(@actions, $$ent{'FileIsDir'} ? 'search' : 'execute');
-				}
-				if ($rights & KAUTH_VNODE_DELETE) {
-					push(@actions, 'delete');
-				}
-				if ($rights & KAUTH_VNODE_APPEND_DATA) {
-					push(@actions, $$ent{'FileIsDir'} ? 'add_subdirectory' : 'append');
-				}
-				if ($rights & KAUTH_VNODE_DELETE_CHILD) {
-					push(@actions, 'delete_child');
-				}
-				if ($rights & KAUTH_VNODE_READ_ATTRIBUTES) {
-					push(@actions, 'readattr');
-				}
-				if ($rights & KAUTH_VNODE_WRITE_ATTRIBUTES) {
-					push(@actions, 'writeattr');
-				}
-				if ($rights & KAUTH_VNODE_READ_EXTATTRIBUTES) {
-					push(@actions, 'readextattr');
-				}
-				if ($rights & KAUTH_VNODE_WRITE_EXTATTRIBUTES) {
-					push(@actions, 'writeextattr');
-				}
-				if ($rights & KAUTH_VNODE_READ_SECURITY) {
-					push(@actions, 'readsecurity');
-				}
-				if ($rights & KAUTH_VNODE_WRITE_SECURITY) {
-					push(@actions, 'writesecurity');
-				}
-				if ($rights & KAUTH_VNODE_CHANGE_OWNER) {
-					push(@actions, 'chown');
-				}
-
-				printf(" \%d: \%s:\%s \%s \%s\n", $i, $idtype,
-						$$name{'UTF8Name'}, $kind, @actions);
 			}
 		}
 	}
@@ -791,11 +800,12 @@ sub expand_globbed_path {
 			$pathElem = shift(@pathElements);
 			next;
 		}
+		$pathElem =~ tr/:/\//;
 		foreach my $expath (@expanded_paths) {
 			my ($rc, $resp, %entries, $elem);
 			do {
-				$rc = $session->FPEnumerateExt2($volid, $$expath[0], $fileBmp,
-						$dirBmp, 256, scalar(keys %entries) + 1, 65536,
+				$rc = &$EnumFn($session, $volid, $$expath[0], $fileBmp,
+						$dirBmp, 256, scalar(keys %entries) + 1, 32767,
 						$pathType, $$expath[1], \$resp);
 				if ($rc == kFPNoErr || $rc == kFPObjectNotFound) {
 					foreach $elem (@$resp) {
@@ -805,6 +815,7 @@ sub expand_globbed_path {
 			} while ($rc == kFPNoErr);
 			my @matches = match_glob($pathElem, keys(%entries));
 			foreach my $match (@matches) {
+				$match =~ tr/\//:/;
 				my $nelem = [];
 				if ($entries{$match}{'FileIsDir'}) {
 					@$nelem = ($entries{$match}{'NodeID'}, '', $match, @$expath[2 .. $#$expath]);
@@ -855,6 +866,7 @@ sub resolve_path {
 			$elem = '';
 			$getParentID = 1;
 		}
+		$elem =~ tr/:/\//;
 		my $resp = '';
 		my $rc = $session->FPGetFileDirParms($volid, $curNode, $fileBmp,
 				$dirBmp, $pathType, $elem, \$resp);

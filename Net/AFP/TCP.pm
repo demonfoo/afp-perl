@@ -97,7 +97,7 @@ sub new { # {{{1
 	bless $obj, $class;
 
 	$$obj{'Session'} = new Net::DSI($host, $port);
-	my $rc = $$obj{'Session'}->DSIOpenSession();
+	my $rc = $$obj{'Session'}->DSIOpenSession('AttentionQuanta' => 2);
 	return($rc == kFPNoErr ? $obj : $rc);
 } # }}}1
 
