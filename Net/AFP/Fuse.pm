@@ -750,15 +750,14 @@ sub rename { # {{{1
 	# FIXME: add FPAccess() check
 
 	my @arglist;
-	my $resp;
 	if ($$old_stat{'FileIsDir'} == 1) {
 		@arglist = ($$self{'volID'}, $$old_stat{'ParentDirID'},
 				$$new_stat{'NodeID'}, $$self{'pathType'}, $oldRealName,
-				$$self{'pathType'}, '', $$self{'pathType'}, $newRealName, \$resp);
+				$$self{'pathType'}, '', $$self{'pathType'}, $newRealName);
 	} else {
 		@arglist = ($$self{'volID'}, $$old_stat{'ParentDirID'},
-				$$new_stat{'NodeID'}, $$self{'pathType'}, $oldRealName, $$self{'pathType'}, '',
-				$$self{'pathType'}, $newRealName, \$resp);
+				$$new_stat{'NodeID'}, $$self{'pathType'}, $oldRealName,
+				$$self{'pathType'}, '', $$self{'pathType'}, $newRealName);
 	}
 	$rc = $$self{'afpconn'}->FPMoveAndRename(@arglist);
 

@@ -4226,10 +4226,6 @@ Type of names in C<$NewName>. See L</"Path Type Constants"> for more information
 
 New name of file or directory (may be null).
 
-=item $resp_r
-
-A reference to a scalar that can be used to return the node ID corresponding to the moved file or directory.
-
 =back
 
 Error replies:
@@ -4279,13 +4275,17 @@ Volume is ReadOnly.
 =back
 
 =cut
+# Note that there is no mechanism here for returning a value from this
+# call; I'm not sure there ever was one, the docs seem pretty wishy-washy
+# about this, and so far I'm not seeing anything in packet dumps to
+# indicate there ever is one. Going back to "Inside AppleTalk", there
+# doesn't seem to be anything returned other than the status code, so
+# I'm going to assume from here on out that that's the case.
 sub FPMoveAndRename { # {{{1
 	my ($self, $VolumeID, $SrcDirID, $DstDirID, $SrcPathType, $SrcPathname,
-			$DstPathType, $DstPathname, $NewType, $NewName, $resp_r) = @_;
+			$DstPathType, $DstPathname, $NewType, $NewName) = @_;
 
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
-	die('$resp_r must be a scalar ref')
-			unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
 
 	my $msg = pack('CxnNNa*a*a*', kFPMoveAndRename, $VolumeID, $SrcDirID,
 			$DstDirID, PackagePath($SrcPathType, $SrcPathname),
@@ -4293,8 +4293,6 @@ sub FPMoveAndRename { # {{{1
 			PackagePath($NewType, $NewName));
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
-	return $rc unless $rc == kFPNoErr;
-	($$resp_r) = unpack('N', $resp);
 	return $rc;
 } # }}}1
 
