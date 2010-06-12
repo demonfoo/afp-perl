@@ -171,6 +171,7 @@ sub new { # {{{1
 				 'RqCB_txq'		=> &share([]),
 				 'RqCB_sem'		=> new Thread::Semaphore(0),
 				 'RqFilters'	=> &share([]),
+				 'TimedCBs'		=> &share([]),
 				 'RspCB_list'	=> &share({}),
 			   );
 	$$obj{'Shared'} = $shared;
@@ -265,13 +266,21 @@ sub thread_core { # {{{1
 	my ($txid, $TxCB, $time, $from, $msg, %msgdata, $msgtype,
 		$wants_sts, $is_eom, $seqno, $RqCB, $is_xo, $xo_tmout, $RspCB, $seq,
 		$pktdata, $ctl_byte, $filter, $rv, $item, $stamp, $port, $paddr,
-		$addr, $txkey);
+		$addr, $txkey, $rec, $cb);
 
 MAINLOOP:
 	while ($$shared{'exit'} == 0) { # {{{2
 		# Okay, now we need to check existing outbound transactions for
 		# status, resends, cleanups, etc...
 		$time = gettimeofday();
+
+		foreach $rec (@{$$shared{'TimedCBs'}}) {
+			if (($$rec{'last_called'} + $$rec{'period'}) < $time) {
+				$cb = $$rec{'callback'};
+				&{$$cb[0]}(@$cb[1 .. $#$cb], $time, $shared);
+				$$rec{'last_called'} = $time;
+			}
+		}
 		#while (($txid, $TxCB) = each(%{$$shared{'TxCB_list'}})) {
 		foreach $txid (keys %{$$shared{'TxCB_list'}}) { # {{{3
 			$TxCB = $$shared{'TxCB_list'}{$txid};
@@ -505,6 +514,7 @@ MAINLOOP:
 			} # }}}4
 		} # }}}3
 	} # }}}2
+	$$shared{'running'} = -1;
 	# If we reach this point, we're exiting the thread. Notify any pending
 	# waiting calls that they've failed before we go away.
 	foreach $TxCB (values %{$$shared{'TxCB_list'}}) {
@@ -515,7 +525,6 @@ MAINLOOP:
 	# of it...
 	$$shared{'RqCB_sem'}->up();
 
-	$$shared{'running'} = -1;
 	undef $$shared{'conn_fd'};
 	CORE::close($conn);
 } # }}}1
@@ -616,6 +625,7 @@ sub SendTransaction { # {{{1
 	return kASPSizeErr if length($options{'Data'}) > ATP_MAXLEN;
 	return if $options{'ResponseLength'} > 8;
 	return if length($options{'UserBytes'}) > 4;
+	return kASPSessClosed unless $$self{'Shared'}{'running'} == 1;
 
 	# Set up the outgoing transaction request packet.
 	my $ctl_byte = ATP_TReq;
@@ -812,6 +822,18 @@ sub AddTransactionFilter { # {{{1
 
 	push(@{$$self{'Shared'}{'RqFilters'}}, $filter);
 } # }}}1
+
+sub AddPeriodicCallback {
+	my ($self, $period, $callback) = @_;
+
+	my $cb_rec = &share({});
+	%$cb_rec = (
+		'callback'		=> $callback,
+		'period'		=> $period,
+		'last_called'	=> 0,
+	);
+	push(@{$$self{'Shared'}{'TimedCBs'}}, $cb_rec);
+}
 
 =back
 

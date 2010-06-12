@@ -38,6 +38,8 @@ use constant OP_SP_WRITE			=> 6;
 use constant OP_SP_WRITECONTINUE	=> 7;
 use constant OP_SP_ATTENTION		=> 8;
 
+use constant SP_TIMEOUT				=> 120;
+
 =head1 CONSTRUCTOR
 
 =over
@@ -56,12 +58,7 @@ sub new { # {{{1
 	return undef unless defined $$obj{'atpsess'};
 	$$obj{'host'} = $host;
 	$$obj{'svcport'} = $port;
-
-	my $filter = &share([]);
-	# We have to pass the fully qualified subroutine name because we can't
-	# pass subroutine refs from thread to thread.
-	@$filter = ( __PACKAGE__ . '::_TickleFilter', $port );
-	$$obj{'atpsess'}->AddTransactionFilter($filter);
+	$$obj{'last_tickle'} = undef;
 
 	return $obj;
 } # }}}1
@@ -69,13 +66,25 @@ sub new { # {{{1
 
 =cut
 sub _TickleFilter { # {{{1
-	my ($realport, $RqCB) = @_;
+	my ($realport, $lt_ref, $RqCB) = @_;
 	my ($txtype) = unpack('C', $$RqCB{'userbytes'});
 	my ($portno, $paddr) = unpack_sockaddr_at($$RqCB{'sockaddr'});
 
-	if ($txtype == OP_SP_TICKLE && $portno == $realport) { return [] }
+	if ($txtype == OP_SP_TICKLE && $portno == $realport) {
+		$$lt_ref = time();
+		return [];
+	}
 	return undef;
 } # }}}1
+
+sub _TickleCheck {
+	my ($lt_ref, $time, $shared) = @_;
+
+	if ($$lt_ref + SP_TIMEOUT < $time) {
+		print "no tickle in more than timeout period, setting exit flag\n";
+		$$shared{'exit'} = 1;
+	}
+}
 
 sub _AttnFilter { # {{{1
 	my ($sid, $attnq_r, $realport, $RqCB) = @_;
@@ -176,6 +185,7 @@ sub SPGetStatus { # {{{1
 		'NumTries'			=> 3,
 		'PeerAddr'			=> $sa,
 	);
+	return $sem unless ref($sem);
 	$sem->down();
 	unless ($success) { return kASPNoServers; }
 	$$resp_r = $$rdata[0][1];
@@ -209,6 +219,7 @@ sub SPOpenSession { # {{{1
 		'PeerAddr'			=> $sa,
 		'ExactlyOnce'		=> ATP_TREL_30SEC,
 	);
+	return $sem unless ref($sem);
 	$sem->down();
 	unless ($success) { return kASPNoServers; }
 	my ($srv_sockno, $sessionid, $errno) = unpack('CCn', $$rdata[0][0]);
@@ -234,6 +245,20 @@ sub SPOpenSession { # {{{1
 		@$filter = ( __PACKAGE__ . '::_CloseFilter', $$self{'sessionid'},
 				$$self{'atpsess'}{'Shared'}, $$self{'sessport'});
 		$$self{'atpsess'}->AddTransactionFilter($filter);
+
+		my $lt_ref = \$$self{'last_tickle'};
+		share($lt_ref);
+		$$lt_ref = time();
+
+		$filter = &share([]);
+		# We have to pass the fully qualified subroutine name because we can't
+		# pass subroutine refs from thread to thread.
+		@$filter = ( __PACKAGE__ . '::_TickleFilter', $$self{'sessport'},
+				$lt_ref );
+		$$self{'atpsess'}->AddTransactionFilter($filter);
+		my $cb = &share([]);
+		@$cb = ( __PACKAGE__ . '::_TickleCheck', $lt_ref );
+		$$self{'atpsess'}->AddPeriodicCallback(5, $cb);
 	} # }}}2
 	return $errno;
 } # }}}1
@@ -301,6 +326,7 @@ sub SPCommand { # {{{1
 		'PeerAddr'			=> $sa,
 		'ExactlyOnce'		=> ATP_TREL_30SEC
 	);
+	return $sem unless ref($sem);
 	$sem->down();
 	unless ($success) { return kASPNoServers; }
 	# string the response bodies back together
@@ -362,6 +388,7 @@ sub SPWrite { # {{{1
 		'PeerAddr'			=> $sa,
 		'ExactlyOnce'		=> ATP_TREL_30SEC
 	);
+	return $sem unless ref($sem);
 
 	# Try getting an SPWriteContinue transaction request from the server
 	my $RqCB = $$self{'atpsess'}->GetTransaction(1, sub {
