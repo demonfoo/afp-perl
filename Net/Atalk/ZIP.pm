@@ -124,8 +124,8 @@ sub ZIPGetZoneList {
 	$sem->down();
 	$conn->close();
 	if ($success) {
-		my ($LastFlag, $count) = unpack('Cxn', $$rdata[0]{'userbytes'});
-		my @zonenames = unpack('C/a*' x $count, $$rdata[0]{'payload'});
+		my ($LastFlag, $count) = unpack('Cxn', $$rdata[0][0]);
+		my @zonenames = unpack('C/a*' x $count, $$rdata[0][1]);
 		return wantarray() ? ([@zonenames], $LastFlag) : [@zonenames];
 	}
 	$! = ETIMEDOUT;
@@ -166,8 +166,8 @@ sub ZIPGetLocalZones {
 	$sem->down();
 	$conn->close();
 	if ($success) {
-		my ($LastFlag, $count) = unpack('Cxn', $$rdata[0]{'userbytes'});
-		my @zonenames = unpack('C/a*' x $count, $$rdata[0]{'payload'});
+		my ($LastFlag, $count) = unpack('Cxn', $$rdata[0][0]);
+		my @zonenames = unpack('C/a*' x $count, $$rdata[0][1]);
 		return wantarray() ? ([@zonenames], $LastFlag) : [@zonenames];
 	}
 	$! = ETIMEDOUT;
@@ -207,9 +207,9 @@ sub ZIPGetMyZone {
 	$sem->down();
 	$conn->close();
 	if ($success) {
-		my ($count) = unpack('xxn', $$rdata[0]{'userbytes'});
+		my ($count) = unpack('xxn', $$rdata[0][0]);
 		die() if $count != 1;
-		my ($zonename) = unpack('C/a*', $$rdata[0]{'payload'});
+		my ($zonename) = unpack('C/a*', $$rdata[0][1]);
 		return $zonename;
 	}
 	$! = ETIMEDOUT;
