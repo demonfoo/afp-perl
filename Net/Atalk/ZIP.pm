@@ -232,7 +232,7 @@ sub ZIPGetNetInfo {
 			unless defined $sock->sockhost();
 
 	my $dest = pack_sockaddr_at($port, atalk_aton('0.255'));
-	my $msg = pack('Cx[5]C/a*', DDPTYPE_ZIP, ZIP_GetNetInfo_Req, $zonename);
+	my $msg = pack('CCx[5]C/a*', DDPTYPE_ZIP, ZIP_GetNetInfo_Req, $zonename);
 	send($sock, $msg, 0, $dest);
 
 	my $poll = new IO::Poll();
@@ -247,6 +247,7 @@ sub ZIPGetNetInfo {
 	my (%zoneinfo, $extra, $flags);
 	($flags, @zoneinfo{'NetNum_start', 'NetNum_end', 'zonename', 'mcastaddr'},
 			$extra) = unpack('xxCnnC/a*C/a*a*', $rbuf);
+	$zoneinfo{'mcastaddr'} = join(':', unpack('H[2]' x 6, $zoneinfo{'mcastaddr'}));
 	if ($flags & ZIP_GNI_ZoneInvalid) {
 		($zoneinfo{'default_zonename'}) = unpack('C/a*', $extra);
 	}
