@@ -218,6 +218,9 @@ sub ZIPGetMyZone {
 
 =item ZIPGetNetInfo (ZONENAME) 
 
+Inquire about network information for a specific AppleTalk zone. Returns a
+hash ref, containing network number range and other information.
+
 =cut
 sub ZIPGetNetInfo {
 	my ($zonename) = @_;
