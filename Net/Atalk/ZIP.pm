@@ -64,7 +64,7 @@ sub ZIPQuery {
 	die("Can't get local socket address, possibly atalk stack out of order")
 			unless defined $sock->sockhost();
 
-	my $dest = pack_sockaddr_at($port, atalk_aton('0.255'));
+	my $dest = pack_sockaddr_at($port, ATADDR_BCAST);
 	my $msg = pack('CCC/n*', DDPTYPE_ZIP, ZIP_Query_Req, @netnums);
 	send($sock, $msg, 0, $dest);
 
@@ -106,7 +106,7 @@ sub ZIPGetZoneList {
 	return undef unless defined $conn;
 
 	my $port = getservbyname('zip', 'ddp') || 6;
-	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
+	my $dest = pack_sockaddr_at($port, ATADDR_ANY);
 
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetZoneList, $StartIndex);
 	my $rdata;
@@ -148,7 +148,7 @@ sub ZIPGetLocalZones {
 	return undef unless defined $conn;
 
 	my $port = getservbyname('zip', 'ddp') || 6;
-	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
+	my $dest = pack_sockaddr_at($port, ATADDR_ANY);
 
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetLocalZones, $StartIndex);
 	my $rdata;
@@ -189,7 +189,7 @@ sub ZIPGetMyZone {
 	return undef unless defined $conn;
 
 	my $port = getservbyname('zip', 'ddp') || 6;
-	my $dest = pack_sockaddr_at($port, atalk_aton('0.0'));
+	my $dest = pack_sockaddr_at($port, ATADDR_ANY);
 
 	my $user_bytes = pack('Cxn', ZIP_ATP_GetMyZone, 0);
 	my $rdata;
@@ -231,7 +231,7 @@ sub ZIPGetNetInfo {
 	die("Can't get local socket address, possibly atalk stack out of order")
 			unless defined $sock->sockhost();
 
-	my $dest = pack_sockaddr_at($port, atalk_aton('0.255'));
+	my $dest = pack_sockaddr_at($port, ATADDR_BCAST);
 	my $msg = pack('CCx[5]C/a*', DDPTYPE_ZIP, ZIP_GetNetInfo_Req, $zonename);
 	send($sock, $msg, 0, $dest);
 
