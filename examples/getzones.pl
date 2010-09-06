@@ -26,7 +26,8 @@ GetOptions( 'm'	=> sub {
 			usage() if defined $myzoneflag;
 			$zipcall = \&ZIPGetLocalZones;
 			$localzonesflag = 1;
-		} ) || usage();
+		},
+			'h' => \&usage ) || usage();
 
 my ($zonelist, $lastflag) = &$zipcall($ARGV[0], 0);
 die('Error sending ZIP request: ' . $!) unless $zonelist;
