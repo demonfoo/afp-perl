@@ -79,7 +79,7 @@ sub ZIPQuery {
 	return undef unless $ddptype == DDPTYPE_ZIP;
 	return undef unless $ziptype == ZIP_Query_Resp ||
 			$ziptype == ZIP_Query_RespExt;
-	my @data = pack('xxC/(nC/a*)', $rbuf);
+	my @data = unpack('xxC/(nC/a*)', $rbuf);
 	my %namedata;
 	while (scalar(@data)) {
 		my $zonenum = shift(@data);
