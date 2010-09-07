@@ -712,7 +712,7 @@ sub GetTransaction { # {{{1
 					($i + 1) .. $#$RqCB_queue];
 			# If the caller asked to block to wait, restore the semaphore
 			# count to where it should be.
-			$$self{'Shared'}{'RqCB_sem'}->up($i - 1) if $do_block;
+			$$self{'Shared'}{'RqCB_sem'}->up($i - 1) if $do_block && $i > 0;
 			return $RqCB;
 		}
 		# Down the sem again, so that if we're at the last, we'll block
