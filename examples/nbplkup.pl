@@ -23,7 +23,7 @@ my ($type, $zone);
 usage() if scalar(@ARGV) > 1;
 my ($host) = @ARGV;
 if (defined $host) {
-	$host =~ s/(?::(\w*|=))?(?:\@(\w*|\*))?$//;
+	$host =~ s/(?::([\w\s\-]*|=))?(?:\@(\w*|\*))?$//;
 	($type, $zone) = ($1, $2);
 }
 

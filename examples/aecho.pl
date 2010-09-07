@@ -32,7 +32,7 @@ my ($target) = @ARGV;
 
 my $paddr = atalk_aton($target);
 unless (defined $paddr) {
-	$target =~ s/(?::(\w*|=))?(?:\@(\w*|\*))?$//;
+	$target =~ s/(?::([\w\s\-]*|=))?(?:\@(\w*|\*))?$//;
 	my ($type, $zone) = ($1, $2);
 	my @tuples = NBPLookup($target, $type, $zone, exists $sockparms{'LocalAddr'} ? $sockparms{'LocalAddr'} : undef, 1);
 	unless (scalar(@tuples)) {
