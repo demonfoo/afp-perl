@@ -112,8 +112,9 @@ sub session_thread { # {{{1
 	my $poll = new IO::Poll;
 	$poll->mask($conn, POLLIN | POLLHUP);
 	my ($data, $real_length, $resp, $type, $cmd, $id, $errcode, $length,
-			$reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref);
-	my $last_tickle = 0;
+			$reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref, $msg,
+			$wsz);
+	my $last_tickle = time();
 MAINLOOP:
 	while ($$shared{'exit'} == 0) {
 		if ($poll->poll(0.5)) {
@@ -125,9 +126,20 @@ MAINLOOP:
 			}
 			# Try to get a message from the server.
 			$$shared{'conn_sem'}->down();
-			$rsz = sysread($conn, $resp, 16);
+			$rsz = 0;
+			until ($rsz >= 16) {
+				$length = sysread($conn, $resp, 16 - $rsz, $rsz);
+				unless (defined $length) {
+					$$shared{'conn_sem'}->up();
+					last MAINLOOP;
+				}
+				if ($length == 0) {
+					$$shared{'conn_sem'}->up();
+					next MAINLOOP;
+				}
+				$rsz += $length;
+			}
 			$$shared{'conn_sem'}->up();
-			last MAINLOOP unless defined $rsz;
 			next MAINLOOP unless $rsz == 16;
 			($type, $cmd, $id, $errcode, $length, $reserved) =
 					unpack('CCnNNN', $resp);
@@ -143,7 +155,10 @@ MAINLOOP:
 
 				elsif ($cmd == OP_DSI_ATTENTION) {
 					$$shared{'conn_sem'}->down();
-					sysread($conn, $data, $length);
+					$rsz = 0;
+					until ($rsz >= $length) {
+						$rsz += sysread($conn, $data, $length - $rsz, $rsz);
+					}
 					$$shared{'conn_sem'}->up();
 					($userBytes) = unpack('n', $data);
 					# Queue the notification for later processing
@@ -177,12 +192,12 @@ MAINLOOP:
 			$real_length = 0;
 			# Get any additional data from the server, if the message
 			# indicated that there was a payload.
+			$$shared{'conn_sem'}->down();
 			until ($real_length >= $length) {
-				$$shared{'conn_sem'}->down();
 				$real_length += sysread($conn, $$rb_ref, $length - $real_length,
 						$real_length);
-				$$shared{'conn_sem'}->up();
 			}
+			$$shared{'conn_sem'}->up();
 
 			$$sem_ref->up() if defined $sem_ref;
 		}
@@ -192,9 +207,13 @@ MAINLOOP:
 			# send a DSITickle to the server
 			# Field 2: Command: DSITickle(5)
 			# Manually queue the DSITickle message.
+			$msg = pack('CCnNNN', 0, OP_DSI_TICKLE,
+					$$shared{'requestid'}++ % 65536, 0, 0, 0);
 			$$shared{'conn_sem'}->down();
-			syswrite($conn, pack('CCnNNN', 0, OP_DSI_TICKLE,
-					$$shared{'requestid'}++ % 65536, 0, 0, 0));
+			$wsz = 0;
+			until ($wsz >= length($msg)) {
+				$wsz += syswrite($conn, $msg, length($msg) - $wsz, $wsz);
+			}
 			$$shared{'conn_sem'}->up();
 			$last_tickle = $now;
 		}
@@ -345,9 +364,15 @@ sub SendMessage { # {{{1
 
 	# Send the request packet to the server.
 	$$self{'Shared'}{'conn_sem'}->down();
-	syswrite($$self{'Conn'}, $msg);
+	my $wlen = 0;
+	while ($wlen < length($msg)) {
+		$wlen += syswrite($$self{'Conn'}, $msg, length($msg) - $wlen, $wlen);
+	}
 	if ($d_len) {
-		syswrite($$self{'Conn'}, $$data_r, $d_len);
+		$wlen = 0;
+		while ($wlen < $d_len) {
+			$wlen += syswrite($$self{'Conn'}, $$data_r, $d_len - $wlen, $wlen);
+		}
 	}
 	$$self{'Shared'}{'conn_sem'}->up();
 

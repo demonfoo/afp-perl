@@ -1,53 +1,3 @@
-#
-# Notice:
-#	The information contained here is based on Apple's documentation of
-#	the Apple Filing Protocol version 3.3. The documents are available in
-#	PDF format at the following URLs:
-#
-#     Conceptual overview:
-#
-# http://developer.apple.com/documentation/Networking/Conceptual/AFP/AFP3_1.pdf
-# 
-#     Protocol details:
-#
-# http://developer.apple.com/mac/library/documentation/Networking/Reference/AFP_Reference/AFP_Reference.pdf
-#
-#	or in HTML at the following URL:
-#
-#     Conceptual overview:
-#
-# http://developer.apple.com/mac/library/documentation/Networking/Conceptual/AFP/Introduction/Introduction.html
-#
-#     Protocol details:
-#
-# http://developer.apple.com/mac/library/documentation/Networking/Reference/AFP_Reference/Reference/reference.html
-#
-#	In writing this module, I have used identifiers, error descriptions, and
-#	other materials from the documentation provided by Apple. Any such
-#	material (identifiers, function and error descriptions, etc.) copied from
-#	Apple's documentation is Copyright (c) Apple Computer, Inc.
-#
-# This is a superclass that implements (most of) the necessary methods for
-# higher-level handling of an AFP session.
-
-# Notes related to netatalk:
-# - Netatalk sends its own DSICloseSession request packet to the client.
-#   This is not in keeping with the AFP and DSI protocol specs; the
-#   DSICloseSession packet from the server gets dropped because the
-#   FIN/ACK has already been sent by that time. It doesn't appear to
-#   bother the code, but it's weird.
-# - Upon FPLogout, netatalk will send a DSICloseSession to the client
-#   and terminate the connection. Worked around easily, but still pretty
-#   goofy.
-# - Also, Netatalk will in certain cases return a positive (undefined)
-#   error code; it uses the received data structure to assemble its
-#   reply, and the error code field is the same field that contains the
-#   data offset pointer. I've implemented a hack in Net::DSI::Session (in the
-#   thread main loop) to work around this.
-
-# Unimplemented functions:
-#  - FPCatSearch{,Ext}
-
 # imports {{{1
 package Net::AFP;
 use strict;
@@ -852,12 +802,6 @@ A non-AFP error occurred.
 =back
 
 =cut
-#### ERRATA ####
-# Documentation says that there's no response block from the server, but
-# in the cases of all but the most basic password-changing methods, it
-# does. This is necessary for chained invocations of FPChangePassword
-# to support the two-way conversations.
-#### /ERRATA ####
 sub FPChangePassword { # {{{1
 	my ($self, $UAM, $UserName, $UserAuthInfo, $resp_r) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -3708,10 +3652,6 @@ sub FPLogin { # {{{1
 		$UserAuthInfo = '';
 	}
 
-	#### ERRATA ####
-	# AFP documentation lies. There is no pad byte after the
-	# CommandCode field. That's why I don't put it there.
-	#### /ERRATA ####
 	my $msg = pack('CC/a*C/a*a*', kFPLogin, $AFPVersion, $UAM, $UserAuthInfo);
 	my $resp;
 	my $rc = $self->SendAFPMessage($msg, \$resp);
@@ -3821,13 +3761,6 @@ sub FPLoginCont { # {{{1
 	my $rc = $self->SendAFPMessage(pack('Cxna*', kFPLoginCont, $ID,
 			$UserAuthInfo), \$resp);
 	
-	#### ERRATA ####
-	# The documents lie again. The FPLoginCont documentation says that the
-	# UserAuthInfo block will only be present in the kFPAuthContinue case,
-	# but the 2-way randnum auth returns a UserAuthInfo block as part of
-	# the last phase (when it returns kFPNoErr on successful completion).
-	# Thanks, Apple...
-	#### /ERRATA ####
 	if (($rc == kFPAuthContinue || $rc == kFPNoErr)
 			&& defined($resp)) {
 		$$resp_r = {};
@@ -5325,13 +5258,6 @@ sub FPSetACL { # {{{1
 			$AdditionalInformation) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
-	### ERRATA ###
-	# Author's note: Apple's documentation provides a visual overview of
-	# the data layout in the kFPSetACL message format. It claims that there
-	# is a MaxReplySize field between the Bitmap and PathType fields. This
-	# is not correct; there is no such field. Does not exist. It isn't
-	# anything else either, it's just flat not there.
-	### /ERRATA ###
 	my $msg = pack('CxnNna*x![s]', kFPSetACL, $VolumeID, $DirectoryID,
 			$Bitmap, PackagePath($PathType, $Pathname));
 	if ($Bitmap & kFileSec_UUID) {
@@ -5990,13 +5916,6 @@ Volume is ReadOnly.
 =back
 
 =cut
-#### ERRATA ####
-# Author's note: The Apple docs refer to using this operation to set the 
-# extended (64-bit) resource and data fork lengths, but it only provides
-# a 32-bit field in which to place a value. I'm not sure what to make of
-# it; of course, this may be deprecated, or the documentation may just
-# be leaving something important out (it's been known to happen).
-#### /ERRATA ####
 sub FPSetForkParms { # {{{1
 	my ($self, $OForkRefNum, $Bitmap, $ForkLen) = @_;
 	print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
@@ -6229,12 +6148,6 @@ Session reference numer or open fork reference number is unknown.
 =back
 
 =cut
-#### ERRATA ####
-# Author's note: The documentation for FPWrite makes mention of it returning
-# a value which is the number of bytes actually written. It appears that this
-# is a lie, as there is nowhere in the DSI packet for such a value to go that
-# isn't already in use. Maybe it's just a holdover of AppleTalk days...
-#### /ERRATA ####
 sub FPWrite { # {{{1
 	my ($self, $Flag, $OForkRefNum, $Offset, $ReqCount, $ForkData_r,
 			$resp_r) = @_;
@@ -6384,6 +6297,105 @@ sub FPZzzzz { # {{{1
 } # }}}1
 
 =back
+
+=head1 REFERENCES
+
+The Apple Filing Protocol implementation contained herein is based on the
+protocol description as provided by Apple, in their online documentation.
+The HTML version of the conceptual documentation is available at:
+
+L<http://developer.apple.com/mac/library/documentation/Networking/Conceptual/AFP/Introduction/Introduction.html>
+
+and the PDF version is available at:
+
+L<http://developer.apple.com/documentation/Networking/Conceptual/AFP/AFP3_1.pdf>
+
+The reference for the actual AFP protocol operations, arguments and other
+information is available in HTML form at:
+
+L<http://developer.apple.com/mac/library/documentation/Networking/Reference/AFP_Reference/Reference/reference.html>
+
+and the PDF version is available at:
+
+L<http://developer.apple.com/mac/library/documentation/Networking/Reference/AFP_Reference/AFP_Reference.pdf>
+
+=head1 DEVELOPER NOTES
+
+Notes related to netatalk:
+
+- Netatalk sends its own DSICloseSession request packet to the client.
+This is not in keeping with the AFP and DSI protocol specs; the
+DSICloseSession packet from the server gets dropped because the
+FIN/ACK has already been sent by that time. It doesn't appear to
+bother the code, but it's weird.
+
+- Upon FPLogout, netatalk will send a DSICloseSession to the client
+and terminate the connection. Worked around easily, but still pretty
+goofy.
+
+- Also, Netatalk will in certain cases return a positive (undefined)
+error code; it uses the received data structure to assemble its
+reply, and the error code field is the same field that contains the
+data offset pointer. I've implemented a hack in Net::DSI::Session (in the
+thread main loop) to work around this.
+
+Notes on AFP:
+
+- Apple's documentation of the FPChangePassword method indicates that
+no response block will be returned; in the case of anything more
+complicated than the Plaintext UAM, this is categorically wrong. Most
+UAMs need to perform two-way conversations for their password change
+operations.
+
+- Apple's documentation of the FPLogin operation is wrong. Their docs
+indicate a pad byte after the command code byte. I have verified
+empirically that no server implementation does this.
+
+- Apple's documentation of the FPLoginCont operation indicates that the
+UserAuthInfo block will only be present if kFPAuthContinue is returned;
+the 2-way randnum UAM returns kFPNoErr and a UserAuthInfo block in the
+last stage of its authentication path.
+
+- Apple's documentation of the FPMapID and FPMapName operations was
+not properly updated in AFP 3.1 and 3.2 to cover the sending/receiving of
+UUIDs. The AFP 3.3 documentation does, but butchers the data type - a
+UUID is 128 bits, not 64, so a "uint64_t" isn't possibly large enough.
+Getting it as a 16-byte string instead, which works for us fine.
+
+- Apple's documentation of the FPSetACL operation provides a visual
+representation of the data layout in the kFPSetACL message. It claims
+there is a MaxReplySize field between the Bitmap and PathType fields.
+No such fields is present (verified empirically).
+
+- Apple's documentation of the FPSetForkParms operation indicates that
+the data field is only 4 bytes, while it also claims that it can be used
+to set the extended resource and data fork lengths. Code was altered to
+pass a 'long long' in the message payload when the extended params are
+to be set.
+
+- Apple's documentation for the FPWrite operation indicates it returns
+the number of bytes written. It does not, and has never done this;
+however, it does return an integer value (32 bits for FPWrite, 64
+bits for FPWriteExt) indicating the offset after the last write request.
+
+- It seems that Apple (as of the AFP implementation contained in their
+AirDisk devices, i.e., the Airport Express 802.11n Dualband) either forgot
+about or changed their minds about write-only files via AFP. Opening
+a fork with the "write-only" flag, and then attempting to write to that
+open handle, yields failed writes. Opening the file as read-write in
+that case allows successful writes.
+
+- Discovered that Netatalk's DSI implementation doesn't like getting
+Tickle packets before the session has been opened; made a little
+workaround for that.
+
+Unimplemented functions:
+
+- FPCatSearch{,Ext}
+
+=head1 SEE ALSO
+
+C<Net::AFP::TCP>, C<Net::AFP::Atalk>
 
 =cut
 1;
