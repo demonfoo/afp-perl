@@ -6,10 +6,21 @@ package Net::Atalk::ASP;
 
 use Net::Atalk::ATP;
 use Net::Atalk;			# for pack_sockaddr_at, unpack_sockaddr_at, atalk_aton
-use Net::AFP::Result;	# for kFPNoErr
 use threads::shared;	# for share
 use strict;
 use warnings;
+
+use constant kASPNoError		=> 0;
+use constant kASPBadVersNum		=> -1066;
+use constant kASPBufTooSmall	=> -1067;
+use constant kASPNoMoreSessions	=> -1068;
+use constant kASPNoServers		=> -1069;
+use constant kASPParamErr		=> -1070;
+use constant kASPServerBusy		=> -1071;
+use constant kASPSessClosed		=> -1072;
+use constant kASPSizeErr		=> -1073;
+use constant kASPTooManyClients	=> -1074;
+use constant kASPNoAck			=> -1075;
 
 =head1 NAME
 
@@ -155,7 +166,7 @@ sub SPGetParms { # {{{1
 				 'QuantumSize'	=> ATP_MAXLEN * 8,
 			   };
 
-	return kFPNoErr;
+	return kASPNoError;
 } # }}}1
 
 =item SPGetStatus (RESP_R)
@@ -189,7 +200,7 @@ sub SPGetStatus { # {{{1
 	$sem->down();
 	unless ($success) { return kASPNoServers; }
 	$$resp_r = $$rdata[0][1];
-	return kFPNoErr;
+	return kASPNoError;
 } # }}}1
 
 =item SPOpenSession
@@ -226,7 +237,7 @@ sub SPOpenSession { # {{{1
 	@$self{'sessport', 'sessionid'} = ($srv_sockno, $sessionid);
 	$$self{'seqno'} = 0;
 	$errno = ($errno & 0x8000) ? -((~$errno & 0xFFFF) + 1) : $errno;
-	if ($errno == kFPNoErr) { # {{{2
+	if ($errno == kASPNoError) { # {{{2
 		# This will cause the client code to send an SPTickle, and resend
 		# it every 30 seconds, forever. The server never actually sends
 		# back a "response" to the pending transaction, thus forcing the
@@ -288,7 +299,7 @@ sub SPCloseSession { # {{{1
 		'PeerAddr'			=> $sa,
 	);
 	delete $$self{'sessionid'};
-	return kFPNoErr;
+	return kASPNoError;
 } # }}}1
 
 =item SPCommand (MESSAGE, RESP_R)

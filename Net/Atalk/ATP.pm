@@ -22,7 +22,6 @@ use threads::shared;
 use Thread::Semaphore;
 use Exporter qw(import);
 use Scalar::Util qw(dualvar);
-use Net::AFP::Result;
 
 =head1 NAME
 
