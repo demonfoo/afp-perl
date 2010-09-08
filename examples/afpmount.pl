@@ -1,5 +1,12 @@
 #!/usr/bin/env perl
 
+# Enables a nice call trace on warning events.
+use Carp ();
+local $SIG{'__WARN__'} = \&Carp::cluck;
+use strict;
+use warnings;
+use diagnostics;
+
 use Net::AFP::Fuse;
 use IO::Poll qw(POLLIN POLLERR);
 use Getopt::Long;				# for parsing command line options
