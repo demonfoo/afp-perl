@@ -322,7 +322,11 @@ sub new { # {{{1
 	} # }}}2
 
 	# purify URL # {{{2
-	my $scrubbed_url = $urlparms{'protocol'} . '://';
+	my $scrubbed_url = $urlparms{'protocol'} . ':/';
+	if ($urlparms{'atalk_transport'}) {
+		$scrubbed_url .= $urlparms{'atalk_transport'};
+	}
+	$scrubbed_url .= '/';
 	if (defined $urlparms{'username'}) {
 		$scrubbed_url .= urlencode($urlparms{'username'}) . '@';
 	}
