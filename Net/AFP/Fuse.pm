@@ -38,9 +38,9 @@ sub ENODATA { return($^O eq 'freebsd' ? &Errno::ENOATTR : &Errno::ENODATA); }
 
 my $has_atalk = 0;
 eval {
-	use Net::AFP::Atalk;		# The class to connect to an AppleTalk server
+	require Net::AFP::Atalk;	# The class to connect to an AppleTalk server
 								# via AppleTalk protocol.
-	use Net::Atalk::NBP;
+	require Net::Atalk::NBP;
 };
 unless ($@) {
 	$has_atalk = 1;
@@ -664,12 +664,18 @@ sub symlink { # {{{1
 	$linkname = decode(ENCODING, $linkname);
 	my $fileName = translate_path($linkname);
 
+	my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
+	return $rc if $rc != kFPNoErr;
 	# FIXME: add FPAccess() check
 	
+	# Seems that the Airport Disk AFP server doesn't like having
+	# FPCreateFile called with the full path; have to get the node ID
+	# of the containing directory and just pass the node name.
+
 	# create the target file first
 	# create target file {{{2
-	my $rc = $$self{'afpconn'}->FPCreateFile(0, $$self{'volID'}, $$self{'topDirID'}, $$self{'pathType'},
-			$fileName);
+	$rc = $$self{'afpconn'}->FPCreateFile(0, $$self{'volID'},
+			$$resp{'NodeID'}, $$self{'pathType'}, node_name($fileName));
 	return -&EACCES if $rc == kFPAccessDenied;
 	return -&ENOSPC if $rc == kFPDiskFull;
 	return -&EBUSY  if $rc == kFPFileBusy;
@@ -682,7 +688,6 @@ sub symlink { # {{{1
 
 	# open the file, and write out the path given as the link target...
 	# open and write link target {{{2
-	my $resp;
 	$rc = $$self{'afpconn'}->FPOpenFork(0, $$self{'volID'}, $$self{'topDirID'}, 0, 0x3,
 			$$self{'pathType'}, $fileName, \$resp);
 	return -&EACCES  if $rc == kFPAccessDenied;
@@ -714,8 +719,9 @@ sub symlink { # {{{1
 
 	# apparently this is the magic to transmute a file into a symlink...
 	$rc = $$self{'afpconn'}->FPSetFileParms($$self{'volID'}, $$self{'topDirID'}, $bitmap,
-			$$self{'pathType'}, $fileName, 'FinderInfo' => 'slnkrhap',
-			'ModDate' => time() + $$self{'timedelta'});
+			$$self{'pathType'}, $fileName,
+			'FinderInfo'	=> "slnkrhap\0@" . "\0" x 22,
+			'ModDate'		=> time() + $$self{'timedelta'});
 	
 	return 0		if $rc == kFPNoErr;
 	return -&EACCES if $rc == kFPAccessDenied;
