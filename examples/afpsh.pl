@@ -12,7 +12,6 @@ use diagnostics;
 # itself and return code symbols, helper functions for version handling
 # and UAMs, etc.
 use Net::AFP::TCP;
-use Net::AFP::Atalk;
 use Net::AFP::Result;
 use Net::AFP::VolParms;
 use Net::AFP::VolAttrs;
@@ -23,7 +22,15 @@ use Net::AFP::Versions;
 use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 
-use Net::Atalk::NBP;
+my $has_atalk = 0;
+eval {
+	require Net::AFP::Atalk;
+	require Net::Atalk::NBP;
+};
+unless ($@) {
+	$has_atalk = 1;
+	Net::Atalk::NBP->import();
+}
 
 use Term::ReadLine;		# for reading input from user
 
@@ -898,6 +905,9 @@ sub doAFPConnection {
 	my $srvInfo;
 	my $rc;
 	if ($as_atalk) {
+		unless ($has_atalk) {
+			die "AppleTalk support libraries not available";
+		}
 		# at least for now we have to resolve the NBP name ourselves
 		my @records = NBPLookup($host, 'AFPServer', $port, undef, 1);
 		die() unless scalar(@records);
