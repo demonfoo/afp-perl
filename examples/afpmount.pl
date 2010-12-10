@@ -58,9 +58,9 @@ Items in [] are optional; they are as follows:
                can be specified in square brackets
   <zone>     : An AppleTalk zone name, or * for the local zone
   <port>     : The port on the server to connect to
-
   <share>    : The name of the exported share on the remote system
   <path>     : A subpath inside the specified share to mount
+
 _EOT_
     exit(&EINVAL);
 }
