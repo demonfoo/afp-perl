@@ -43,7 +43,8 @@ Description: Apple File Protocol FUSE client in Perl
 Package: afpsh-perl
 Architecture: all
 Depends: perl (>= 5.10.0), libnet-afp-perl, libtext-glob-perl,
- libterm-readpassword-perl, libarchive-tar-perl
+ libterm-readpassword-perl
+Suggests: libarchive-tar-perl, libterm-readline-gnu-perl
 Description: An FTP-style client for accessing AFP shares
  A command-line tool, similar to FTP or smbclient, which can be used to
  transfer files to/from AFP servers.
