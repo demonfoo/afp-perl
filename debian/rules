@@ -32,9 +32,9 @@ clean:
 	dh_testdir
 	dh_testroot
 	dh_clean build-stamp install-stamp
+	rm -rf $(TMP)
 	[ ! -f Makefile ] || $(MAKE) distclean
 	rm -f Makefile.old
-	rm -rf $(TMP)
 
 install: install-stamp
 install-stamp: build-stamp
