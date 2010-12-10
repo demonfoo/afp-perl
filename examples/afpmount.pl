@@ -46,8 +46,8 @@ Options:
 
 AFP URL format:
 
-afp://[<user>[;AUTH=<uam>[:<password>]@]<host>[:<port>]/<share>[/<path>]
-afp:/at/[<user>[;AUTH=<uam>[:<password>]@]<host>[:<zone>]/<share>[/<path>]
+afp://[<user>[;AUTH=<uam>][:<password>]@]<host>[:<port>]/<share>[/<path>]
+afp:/at/[<user>[;AUTH=<uam>][:<password>]@]<host>[:<zone>]/<share>[/<path>]
 
 Items in [] are optional; they are as follows:
 
