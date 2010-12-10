@@ -1,0 +1,49 @@
+Source: libnet-afp-perl
+Section: perl
+Priority: optional
+Maintainer: Derrik Pates <demon@now.ai>
+Standards-Version: 3.8.0
+Build-Depends: debhelper (>= 7), perl (>= 5.10.0), quilt (>= 0.46-7)
+
+Package: libnet-afp-perl
+Architecture: all
+Depends: perl (>= 5.10.0), perl-modules, liblog-log4perl-perl,
+ libmath-bigint-gmp-perl, libdata-uuid-perl, libcrypt-cbc-perl,
+ libcrypt-cast5-perl, liblog-dispatch-perl, libfuse-class-perl
+Suggests: libnet-atalk-perl, libcrypt-des-perl, libio-socket-inet6-perl,
+ libnss-mdns
+Description: Apple Filing Protocol implementation in Perl
+ Net::AFP is a collection of packages which implement a working Apple Filing
+ Protocol stack in Perl. It supports AFP over TCP, for mounting shares from
+ Macintosh computer systems, Apple AirPort Disk devices (including the Apple
+ AirPort Extreme base stations), netatalk shares, and others. It also can
+ optionally support the AppleTalk protocol, for compatibility with MacOS
+ versions prior to MacOS X.
+ .
+ This module supports several advanced AFP features:
+ .
+   * Access control lists
+   * Extended attributes
+   * Large files
+   * Encrypted login (via Diffie-Hellman exchange)
+   * UNIX ownership/permissions
+   * UTF-8 filenames
+   * IPv6 support, with IO::Socket::INET6
+
+Package: afp-perl
+Architecture: all
+Depends: perl (>= 5.10.0), libnet-afp-perl, libfile-extattr-perl,
+ libterm-readpassword-perl
+Description: Apple File Protocol FUSE client in Perl
+ A command line tool which uses Net::AFP to mount an AFP share. This package
+ also includes an additional tool (afp_acl.pl) for managing ACLs on remote
+ Apple Filing Protocol shares, if your server supports ACLs (OS X 10.3 and
+ later).
+
+Package: afpsh-perl
+Architecture: all
+Depends: perl (>= 5.10.0), libnet-afp-perl, libtext-glob-perl,
+ libterm-readpassword-perl, libarchive-tar-perl
+Description: An FTP-style client for accessing AFP shares
+ A command-line tool, similar to FTP or smbclient, which can be used to
+ transfer files to/from AFP servers.

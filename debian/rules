@@ -1,0 +1,69 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# This is the debhelper compatability version to use.
+# export DH_COMPAT=3
+# set in debian/compat
+
+# If set to a true value then MakeMaker's prompt function will
+# always return the default without waiting for user input.
+export PERL_MM_USE_DEFAULT=1
+
+include /usr/share/quilt/quilt.make
+
+PERL   ?= /usr/bin/perl
+TMP     = $(CURDIR)/debian/build
+
+build: build-stamp
+build-stamp: $(QUILT_STAMPFN)
+	dh_testdir
+	$(PERL) Makefile.PL INSTALLDIRS=vendor
+	$(MAKE)
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	$(MAKE) test
+endif
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	dh_clean build-stamp install-stamp
+	[ ! -f Makefile ] || $(MAKE) distclean
+	rm -f Makefile.old
+	rm -rf $(TMP)
+
+install: install-stamp
+install-stamp: build-stamp
+	dh_testdir
+	dh_testroot
+	dh_prep
+	$(MAKE) install DESTDIR=$(TMP) PREFIX=/usr
+	[ ! -d $(TMP)/usr/lib/perl ] || \
+		rm -rf $(TMP)/usr/lib/perl
+	[ ! -d $(TMP)/usr/lib/perl5 ] || \
+		rm -rf $(TMP)/usr/lib/perl5
+	touch $@
+
+binary-arch:
+# We have nothing to do here for an architecture-independent package.
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_installdocs
+	dh_installchangelogs
+	dh_perl
+	dh_install --sourcedir=debian/build
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install
