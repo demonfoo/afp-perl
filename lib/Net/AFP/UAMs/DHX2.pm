@@ -18,7 +18,26 @@ use constant C2SIV => 'LWallace';
 use constant S2CIV => 'CJalbert';
 
 # Provides the encryption algorithm.
-use Crypt::CAST5;
+my $has_Crypt__CAST5_PP = 0;
+eval {
+    require Crypt::CAST5_PP;
+    1;
+} and do {
+    $has_Crypt__CAST5_PP = 1;
+    Crypt::CAST5_PP->import;
+};
+
+my $has_Crypt__CAST5 = 0;
+eval {
+    require Crypt::CAST5;
+    1;
+} and do {
+    $has_Crypt__CAST5 = 1;
+    Crypt::CAST5->import;
+};
+die("No CAST5 implementation was available?")
+        unless $has_Crypt__CAST5 || $has_Crypt__CAST5_PP;
+
 # Provides the cipher-block chaining layer over the encryption algorithm.
 use Crypt::CBC;
 # Pull in the module containing all the result code symbols.
@@ -219,7 +238,7 @@ sub Authenticate {
 	# which then break expected behavior for those coding against it.
 	# This code is PERFECT. It is 100% in line with Apple's docs.
 	my $ctx = new Crypt::CBC( {	'key'				=> $K_hash,
-								'cipher'			=> 'CAST5',
+								'cipher'			=> $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
 								'padding'			=> 'null',
 								'regenerate_key'	=> 0,
 								'prepend_iv'		=> 0,
@@ -382,7 +401,7 @@ sub ChangePassword {
 	# which then break expected behavior for those coding against it.
 	# This code is PERFECT. It is 100% in line with Apple's docs.
 	my $ctx = new Crypt::CBC( {	'key'				=> $K_binary,
-								'cipher'			=> 'CAST5',
+								'cipher'			=> $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
 								'padding'			=> 'null',
 								'regenerate_key'	=> 1,
 								'prepend_iv'		=> 0,
