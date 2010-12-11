@@ -46,7 +46,8 @@ This module supports several advanced AFP features:
    * IPv6 support, with IO::Socket::INET6
 
 %package -n afp-perl
-summary:  Apple Filing Protocol FUSE client in Perl
+summary:   Apple Filing Protocol FUSE client in Perl
+autoreq:   0
 requires:  perl >= 5.10.0, perl(Net::AFP), perl(File::ExtAttr), perl(Term::ReadPassword)
 group:     Applications/Perl
 %description -n afp-perl
@@ -56,7 +57,8 @@ Apple Filing Protocol shares, if your server supports ACLs (OS X 10.3 and
 later).
 
 %package -n afpsh-perl
-summary:  An FTP-style client for accessing AFP shares
+summary:   An FTP-style client for accessing AFP shares
+autoreq:   0
 requires:  perl >= 5.10.0, perl(Net::AFP), perl(Text::Glob), perl(Term::ReadPassword)
 #suggests:  perl(Archive::Tar), perl(Term::ReadLine::GNU)
 %description -n afpsh-perl
