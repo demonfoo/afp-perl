@@ -127,6 +127,9 @@ _EOT_
         my @NBPResults;
 
         eval {
+            # Call this in an eval block so that if the AFP stack isn't
+            # functional, when it calls die() the whole thing doesn't
+            # fall apart on us.
             @NBPResults = NBPLookup(undef, 'AFPServer');
         };
 
