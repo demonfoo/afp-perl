@@ -13,7 +13,7 @@
 
 name:      perl-Net-AFP
 summary:   Net-AFP - Apple Filing Protocol implementation in Perl
-version:   0.61
+version:   0.61.1
 release:   1
 vendor:    Derrik Pates <demon@now.ai>
 packager:  Derrik Pates <demon@now.ai>
@@ -164,3 +164,11 @@ ln -sf /usr/local/bin/afpmount.pl %{buildroot}/sbin/mount.pafpfs
 %changelog
 * Sat Dec 11 2010 demon@now.ai
 - Initial build.
+
+* Sun Dec 12 2010 demon@now.ai
+- Added RPM packaging.
+- Debian packaging cleanups.
+- Altered DHX and DHX2 UAMs to support Crypt::CAST5_PP as an alternative
+  to Crypt::CAST5.
+- Got the Makefile.PL and MANIFEST files added to the tree.
+- Cleanup the URL regex in Net::AFP::Fuse a bit.

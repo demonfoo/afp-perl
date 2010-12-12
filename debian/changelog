@@ -1,3 +1,14 @@
+libnet-afp-perl (0.61.1-1) unstable; urgency=low
+
+  * Added RPM packaging.
+  * Debian packaging cleanups.
+  * Altered DHX and DHX2 UAMs to support Crypt::CAST5_PP as an alternative
+    to Crypt::CAST5.
+  * Got the Makefile.PL and MANIFEST files added to the tree.
+  * Cleanup the URL regex in Net::AFP::Fuse a bit.
+
+ -- Derrik Pates <demon@now.ai>  Sun, 12 Dec 2010 00:36:47 -0700
+
 libnet-afp-perl (0.61-1) unstable; urgency=medium
 
   * Tagging a proper release after rolling a lot of changes into SVN.
