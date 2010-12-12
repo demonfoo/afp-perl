@@ -9,7 +9,8 @@ Package: libnet-afp-perl
 Architecture: all
 Depends: perl (>= 5.10.0), perl-modules, liblog-log4perl-perl,
  libmath-bigint-gmp-perl, libdata-uuid-perl, libcrypt-cbc-perl,
- libcrypt-cast5-perl, liblog-dispatch-perl, libfuse-class-perl
+ libcrypt-cast5-perl | libcrypt-cast5-pp-perl, liblog-dispatch-perl,
+ libfuse-class-perl
 Suggests: libnet-atalk-perl, libcrypt-des-perl, libio-socket-inet6-perl,
  libnss-mdns
 Description: Apple Filing Protocol implementation in Perl

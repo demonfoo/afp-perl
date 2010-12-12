@@ -146,6 +146,8 @@ find %{buildroot}%{_prefix}             \
     exit -1
     }
 
+ln -sf /usr/local/bin/afpmount.pl %{buildroot}/sbin/mount.pafpfs
+
 %clean
 [ "%{buildroot}" != "/" ] && rm -rf %{buildroot}
 
@@ -153,6 +155,7 @@ find %{buildroot}%{_prefix}             \
 %files -n afp-perl
 /usr/local/bin/afpmount.pl
 /usr/local/bin/afp_acl.pl
+/sbin/mount.pafpfs
 %files -n afpsh-perl
 /usr/local/bin/afpsh.pl
 %defattr(-,root,root)
