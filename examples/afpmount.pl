@@ -15,9 +15,9 @@ use Getopt::Long;                   # for parsing command line options
 use Socket;
 use Errno qw(:POSIX);
 
-# Conditionally include Term::ReadPassword; it doesn't need to be present
-# for supplying passwords via the AFP URL directly, but it's needed for
-# prompting.
+# Do conditional includes of several modules, and denote to ourselves
+# if they got imported or not.
+# conditional includes {{{1
 my $has_Term__ReadPassword = 0;
 eval {
     require Term::ReadPassword;
@@ -44,6 +44,7 @@ eval {
     Net::Atalk::NBP->import;
     $has_Net__Atalk__NBP = 1;
 };
+# }}}1
 
 # define constants {{{1
 use constant MSG_NEEDPASSWORD   => 1;
@@ -107,11 +108,29 @@ sub list_servers {
     # available AFP servers that one *could* mount shares from...
 
     my @servers;
+    if (!$has_Net__Bonjour && !$has_Net__Atalk::NBP) {
+        print STDERR <<'_EOT_';
+Neither Net::Bonjour nor Net::Atalk::NBP was available; can't discover
+servers without at least one of these present!
+_EOT_
+        exit(&EOPNOTSUPP);
+    }
+
     if ($has_Net__Bonjour) {
         my $discover = new Net::Bonjour('afpovertcp', 'tcp');
         $discover->discover();
 
         push(@servers, map { $_->hostname() } $discover->entries());
+    }
+
+    if ($has_Net__Atalk__NBP) {
+        my @NBPResults;
+
+        eval {
+            @NBPResults = NBPLookup(undef, 'AFPServer');
+        };
+
+        push(@servers, map { $_->[3] } @NBPResults);
     }
 
     print map { $_ . "\n" } @servers;
