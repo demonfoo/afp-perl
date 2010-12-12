@@ -162,9 +162,6 @@ ln -sf /usr/local/bin/afpmount.pl %{buildroot}/sbin/mount.pafpfs
 %defattr(-,root,root)
 
 %changelog
-* Sat Dec 11 2010 demon@now.ai
-- Initial build.
-
 * Sun Dec 12 2010 demon@now.ai
 - Added RPM packaging.
 - Debian packaging cleanups.
@@ -172,3 +169,6 @@ ln -sf /usr/local/bin/afpmount.pl %{buildroot}/sbin/mount.pafpfs
   to Crypt::CAST5.
 - Got the Makefile.PL and MANIFEST files added to the tree.
 - Cleanup the URL regex in Net::AFP::Fuse a bit.
+
+* Sat Dec 11 2010 demon@now.ai
+- Initial build.
