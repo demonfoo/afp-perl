@@ -108,7 +108,7 @@ sub list_servers {
     # available AFP servers that one *could* mount shares from...
 
     my @servers;
-    if (!$has_Net__Bonjour && !$has_Net__Atalk::NBP) {
+    if (!$has_Net__Bonjour && !$has_Net__Atalk__NBP) {
         print STDERR <<'_EOT_';
 Neither Net::Bonjour nor Net::Atalk::NBP was available; can't discover
 servers without at least one of these present!
