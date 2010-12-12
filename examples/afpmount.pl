@@ -18,9 +18,32 @@ use Errno qw(:POSIX);
 # Conditionally include Term::ReadPassword; it doesn't need to be present
 # for supplying passwords via the AFP URL directly, but it's needed for
 # prompting.
-my $has_Term_ReadPassword = 1;
-eval { require Term::ReadPassword; };
-if ($@) { $has_Term_ReadPassword = 0; }
+my $has_Term__ReadPassword = 0;
+eval {
+    require Term::ReadPassword;
+    1;
+} and do {
+    Term::ReadPassword->import;
+    $has_Term__ReadPassword = 1;
+};
+
+my $has_Net__Bonjour = 0;
+eval {
+    require Net::Bonjour;
+    1;
+} and do {
+    Net::Bonjour->import;
+    $has_Net__Bonjour = 1;
+};
+
+my $has_Net__Atalk__NBP = 0;
+eval {
+    require Net::Atalk::NBP;
+    1;
+} and do {
+    Net::Atalk::NBP->import;
+    $has_Net__Atalk__NBP = 1;
+};
 
 # define constants {{{1
 use constant MSG_NEEDPASSWORD   => 1;
@@ -65,6 +88,36 @@ _EOT_
     exit(&EINVAL);
 }
 
+sub list_mounts {
+    # See if there's a URL on @ARGV with at least a hostname (and possibly
+    # user creds), and try to get a mount list from the server.
+
+    # - connect to server
+    # - if auth credentials are present, do password login, otherwise
+    #   do anonymous login
+    # - call FPGetSrvrParms() on connection object
+    # - list off volumes to stdout
+    # - call FPLogout() and close()
+
+    exit(0);
+}
+
+sub list_servers {
+    # Try to use Bonjour (and NBP, if it's available?) to get a list of
+    # available AFP servers that one *could* mount shares from...
+
+    my @servers;
+    if ($has_Net__Bonjour) {
+        my $discover = new Net::Bonjour('afpovertcp', 'tcp');
+        $discover->discover();
+
+        push(@servers, map { $_->hostname() } $discover->entries());
+    }
+
+    print map { $_ . "\n" } @servers;
+
+    exit(0);
+}
 
 # Handle the command line args.
 my($interactive, $options);
@@ -72,7 +125,9 @@ my($interactive, $options);
 # string we get, that allows mounting via fstab to work.
 exit(&EINVAL) unless GetOptions('interactive'   => \$interactive,
                                 'options=s'     => \$options,
-                                'help'          => \&usage);
+                                'help'          => \&usage,
+                                'list-mounts'   => \&list_mounts,
+                                'list-servers'  => \&list_servers);
 my($path, $mountpoint) = @ARGV;
 
 unless ($path) {
@@ -134,8 +189,8 @@ if ($pid > 0) {
                 my $prompt = 'Password for ' . $username .
                         ' at ' . $hostname . ': ';
                 my $pw;
-                if ($has_Term_ReadPassword) {
-                    $pw = Term::ReadPassword::read_password($prompt);
+                if ($has_Term__ReadPassword) {
+                    $pw = read_password($prompt);
                 }
                 else {
                     print "Term::ReadPassword was not available, can't ",
