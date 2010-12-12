@@ -11,8 +11,6 @@ lib/Net/AFP/UAMs/Randnum2.pm
 lib/Net/AFP/UAMs/Plaintext.pm
 lib/Net/AFP/UAMs/Randnum.pm
 lib/Net/AFP/UAMs/DHX2.pm
-lib/Net/AFP/UAMs/Reconnect.pm
-lib/Net/AFP/UAMs/Kerberos.pm
 lib/Net/AFP/UAMs/Anonymous.pm
 lib/Net/AFP/UAMs/DHX.pm
 lib/Net/AFP/VolAttrs.pm
