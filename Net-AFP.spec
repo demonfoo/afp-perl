@@ -24,7 +24,7 @@ buildarch: noarch
 prefix:    %(echo %{_prefix})
 source:    Net-AFP-%{version}.tar.gz
 autoreq:   0
-requires:  perl >= 5.10.0, perl(Log::Log4perl), perl(Math::BigInt::GMP), perl(Data::UUID), perl(Crypt::CBC), perl(Crypt::CAST5), perl(Log::Dispatch), perl(Fuse), perl(Fuse::Class)
+requires:  perl >= 5.10.0, perl(Log::Log4perl), perl(Math::BigInt::GMP), perl(Data::UUID), perl(Crypt::CBC), perl(Crypt::CAST5_PP), perl(Log::Dispatch), perl(Fuse), perl(Fuse::Class)
 #suggests: perl(Net::Atalk), perl(Crypt::DES), perl(IO::Socket::INET6), nss-mdns
 
 %description
@@ -146,6 +146,7 @@ find %{buildroot}%{_prefix}             \
     exit -1
     }
 
+mkdir %{buildroot}/sbin
 ln -sf /usr/local/bin/afpmount.pl %{buildroot}/sbin/mount.pafpfs
 
 %clean
