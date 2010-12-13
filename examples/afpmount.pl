@@ -72,6 +72,13 @@ Options:
         Pass mount options; currently accepted but not used.
     -h|--help
         This help summary.
+    --list-servers
+        Query for AFP servers via mDNS if Net::Bonjour is available,
+        and via NBP if Net::Atalk is available.
+    --list-mounts [AFP URL]
+        Query the given AFP server, using supplied credentials if given,
+        for the mounts available. Prompts for password if username is
+        given, but no password.
 
 AFP URL format:
 
@@ -207,7 +214,7 @@ _EOT_
         my $discover = new Net::Bonjour('afpovertcp', 'tcp');
         $discover->discover();
 
-        push(@servers, map { $_->hostname() } $discover->entries());
+        push(@servers, map { 'afp://' . $_->hostname() . '/' } $discover->entries());
     }
 
     if ($has_atalk) {
@@ -220,7 +227,7 @@ _EOT_
             @NBPResults = NBPLookup(undef, 'AFPServer');
         };
 
-        push(@servers, map { $_->[3] } @NBPResults);
+        push(@servers, map { 'afp:/at/' . $_->[3] . '/' } @NBPResults);
     }
 
     print map { $_ . "\n" } @servers;
