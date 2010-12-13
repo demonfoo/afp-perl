@@ -115,6 +115,10 @@ sub list_mounts {
         exit(&EINVAL);
     }
 
+    foreach (keys(%values)) {
+        $values{$_} = Net::AFP::Fuse::urldecode($values{$_});
+    }
+
     unless (defined $values{'host'}) {
         print STDERR "Could not extract host from AFP URL\n";
         exit(&EINVAL);
