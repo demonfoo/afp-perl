@@ -111,7 +111,7 @@ find %{buildroot}%{_prefix}             \
 
 %{__perl} -MFile::Find -le '
     find({ wanted => \&wanted, no_chdir => 1}, "%{buildroot}");
-    print "%doc  Todo";
+    print "%doc  Todo README";
     for my $x (sort @dirs, @files) {
         unless (indirs($x) || $x =~ m{^/usr/local/bin}) {
             push @ret, $x;
