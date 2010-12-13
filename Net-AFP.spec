@@ -48,7 +48,8 @@ This module supports several advanced AFP features:
 %package -n afp-perl
 summary:   Apple Filing Protocol FUSE client in Perl
 autoreq:   0
-requires:  perl >= 5.10.0, perl(Net::AFP), perl(File::ExtAttr), perl(Term::ReadPassword)
+requires:  perl >= 5.10.0, perl(Net::AFP), perl(File::ExtAttr), perl(Term::ReadPassword), perl(Net::Bonjour)
+#suggests:  perl(Net::Bonjour)
 group:     Applications/Perl
 %description -n afp-perl
 A command line tool which uses Net::AFP to mount an AFP share. This package
