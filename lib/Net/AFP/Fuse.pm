@@ -1773,18 +1773,20 @@ sub lookup_afp_entry { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
-    if (defined $$self{'client_uuid'}) {
-        my $rc = $$self{'afpconn'}->FPAccess(
-                'VolumeID'      => $$self{'volID'},
-                'DirectoryID'   => $$self{'topDirID'},
-                'UUID'          => $$self{'client_uuid'},
-                'ReqAccess'     => KAUTH_VNODE_READ_ATTRIBUTES,
-                'PathType'      => $$self{'pathType'},
-                'Pathname'      => $fileName);
-        return -&EACCES if $rc == kFPAccessDenied;
-        return -&ENOENT if $rc == kFPObjectNotFound;
-        return -&EBADF  if $rc != kFPNoErr;
-    }
+    # Disabling this for now, as it causes errors with dangling, but otherwise
+    # well-formed, symlinks.
+#    if (defined $$self{'client_uuid'}) {
+#        my $rc = $$self{'afpconn'}->FPAccess(
+#                'VolumeID'      => $$self{'volID'},
+#                'DirectoryID'   => $$self{'topDirID'},
+#                'UUID'          => $$self{'client_uuid'},
+#                'ReqAccess'     => KAUTH_VNODE_READ_ATTRIBUTES,
+#                'PathType'      => $$self{'pathType'},
+#                'Pathname'      => $fileName);
+#        return -&EACCES if $rc == kFPAccessDenied;
+#        return -&ENOENT if $rc == kFPObjectNotFound;
+#        return -&EBADF  if $rc != kFPNoErr;
+#    }
 
     my $fileBitmap = kFPCreateDateBit | kFPModDateBit | kFPNodeIDBit |
                      kFPParentDirIDBit | $$self{'DForkLenFlag'};
