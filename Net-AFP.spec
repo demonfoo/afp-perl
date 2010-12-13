@@ -60,7 +60,7 @@ later).
 summary:   An FTP-style client for accessing AFP shares
 autoreq:   0
 requires:  perl >= 5.10.0, perl(Net::AFP), perl(Text::Glob), perl(Term::ReadPassword)
-#suggests:  perl(Archive::Tar), perl(Term::ReadLine::GNU)
+#suggests:  perl(Archive::Tar), perl(Term::ReadLine::Gnu)
 %description -n afpsh-perl
 A command-line tool, similar to FTP or smbclient, which can be used to
 transfer files to/from AFP servers.
