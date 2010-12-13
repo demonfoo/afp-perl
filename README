@@ -1,0 +1,64 @@
+Net::AFP version 0.61.1
+=======================
+
+This collection of modules implements the Apple Filing Protocol stack in
+Perl. It contains several separate modules which implement components
+that allow it to do its work:
+
+    Net::DSI - A Perl implementation of the DSI mid-layer protocol over TCP
+    Net::AFP - A superclass implementing generic AFP operations
+    Net::AFP::TCP - A derivative of Net::AFP implementing TCP transport
+    Net::AFP::Atalk - A derivative of Net::AFP implementing AppleTalk transport
+    Net::AFP::Fuse - A derivative of Fuse::Class implementing a Fuse filesystem
+    Net::AFP::UAMs - A utility module for calling User Authentication Methods
+    Net::AFP::Versions - A utility module for protocol version agreement
+                         and checking
+    Net::AFP::ACL - A package providing symbols related to using AFP's
+                    Access Control List implementation
+    Net::AFP::Result - Symbols for known AFP result codes, and mappings of
+                       result codes to error strings
+    Net::AFP::Parsers - A utility module for parsing various common packed
+                        data types and structures from an AFP server
+
+This code is known to work on Linux, FreeBSD (8.x), NetBSD and MacOS X/Darwin.
+It makes use of Perl ithreads, so requires a threaded build of Perl.
+I have attempted to test this module on both Solaris (well, OpenSolaris)
+and Windows; unfortunately there seem to be threading deficiencies on
+both that make the code non-functional there.
+
+See the following URL for more information on AFP:
+
+http://developer.apple.com/library/mac/#documentation/Networking/Conceptual/AFP/Introduction/Introduction.html
+
+
+INSTALLATION
+
+To install this module, run the following:
+
+    perl Makefile.PL
+    make
+    make install
+
+
+DEPENDENCIES
+
+This module requires or encourages use of these other modules and libraries:
+
+    Log::Log4perl is used for some message logging
+    Log::Dispatch::Syslog is used for routing log messages to syslog
+    Fuse::Class is used as the superclass for Net::AFP::Fuse
+    Fuse is depended upon by Fuse::Class, need version 0.09_5 or later
+    Data::UUID is recommended, used internally for access checking
+    Crypt::CBC is recommended, needed for advanced UAMs
+    Crypt::CAST5 or Crypt::CAST5_PP is recommended, needed for DHX UAMs
+    Crypt::DES is suggested, needed for Randnum UAMs
+    Math::BigInt::GMP is recommended, speeds up DHX UAMs
+    IO::Socket::INET6 is suggested, adds v6 socket support
+    Net::Atalk is suggested, adds AppleTalk socket support
+    Net::Bonjour is suggested, adds mDNS/Bonjour service discovery
+
+COPYRIGHT AND LICENSE
+
+Copyright (C) 2005-2010 Derrik Pates
+
+

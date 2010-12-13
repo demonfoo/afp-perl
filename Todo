@@ -1,9 +1,8 @@
-- Improve resilience to disconnection.
+- Improve dead peer detection in Net::DSI.
 - Handle shutdown announcements better (we currently receive them, but don't
   really do anything with them).
-- See if there's a better way to deal with dead symlinks, currently the
-  attempts to read the links make Linux/AFP somewhat cranky.
-- See about bootstrapping a Solaris/OpenSolaris environment with Fuse.
 - Maybe see about AppleDouble-style resource fork support?
 - Kerberos support?
 - Reconnect UAM support?
+- Maybe DBus integration so we can call FPZzzzz() appropriately before the
+  machine goes to sleep?
