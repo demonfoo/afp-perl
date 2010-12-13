@@ -1009,7 +1009,7 @@ sub doAFPConnection {
 	else {
 		$session = new Net::AFP::TCP($host, $port);
 	}
-	unless (ref($session) ne '' and $session->isa('Net::AFP')) {
+	unless (ref($session) and $session->isa('Net::AFP')) {
 		print "Could not connect via AFP to ", $host, "\n";
 		exit(1);
 	}
