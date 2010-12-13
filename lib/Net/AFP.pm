@@ -125,9 +125,7 @@ This class implements generalized functionality; protocol-specific
 functionality is completely abstracted out from this class.
 
 Note that not all AFP operations are implemented. The documentation describes
-many functions which I have not implemented due to lack of need. Many of the
-possible functions are Mac-specific, and not necessary for what I've been
-doing thus far.
+a few functions which I have not implemented due to lack of need.
 
 =head2 Path Type Constants
 
