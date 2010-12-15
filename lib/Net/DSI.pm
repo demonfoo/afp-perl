@@ -14,7 +14,7 @@ eval {
     1;
 } and do {
     $has_IO__Socket__INET6 = 1;
-}
+};
 use IO::Socket::INET;
 use IO::Poll qw(POLLIN POLLHUP);
 use IO::Handle;
