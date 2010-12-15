@@ -9,8 +9,10 @@ use strict;
 use warnings;
 
 my $has_IO__Socket__INET6 = 0;
-eval { require IO::Socket::INET6; };
-unless ($@) {
+eval {
+    require IO::Socket::INET6;
+    1;
+} and do {
 	$has_IO__Socket__INET6 = 1;
 }
 use IO::Socket::INET;
@@ -284,7 +286,7 @@ sub new { # {{{1
 } # }}}1
 =back
 
-=head2 METHODS
+=head2 SUBROUTINES/METHODS
 
 =over
 
@@ -380,7 +382,12 @@ sub SendMessage { # {{{1
 	return $reqId;
 } # }}}1
 
-=item DSICloseSession
+=item DSICloseSession ()
+
+The C<DSICloseSession> call can be issued at any time by the DSI client to
+close a session previously opened through an C<DSIOpenSession> call. As a
+result of the call, all pending activity on the session is immediately
+canceled.
 
 =cut
 sub DSICloseSession { # {{{1
@@ -392,7 +399,14 @@ sub DSICloseSession { # {{{1
 	return;
 } # }}}1
 
-=item DSICommand
+=item DSICommand (MESSAGE, RESP_R)
+
+Once a session has been opened, the workstation end client can send a
+command to the server end by issuing an C<DSICommand> call.
+
+MESSAGE contains the binary data for the outgoing request. RESP_R must
+be a scalar ref that will contain the reassembled response data, if any,
+received from the server in response to the request sent.
 
 =cut
 sub DSICommand { # {{{1
@@ -410,7 +424,13 @@ sub DSICommand { # {{{1
 	return $rc;
 } # }}}1
 
-=item DSIGetStatus
+=item DSIGetStatus (RESP_R)
+
+The C<DSIGetStatus> call is used by a DSI client to obtain status
+information for a particular server.
+
+RESP_R must be a scalar ref which will contain a hash ref with the
+parsed structure data from the DSIGetStatus call.
 
 =cut
 sub DSIGetStatus { # {{{1
@@ -431,7 +451,10 @@ sub DSIGetStatus { # {{{1
 	return $rc;
 } # }}}1
 
-=item DSIOpenSession
+=item DSIOpenSession ( [OPTIONS] )
+
+The C<DSIOpenSession> call is issued by a client to begin a DSI session with
+the connected server.
 
 =cut
 sub DSIOpenSession { # {{{1
@@ -484,6 +507,9 @@ sub DSIOpenSession { # {{{1
 # do dispatch duty, so it can handle things like that.
 =item DSITickle
 
+This call is used to keep an existing DSI connection alive. It should not
+be called directly in your code; this operation is handled internally.
+
 =cut
 sub DSITickle { # {{{1
 	my ($self) = @_;
@@ -491,7 +517,11 @@ sub DSITickle { # {{{1
 	my $reqId = $self->SendMessage(OP_DSI_TICKLE);
 } # }}}1
 
-=item DSIWrite
+=item DSIWrite (MESSAGE, DATA_R, D_LEN, RESP_R)
+
+Used for sending write requests to the server. This is only applicable for
+the L<Net::AFP/"FPWrite">, L<Net::AFP/"FPWriteExt">, and
+L<Net::AFP/"FPAddIcon"> operations.
 
 =cut
 sub DSIWrite { # {{{1
@@ -518,6 +548,38 @@ in PDF form, at:
 
 L<http://developer.apple.com/documentation/macos8/pdf/ASAppleTalkFiling2.1_2.2.pdf>
 
+=head1 DEPENDENCIES
+
+Requires a threaded version of Perl to run.
+
+Most of the required packages are included in the Perl distribution, so
+they do not need to be installed on your system.
+
+IO::Socket::INET6 can optionally be used. It adds the ability to connect
+to AFP servers that listen on IPv6 sockets.
+
+=head1 BUGS AND LIMITATIONS
+
+None currently known.
+
+=head1 INCOMPATIBILITIES
+
+Does not work on Nexenta. Don't currently know if it will work on any version
+of Solaris.
+
+Has some sort of socket/threading interaction on Windows systems. It gets
+connected, but sending packets gets slower and slower the more it does it.
+Seems to happen with both Strawberry Perl and ActivePerl.
+
+=head1 AUTHOR
+
+Derrik Pates <demon@devrandom.net>
+
+=head1 SEE ALSO
+
+C<IO::Socket::INET>, C<IO::Socket::INET6>, C<Net::AFP>, C<Net::AFP::TCP>
+
 =cut
+
 1;
 # vim: ts=4 fdm=marker ai et

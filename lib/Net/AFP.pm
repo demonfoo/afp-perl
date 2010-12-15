@@ -897,9 +897,24 @@ Not yet implemented.
 
 =cut
 sub FPCatSearch {
+    my ($self, %options) = @_;
+
     DEBUG('called ', (caller(0))[3]);
     ERROR('called function ', (caller(0))[3], ' not implemented');
     croak('Not yet implemented');
+    croak('VolumeID must be provided')
+            unless exists $options{'VolumeID'};
+    croak('ReqMatches must be provided')
+            unless exists $options{'ReqMatches'};
+    $options{'CatalogPosition'} ||= '';
+    $options{'FileRsltBitmap'} ||= 0;
+    $options{'DirectoryRsltBitmap'} ||= 0;
+    $options{'ReqBitmap'} ||=
+
+    my $msg = pack('CxnNx[4]a[16]nnN', kFPCatSearch,
+            @options{'VolumeID', 'ReqMatches', 'CatalogPosition',
+                     'FileRsltBitmap', 'DirectoryRsltBitmap',
+                     'ReqBitmap'});
 }
 
 =item FPCatSearchExt()

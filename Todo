@@ -6,3 +6,4 @@
 - Reconnect UAM support?
 - Maybe DBus integration so we can call FPZzzzz() appropriately before the
   machine goes to sleep?
+- Improve afp_acl.pl's support for inherited ACEs/inheritance control.
