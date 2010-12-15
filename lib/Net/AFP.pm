@@ -5221,37 +5221,39 @@ Removes an APPL mapping from a volume's Desktop database.
 
 Deprecated as of Mac OS X 10.6.
 
+Arguments are passed as key-value pair for this method.
+
 Arguments:
 
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $DTRefNum
+=item DTRefNum
 
 Desktop database reference number.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory ID.
 
-=item $FileCreator
+=item FileCreator
 
 File creator of the application corresponding to the APPL mapping that
 is to be removed.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to desired file or directory.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -5378,40 +5380,42 @@ Removes an extended attribute.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume identifier.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory identifier.
 
-=item $Bitmap
+=item Bitmap
 
 Bitmap specifying the desired behavior when removing an extended attribute.
 For this command, C<kAttrDontFollow> is the only valid bit. For details,
 see L<Net::AFP::ExtAttrs/"Extended Attributes Bitmap">.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to desired file or directory.
 
-=item $Name
+=item Name
 
 UTF-8 encoded name of the extended attribute that is to be removed.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -5472,37 +5476,39 @@ Renames a file or directory.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Ancestor Directory ID.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for possible values.
+Type of names in C<Pathname>. See L</"Path Type Constants"> for possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to the CNode whose name is being changed (cannot be null).
 
-=item $NewType
+=item NewType
 
-Type of names in C<$NewName>. See L</"Path Type Constants"> for possible values.
+Type of names in C<NewName>. See L</"Path Type Constants"> for possible values.
 
-=item $NewName
+=item NewName
 
 Pathname to the CNode, including its new name (cannot be null).
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -5664,21 +5670,19 @@ ACL from a file or directory.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume identifier.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory identifier.
 
-=item $Bitmap
+=item Bitmap
 
 Bits that specify the values that are to be set. Specify C<kFileSec_UUID>
 to set the UUID of the specified file or directory. Specify
@@ -5694,26 +5698,39 @@ field. The server copies any currently inherited ACEs to the end of the
 incoming list of ACEs and sets the ACL on the item. For declarations of
 these constants, see L<Net::AFP::ACL/Access Control List Bitmap>.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname of the file or directory for which the access control list (ACL)
 is to be obtained.
 
-=item $AdditionalInformation
+=item UUID
 
-A hash reference containing additional parameters, based on the flags
-passed in the C<$Bitmap> argument. If C<kFileSec_UUID> is set, the
-C<UUID> key should contain the user UUID. If C<kFileSec_GRPUUID> is
-set, the C<GRPUUID> key should contain the group UUID. If
-C<kFileSec_ACL> is set, the C<acl_flags> and C<acl_ace> keys should
-contain the corresponding information.
+If C<kFileSec_UUID> is set in the C<Bitmap> argument, this should contain
+the owner UUID.
+
+=item GRPUUID
+
+If C<kFileSec_GRPUUID> is set in the C<Bitmap> argument, this should contain
+the owning group UUID.
+
+=item acl_flags
+
+If C<kFileSec_ACL> is set, this should contain a list of ACE structures.
+
+=item acl_flags
+
+If C<kFileSec_ACL> is set, this should contain the ACL flag bitmask.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -5790,46 +5807,51 @@ Sets parameters for a directory.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Ancestor Directory ID.
 
-=item $Bitmap
+=item Bitmap
 
 Bitmap describing the parameters to set. Set the bit that corresponds to
-each desired parameter. This bitmap is the same as the C<$DirectoryBitmap>
+each desired parameter. This bitmap is the same as the C<DirectoryBitmap>
 parameter of the L</FPGetFileDirParms> command. For bit defintions for
 this bitmap, see L<Net::AFP::DirParms>.
 
-=item $PathType
+=item PathType
 
-Type of name in C<$Pathname>. See L</"Path Type Constants"> for possible values.
+Type of name in C<Pathname>. See L</"Path Type Constants"> for possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to the desired directory.
 
-=item %DirectoryParameters:
+=item Other parameters
 
-Parameters to be set, passed as a hash. Only the values C<Attribute>,
+Parameter values to set on the directory may be specified as part of the
+same set of key-value pairs. Only the values C<Attribute>,
 C<CreateDate>, C<ModDate>, C<BackupDate>, C<FinderInfo>, C<OwnerID>,
 C<GroupID>, C<AccessRights>, C<UnixUID>, C<UnixGID>, C<UnixPerms>,
-and C<UnixAccessRights> may be updated in this way.
+and C<UnixAccessRights> may be updated in this way. The corresponding
+bits must be set in the C<Bitmap> argument; see C<Net::AFP::DirParms>
+for the relevant flags.
 
 If any of the Unix* parameters are passed, they must all be passed at
 the same time, or C<kFPParamErr> will be returned.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -5908,48 +5930,50 @@ Sets the value of an extended attribute.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume identifier.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory identifier.
 
-=item $Bitmap
+=item Bitmap
 
 Bitmap specifying the desired behavior when setting the value of an
 extended attribute. For details, see
 L<Net::AFP::ExtAttrs/"Extended Attributes Bitmap">.
 
-=item $Offset
+=item Offset
 
 Always zero; reserved for future use.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to desired file or directory.
 
-=item $Name
+=item Name
 
 UTF-8 encoded name of the extended attribute whose value is to be set.
 
-=item $AttributeData
+=item AttributeData
 
 Value to which the extended attribute is to be set.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -6013,48 +6037,52 @@ Sets parameters for a file or a directory.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Ancestor Directory ID.
 
-=item $Bitmap
+=item Bitmap
 
 Bitmap describing the parameters to set. Set the bit that corresponds to
-each desired parameter. This bitmap can be the same as the C<$DirectoryBitmap>
-or the C<$FileBitmap> parameter of the L</FPGetFileDirParms> command, but
+each desired parameter. This bitmap can be the same as the C<DirectoryBitmap>
+or the C<FileBitmap> parameter of the L</FPGetFileDirParms> command, but
 this command can only set the parameters common to both bitmaps. For bit
 definitions for the Directory bitmap, see L<Net::AFP::DirParms>; for bit
 definitions for the File bitmap, see L<Net::AFP::FileParms>.
 
-=item $PathType
+=item PathType
 
-Type of name in C<$Pathname>. See L</"Path Type Constants"> for possible values.
+Type of name in C<Pathname>. See L</"Path Type Constants"> for possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to the desired file or directory.
 
-=item %DirectoryParameters
+=item Other parameters
 
-Parameters to be set, passed as a hash. Only the values C<Attribute>,
+Parameter values to set on the directory may be specified as part of the
+same set of key-value pairs.  Only the values C<Attribute>,
 C<CreateDate>, C<ModDate>, C<BackupDate>, C<FinderInfo>, C<UnixUID>,
 C<UnixGID>, C<UnixPerms>, and C<UnixAccessRights> may be updated in
-this way.
+this way. The corresponding bits must be set in the C<Bitmap> argument;
+see C<Net::AFP::DirParms> and C<Net::AFP::FileParms> for the relevant flags.
 
 If any of the Unix* parameters are passed, they must all be passed at
 the same time, or C<kFPParamErr> will be returned.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -6127,46 +6155,50 @@ Sets parameters for a file.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Ancestor Directory ID.
 
-=item $Bitmap
+=item Bitmap
 
 Bitmap describing the parameters to set. Set the bit that corresponds to
-each desired parameter. This bitmap can be the same as the C<$FileBitmap>
+each desired parameter. This bitmap can be the same as the C<FileBitmap>
 parameter of the L</FPGetFileDirParms> command. For bit definitions for
 the File bitmap, see L<Net::AFP::FileParms>.
 
-=item $PathType
+=item PathType
 
-Type of name in C<$Pathname>. See L</"Path Type Constants"> for possible values.
+Type of name in C<Pathname>. See L</"Path Type Constants"> for possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to the desired file or directory.
 
-=item %DirectoryParameters
+=item Other parameters
 
-Parameters to be set, passed as a hash. Only the values C<Attribute>,
+Parameter values to set on the directory may be specified as part of the
+same set of key-value pairs. Only the values C<Attribute>,
 C<CreateDate>, C<ModDate>, C<BackupDate>, C<FinderInfo>, C<UnixUID>,
 C<UnixGID>, C<UnixPerms>, and C<UnixAccessRights> may be updated in
-this way.
+this way. The corresponding bits must be set in the C<Bitmap> argument;
+see C<Net::AFP::FileParms> for the relevant flags.
 
 If any of the Unix* parameters are passed, they must all be passed at
 the same time, or C<kFPParamErr> will be returned.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 

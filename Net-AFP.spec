@@ -162,6 +162,11 @@ ln -sf /usr/local/bin/afpmount.pl %{buildroot}/sbin/mount.pafpfs
 /usr/local/bin/afpsh.pl
 %defattr(-,root,root)
 
+%post -n afp-perl
+if [ ! -e /etc/fuse.conf ] ; then
+    echo "user_allow_other" > /etc/fuse.conf
+fi
+
 %changelog
 * Sun Dec 12 2010 demon@now.ai
 - Added RPM packaging.
