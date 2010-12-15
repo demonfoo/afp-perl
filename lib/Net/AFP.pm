@@ -6504,45 +6504,43 @@ Deprecated; use C<FPWriteExt()> instead.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
+=item Flag
 
-An object that is a subclass of Net::AFP.
-
-=item $Flag
-
-Bit 7 is the C<StartEndFlag> bit, and indicates whether C<$Offset> is
+Bit 7 is the C<StartEndFlag> bit, and indicates whether C<Offset> is
 relative to the beginning or end of the fork. A value of zero indicates
 that the start is relative to the beginning of the fork; a value of 1
 indicates that the start is relative to the end of the fork.
 
-=item $OForkRefNum
+=item OForkRefNum
 
 Open fork reference number.
 
-=item $Offset
+=item Offset
 
 Byte offset from the beginning or the end of the fork indicating where
 the write is to begin; a negative value indicates a byte within the
 fork relative to the end of the fork.
 
-=item $ReqCount
+=item ReqCount
 
 Number of bytes to be written.
 
-=item $ForkData
+=item ForkData
 
 A reference to a scalar containing data to be written, which is not part
 of the request block. Instead, the data is transmitted to the server in
 an intermediate exchange of DSI packets.
 
-=item $resp_r
-
-A reference to a scalar which will contain a hash
-containing returned values from the server call.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, and the offset of the last written byte.
 
 Error replies:
 
@@ -6602,45 +6600,43 @@ Writes a block of data to an open fork.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Flag
+=item Flag
 
 Bit 7 is the C<StartEndFlag> bit, and indicates whether C<$Offset> is
 relative to the beginning or end of the fork. A value of zero indicates
 that the start is relative to the beginning of the fork; a value of 1
 indicates that the start is relative to the end of the fork.
 
-=item $OForkRefNum
+=item OForkRefNum
 
 Open fork reference number.
 
-=item $Offset
+=item Offset
 
 Byte offset from the beginning or the end of the fork indicating where
 the write is to begin; a negative value indicates a byte within the
 fork relative to the end of the fork.
 
-=item $ReqCount
+=item ReqCount
 
 Number of bytes to be written.
 
-=item $ForkData_r
+=item ForkData
 
 A reference to a scalar containing data to be written, which is not part of
 the request block. Instead, the data is transmitted to the server in an
 intermediate exchange of DSI packets.
 
-=item $resp_r
-
-A reference to a scalar which will contain a hash
-containing returned values from the server call.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, and the offset of the last written byte.
 
 Error replies:
 
