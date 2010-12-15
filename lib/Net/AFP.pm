@@ -159,7 +159,7 @@ use constant kFPUTF8Name        => 3;
 =head2 File Creation Constants
 
 Constants used when creating files. These constants are used in the
-C<$Flag> parameter for the L</FPCreateFile()> command.
+C<Flag> parameter for the L</FPCreateFile()> command.
 
 =over
 
@@ -701,8 +701,8 @@ Arguments are passed as key-value pair for this method.
 
 Bit 0 is the C<LockUnlock> bit, where 0 indicates lock and 1 indicates
 unlock. Bit 7 is the C<StartEndFlag> bit, where 0 indicates that
-C<$Offset> is relative to the beginning of the fork and 1 indicates
-that C<$Offset> is relative to the end of the fork. The C<StartEndFlag>
+C<Offset> is relative to the beginning of the fork and 1 indicates
+that C<Offset> is relative to the end of the fork. The C<StartEndFlag>
 bit is only used when locking a range.
 
 =item OForkRefNum
@@ -746,7 +746,7 @@ Server's maximum lock count has been reached.
 =item kFPParamErr
 
 Session reference number or open fork reference number is unknown; a
-combination of the C<StartEndFlag> bit and C<$Offset> specifies a range
+combination of the C<StartEndFlag> bit and C<Offset> specifies a range
 that starts before byte zero.
 
 =item kFPRangeNotLocked
@@ -801,8 +801,8 @@ Arguments are passed as key-value pair for this method.
 
 Bit 0 is the C<LockUnlock> bit, where 0 indicates lock and 1 indicates
 unlock. Bit 7 is the C<StartEndFlag> bit, where 0 indicates that
-C<$Offset> is relative to the beginning of the fork and 1 indicates
-that C<$Offset> is relative to the end of the fork. The C<StartEndFlag>
+C<Offset> is relative to the beginning of the fork and 1 indicates
+that C<Offset> is relative to the end of the fork. The C<StartEndFlag>
 bit is only used when locking a range.
 
 =item OForkRefNum
@@ -846,7 +846,7 @@ Server's maximum lock count has been reached.
 =item kFPParamErr
 
 Session reference number or open fork reference number is unknown; a
-combination of the C<StartEndFlag> bit and C<$Offset> specifies a range
+combination of the C<StartEndFlag> bit and C<Offset> specifies a range
 that starts before byte zero.
 
 =item kFPRangeNotLocked
@@ -1264,7 +1264,7 @@ Non-AFP error occurred.
 
 =item kFPObjectExists
 
-File or directory of the name specified by C<$NewName> already exists
+File or directory of the name specified by C<NewName> already exists
 in the destination parent directory.
 
 =item kFPObjectNotFound
@@ -1323,35 +1323,34 @@ Creates a new directory.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Ancestor Directory ID.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname, including the name of the new directory (cannot be null).
 
-=item $resp_r
-
-A reference to a scalar that can be used to return the Directory ID of the
-newly created directory upon success.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, the return
+is a list, containing both the error code and the Directory ID of the
+newly created directory.
 
 Error replies:
 
@@ -1420,35 +1419,37 @@ Creates a new file.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Flag
+=item Flag
 
 Bit 7 of the Flag parameter is the C<CreateFlag> bit, where 0 indicates
 a soft create and 1 indicates a hard create.
 
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Ancestor directory ID.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname, including the name of the new file (cannot be null).
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -1518,26 +1519,24 @@ deleted.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory ID containing the referenced file.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</Path Type Constants> for possible
+Type of names in C<Pathname>. See L</Path Type Constants> for possible
 values.
 
-=item $Pathname
+=item Pathname
 
 Name of the file that is the target of the File ID (that is, the filename
 of the file for which a File ID is being created).
@@ -1547,6 +1546,11 @@ of the file for which a File ID is being created).
 A reference to a scalar which will contain the new File ID.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, and the new File ID.
 
 Error replies:
 
@@ -1810,59 +1814,57 @@ Deprecated; use C<FPEnumerateExt2()> instead.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Identifier for the directory to list.
 
-=item $FileBitmap
+=item FileBitmap
 
 Bitmap describing the parameters to return if the enumerated offspring is
 a file. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<$FileBitmap> parameter of the
+bitmap is the same as the C<FileBitmap> parameter of the
 L</FPGetFileDirParms> command and can be null. For bit definitions for
 this bitmap, see L<Net::AFP::FileParms>.
 
-=item $DirectoryBitmap
+=item DirectoryBitmap
 
 Bitmap describing the parameters to return if the enumerated offspring is
 a directory. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<$DirectoryBitmap> parameter of the
+bitmap is the same as the C<DirectoryBitmap> parameter of the
 L</FPGetFileDirParms> command and can be null. For bit definitions for
 this bitmap, see L<Net::AFP::DirParms>.
 
-=item $ReqCount
+=item ReqCount
 
 Maximum number of C<ResultsRecord> structures for which information is
 to be returned.
 
-=item $StartIndex
+=item StartIndex
 
 Directory offspring index. (Starts at 1.)
 
-=item $MaxReplySize
+=item MaxReplySize
 
 Maximum size of the reply block.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to the desired directory.
 
-=item $resp_r
+=item Entries_ref
 
 A reference to a scalar that can be used to contain an array of parsed
 data structures containing information about remote files.
@@ -1886,6 +1888,10 @@ data structures containing information about remote files.
  ]
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -1985,61 +1991,59 @@ Lists the contents of a directory.
 
 Deprecated; use C<FPEnumerateExt2()> instead.
 
+Arguments are passed as key-value pair for this method.
+
 Arguments:
 
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Identifier for the directory to list.
 
-=item $FileBitmap
+=item FileBitmap
 
 Bitmap describing the parameters to return if the enumerated offspring is
 a file. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<$FileBitmap> parameter of the
+bitmap is the same as the C<FileBitmap> parameter of the
 L</FPGetFileDirParms> command and can be null. For bit definitions for
 this bitmap, see L<Net::AFP::FileParms>.
 
-=item $DirectoryBitmap
+=item DirectoryBitmap
 
 Bitmap describing the parameters to return if the enumerated offspring is
 a directory. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<$DirectoryBitmap> parameter of the
+bitmap is the same as the C<DirectoryBitmap> parameter of the
 L</FPGetFileDirParms> command and can be null. For bit definitions for
 this bitmap, see L<Net::AFP::DirParms>.
 
-=item $ReqCount
+=item ReqCount
 
 Maximum number of C<ResultsRecord> structures for which information is
 to be returned.
 
-=item $StartIndex
+=item StartIndex
 
 Directory offspring index. (Starts at 1.)
 
-=item $MaxReplySize
+=item MaxReplySize
 
 Maximum size of the reply block.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to the desired directory.
 
-=item $resp_r
+=item Entries_ref
 
 A reference to a scalar that can be used to contain an array of parsed
 data structures containing information about remote files.
@@ -2063,6 +2067,10 @@ data structures containing information about remote files.
  ]
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -2158,61 +2166,59 @@ sub FPEnumerateExt { # {{{1
 
 List the contents of a directory.
 
+Arguments are passed as key-value pair for this method.
+
 Arguments:
 
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Identifier for the directory to list.
 
-=item $FileBitmap
+=item FileBitmap
 
 Bitmap describing the parameters to return if the enumerated offspring is
 a file. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<$FileBitmap> parameter of the
+bitmap is the same as the C<FileBitmap> parameter of the
 L</FPGetFileDirParms> command and can be null. For bit definitions for
 this bitmap, see L<Net::AFP::FileParms>.
 
-=item $DirectoryBitmap
+=item DirectoryBitmap
 
 Bitmap describing the parameters to return if the enumerated offspring is
 a directory. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<$DirectoryBitmap> parameter of the
+bitmap is the same as the C<DirectoryBitmap> parameter of the
 L</FPGetFileDirParms> command and can be null. For bit definitions for
 this bitmap, see L<Net::AFP::DirParms>.
 
-=item $ReqCount
+=item ReqCount
 
 Maximum number of C<ResultsRecord> structures for which information is
 to be returned.
 
-=item $StartIndex
+=item StartIndex
 
 Directory offspring index. (Starts at 1.)
 
-=item $MaxReplySize
+=item MaxReplySize
 
 Maximum size of the reply block.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to the desired directory.
 
-=item $resp_r
+=item Entries_ref
 
 A reference to a scalar that can be used to contain an array of parsed
 data structures containing information about remote files.
@@ -2236,6 +2242,10 @@ data structures containing information about remote files.
  ]
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -2334,43 +2344,45 @@ Exchanges file metadata between two files.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $SrcDirID
+=item SourceDirectoryID
 
 Identifier of the directory containing the source file.
 
-=item $DstDirID
+=item DestDirectoryID
 
 Identifier of the directory containing the destination file.
 
-=item $SrcPathType
+=item SourcePathType
 
-Type of names in C<$SrcPathname>. See L</"Path Type Constants"> for
+Type of names in C<SourcePathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $SrcPathname
+=item SourcePathname
 
 Pathname of the source file.
 
-=item $DstPathType
+=item DestPathType
 
-Type of names in C<$SrcPathname>. See L</"Path Type Constants"> for
+Type of names in C<SourcePathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $DstPathname
+=item DestPathname
 
 Pathname of the destination file.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -2522,21 +2534,19 @@ Gets the access control list for a file or directory.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume identifier.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory identifier.
 
-=item $Bitmap
+=item Bitmap
 
 Bits that specify the values that are to be obtained. Specify
 C<kFileSec_UUID> to get the UUID of the specified file or directory.
@@ -2545,26 +2555,29 @@ file or directory, or specify kFileSec_ACL to get the ACL of the
 specified file or directory. For declarations of these constants,
 see L<Net::AFP::ACL/Access Control List Bitmap>.
 
-=item $MaxReplySize
+=item MaxReplySize
 
 Reserved. Set this parameter to zero.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname of the file or directory for which the access control list (ACL)
 is to be obtained.
 
-=item $resp_r
+=back
 
-A reference to a scalar that can be used to contain a hash reference, which
-will contain the returned ACL information.
+Returns:
 
- {
+A scalar indicating the error code from the call; upon success, a list
+containing the error code, followed by key-value pairs containing ACL
+related fields about the requested file, like the following:
+
+ (
    'acl_ace' => [
                   {
                     'ace_flags' => 1,
@@ -2577,9 +2590,7 @@ will contain the returned ACL information.
    'acl_flags' => 0,
    'UUID' => 'abcdefab-cdef-abcd-efab-cdef00000050',
    'GRPUUID' => 'abcdefab-cdef-abcd-efab-cdef00000050',
- }
-
-=back
+ )
 
 Error replies:
 
@@ -2665,33 +2676,56 @@ Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $DTRefNum
+=item DTRefNum
 
 Desktop database reference number.
 
-=item $FileCreator
+=item FileCreator
 
 File creator of the application corresponding to the APPL mapping
 to be retrieved.
 
-=item $Index
+=item Index
 
 Index of the APPL mapping to be retrieved.
 
-=item $Bitmap
+=item Bitmap
 
+Parameters to retrieve about the application to be used to open the file
+with the indicated Creator ID. See C<Net::AFP::FileParms> for the parameter
+bits which can be set.
 
+=back
 
-=item $resp_r
+Returns:
 
-A reference to a scalar which will contain a hash reference with the
-APPL tag ID and requested file parameters.
+A scalar indicating the error code from the call. Upon success, a list
+will be returned containing the error call, and a set of key/value pairs
+with the returned parameters.
+
+Error replies:
+
+=over
+
+=item kFPParamErr
+
+Session reference number or Desktop database reference was unknown.
+
+=item kFPItemNotFound
+
+No entries in the Desktop database matched the given parameters.
+
+=item kFPBitmapErr
+
+A parameter was requested which could not be retrieved using this operation.
+
+=item kFPMiscErr
+
+Non-AFP error occurred.
 
 =back
 
@@ -2807,35 +2841,34 @@ Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $DTRefNum
+=item DTRefNum
 
 Desktop database reference number.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory ID.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to desired file or directory.
 
-=item $resp_r
-
-A reference to a scalar which will contain the comment text (if any) for
-the referenced file.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+will be returned, containing the error code and a string containing the
+comment text (if any was present) for the referenced file.
 
 Error replies:
 
@@ -2893,60 +2926,58 @@ Gets the value of an extended attribute.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume identifier.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory identifier.
 
-=item $Bitmap
+=item Bitmap
 
 Bitmap specifying the desired behavior when getting the value of an
 extended attribute. For this command, only kAttrDontFollow is valid.
 For details, see L<Net::AFP::ExtAttrs/"Extended Attributes Bitmap">.
 
-=item $Offset
+=item Offset
 
 Always zero; reserved for future use.
 
-=item $ReqCount
+=item ReqCount
 
 Always -1; reserved for future use.
 
-=item $MaxReplySize
+=item MaxReplySize
 
 Size in bytes of the reply that your application can handle; set to zero
 to get the size of the reply without actually getting the attributes.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to desired file or directory.
 
-=item $Name
+=item Name
 
 UTF-8 encoded name of the extended attribute whose value is to be
 obtained.
 
-=item $resp_r
-
-A reference to a scalar that can be used to contain a hash with the
-returned information about the contents of the requested extended
-attribute.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, followed by key-value pairs containing the
+requested information about the supplied extended attribute.
 
 Error replies:
 
@@ -3022,46 +3053,44 @@ Gets the parameters for a file or a directory.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory ID.
 
-=item $FileBitmap
+=item FileBitmap
 
 Bitmap describing the parameters to return for a file. Set the bit that
 corresponds to each desired parameter. For the bit definitions of this
 bitmap, see L<Net::AFP::FileParms>.
 
-=item $DirectoryBitmap
+=item DirectoryBitmap
 
 Bitmap describing the parameters to return for a directory. Set the bit
 that corresponds to each desired parameter. For the bit definitions of
 this bitmap, see L<Net::AFP::DirParms>.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to desired file or directory.
 
-=item $resp_r
+Returns:
 
-A reference to a scalar that can be used to return a reference to a hash containing information about the file.
-
-=back
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, followed by key-value pairs containing the
+requested parameters about the indicated file or directory.
 
 Error replies:
 
@@ -3136,7 +3165,7 @@ Open fork reference number.
 
 Bitmap describing the parameters to be returned. Set the bits that
 correspond to each desired parameter. This bitmap is the same as the
-C<$FileBitmap> parameter of the L</FPGetFileDirParms> command. For
+C<FileBitmap> parameter of the L</FPGetFileDirParms> command. For
 bit definitions for this bitmap, see L<Net::AFP::FileParms>.
 
 =item $resp_r
@@ -3183,38 +3212,38 @@ Deprecated as of Mac OS X 10.6.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $DTRefNum
+=item DTRefNum
 
 Desktop database reference number.
 
-=item $FileCreator
+=item FileCreator
 
 File creator associated with the icon that is to be added.
 
-=item $FileType
+=item FileType
 
 File type associated with the icon that is to be added.
 
-=item $IconType
+=item IconType
 
 Type of icon that is to be added.
 
-=item $Length
+=item Length
 
 Number of bytes the caller expects the icon bitmap to require in the
 reply block.
 
-=item $resp_r
-
-A reference to a scalar which will contain the binary icon data.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, followed by a string containing the binary
+icon data.
 
 Error replies:
 
@@ -3803,59 +3832,58 @@ Gets the names of extended attributes for a file or directory.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume identifier.
 
-=item $DirectoryID
+=item DirectoryID
 
 Directory identifier.
 
-=item $Bitmap
+=item Bitmap
 
 Bitmap describing the desired behavior when getting the names of extended
 attributes. For this command C<kAttrDontFollow> is the only valid bit.
 For details, see L<Net::AFP::ExtAttrs/"Extended Attributes Bitmap">.
 
-=item $ReqCount
+=item ReqCount
 
 Reserved for future use. For AFP 3.2, clients can set this parameter to
 any numeric value. Servers should ignore this parameter and return all
 extended attribute names.
 
-=item $StartIndex
+=item StartIndex
 
 Reserved for future use. For AFP 3.2, set C<$StartIndex> to zero.
 Servers should ignore this parameter.
 
-=item $MaxReplySize
+=item MaxReplySize
 
 Size in bytes of the reply that your application can handle, including
 the size of the C<$Bitmap> and C<$DataLength> parameters. Set this
 parameter to zero to get the size of the reply block that would be
 returned without actually getting the names of the extended attributes.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to desired file or directory.
 
-=item $resp_r
-
-A reference to a scalar that can be used to contain a hash with the
-returned information about the extended attributes list.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, followed by key-value pairs containing the
+returned information about the extended attributes list.
 
 Error replies:
 
@@ -4145,49 +4173,47 @@ Establishes a session with a server using an Open Directory domain.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
 =item $self
 
 An object that is a subclass of Net::AFP.
 
-=item $Flags
-
-Flags providing additional information. (No flags are currently defined.)
-
-=item $AFPVersion
+=item AFPVersion
 
 String indicating which AFP version to use. For possible values, see
 L</"AFP Version Strings">.
 
-=item $UAM
+=item UAM
 
 String indicating which UAM to use. For possible values, see
 L</"AFP UAM Strings">.
 
-=item $UserNameType
+=item UserNameType
 
-Type of name in C<$UserName>; always 3.
+Type of name in C<UserName>; always 3.
 
-=item $UserName
+=item UserName
 
 UTF-8 encoded name of the user.
 
-=item $PathType
+=item PathType
 
 Type of names in C<$Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname for the Open Directory domain in which the user specified by
 C<$UserName> can be found.
 
-=item $UserAuthInfo
+=item UserAuthInfo
 
 UAM-dependent information required to authenticate the user (can be null).
-The data type of C<$UserAuthInfo> is dependent on the UAM specified by
-C<$UAM>.
+The data type of C<UserAuthInfo> is dependent on the UAM specified by
+C<UAM>.
 
 =item $resp_r
 
@@ -4196,6 +4222,12 @@ a reference to a hash containing information
 relevant to the login process.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, followed by key-value pairs containing
+information relevant to the login process.
 
 Error replies:
 
@@ -4489,47 +4521,47 @@ Arguments:
 
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 The numeric volume ID returned as part of FPOpenVol().
 
-=item $SrcDirID
+=item SourceDirectoryID
 
 Source ancestor Directory ID.
 
-=item $DstDirID
+=item DestDirectoryID
 
 Destination ancestor Directory ID.
 
-=item $SrcPathType
+=item SourcePathType
 
-Type of names in C<$SrcPathname>. See L</"Path Type Constants"> for more information.
+Type of names in C<SourcePathname>. See L</"Path Type Constants"> for more information.
 
-=item $SrcPathname
+=item SourcePathname
 
 Pathname of the file or directory to be moved (may be null if a directory is being moved).
 
-=item $DstPathType
+=item DestPathType
 
-Type of names in C<$DstPathname>. See L</"Path Type Constants"> for more information.
+Type of names in C<DestPathname>. See L</"Path Type Constants"> for more information.
 
-=item $DstPathname
+=item DestPathname
 
 Pathname of the file or directory to be moved to. (may be null if a directory is being moved).
 
-=item $NewType
+=item NewType
 
-Type of names in C<$NewName>. See L</"Path Type Constants"> for more information.
+Type of names in C<NewName>. See L</"Path Type Constants"> for more information.
 
-=item $NewName
+=item NewName
 
 New name of file or directory (may be null).
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -4626,36 +4658,34 @@ Deprecated in Mac OS X.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Ancestor Directory ID.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname of the file or directory to be moved (may be null if a directory
 is being moved).
 
-=item $resp_r
-
-A reference to a scalar that can be used to contain the received
-Directory ID value.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, followed by the returned Directory ID.
 
 Error replies:
 
@@ -4767,35 +4797,33 @@ Opens a fork of an existing file for reading or writing.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Flag
+=item Flag
 
 Bit 7 of the Flag parameter is the ResourceDataFlag bit, and
 it indicates which fork to open, where 0 specifies the data
 fork and 1 specifies the resource fork.
 
-=item $VolumeID
+=item VolumeID
 
 Volume ID.
 
-=item $DirectoryID
+=item DirectoryID
 
 Ancestor Directory ID.
 
-=item $Bitmap
+=item Bitmap
 
 Bitmap describing the fork parameters to be returned. Set the bit that
 corresponds to each desired parameter. This bitmap is the same as the
-C<$FileBitmap> parameter of the L</FPGetFileDirParms> command and can
+C<FileBitmap> parameter of the L</FPGetFileDirParms> command and can
 be null. For bit definitions for the File bitmap, see
 L<Net::AFP::FileParms>.
 
-=item $AccessMode
+=item AccessMode
 
 Desired access and deny modes, specified by any combination of the
 following bits:
@@ -4807,22 +4835,22 @@ following bits:
 
 For more information on access and deny modes, see L</"File Sharing Modes">.
 
-=item $PathType
+=item PathType
 
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
+Type of names in C<Pathname>. See L</"Path Type Constants"> for
 possible values.
 
-=item $Pathname
+=item Pathname
 
 Pathname to the desired file (cannot be null).
 
-=item $resp_r
-
-A reference to a scalar that is used to return a hash
-reference containing information returned from the server
-about the opened fork.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code, followed by key-value pairs containing
+information returned from the server about the opened fork.
 
 Error replies:
 
@@ -5012,38 +5040,37 @@ Deprecated; use C<FPReadExt()> instead.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $OForkRefNum
+=item OForkRefNum
 
 Open fork reference number.
 
-=item $Offset
+=item Offset
 
 Number of the first byte to read.
 
-=item $ReqCount
+=item ReqCount
 
 Number of bytes to read.
 
-=item $NewLineMask
+=item NewLineMask
 
 Mask for determining where the read should terminate.
 
-=item $NewLineChar
+=item NewLineChar
 
 Character for determining where the read should terminate.
 
-=item $resp_r
-
-A reference to a scalar which will contain the data read
-from the referenced fork.
-
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code and a string containing the data read from the
+referenced fork.
 
 Error replies:
 
@@ -5108,21 +5135,19 @@ Reads a block of data.
 
 Arguments:
 
+Arguments are passed as key-value pair for this method.
+
 =over
 
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $OForkRefNum
+=item OForkRefNum
 
 Open fork reference number.
 
-=item $Offset
+=item Offset
 
 Number of the first byte to read.
 
-=item $ReqCount
+=item ReqCount
 
 Number of bytes to read.
 
@@ -5132,6 +5157,12 @@ A reference to a scalar which will contain the data read from the
 referenced fork.
 
 =back
+
+Returns:
+
+A scalar indicating the error code from the call. Upon success, a list
+containing the error code and a string containing the data read from the
+referenced fork.
 
 Error replies:
 
