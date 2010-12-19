@@ -889,12 +889,12 @@ sub rename { # {{{1
     # sure, but it seems to be the most sensible choice...
     if (defined $$self{'client_uuid'}) {
         $rc = $$self{'afpconn'}->FPAccess(
-                'VolumeID'      => $$self{'volID'},
+                'VolumeID'      => $$old_stat{'ParentDirID'},
                 'DirectoryID'   => $$self{'topDirID'},
                 'UUID'          => $$self{'client_uuid'},
                 'ReqAccess'     => KAUTH_VNODE_DELETE,
                 'PathType'      => $$self{'pathType'},
-                'Pathname'      => $oldName);
+                'Pathname'      => $oldRealName);
         return -&EACCES if $rc == kFPAccessDenied;
         return -&ENOENT if $rc == kFPObjectNotFound;
         return -&EBADF  if $rc != kFPNoErr;
