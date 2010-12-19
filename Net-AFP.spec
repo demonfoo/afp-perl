@@ -13,7 +13,7 @@
 
 name:      perl-Net-AFP
 summary:   Net-AFP - Apple Filing Protocol implementation in Perl
-version:   0.62.1
+version:   0.62.2
 release:   1
 vendor:    Derrik Pates <demon@now.ai>
 packager:  Derrik Pates <demon@now.ai>
@@ -168,6 +168,9 @@ if [ ! -e /etc/fuse.conf ] ; then
 fi
 
 %changelog
+* Sun Dec 19 2010 demon@now.ai
+- Fix dead peer detection.
+
 * Sun Dec 19 2010 demon@now.ai
 - Really fix the rename() method in Net::AFP::Fuse.
 

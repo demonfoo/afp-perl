@@ -1,3 +1,9 @@
+libnet-afp-perl (0.62.2-1) unstable; urgency=low
+
+  * Fix dead peer detection.
+
+ -- Derrik Pates <demon@noq.ai>  Sun, 19 Dec 2010 12:25:38 -0700
+
 libnet-afp-perl (0.62.1-1) unstable; urgency=low
 
   * Really fix the rename() method in Net::AFP::Fuse.
