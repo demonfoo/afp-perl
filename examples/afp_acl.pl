@@ -392,13 +392,13 @@ elsif (defined $add) { # {{{1
 
             if ($is_inherited) {
                 if ($is_allow) {
-                    $offset = $first_allow_inherited;
+                    $offset = $first_inherited_allow;
                 }
                 else {
                     $offset = $first_inherited;
                 }
                 if (!defined $offset) {
-                    $offset = scalar(@acl);
+                    $offset = scalar(@$acl);
                 }
             }
             else {
@@ -408,7 +408,7 @@ elsif (defined $add) { # {{{1
                         $offset = $first_inherited;
                     }
                     if (!defined $offset) {
-                        $offset = scalar(@acl);
+                        $offset = scalar(@$acl);
                     }
                 }
                 else {
