@@ -13,7 +13,7 @@
 
 name:      perl-Net-AFP
 summary:   Net-AFP - Apple Filing Protocol implementation in Perl
-version:   0.61.1
+version:   0.62
 release:   1
 vendor:    Derrik Pates <demon@now.ai>
 packager:  Derrik Pates <demon@now.ai>
@@ -177,6 +177,8 @@ fi
 - Added more documentation in Net::DSI and Net::AFP::Fuse.
 - Added dead peer checking in Net::DSI.
 - Fixups in afp_acl.pl to deal better with inherited ACEs.
+- Fixed a bug in Net::AFP::Fuse that prevented the rename call from working
+  on volumes with ACL support.
 
 * Sun Dec 12 2010 demon@now.ai
 - Added RPM packaging.
