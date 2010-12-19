@@ -176,6 +176,7 @@ fi
 - Altered packaging to enable needed features in /etc/fuse.conf.
 - Added more documentation in Net::DSI and Net::AFP::Fuse.
 - Added dead peer checking in Net::DSI.
+- Fixups in afp_acl.pl to deal better with inherited ACEs.
 
 * Sun Dec 12 2010 demon@now.ai
 - Added RPM packaging.
