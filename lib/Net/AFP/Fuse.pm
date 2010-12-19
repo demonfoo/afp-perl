@@ -889,8 +889,8 @@ sub rename { # {{{1
     # sure, but it seems to be the most sensible choice...
     if (defined $$self{'client_uuid'}) {
         $rc = $$self{'afpconn'}->FPAccess(
-                'VolumeID'      => $$old_stat{'ParentDirID'},
-                'DirectoryID'   => $$self{'topDirID'},
+                'VolumeID'      => $$self{'volID'},
+                'DirectoryID'   => $$old_stat{'ParentDirID'},
                 'UUID'          => $$self{'client_uuid'},
                 'ReqAccess'     => KAUTH_VNODE_DELETE,
                 'PathType'      => $$self{'pathType'},
