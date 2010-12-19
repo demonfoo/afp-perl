@@ -1,4 +1,3 @@
-- Improve dead peer detection in Net::DSI.
 - Handle shutdown announcements better (we currently receive them, but don't
   really do anything with them).
 - Maybe see about AppleDouble-style resource fork support?

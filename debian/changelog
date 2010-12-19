@@ -1,3 +1,15 @@
+libnet-afp-perl (0.62-1) unstable; urgency=low
+
+  * Added --list-servers and --list-mounts options to afpmount.pl, to help
+    make it easier to find servers on the local network and discover mounts.
+  * Improved uniformity of conditional includes.
+  * Corrected documentation of methods in Net::AFP.
+  * Altered packaging to enable needed features in /etc/fuse.conf.
+  * Added more documentation in Net::DSI and Net::AFP::Fuse.
+  * Added dead peer checking in Net::DSI.
+
+ -- Derrik Pates <demon@now.ai>  Sun, 19 Dec 2010 08:40:25 -0700
+
 libnet-afp-perl (0.61.1-1) unstable; urgency=low
 
   * Added RPM packaging.

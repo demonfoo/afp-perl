@@ -168,6 +168,15 @@ if [ ! -e /etc/fuse.conf ] ; then
 fi
 
 %changelog
+* Sun Dec 19 2010 demon@now.ai
+- Added --list-servers and --list-mounts options to afpmount.pl, to help
+  make it easier to find servers on the local network and discover mounts.
+- Improved uniformity of conditional includes.
+- Corrected documentation of methods in Net::AFP.
+- Altered packaging to enable needed features in /etc/fuse.conf.
+- Added more documentation in Net::DSI and Net::AFP::Fuse.
+- Added dead peer checking in Net::DSI.
+
 * Sun Dec 12 2010 demon@now.ai
 - Added RPM packaging.
 - Debian packaging cleanups.
