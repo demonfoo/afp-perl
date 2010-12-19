@@ -118,13 +118,13 @@ sub session_thread { # {{{1
             $reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref, $msg,
             $wsz);
     my $last_tickle = gettimeofday();
-    my $last_tickle_rcvd = $last_tickle;
+    my $last_pkt_rcvd = $last_tickle;
 MAINLOOP:
     while ($$shared{'exit'} == 0) {
         $now = gettimeofday();
         # Check to see how long it's been since we've heard a tickle packet
         # from the server...
-        if ($now - $last_tickle_rcvd > 120) {
+        if ($now - $last_pkt_rcvd > 120) {
             # Apple's docs say if we are 2 minutes out from receiving a
             # tickle from the peer, we should assume the connection is
             # dead.
@@ -160,6 +160,9 @@ MAINLOOP:
 
             $rb_ref = *bar{SCALAR};
             $sem_ref = undef;
+
+            $last_pkt_rcvd = gettimeofday();
+
             if ($type == 0) {
                 # DSICloseSession from server; this means the server is
                 # going away (i.e., it's shutting down).
@@ -177,11 +180,6 @@ MAINLOOP:
                     ($userBytes) = unpack('n', $data);
                     # Queue the notification for later processing
                     push(@{$$shared{'attnq'}}, $userBytes);
-                    next MAINLOOP;
-                }
-
-                elsif ($cmd == OP_DSI_TICKLE) {
-                    $last_tickle_rcvd = gettimeofday();
                     next MAINLOOP;
                 }
             } else {
