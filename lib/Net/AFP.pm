@@ -26,7 +26,7 @@ our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name kFPSoftCreate
                  kFPHardCreate kFPStartEndFlag kFPLockUnlockFlag);
 
 # define constants {{{1
-our $VERSION = '0.62';
+our $VERSION = '0.62.1';
 use constant kFPByteRangeLock           => 1;   # AFP 2.0
 use constant kFPCloseVol                => 2;   # AFP 2.0
 use constant kFPCloseDir                => 3;   # AFP 2.0

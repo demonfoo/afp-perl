@@ -1,3 +1,9 @@
+libnet-afp-perl (0.62.1-1) unstable; urgency=low
+
+  * Really fix the rename() method in Net::AFP::Fuse.
+
+ -- Derrik Pates <demon@now.ai>  Sun, 19 Dec 2010 11:28:42 -0700
+
 libnet-afp-perl (0.62-1) unstable; urgency=low
 
   * Added --list-servers and --list-mounts options to afpmount.pl, to help
