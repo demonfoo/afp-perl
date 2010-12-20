@@ -9,6 +9,9 @@ use warnings;
 no warnings qw(redefine);
 use diagnostics;
 
+# Tell Perl we need to be run in at least v5.8.
+use v5.8;
+
 # Enables a nice call trace on warning events.
 use Carp;
 local $SIG{'__WARN__'} = \&Carp::cluck;
@@ -69,7 +72,9 @@ use constant COMMENT_XATTR      => 'system.comment';
 # }}}1
 
 # Set up the pattern to use for breaking the AFP URL into its components.
-our $url_rx = qr{^
+our $url_rx;
+if ($] >= 5.010) {
+    $url_rx = qr{^
                   (afps?):/             # protocol specific prefix
                   (at)?/                # optionally specify atalk transport
                   (?:                   # authentication info block
@@ -84,6 +89,26 @@ our $url_rx = qr{^
                       (/.*)?            # rest of path is local subpath
                   )?)?                  # closure of path capture
                   $}xs;
+}
+elsif ($] >= 5.008) {
+    # Since we can't do (?|...) in Perl 5.8.x (didn't get added till 5.10),
+    # just leave it out in this version.
+    $url_rx = qr{^
+                  (afps?):/             # protocol specific prefix
+                  (at)?/                # optionally specify atalk transport
+                  (?:                   # authentication info block
+                      ([^:\@/;]*)       # capture username
+                      (?:;AUTH=([^:\@/;]+))? # capture uam name
+                      (?::([^:\@/;]*))? # capture password
+                  \@)?                  # closure of auth info capture
+                  ([^:/\[\]:]+)         # capture target host
+                  (?::([^:/;]+))?       # capture optional port
+                  (?:/(?:               # start path capture
+                      ([^:/;]+)         # first path element is vol name
+                      (/.*)?            # rest of path is local subpath
+                  )?)?                  # closure of path capture
+                  $}xs;
+}
 our @args = qw(protocol atalk_transport username UAM password host port
                volume subpath);
 
