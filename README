@@ -126,16 +126,27 @@ FREQUENTLY ASKED QUESTIONS
      and so on), as well as rules that both confer *and* eliminate
      specific operational permissions. The models are, needless to say,
      not 1:1, so POSIX ACL tools are basically useless. That's what the
-     'afp_acl.pl' tool is for; it lets you view the ACL on a file (FYI:
-     no ACLs on AirPort disk devices, they just don't support it),
+     'afp_acl.pl' tool is for; it lets you view the ACL on a file,
      add/delete/modify entries, clear ACLs, you know.
+
+
+  Q: I have an AirPort Disk device mounted. All files have 0777 permissions,
+     and ACLs don't work. What's the deal?
+
+  A: AirPort Disk devices provide UNIX permission bits, but don't actually
+     support changing permissions, and they don't set the "I know ACLs"
+     flag in the volume metadata. If you think they should support these
+     features, complain to Apple. Also, it's the same deal with OS X, so
+     it's not like I'm doing something to disable a feature that works
+     with Apple's client.
 
 
   Q: Why is it slow?
 
   A: My experience has shown that it's actually pretty fast in general.
      Reading files can easily peak at 200-300 Mbps on a fast medium
-     (e.g.: gigabit Ethernet, IP-over-FireWire network). Directory
+     (e.g.: gigabit Ethernet, IP-over-FireWire network), and pretty much
+     complete connection saturation on 100 Mbps Ethernet. Directory
      walking is somewhat slower than with Apple's client, but not very
      much (about half as fast). If you're seeing substantially lower
      performance, check your network driver's poll rate and events
@@ -146,19 +157,28 @@ FREQUENTLY ASKED QUESTIONS
 
   A: I have successfully run this code on Linux 2.6-based distributions
      (specifically Ubuntu 9.10 and later, Fedora 14, and Debian), FreeBSD
-     8.1, NetBSD 5.x, and Mac OS X 10.4 and later. (FreeBSD requires a
-     customized Perl build with threads support.) I have tried to get
-     this code to work on Solaris (specifically Nexenta) and Windows;
-     unfortunately it seems that Perl threads do not work so well on
-     these platforms. Windows has some odd interaction between sockets
-     and threads, causing socket writes to block for longer and longer
-     before sending for no obvious reason, and on Nexenta it just dies
-     as soon as I start trying to use threads, no errors, just
-     insta-death. If you try this on another platform with success,
-     let me know.
+     8.1, NetBSD 5.x, and Mac OS X 10.4 and later with MacFUSE. (FreeBSD
+     requires a customized Perl build with threads support.)
+
+     I did successfully use it with NetBSD 4.x, but PUFFS/ReFUSE wasn't
+     yet integrated with the distribution, which made it very difficult
+     to set up; NetBSD 5.x includes PUFFS, so I would recommend using it.
+
+     Older versions of FreeBSD suffered problems with Perl threads,
+     mostly when unmounting filesystems. I know FreeBSD 8.1 definitely
+     works cleanly.
+
+     I have tried to get this code to work on Solaris (specifically
+     Nexenta) and Windows; unfortunately it seems that Perl threads do
+     not work so well on these platforms. Windows has some odd
+     interaction between sockets and threads, causing socket writes to
+     block for longer and longer before sending for no obvious reason,
+     and on Nexenta it just dies as soon as I start trying to use
+     threads, no errors, just insta-death. If you try this on another
+     platform with success, let me know.
 
 
-  Q: How much are you haoving to cheat to make the performance be... well,
+  Q: How much are you having to cheat to make the performance be... well,
      not terrible?
 
   A: Really, less than you'd think. I used to have extensive metadata
