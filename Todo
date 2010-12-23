@@ -1,3 +1,7 @@
+- Fix removal of dead symlinks (problem due to FPAccess() failing on
+  ACL-enabled mounts).
+- Use the list of network addresses the server provides us to figure out the
+  best way to connect for actual file service.
 - Handle shutdown announcements better (we currently receive them, but don't
   really do anything with them).
 - Maybe see about AppleDouble-style resource fork support?
