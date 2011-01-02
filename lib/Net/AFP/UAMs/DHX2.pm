@@ -332,7 +332,7 @@ sub ChangePassword {
 			kFPVerAtLeast)) {
 		$username = '';
 	}
-	my $rc = $session->FPChangePassword(UAMNAME, $username, '', \$resp);
+	my $rc = $session->FPChangePassword(UAMNAME, $username, undef, \$resp);
 	DEBUG('FPChangePassword() completed with result code ', $rc);
 	return $rc unless $rc == kFPAuthContinue;
 

@@ -1015,6 +1015,8 @@ sub FPChangePassword { # {{{1
         $resp_r = \q//;
     }
 
+    $UserAuthInfo ||= '';
+
     my $msg = pack('CxC/a*x![s]C/a*x![s]a*', kFPChangePassword, $UAM,
             $UserName, $UserAuthInfo);
     return $self->SendAFPMessage($msg, $resp_r);
