@@ -11,7 +11,8 @@ local $SIG{'__WARN__'} = \&Carp::cluck;
 # Pull in all the AFP packages that we need, for the connection object
 # itself and return code symbols, helper functions for version handling
 # and UAMs, etc.
-use Net::AFP::TCP;
+use Net::AFP::Helpers;
+use Net::AFP;
 use Net::AFP::Result;
 use Net::AFP::VolParms;
 use Net::AFP::VolAttrs;
@@ -21,16 +22,6 @@ use Net::AFP::MapParms;
 use Net::AFP::Versions;
 use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
-
-my $has_atalk = 0;
-eval {
-    require Net::AFP::Atalk;
-    require Net::Atalk::NBP;
-    1;
-} and do {
-    $has_atalk = 1;
-    Net::Atalk::NBP->import();
-};
 
 use Term::ReadLine;     # for reading input from user
 
@@ -69,39 +60,21 @@ GetOptions( 'debug-afp' => sub { $__AFP_DEBUG = 1; },
             'debug-dsi' => sub { $__DSI_DEBUG = 1; } );
 
 my($path) = @ARGV;
-my $url_rx = qr|^
-                  (afps?):/             # protocol specific prefix
-                  (at)?/                # optionally specify atalk transport
-                  (?:                   # authentication info block
-                      ([^:\@\/;]*)      # capture username
-                      (?:;AUTH=([^:\@\/;]+))? # capture uam name
-                      (?::([^:\@\/;]*))? # capture password
-                  \@)?                  # closure of auth info capture
-                  (?\|([^:\/\@\[\]:]+)\|\[([^\]]+)\]) # capture target host
-                  (?::([^:\/\@;]+))?    # capture optional port
-                  (?:\/(?:              # start path capture
-                      ([^:\/\@;]+)      # first path element is vol name
-                      (\/.*)?           # rest of path is local subpath
-                  )?)?                  # closure of path capture
-                  $|x;
-my @args = ('protocol', 'atalk_transport', 'username', 'UAM', 'password',
-        'host', 'port', 'volume', 'subpath');
-my %values;
 
-unless (@values{@args} = $path =~ $url_rx) {
-    print "Volume path ", $path, " is not valid, sorry.\n";
-    exit(1);
+my $pw_cb = sub {
+    my(%values) = @_;
+    my $prompt = 'Password: ';
+    return $values{'password'} if defined $values{'password'};
+    return read_password($prompt);
+};
+my($session, %values) = do_afp_connect($pw_cb, $path);
+unless (ref($session) && $session->isa('Net::AFP')) {
+    exit($session);
 }
-foreach (keys(%values)) { $values{$_} = urldecode($values{$_}); }
-
-my($host, $volume) = @values{'host', 'volume'};
-
-my $srvInfo;
-my $session = doAFPConnection(@values{'host', 'port', 'username', 'password', 'UAM', 'atalk_transport'}, \$srvInfo);
 
 # If no volume was named, contact the server and find out the volumes
 # it knows, and spit those out in a friendly format.
-unless (defined $volume) {
+unless ($values{'volume'}) {
     my $srvrParms;
     $session->FPGetSrvrParms(\$srvrParms);
     print <<'_EOT_';
@@ -119,7 +92,8 @@ _EOT_
 }
 
 my $volInfo;
-my $rc = $session->FPOpenVol(kFPVolAttributeBit, $volume, undef, \$volInfo);
+my $rc = $session->FPOpenVol(kFPVolAttributeBit, $values{'volume'}, undef,
+        \$volInfo);
 unless ($rc == kFPNoErr) {
     print "Volume was unknown?\n";
     $session->FPLogout();
@@ -976,92 +950,5 @@ $session->FPLogout();
 $session->close();
 exit(0);
 
-sub doAFPConnection {
-	my($host, $port, $user, $password, $uam, $as_atalk, $srvinf_r) = @_;
-	my $srvInfo;
-	my $rc;
-	if ($as_atalk) {
-		unless ($has_atalk) {
-			die "AppleTalk support libraries not available";
-		}
-		# at least for now we have to resolve the NBP name ourselves
-		my @records = NBPLookup($host, 'AFPServer', $port, undef, 1);
-		die() unless scalar(@records);
-		($host, $port) = @{$records[0]}[0,1];
-
-		$rc = Net::AFP::Atalk->GetStatus($host, $port, \$srvInfo);
-	}
-	else {
-		$rc = Net::AFP::TCP->GetStatus($host, $port, \$srvInfo);
-	}
-	if ($rc != kFPNoErr) {
-		print "Could not issue GetStatus on ", $host, "\n";
-		exit(1);
-	}
-	if (ref($srvinf_r) eq 'SCALAR') {
-		$$srvinf_r = $srvInfo;
-	}
-
-	my $session;
-	if ($as_atalk) {
-		$session = new Net::AFP::Atalk($host, $port);
-	}
-	else {
-		$session = new Net::AFP::TCP($host, $port);
-	}
-	unless (ref($session) and $session->isa('Net::AFP')) {
-		print "Could not connect via AFP to ", $host, "\n";
-		exit(1);
-	}
-
-	my $commonVersion = Net::AFP::Versions::GetPreferredVersion($$srvInfo{'AFPVersions'}, $as_atalk);
-	unless (defined $commonVersion) {
-		print "Couldn't agree on an AFP protocol version with the server\n";
-		$session->close();
-		exit(1);
-	}
-
-	if (defined $user) {
-#		my $term = new Term::ReadLine 'afpsh';
-#		my $attribs = $term->Attribs;
-#		my $redisp_fn = $$attribs{'redisplay_function'};
-#		$$attribs{'redisplay_function'} = $$attribs{'shadow_redisplay'};
-#		my $password = $term->readline('Password: ');
-#		$$attribs{'redisplay_function'} = $redisp_fn;
-		my $uamlist = $$srvInfo{'UAMs'};
-		if (defined $uam) {
-			$uamlist = [ $uam ];
-		}
-		my $rc = Net::AFP::UAMs::PasswordAuth($session, $commonVersion,
-				$uamlist, $user, sub {
-					my $prompt = 'Password: ';
-					return $password if defined $password;
-					return Term::ReadPassword::read_password($prompt);
-				});
-		unless ($rc == kFPNoErr) {
-			print "Incorrect username/password while trying to authenticate\n";
-			$session->close();
-			exit(1);
-		}
-	}
-	else {
-		my $rc = Net::AFP::UAMs::GuestAuth($session, $commonVersion);
-		unless ($rc == kFPNoErr) {
-			print "Anonymous authentication failed\n";
-			$session->close();
-			exit(1);
-		}
-	}
-	return $session;
-}
-
-sub urldecode {
-	my ($string) = @_;
-	if (defined $string) {
-		$string =~ tr/+/ /;
-		$string =~ s/\%([0-9a-f]{2})/chr(hex($1))/gei;
-	}
-	return $string;
-}
 
 # vim: ts=4 ai
