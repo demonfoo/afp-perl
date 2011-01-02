@@ -132,8 +132,10 @@ sub new { # {{{1
         exit($session);
     }
 
-    croak('Unable to extract volume from AFP URL')
-            unless defined $urlparms{'volume'};
+    unless (defined $urlparms{'volume'}) {
+        $session->close();
+        croak('Unable to extract volume from AFP URL')
+    }
     $$obj{'afpconn'} = $session;
 
     # Since AFP presents pre-localized times for everything, we need to get
