@@ -277,8 +277,8 @@ sub ChangePassword {
 	DEBUG('$nonce is ', $nonce->as_hex(), " after increment");
 	my $newnonce_text = substr($nonce->as_hex(), 2);
 	undef $nonce;
-	my $authdata = pack('H32a64a64', zeropad($newnonce_text, 32), $oldPassword,
-			$newPassword);
+	my $authdata = pack('H32a64a64', zeropad($newnonce_text, 32), $newPassword,
+			$oldPassword);
 	undef $newnonce_text;
 	$ctx->set_initialization_vector(C2SIV);
 	my $ciphertext = $ctx->encrypt($authdata);

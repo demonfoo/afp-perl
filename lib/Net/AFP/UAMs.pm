@@ -39,16 +39,18 @@ sub RegisterUAM {
 	push(@UAMReg, $uaminfo);
 }
 
-# Find the UAM includes, and assemble a list of them.
-my @uampaths = ();
-foreach my $incpath (@INC) {
-	next if $incpath eq '.';
-	my $uamincpath = $incpath . '/Net/AFP/UAMs';
-	if (-d $uamincpath) {
-		opendir(UAMDIR, $uamincpath);
-		push(@uampaths, map { $uamincpath . '/' . $_ } grep(/\.pm$/, readdir(UAMDIR)));
-		closedir(UAMDIR);
-	}
+# Where am I being included from? Use our own package name to get the
+# inclusion path where we should pull our own UAMs from.
+my $incname = __PACKAGE__;
+$incname =~ s{::}{/}g;
+$incname .= '.pm';
+# %INC contains the include paths for all currently-imported packages.
+my $incpath = $INC{$incname};
+$incpath =~ s{\.pm$}{};
+if (-d $incpath) {
+    opendir(UAMDIR, $incpath);
+    push(@uampaths, map { $incpath . '/' . $_ } grep(/\.pm$/, readdir(UAMDIR)));
+    closedir(UAMDIR);
 }
 
 # Try including each of them via eval, so that if they explode, it won't
@@ -123,7 +125,6 @@ sub PasswordAuth($$$$$) {
 		last if $$uaminfo{'pref'} < 0 and scalar(keys %ReqUAMs) > 1;
 		my $function = $$uaminfo{'class'} . '::Authenticate';
 		DEBUG('auth function is ', $function);
-		$session->{'username'} = $UserName;
 		my $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
 		if ($rc == kFPNoErr) {
 			$$session{'AFPVersion'} = $AFPVersion;
@@ -134,6 +135,30 @@ sub PasswordAuth($$$$$) {
 	# If we reach this point, none of the UAMs the server knew were available.
 	DEBUG((caller(0))[3], 
 			" Could not find an agreeable UAM for authenticating to server\n");
+	return kFPBadUAM;
+}
+
+=item ChangePassword()
+
+=cut
+sub ChangePassword {
+    my($session, $UserName, $OldPW, $NewPW) = @_;
+
+	foreach my $uaminfo (@UAMReg) {
+		next unless lc($$uaminfo{'name'}) eq lc("DHX2");
+		last if $$uaminfo{'pref'} < 0 and scalar(keys %ReqUAMs) > 1;
+		my $function = $$uaminfo{'class'} . '::ChangePassword';
+		DEBUG('auth function is ', $function);
+		$session->{'username'} = $UserName;
+        #my $NewPW = &$PwCallback();
+		my $rc = &{$function}($session, $UserName, $OldPW, $NewPW);
+		return $rc;
+	}
+
+	# If we reach this point, none of the UAMs the server knew were available.
+	DEBUG((caller(0))[3], 
+			" Could not find valid password changing UAM\n");
+    print "test 1\n";
 	return kFPBadUAM;
 }
 

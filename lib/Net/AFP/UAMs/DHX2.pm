@@ -332,7 +332,7 @@ sub ChangePassword {
 			kFPVerAtLeast)) {
 		$username = '';
 	}
-	my $rc = $session->FPChangePassword(UAMNAME, $username, undef, \$resp);
+	my $rc = $session->FPChangePassword(UAMNAME, $username, '', \$resp);
 	DEBUG('FPChangePassword() completed with result code ', $rc);
 	return $rc unless $rc == kFPAuthContinue;
 
@@ -467,8 +467,8 @@ sub ChangePassword {
 	# Assemble the final message to send back to the server with the
 	# incremented server nonce, the user's current password, and the
 	# desired new password, then encrypt the message.
-	my $authdata = pack('H32a256a256', $newServerNonce_text, $oldPassword,
-			$newPassword);
+	my $authdata = pack('H32a256a256', $newServerNonce_text, $newPassword,
+			$oldPassword);
 	undef $newServerNonce_text;
 	$ctx->set_initialization_vector(C2SIV);
 	$ciphertext = $ctx->encrypt($authdata);
