@@ -10,8 +10,8 @@ local $SIG{'__WARN__'} = \&Carp::cluck;
 
 use Net::AFP::Fuse;
 use Net::AFP;                       # just for its $VERSION...
-use Net::AFP::TCP;
 use Net::AFP::Result;
+use Net::AFP::Helpers;
 use IO::Poll qw(POLLIN POLLERR);
 use Getopt::Long;                   # for parsing command line options
 use Socket;
@@ -40,14 +40,14 @@ eval {
 
 my $has_atalk = 0;
 eval {
+    require Net::AFP::Atalk;    # The class to connect to an AppleTalk server
+                                # via AppleTalk protocol.
     require Net::Atalk::NBP;
-    require Net::AFP::Atalk;
     1;
 } and do {
-    Net::Atalk::NBP->import;
     $has_atalk = 1;
+    Net::Atalk::NBP->import;
 };
-
 
 # }}}1
 
@@ -106,90 +106,18 @@ sub list_mounts {
     # See if there's a URL on @ARGV with at least a hostname (and possibly
     # user creds), and try to get a mount list from the server.
 
-    # - call FPGetSrvrParms() on connection object
-    # - list off volumes to stdout
-    # - call FPLogout() and close()
-    my %values;
-    unless (@values{@Net::AFP::Fuse::args} = $url =~ $Net::AFP::Fuse::url_rx) {
-        print STDERR "URL ", $url, " was not valid, sorry\n";
-        exit(&EINVAL);
-    }
+    my $pw_cb =  sub {
+        my(%values) = @_;
+        my $prompt = 'Password for ' . $values{'username'} .
+                ' at ' . $values{'host'} . ': ';
+        return $values{'password'} if $values{'password'};
+        return read_password($prompt) if $has_Term__ReadPassword;
+        return '';
+    };
 
-    foreach (keys(%values)) {
-        $values{$_} = Net::AFP::Fuse::urldecode($values{$_});
-    }
-
-    unless (defined $values{'host'}) {
-        print STDERR "Could not extract host from AFP URL\n";
-        exit(&EINVAL);
-    }
-
-    my($srvInfo, $rc, $host, $port);
-    if ($values{'atalk_transport'}) {
-        unless ($has_atalk) {
-            die "AppleTalk support libraries not available";
-        }
-        my @records = NBPLookup($values{'host'}, 'AFPServer', $values{'port'},
-                undef, 1);
-        die() unless scalar(@records);
-        ($host, $port) = @{$records[0]}[0,1];
-
-        $rc = Net::AFP::Atalk->GetStatus($host, $port, \$srvInfo);
-    }
-    else {
-        $rc = Net::AFP::TCP->GetStatus(@values{'host', 'port'}, \$srvInfo);
-    }
-    if ($rc != kFPNoErr) {
-        print STDERR "Could not issue GetStatus on ", $values{'host'}, "\n";
-        exit(&EINVAL);
-    }
-
-    my $session;
-    if ($values{'atalk_transport'}) {
-        $session = new Net::AFP::Atalk($host, $port);
-    }
-    else {
-        $session = new Net::AFP::TCP(@values{'host', 'port'});
-    }
-    unless (ref($session) and $session->isa('Net::AFP')) {
-        print STDERR "Could not connect via AFP to ", $values{'host'}, "\n";
-        exit(&EINVAL);
-    }
-
-    my $cv = Net::AFP::Versions::GetPreferredVersion($$srvInfo{'AFPVersions'},
-            $values{'atalk_transport'});
-    unless ($cv) {
-        print STDERR "Couldn't agree on an AFP protocol version with the server\n";
-        $session->close();
-        exit(&EINVAL);
-    }
-
-    if (defined $values{'username'}) {
-        my $uamlist = $$srvInfo{'UAMs'};
-        if ($values{'UAM'}) {
-            $uamlist = [ $values{'UAM'} ];
-        }
-        my $rc = Net::AFP::UAMs::PasswordAuth($session, $cv, $uamlist,
-                $values{'username'}, sub {
-                    my $prompt = 'Password for ' . $values{'username'} .
-                            ' at ' . $values{'host'} . ': ';
-                    return $values{'password'} if $values{'password'};
-                    return read_password($prompt) if $has_Term__ReadPassword;
-                    return '';
-                });
-        unless ($rc == kFPNoErr) {
-            print STDERR "Incorrect username/password while trying to authenticate\n";
-            $session->close();
-            exit(&EINVAL);
-        }
-    }
-    else {
-        my $rc = Net::AFP::UAMs::GuestAuth($session, $cv);
-        unless ($rc == kFPNoErr) {
-            print STDERR "Anonymous authentication failed\n";
-            $session->close();
-            exit(&EINVAL);
-        }
+    my $session = do_afp_connect($pw_cb, $url);
+    unless (ref($session) && $session->isa('Net::AFP')) {
+        exit($session);
     }
 
     my $srvrParms;

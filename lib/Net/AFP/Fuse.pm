@@ -16,13 +16,11 @@ use v5.8;
 use Carp;
 local $SIG{'__WARN__'} = \&Carp::cluck;
 
-use Net::AFP::TCP;              # the class which actually sets up and
-                                # handles the guts of talking to an AFP
-                                # server via TCP/IP
+use Net::AFP;
+use Net::AFP::Helpers;
 use Net::AFP::Result;           # AFP result codes
 use Net::AFP::VolAttrs;         # volume attribute definitions
 use Net::AFP::VolParms;         # parameters for FPOpenVol()
-use Net::AFP::UAMs;             # User Auth Method helper code
 use Net::AFP::Versions;         # version checking/agreement helper code
 use Net::AFP::MapParms;         # mapping function operation codes
 use Net::AFP::FileParms qw(:DEFAULT !:common);
@@ -39,17 +37,6 @@ use Fuse qw(:xattr);            # Still need this for extended attribute
                                 # related macros.
 
 sub ENODATA { return($^O eq 'freebsd' ? &Errno::ENOATTR : &Errno::ENODATA); }
-
-my $has_atalk = 0;
-eval {
-    require Net::AFP::Atalk;    # The class to connect to an AppleTalk server
-                                # via AppleTalk protocol.
-    require Net::Atalk::NBP;
-    1;
-} and do {
-    $has_atalk = 1;
-    Net::Atalk::NBP->import;
-};
 
 # We need Data::UUID for a portable means to get a UUID to identify
 # ourselves to the AFP server for FPAccess() calls; if it's there, it's
@@ -70,47 +57,6 @@ use constant ACL_XATTR          => 'system.afp_acl';
 use constant COMMENT_XATTR      => 'system.comment';
 
 # }}}1
-
-# Set up the pattern to use for breaking the AFP URL into its components.
-our $url_rx;
-if ($] >= 5.010) {
-    $url_rx = qr{^
-                  (afps?):/             # protocol specific prefix
-                  (at)?/                # optionally specify atalk transport
-                  (?:                   # authentication info block
-                      ([^:\@/;]*)       # capture username
-                      (?:;AUTH=([^:\@/;]+))? # capture uam name
-                      (?::([^:\@/;]*))? # capture password
-                  \@)?                  # closure of auth info capture
-                  (?|([^:/\[\]:]+)|\[([^\]]+)\]) # capture target host
-                  (?::([^:/;]+))?       # capture optional port
-                  (?:/(?:               # start path capture
-                      ([^:/;]+)         # first path element is vol name
-                      (/.*)?            # rest of path is local subpath
-                  )?)?                  # closure of path capture
-                  $}xs;
-}
-elsif ($] >= 5.008) {
-    # Since we can't do (?|...) in Perl 5.8.x (didn't get added till 5.10),
-    # just leave it out in this version.
-    $url_rx = qr{^
-                  (afps?):/             # protocol specific prefix
-                  (at)?/                # optionally specify atalk transport
-                  (?:                   # authentication info block
-                      ([^:\@/;]*)       # capture username
-                      (?:;AUTH=([^:\@/;]+))? # capture uam name
-                      (?::([^:\@/;]*))? # capture password
-                  \@)?                  # closure of auth info capture
-                  ([^:/\[\]:]+)         # capture target host
-                  (?::([^:/;]+))?       # capture optional port
-                  (?:/(?:               # start path capture
-                      ([^:/;]+)         # first path element is vol name
-                      (/.*)?            # rest of path is local subpath
-                  )?)?                  # closure of path capture
-                  $}xs;
-}
-our @args = qw(protocol atalk_transport username UAM password host port
-               volume subpath);
 
 =head1 NAME
 
@@ -176,100 +122,25 @@ sub new { # {{{1
     # open fork numbers for files that have been opened via afp_open()
     $$obj{'ofcache'} = {};
 
-    my %urlparms;
-    @urlparms{@args} = $url =~ $url_rx;
-    croak('Unable to extract host from AFP URL')
-            unless defined $urlparms{'host'};
+    my($session, %urlparms);
+    my $callback = sub {
+        my(%values) = @_;
+        return &$pw_cb(@values{'username', 'host', 'password'});
+    };
+    ($session, %urlparms) = do_afp_connect($callback, $url);
+    unless (ref($session) && $session->isa('Net::AFP')) {
+        exit($session);
+    }
+
     croak('Unable to extract volume from AFP URL')
             unless defined $urlparms{'volume'};
-    foreach (keys(%urlparms)) { $urlparms{$_} = urldecode($urlparms{$_}); }
-
-    # Use FPGetSrvrInfo() to get some initial information about the server for
-    # use later in the connection process.
-    # get server information {{{2
-    my $srvInfo;
-    my $rc;
-    if ($urlparms{'atalk_transport'}) {
-        croak("AppleTalk support libraries not available")
-                unless $has_atalk;
-        # Query for one record that will match, and return as soon as we
-        # have it.
-        my @records = NBPLookup($urlparms{'host'}, 'AFPServer',
-                $urlparms{'port'}, undef, 1);
-        croak("Could not resolve NBP name " . $urlparms{'host'})
-                unless scalar(@records);
-        @urlparms{'hostaddr', 'sockno'} = @{$records[0]}[0,1];
-
-        $rc = Net::AFP::Atalk->GetStatus(@urlparms{'hostaddr', 'sockno'},
-                \$srvInfo);
-    }
-    else {
-        $rc = Net::AFP::TCP->GetStatus(@urlparms{'host', 'port'}, \$srvInfo);
-    }
-    if ($rc != kFPNoErr) {
-        print "Could not issue GetStatus on ", $urlparms{'host'}, "\n";
-        return ENODEV;
-    }
-    # }}}2
-
-    # Actually open a session to the server.
-    # open server connection {{{2
-    if ($urlparms{'atalk_transport'}) {
-        $$obj{'afpconn'} = new Net::AFP::Atalk(@urlparms{'hostaddr', 'sockno'});
-    }
-    else {
-        $$obj{'afpconn'} = new Net::AFP::TCP(@urlparms{'host', 'port'});
-    }
-    if (ref($$obj{'afpconn'}) eq '' ||
-            !$$obj{'afpconn'}->isa('Net::AFP')) {
-        print "Could not connect via AFP to ", $urlparms{'host'}, "\n";
-        return ENODEV;
-    }
-    # }}}2
-
-    # Establish which AFP protocol version the server has in common with us.
-    # Abort if (by chance) we can't come to an agreement.
-    # version agreement {{{2
-    my $commonVersion = Net::AFP::Versions::GetPreferredVersion(
-            $$srvInfo{'AFPVersions'}, $urlparms{'atalk_transport'});
-    if (!defined $commonVersion) {
-        print "Couldn't agree on an AFP protocol version with the server\n";
-        $obj->disconnect();
-        return ENODEV;
-    }
-    # }}}2
-
-    # Authenticate with the server.
-    # do authentication {{{2
-    if (defined $urlparms{'username'}) {
-        my $uamList = $$srvInfo{'UAMs'};
-        if (defined $urlparms{'UAM'}) {
-            $uamList = [ $urlparms{'UAM'} ];
-        }
-        $rc = Net::AFP::UAMs::PasswordAuth($$obj{'afpconn'}, $commonVersion,
-                $uamList, $urlparms{'username'},
-                sub { return &$pw_cb(@urlparms{'username', 'host', 'password'}); });
-        unless ($rc == kFPNoErr) {
-            print "Incorrect username/password while trying to authenticate\n";
-            $obj->disconnect();
-            return EACCES;
-        }
-    } else {
-        # do anonymous auth to the AFP server instead
-        $rc = Net::AFP::UAMs::GuestAuth($$obj{'afpconn'}, $commonVersion);
-        unless ($rc == kFPNoErr) {
-            print "Anonymous authentication to server failed (maybe no ",
-                    "guest auth allowed?)\n";
-            $obj->disconnect();
-            return EACCES;
-        }
-    } # }}}2
+    $$obj{'afpconn'} = $session;
 
     # Since AFP presents pre-localized times for everything, we need to get
     # the server's time offset, and compute the difference between that and
     # our timestamp, to appropriately apply time localization.
     my $srvParms;
-    $rc = $$obj{'afpconn'}->FPGetSrvrParms(\$srvParms);
+    my $rc = $$obj{'afpconn'}->FPGetSrvrParms(\$srvParms);
     if ($rc != kFPNoErr) {
         $obj->disconnect();
         return EACCES;
@@ -754,8 +625,11 @@ sub unlink { # {{{1
                 'PathType'      => $$self{'pathType'},
                 'Pathname'      => $fileName);
         return -&EACCES if $rc == kFPAccessDenied;
-        return -&ENOENT if $rc == kFPObjectNotFound;
-        return -&EBADF  if $rc != kFPNoErr;
+        #return -&ENOENT if $rc == kFPObjectNotFound;
+        # HACK ALERT: Seems FPAccess() always follows links, so I can't
+        # remove a dead symlink because the FPAccess() call always fails.
+        # This works around that, but it's probably not the best solution.
+        return -&EBADF  if $rc != kFPNoErr and $rc != kFPObjectNotFound;
     }
 
     # don't have to worry about checking to ensure we're 'rm'ing a file;
@@ -874,7 +748,7 @@ sub symlink { # {{{1
             'PathType'      => $$self{'pathType'},
             'Pathname'      => $fileName,
             'FinderInfo'    => "slnkrhap\0\@" . "\0" x 22,
-            'ModDate'       => time() + $$self{'timedelta'});
+            'ModDate'       => time() - $$self{'timedelta'});
     
     return 0        if $rc == kFPNoErr;
     return -&EACCES if $rc == kFPAccessDenied;
@@ -1993,15 +1867,6 @@ sub acl_to_xattr { # {{{1
     # Pack the ACL into a single byte sequence, and push it to
     # the client.
     return pack('LS/(a*)', $$acldata{'acl_flags'}, @acl_parts);
-} # }}}1
-
-sub urldecode { # {{{1
-    my ($string) = @_;
-    if (defined $string) {
-        $string =~ tr/+/ /;
-        $string =~ s/\%([0-9a-f]{2})/chr(hex($1))/gei;
-    }
-    return $string;
 } # }}}1
 
 sub urlencode { # {{{1
