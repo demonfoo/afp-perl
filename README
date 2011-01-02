@@ -76,6 +76,14 @@ FREQUENTLY ASKED QUESTIONS
      and so do a better job.
 
 
+  Q: It's not even version 1.0 yet? Why should I use this if you don't even
+     think it's "version 1.0" material?
+
+  A: There are a few things I want to get in before I make it 1.0, but it's
+     a pretty stable piece of code, which I use every day now. Really, it
+     (probably) won't bite.
+
+
   Q: I mounted my filesystem and put my computer to sleep, or did something
      else, and now when I try to access the mounted filesystem, I get a
      message that says "Transport endpoint is not connected". What is wrong?
