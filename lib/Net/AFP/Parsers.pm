@@ -261,7 +261,7 @@ _EOT_
 			$$addrEnt{'address'} = inet_ntoa($addr);
 			$$addrEnt{'port'} = $port;
 		} elsif ($entryType == 3) { # Packed DDP (AppleTalk) address
-			$$addrEnt{'family'} = 5; # aka AF_APPLETALK
+			$$addrEnt{'family'} = AF_APPLETALK;
 			$$addrEnt{'address'} = sprintf('%u.%u:%u', unpack('nCC', $packed));
 		} elsif ($entryType == 4) { # Just the DNS name
 			$$addrEnt{'hostname'} = $packed;
