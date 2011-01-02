@@ -6737,6 +6737,8 @@ sub FPZzzzz { # {{{1
 
 =back
 
+=back
+
 =head1 REFERENCES
 
 The Apple Filing Protocol implementation contained herein is based on the
