@@ -53,9 +53,9 @@ requires:  perl >= 5.10.0, perl(Net::AFP), perl(File::ExtAttr), perl(Term::ReadP
 group:     Applications/Perl
 %description -n afp-perl
 A command line tool which uses Net::AFP to mount an AFP share. This package
-also includes an additional tool (afp_acl.pl) for managing ACLs on remote
-Apple Filing Protocol shares, if your server supports ACLs (OS X 10.3 and
-later).
+also includes a tool (afp_acl.pl) for managing ACLs on remote Apple Filing
+Protocol shares, if your server supports ACLs (OS X 10.3 and later), and a
+tool for changing user passwords on AFP servers (afp_chpass.pl).
 
 %package -n afpsh-perl
 summary:   An FTP-style client for accessing AFP shares
@@ -157,6 +157,7 @@ ln -sf /usr/local/bin/afpmount.pl %{buildroot}/sbin/mount.pafpfs
 %files -n afp-perl
 /usr/local/bin/afpmount.pl
 /usr/local/bin/afp_acl.pl
+/usr/local/bin/afp_chpass.pl
 /sbin/mount.pafpfs
 %files -n afpsh-perl
 /usr/local/bin/afpsh.pl

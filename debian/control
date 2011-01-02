@@ -38,9 +38,9 @@ Depends: perl (>= 5.10.0), libnet-afp-perl, libfile-extattr-perl,
 Suggests: libnet-bonjour-perl
 Description: Apple Filing Protocol FUSE client in Perl
  A command line tool which uses Net::AFP to mount an AFP share. This package
- also includes an additional tool (afp_acl.pl) for managing ACLs on remote
- Apple Filing Protocol shares, if your server supports ACLs (OS X 10.3 and
- later).
+ also includes a tool (afp_acl.pl) for managing ACLs on remote Apple Filing 
+ Protocol shares, if your server supports ACLs (OS X 10.3 and later), and a
+ tool for changing user passwords on AFP servers (afp_chpass.pl).
 
 Package: afpsh-perl
 Architecture: all
