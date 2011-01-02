@@ -125,6 +125,7 @@ sub PasswordAuth($$$$$) {
 		last if $$uaminfo{'pref'} < 0 and scalar(keys %ReqUAMs) > 1;
 		my $function = $$uaminfo{'class'} . '::Authenticate';
 		DEBUG('auth function is ', $function);
+		$session->{'username'} = $UserName;
 		my $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
 		if ($rc == kFPNoErr) {
 			$$session{'AFPVersion'} = $AFPVersion;
@@ -148,8 +149,7 @@ sub ChangePassword {
 		next unless lc($$uaminfo{'name'}) eq lc("DHX2");
 		last if $$uaminfo{'pref'} < 0 and scalar(keys %ReqUAMs) > 1;
 		my $function = $$uaminfo{'class'} . '::ChangePassword';
-		DEBUG('auth function is ', $function);
-		$session->{'username'} = $UserName;
+		DEBUG('password changing function is ', $function);
         #my $NewPW = &$PwCallback();
 		my $rc = &{$function}($session, $UserName, $OldPW, $NewPW);
 		return $rc;
@@ -158,7 +158,6 @@ sub ChangePassword {
 	# If we reach this point, none of the UAMs the server knew were available.
 	DEBUG((caller(0))[3], 
 			" Could not find valid password changing UAM\n");
-    print "test 1\n";
 	return kFPBadUAM;
 }
 
