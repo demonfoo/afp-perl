@@ -143,10 +143,11 @@ sub PasswordAuth($$$$$) {
 
 =cut
 sub ChangePassword {
-    my($session, $UserName, $OldPW, $NewPW) = @_;
+    my($session, $SupportedUAMs, $UserName, $OldPW, $NewPW) = @_;
 
+	my %ReqUAMs = map { lc($_), 1 } @$SupportedUAMs;
 	foreach my $uaminfo (@UAMReg) {
-		next unless lc($$uaminfo{'name'}) eq lc("DHX2");
+		next unless exists $ReqUAMs{lc($$uaminfo{'name'})};
 		last if $$uaminfo{'pref'} < 0 and scalar(keys %ReqUAMs) > 1;
 		my $function = $$uaminfo{'class'} . '::ChangePassword';
 		DEBUG('password changing function is ', $function);

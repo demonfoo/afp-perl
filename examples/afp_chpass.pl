@@ -30,7 +30,8 @@ my $pw_cb =  sub {
     return $values{'password'};
 };
 
-my($session, %values) = do_afp_connect($pw_cb, $url);
+my $srvInfo;
+my($session, %values) = do_afp_connect($pw_cb, $url, \$srvInfo);
 unless (ref($session) && $session->isa('Net::AFP')) {
     exit($session);
 }
@@ -39,7 +40,7 @@ my $new_pass = read_password('Enter your new password: ');
 my $check_pass = read_password('Reenter your password: ');
 
 if ($new_pass eq $check_pass) {
-    my $rc = Net::AFP::UAMs::ChangePassword($session,
+    my $rc = Net::AFP::UAMs::ChangePassword($session, $$srvInfo{'UAMs'},
             $values{'username'}, $old_pass, $new_pass);
     if ($rc != kFPNoErr) {
         print "Server responded: ", afp_strerror($rc), " (", $rc, ")\n";

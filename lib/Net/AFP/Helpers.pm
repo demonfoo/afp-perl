@@ -78,7 +78,7 @@ our @args = qw(protocol atalk_transport username UAM password host port
                volume subpath);
 
 sub do_afp_connect {
-    my($pw_cb, $url) = @_;
+    my($pw_cb, $url, $srvInfo_r) = @_;
 
     my %values;
     unless (@values{@args} = $url =~ $url_rx) {
@@ -114,6 +114,10 @@ sub do_afp_connect {
     if ($rc != kFPNoErr) {
         print STDERR "Could not issue GetStatus on ", $values{'host'}, "\n";
         return &ENODEV;
+    }
+
+    if (ref($srvInfo_r) eq 'SCALAR') {
+        $$srvInfo_r = $srvInfo;
     }
 
     # FIXME: Should actually look at $srvInfo->{'NetworkAddresses'}; we
