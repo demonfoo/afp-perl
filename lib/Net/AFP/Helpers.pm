@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use diagnostics;
 use Carp;
+use Errno qw(:POSIX);
 
 # We need at least Perl 5.8 to make this all go...
 use v5.8;
