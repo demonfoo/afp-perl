@@ -10,6 +10,7 @@ local $SIG{'__WARN__'} = \&Carp::cluck;
 use Net::AFP::Helpers;
 use Net::AFP::UAMs;
 use Net::AFP::Result;
+use Net::AFP::SrvParms;
 use Term::ReadPassword;
 
 my($url) = @ARGV;
@@ -34,6 +35,11 @@ my $srvInfo;
 my($session, %values) = do_afp_connect($pw_cb, $url, \$srvInfo);
 unless (ref($session) && $session->isa('Net::AFP')) {
     exit($session);
+}
+
+if (!($srvInfo->{'Flags'} & kSupportsChgPwd)) {
+    print "ERROR: Server does not support password changing\n";
+    exit(1)
 }
 
 my $new_pass = read_password('Enter your new password: ');
