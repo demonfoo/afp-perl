@@ -2,6 +2,8 @@
 # Method for AFP. It uses Crypt::DES for the actual DES encryption used
 # as part of the authentication process.
 
+# This UAM was added as of AFP 2.1.
+
 package Net::AFP::UAMs::Randnum2;
 
 use strict;

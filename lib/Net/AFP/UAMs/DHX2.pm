@@ -7,6 +7,8 @@
 # DHCAST128 UAM, causing the authentication process to be very slow with
 # Math::BigInt::Calc.
 
+# This UAM was added as of AFP 3.1.
+
 package Net::AFP::UAMs::DHX2;
 
 use strict;

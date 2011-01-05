@@ -3,10 +3,10 @@ package Net::AFP::VolParms;
 use Exporter qw(import);
 
 our @EXPORT = qw(kFPVolAttributeBit kFPVolSignatureBit kFPVolCreateDateBit
-				 kFPVolModDateBit kFPVolBackupDateBit kFPVolIDBit
-				 kFPVolBytesFreeBit kFPVolBytesTotalBit kFPVolNameBit
-				 kFPVolExtBytesFreeBit kFPVolExtBytesTotalBit
-				 kFPVolBlockSizeBit kFPBadVolBitmap kFPBadVolPre222Bitmap);
+                 kFPVolModDateBit kFPVolBackupDateBit kFPVolIDBit
+                 kFPVolBytesFreeBit kFPVolBytesTotalBit kFPVolNameBit
+                 kFPVolExtBytesFreeBit kFPVolExtBytesTotalBit
+                 kFPVolBlockSizeBit kFPBadVolBitmap kFPBadVolPre222Bitmap);
 
 =head1 NAME
 
@@ -25,27 +25,27 @@ L<Net::AFP/FPGetVolParms>.
 Volume attributes. See L<Net::AFP::VolAttrs/Attribute Flags> for details.
 
 =cut
-use constant kFPVolAttributeBit		=> 0x0001;
+use constant kFPVolAttributeBit     => 0x0001;
 =item kFPVolSignatureBit
 
 The volume signature identifies the volume type (flat, fixed Directory ID,
 or variable Directory ID). For details, see the section "Volume Types."
 
 =cut
-use constant kFPVolSignatureBit		=> 0x0002;
+use constant kFPVolSignatureBit     => 0x0002;
 =item kFPVolCreateDateBit
 
 The date the server created the volume. This parameter cannot be modified
 by an AFP client.
 
 =cut
-use constant kFPVolCreateDateBit	=> 0x0004;
+use constant kFPVolCreateDateBit    => 0x0004;
 =item kFPVolModDateBit
 
 Updated by the server each time anything on the volume is modified. This parameter cannot be modified by an AFP client.
 
 =cut
-use constant kFPVolModDateBit		=> 0x0008;
+use constant kFPVolModDateBit       => 0x0008;
 =item kFPVolBackupDateBit
 
 Set by a backup program each time the volume¿s contents are backed up.
@@ -53,7 +53,7 @@ When a volume is created, the Backup Date is set to 0x80000000 (the
 earliest representable date-time value).
 
 =cut
-use constant kFPVolBackupDateBit	=> 0x0010;
+use constant kFPVolBackupDateBit    => 0x0010;
 =item kFPVolIDBit
 
 For each session between the server and an AFP client, the server assigns
@@ -61,7 +61,7 @@ a Volume ID to each of its volumes. This value is unique among the volumes
 of a given server for that session.
 
 =cut
-use constant kFPVolIDBit			=> 0x0020;
+use constant kFPVolIDBit            => 0x0020;
 =item kFPVolBytesFreeBit
 
 Total bytes free on volumes less than 4 GB in size. If a volume is more
@@ -70,7 +70,7 @@ any case, Extended Bytes Free always reflects the correct value. This
 value is maintained by the server and cannot be modified by an AFP client.
 
 =cut
-use constant kFPVolBytesFreeBit		=> 0x0040;
+use constant kFPVolBytesFreeBit     => 0x0040;
 =item kFPVolBytesTotalBit
 
 Total bytes on volumes less than 4 GB in size. If a volume is more than
@@ -79,7 +79,7 @@ case, Extended Bytes Total always reflects the correct value. This value
 is maintained by the server and cannot be modified by an AFP client.
 
 =cut
-use constant kFPVolBytesTotalBit	=> 0x0080;
+use constant kFPVolBytesTotalBit    => 0x0080;
 =item kFPVolNameBit
 
 The volume name identifies a server volume to an AFP client user, so it
@@ -92,29 +92,29 @@ sending subsequent AFP commands. For more information, see "Designating
 a Path to a CNode".
 
 =cut
-use constant kFPVolNameBit			=> 0x0100;
+use constant kFPVolNameBit          => 0x0100;
 =item kFPVolExtBytesFreeBit
 
 Total bytes free on this volume. This value is maintained by the server
 and cannot be modified by an AFP client
 
 =cut
-use constant kFPVolExtBytesFreeBit	=> 0x0200;
+use constant kFPVolExtBytesFreeBit  => 0x0200;  # AFP 2.2
 =item kFPVolExtBytesTotalBit
 
 Total bytes on this volume. This value is maintained by the server and
 cannot be modified by an AFP client.
 
 =cut
-use constant kFPVolExtBytesTotalBit	=> 0x0400;
+use constant kFPVolExtBytesTotalBit => 0x0400;  # AFP 2.2
 =item kFPVolBlockSizeBit
 
 The block allocation size.
 
 =cut
-use constant kFPVolBlockSizeBit		=> 0x0800;
-use constant kFPBadVolBitmap		=> 0xF000;
-use constant kFPBadVolPre222Bitmap	=> 0xFE00;
+use constant kFPVolBlockSizeBit     => 0x0800;  # AFP 2.2
+use constant kFPBadVolBitmap        => 0xF000;
+use constant kFPBadVolPre222Bitmap  => 0xFE00;
 
 =back
 

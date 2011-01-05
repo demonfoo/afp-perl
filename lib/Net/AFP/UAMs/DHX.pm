@@ -8,6 +8,8 @@
 # recommended for fast large-integer operations, as Math::BigInt::Calc
 # works but is quite slow.
 
+# This UAM was added as of AFP 3.0. (Later backported to Classic - AFP 2.3?)
+
 package Net::AFP::UAMs::DHX;
 use strict;
 use warnings;

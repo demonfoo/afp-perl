@@ -1,3 +1,5 @@
+# This UAM was added as of AFP 3.1.
+
 package Net::AFP::UAMs::Kerberos;
 
 use constant UAMNAME => 'Client Krb v2';
