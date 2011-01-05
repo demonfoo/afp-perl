@@ -81,13 +81,13 @@ use constant kFPGetComment              => 58;  # AFP 2.0
 use constant kFPByteRangeLockExt        => 59;  # AFP 3.0
 use constant kFPReadExt                 => 60;  # AFP 3.0
 use constant kFPWriteExt                => 61;  # AFP 3.0
-use constant kFPGetAuthMethods          => 62;  # AFP 3.1
-use constant kFPLoginExt                => 63;  # AFP 3.1
-use constant kFPGetSessionToken         => 64;  # AFP 3.1
-use constant kFPDisconnectOldSession    => 65;  # AFP 3.1
-use constant kFPEnumerateExt            => 66;
-use constant kFPCatSearchExt            => 67;
-use constant kFPEnumerateExt2           => 68;
+use constant kFPGetAuthMethods          => 62;  # AFP 3.0
+use constant kFPLoginExt                => 63;  # AFP 3.0
+use constant kFPGetSessionToken         => 64;  # AFP 3.0
+use constant kFPDisconnectOldSession    => 65;  # AFP 3.0
+use constant kFPEnumerateExt            => 66;  # AFP 3.0
+use constant kFPCatSearchExt            => 67;  # AFP 3.0
+use constant kFPEnumerateExt2           => 68;  # AFP 3.1
 use constant kFPGetExtAttr              => 69;  # AFP 3.2
 use constant kFPSetExtAttr              => 70;  # AFP 3.2
 use constant kFPRemoveExtAttr           => 71;  # AFP 3.2
@@ -95,9 +95,9 @@ use constant kFPListExtAttrs            => 72;  # AFP 3.2
 use constant kFPGetACL                  => 73;  # AFP 3.2
 use constant kFPSetACL                  => 74;  # AFP 3.2
 use constant kFPAccess                  => 75;  # AFP 3.2
-use constant kFPSpotlightPrivate        => 76;  # AFP 3.2 (OS X 10.5?)
-use constant kFPSyncDir                 => 78;  # AFP 3.2 (OS X 10.5?)
-use constant kFPSyncFork                => 79;  # AFP 3.2 (OS X 10.5?)
+use constant kFPSpotlightRPC            => 76;  # AFP 3.2+ (10.5)
+use constant kFPSyncDir                 => 78;  # AFP 3.2+ (10.5)
+use constant kFPSyncFork                => 79;  # AFP 3.2+ (10.5)
 use constant kFPZzzzz                   => 122; # AFP 2.3
 use constant kFPAddIcon                 => 192; # AFP 2.0
 # }}}1
@@ -152,7 +152,7 @@ consists of a four-byte text encoding hint followed a two-byte length,
 followed by a UTF-8 encoded pathname.
 
 =cut
-use constant kFPUTF8Name        => 3;
+use constant kFPUTF8Name        => 3;   # AFP 3.0
 
 =back
 
@@ -779,7 +779,7 @@ sub FPByteRangeLock { # {{{1
             long_convert($options{'Offset'}),
             long_convert($options{'Length'}));
     my $resp;
-    my $rc = $self->SendAFPMessage($msg, \$resp);
+    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     if ($rc == kFPNoErr) {
         croak('Need to accept returned list') unless wantarray();
         return($rc, unpack('N', $resp));
@@ -879,7 +879,7 @@ sub FPByteRangeLockExt { # {{{1
             ll_convert($options{'Offset'}),
             ll_convert($options{'Length'}));
     my $resp;
-    my $rc = $self->SendAFPMessage($msg, \$resp);
+    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     if ($rc == kFPNoErr) {
         croak('Need to accept returned list') unless wantarray();
         return($rc, ll_unconvert(unpack('NN', $resp)));
@@ -1015,11 +1015,11 @@ sub FPChangePassword { # {{{1
         $resp_r = \q//;
     }
 
-    $UserAuthInfo ||= '';
+    $UserAuthInfo ||= q//;
 
     my $msg = pack('CxC/a*x![s]C/a*x![s]a*', kFPChangePassword, $UAM,
             $UserName, $UserAuthInfo);
-    return $self->SendAFPMessage($msg, $resp_r);
+    return $self->SendAFPMessage($msg, $resp_r, 1);
 } # }}}1
 
 =item FPCloseDir()
@@ -1151,7 +1151,8 @@ sub FPCloseFork { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPCloseFork, $OForkRefNum));
+    return $self->SendAFPMessage(pack('Cxn', kFPCloseFork, $OForkRefNum),
+            undef, 1);
 } # }}}1
 
 =item FPCloseVol()
@@ -1192,7 +1193,7 @@ sub FPCloseVol { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPCloseVol, $VolumeID));
+    return $self->SendAFPMessage(pack('Cxn', kFPCloseVol, $VolumeID), undef, 1);
 } # }}}1
 
 =item FPCopyFile()
@@ -1331,7 +1332,7 @@ sub FPCopyFile { # {{{1
             PackagePath(@options{'SourcePathType', 'SourcePathname'}),
             PackagePath(@options{'DestPathType', 'DestPathname'}),
             PackagePath(@options{'NewType', 'NewName'}));
-    return $self->SendAFPMessage($msg);
+    return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
 =item FPCreateDir()
@@ -1424,7 +1425,7 @@ sub FPCreateDir { # {{{1
     my $resp;
     my $rc = $self->SendAFPMessage(pack('CxnNa*', kFPCreateDir,
             @options{'VolumeID', 'DirectoryID'},
-            PackagePath(@options{'PathType', 'Pathname'})), \$resp);
+            PackagePath(@options{'PathType', 'Pathname'})), \$resp, 1);
     return($rc, unpack('N', $resp))
             if $rc == kFPNoErr and wantarray();
     return $rc;
@@ -1523,7 +1524,7 @@ sub FPCreateFile { # {{{1
 
     return $self->SendAFPMessage(pack('CCnNa*', kFPCreateFile,
             @options{'Flag', 'VolumeID', 'DirectoryID'},
-            PackagePath(@options{'PathType', 'Pathname'})));
+            PackagePath(@options{'PathType', 'Pathname'})), undef, 1);
 } # }}}1
 
 =item FPCreateID()
@@ -1701,7 +1702,7 @@ sub FPDelete { # {{{1
     DEBUG('called ', (caller(0))[3]);
 
     return $self->SendAFPMessage(pack('CxnNa*', kFPDelete, $VolumeID,
-            $DirectoryID, PackagePath($PathType, $Pathname)));
+            $DirectoryID, PackagePath($PathType, $Pathname)), undef, 1);
 } # }}}1
 
 =item FPDeleteID()
@@ -2460,7 +2461,7 @@ sub FPExchangeFiles {
             @options{'VolumeID', 'SourceDirectoryID', 'DestDirectoryID'},
             PackagePath(@options{'SourcePathType', 'SourcePathname'}),
             PackagePath(@options{'DestPathType', 'DestPathname'}));
-    return $self->SendAFPMessage($msg);
+    return $self->SendAFPMessage($msg, undef, 1);
 }
 
 =item FPFlush()
@@ -2501,7 +2502,7 @@ sub FPFlush { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPFlush, $VolumeID));
+    return $self->SendAFPMessage(pack('Cxn', kFPFlush, $VolumeID), undef, 1);
 } # }}}1
 
 =item FPFlushFork()
@@ -2542,7 +2543,8 @@ sub FPFlushFork { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPFlushFork, $OForkRefNum));
+    return $self->SendAFPMessage(pack('Cxn', kFPFlushFork, $OForkRefNum),
+            undef, 1);
 } # }}}1
 
 =item FPGetACL()
@@ -4662,7 +4664,7 @@ sub FPMoveAndRename { # {{{1
             PackagePath(@options{'DestPathType', 'DestPathname'}),
             PackagePath(@options{'NewType', 'NewName'}));
     my $resp;
-    my $rc = $self->SendAFPMessage($msg, \$resp);
+    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     return $rc;
 } # }}}1
 
@@ -4946,7 +4948,7 @@ sub FPOpenFork { # {{{1
 
     my $resp;
     my %rvals;
-    my $rc = $self->SendAFPMessage($msg, \$resp);
+    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     croak('Need to accept returned list') unless wantarray();
     if ($rc == kFPNoErr) {
         my ($rBitmap, $OForkRefNum, $FileParameters) = unpack('nna*', $resp);
@@ -5043,7 +5045,7 @@ sub FPOpenVol { # {{{1
     my $msg = pack($PackPattern, @PackArgs);
 
     my $resp;
-    my $rc = $self->SendAFPMessage($msg, \$resp);
+    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     return $rc unless $rc == kFPNoErr;
     ${$resp_r} = _ParseVolParms($resp);
     return $rc;
@@ -5484,7 +5486,7 @@ sub FPRemoveExtAttr { # {{{1
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             PackagePath(@options{'PathType', 'Pathname'}),
             encode_utf8(decompose($options{'Name'})));
-    return $self->SendAFPMessage($msg);
+    return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
 =item FPRename()
@@ -5587,7 +5589,7 @@ sub FPRename { # {{{1
             @options{'VolumeID', 'DirectoryID'},
             PackagePath(@options{'PathType', 'Pathname'}),
             PackagePath(@options{'NewType', 'NewName'}));
-    return $self->SendAFPMessage($msg);
+    return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
 =item FPResolveID()
@@ -5815,7 +5817,7 @@ sub FPSetACL { # {{{1
             $options{'acl_flags'}, @ace_list);
     }
     
-    return $self->SendAFPMessage($msg);
+    return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
 =item FPSetDirParms()
@@ -5938,7 +5940,7 @@ sub FPSetDirParms { # {{{1
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             PackagePath(@options{'PathType', 'Pathname'}),
             $ParamsBlock);
-    return $self->SendAFPMessage($msg);
+    return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
 =item FPSetExtAttr()
@@ -6045,7 +6047,7 @@ sub FPSetExtAttr { # {{{1
             PackagePath(@options{'PathType', 'Pathname'}),
             encode_utf8(decompose($options{'Name'})),
             $options{'AttributeData'});
-    return $self->SendAFPMessage($msg);
+    return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
 =item FPSetFileDirParms()
@@ -6163,7 +6165,7 @@ sub FPSetFileDirParms { # {{{1
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             PackagePath(@options{'PathType', 'Pathname'}),
             $ParamsBlock);
-    return $self->SendAFPMessage($msg);
+    return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
 =item FPSetFileParms()
@@ -6284,7 +6286,7 @@ sub FPSetFileParms { # {{{1
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             PackagePath(@options{'PathType', 'Pathname'}),
             $ParamsBlock);
-    return $self->SendAFPMessage($msg);
+    return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
 =item FPSetForkParms()
@@ -6371,7 +6373,7 @@ sub FPSetForkParms { # {{{1
     }
 
     return $self->SendAFPMessage(pack('Cxnna*', kFPSetForkParms, $OForkRefNum,
-            $Bitmap, $packed));
+            $Bitmap, $packed), undef, 1);
 } # }}}1
 
 =item FPSetVolParms()
@@ -6437,7 +6439,7 @@ sub FPSetVolParms { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     return $self->SendAFPMessage(pack('CxnnN', kFPSetVolParms, $VolumeID,
-            $Bitmap, $BackupDate));
+            $Bitmap, $BackupDate), undef, 1);
 } # }}}1
 
 =item FPSyncDir()
@@ -6474,7 +6476,7 @@ sub FPSyncDir { # {{{1
     DEBUG('called ', (caller(0))[3]);
 
     return $self->SendAFPMessage(pack('CxnN', kFPSyncDir, $VolumeID,
-            $DirectoryID));
+            $DirectoryID), undef, 1);
 } # }}}1
 
 =item FPSyncFork()
@@ -6510,7 +6512,8 @@ sub FPSyncFork { # {{{1
     my($self, $OForkRefNum) = @_;
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPSyncFork, $OForkRefNum));
+    return $self->SendAFPMessage(pack('Cxn', kFPSyncFork, $OForkRefNum),
+            undef, 1);
 } # }}}1
 
 =item FPWrite()
