@@ -7,3 +7,8 @@
 - Reconnect UAM support?
 - Maybe DBus integration so we can call FPZzzzz() appropriately before the
   machine goes to sleep?
+- Work around an issue with rsync where the source filesystem contains a
+  '.DS_Store' file, and when trying to rsync a directory onto an AFP mount,
+  rsync gets stuck in a loop trying to open() a ..DS_Store.XXXXXX file with
+  O_CREAT, and receives EEXIST every time. rsync will (apparently?) keep on
+  doing this forever.

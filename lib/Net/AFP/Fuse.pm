@@ -1895,7 +1895,13 @@ None currently known.
 
 =head1 INCOMPATIBILITIES
 
-None currently known.
+When an AFP volume is mounted, if a user attempts to rsync a directory
+hierarchy onto the AFP volume and there is a '.DS_Store' file in one of
+them, rsync will get stuck in an infinite loop trying to open a temporary
+file like '..DS_Store.XXXXXX' with O_CREAT, receiving EEXIST every time.
+The AFP server really doesn't want anything named '.DS_Store' or anything
+similar on the volume, as this is a "magic" file. There needs to be some
+sort of workaround for this; I'm going to have to figure out how to do that.
 
 =head1 AUTHOR
 
