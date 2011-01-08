@@ -234,11 +234,6 @@ sub Authenticate {
 	
 	# Set up an encryption context with the key we derived, for encrypting
 	# and decrypting stuff to talk to the server.
-
-	# NOTE NOTE NOTE: If this UAM breaks, see the docs for Crypt::CBC.
-	# Its developer thinks it's a great idea to keep adding parameters
-	# which then break expected behavior for those coding against it.
-	# This code is PERFECT. It is 100% in line with Apple's docs.
 	my $ctx = new Crypt::CBC( {	'key'				=> $K_hash,
 								'cipher'			=> $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
 								'padding'			=> 'null',
@@ -397,11 +392,6 @@ sub ChangePassword {
 	# and decrypting stuff to talk to the server. Note the setting of
 	# literal_key to a false value, because in this method, we
 	# actually want the MD5 hash of the key, not the key itself.
-
-	# NOTE NOTE NOTE: If this UAM breaks, see the docs for Crypt::CBC.
-	# Its developer thinks it's a great idea to keep adding parameters
-	# which then break expected behavior for those coding against it.
-	# This code is PERFECT. It is 100% in line with Apple's docs.
 	my $ctx = new Crypt::CBC( {	'key'				=> $K_binary,
 								'cipher'			=> $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
 								'padding'			=> 'null',

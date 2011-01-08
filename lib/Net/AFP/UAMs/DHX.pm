@@ -133,11 +133,6 @@ sub Authenticate {
 
 	# Set up an encryption context with the key we derived, and decrypt the
 	# ciphertext that the server sent back to us.
-
-	# NOTE NOTE NOTE: If this UAM breaks, see the docs for Crypt::CBC.
-	# Its developer thinks it's a great idea to keep adding parameters
-	# which then break expected behavior for those coding against it.
-	# This code is PERFECT. It is 100% in line with Apple's docs.
 	my $ctx = new Crypt::CBC( {	'key'				=> $K_binary,
 								'cipher'			=> $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
 								'padding'			=> 'null',
