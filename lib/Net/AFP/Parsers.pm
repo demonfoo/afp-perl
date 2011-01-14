@@ -213,17 +213,17 @@ static char *volicon_xpm[] = {
 "_ c #ffffff",
 "X c #000000",
 _EOT_
-        my @data_lines = unpack('x[' . $icon_off . '](a4)[32]', $data);
-        my @mask_lines = unpack('x[' . ($icon_off + 128) . '](a4)[32]', $data);
+        my @data = map { [ split('', $_) ] }
+                unpack('x[' . $icon_off . '](B32)[32]', $data);
+        my @mask = map { [ split('', $_) ] }
+                unpack('x[' . ($icon_off + 128) . '](B32)[32]', $data);
         my @xpm_rows = ();
 
-        for (my $i = 0; $i < 32; $i++) {
+        for my $i (0 .. 31) {
             my $line;
-            my @data_row = split '', unpack('B*', $data_lines[$i]);
-            my @mask_row = split '', unpack('B*', $mask_lines[$i]);
             $line = '"';
-            for (my $j = 0; $j < 32; $j++) {
-                $line .= ($mask_row[$j] ? ($data_row[$j] ? 'X' : '_') : ' ');
+            for my $j (0 .. 31) {
+                $line .= ($mask[$i][$j] ? ($data[$i][$j] ? 'X' : '_') : ' ');
             }
             $line .= '"';
             push(@xpm_rows, $line);
@@ -297,7 +297,7 @@ _EOT_
 
     if ($flags & kSupportsDirServices) {
         $$resp{'DirectoryNames'} =
-                [unpack('x' . $dirserv_off . 'C(C/a)', $data)];
+                [unpack('x' . $dirserv_off . 'C/(C/a)', $data)];
     }
 
     return $resp;
