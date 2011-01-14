@@ -6504,10 +6504,6 @@ Error replies:
 =back
 
 =cut
-# AFP command 79 is for FPSyncFork. You get this, as you worked out, by calling fcntl F_FULLFSYNC on a file. The command layout is:
-#  byte CommandCode
-#  byte Pad
-#  short OForkRefNum
 sub FPSyncFork { # {{{1
     my($self, $OForkRefNum) = @_;
     DEBUG('called ', (caller(0))[3]);
