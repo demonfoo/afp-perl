@@ -1323,7 +1323,6 @@ sub setxattr { # {{{1
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
     $attr = decode(ENCODING, $attr);
-    $value = decode(ENCODING, $value);
 
     # handle ACL xattr {{{2
     if ($attr eq ACL_XATTR && defined($$self{'client_uuid'})) {
