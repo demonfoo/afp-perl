@@ -1710,7 +1710,7 @@ sub removexattr { # {{{1
         return -&EACCES  if $rc == kFPAccessDenied;
         return -&ENOENT  if $rc == kFPObjectNotFound;
         # hopefully this is correct...
-        return -&ENODATA if $rc == kFPMiscErr;
+        return -&ENODATA if $rc == kFPParamErr;
         return -&EBADF   if $rc != kFPNoErr;
         return 0;
     } # }}}2
