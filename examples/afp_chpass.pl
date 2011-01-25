@@ -39,6 +39,7 @@ unless (ref($session) && $session->isa('Net::AFP')) {
 
 if (!($srvInfo->{'Flags'} & kSupportsChgPwd)) {
     print "ERROR: Server does not support password changing\n";
+    $session->close();
     exit(1)
 }
 
@@ -70,3 +71,4 @@ _EOT_
 
     exit(1);
 }
+# vim: ts=4 fdm=marker sw=4 et
