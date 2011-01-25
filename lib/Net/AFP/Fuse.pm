@@ -1895,13 +1895,13 @@ None currently known.
 
 =head1 INCOMPATIBILITIES
 
-When an AFP volume is mounted, if a user attempts to rsync a directory
-hierarchy onto the AFP volume and there is a '.DS_Store' file in one of
-them, rsync will get stuck in an infinite loop trying to open a temporary
-file like '..DS_Store.XXXXXX' with O_CREAT, receiving EEXIST every time.
-The AFP server really doesn't want anything named '.DS_Store' or anything
-similar on the volume, as this is a "magic" file. There needs to be some
-sort of workaround for this; I'm going to have to figure out how to do that.
+Attempting to create a file with a leading '..' in the name causes Apple
+AirPort Disk devices to always return an error indicating the file already
+exists. This can have problematic side effects when rsync'ing a directory
+tree onto an AFP mountpoint that contains dot files (files with names
+starting with the '.' character). Rsync will keep trying to create the
+file, and every time get told that the file already exists, trying new
+names literally forever.
 
 =head1 AUTHOR
 
