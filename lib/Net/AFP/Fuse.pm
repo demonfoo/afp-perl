@@ -1348,7 +1348,8 @@ sub setxattr { # {{{1
                     'Pathname'      => $fileName);
             if ($flags & XATTR_CREATE) {
                 return -&EEXIST if $resp{'Bitmap'} & kFileSec_ACL;
-            } elsif ($flags & XATTR_REPLACE) {
+            }
+            elsif ($flags & XATTR_REPLACE) {
                 return -&ENODATA unless $resp{'Bitmap'} & kFileSec_ACL;
             }
         }
