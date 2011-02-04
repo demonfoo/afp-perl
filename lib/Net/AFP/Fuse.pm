@@ -363,7 +363,8 @@ sub getattr { # {{{1
         # data modified time
         $$resp{'ModDate'} + $$self{'timedelta'},
         # inode changed time
-        $$resp{'CreateDate'} + $$self{'timedelta'},
+        $$resp{'ModDate'} + $$self{'timedelta'},
+        #$$resp{'CreateDate'} + $$self{'timedelta'},
         # preferred block size
         512,
         # size in blocks
@@ -996,10 +997,11 @@ sub utime { # {{{1
     my $rc = $$self{'afpconn'}->FPSetFileDirParms(
             'VolumeID'      => $$self{'volID'},
             'DirectoryID'   => $$self{'topDirID'},
-            'Bitmap'        => kFPCreateDateBit | kFPModDateBit,
+            'Bitmap'        => kFPModDateBit,
+            #'Bitmap'        => kFPCreateDateBit | kFPModDateBit,
             'PathType'      => $$self{'pathType'},
             'Pathname'      => $fileName,
-            'CreateDate'    => $actime - $$self{'timedelta'},
+            #'CreateDate'    => $actime - $$self{'timedelta'},
             'ModDate'       => $modtime - $$self{'timedelta'});
     return 0        if $rc == kFPNoErr;
     return -&EPERM  if $rc == kFPAccessDenied;
@@ -1742,9 +1744,11 @@ sub lookup_afp_entry { # {{{1
 #        return -&EBADF  if $rc != kFPNoErr;
 #    }
 
-    my $fileBitmap = kFPCreateDateBit | kFPModDateBit | kFPNodeIDBit |
+    #my $fileBitmap = kFPCreateDateBit | kFPModDateBit | kFPNodeIDBit |
+    my $fileBitmap = kFPModDateBit | kFPNodeIDBit |
                      kFPParentDirIDBit | $$self{'DForkLenFlag'};
-    my $dirBitmap = kFPCreateDateBit | kFPModDateBit | kFPNodeIDBit |
+    #my $dirBitmap = kFPCreateDateBit | kFPModDateBit | kFPNodeIDBit |
+    my $dirBitmap = kFPModDateBit | kFPNodeIDBit |
                     kFPOffspringCountBit | kFPParentDirIDBit;
     if ($$self{'volAttrs'} & kSupportsUnixPrivs) {
         $fileBitmap |= kFPUnixPrivsBit;
