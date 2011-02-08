@@ -1909,7 +1909,7 @@ names literally forever.
 
 =head1 AUTHOR
 
-Derrik Pates <demon@devrandom.net
+Derrik Pates <demon@devrandom.net>
 
 =head1 SEE ALSO
 
