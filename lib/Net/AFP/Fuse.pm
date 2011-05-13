@@ -30,12 +30,15 @@ use Net::AFP::ACL;
 use Encode;                     # handle encoding/decoding strings
 use Socket;                     # for socket related constants for
                                 # parent/child IPC code
-use Fcntl qw(O_RDONLY O_WRONLY O_RDWR O_ACCMODE :mode);
+use Fcntl qw(:mode :DEFAULT);   # for O_* (access mode) and S_* (permission
+                                # mode) macros
 use Data::Dumper;               # for diagnostic output when debugging is on
-use Errno qw(:POSIX);           # Standard errors codes.
-use Fuse qw(:xattr);            # Still need this for extended attribute
+use Fuse qw(:all);              # Still need this for extended attribute
                                 # related macros.
+use POSIX;                      # Standard error codes, access() modes, etc.
 
+# FreeBSD oh-so-handily names this error code differently, so I'm going
+# to cheat just slightly...
 sub ENODATA { return($^O eq 'freebsd' ? &Errno::ENOATTR : &Errno::ENODATA); }
 
 # We need Data::UUID for a portable means to get a UUID to identify
@@ -44,8 +47,8 @@ sub ENODATA { return($^O eq 'freebsd' ? &Errno::ENOATTR : &Errno::ENODATA); }
 my $has_Data__UUID = 0;
 eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
 
-# How much write data can we buffer locally before flushing to the server?
-use constant COALESCE_MAX       => 131072;
+# Use a nice learge blocksize to require fewer transactions with the server.
+use constant IO_BLKSIZE       => 131072;
 
 # What character encoding we should be pushing out to the virtual filesystem
 # for paths? This is it.
@@ -112,22 +115,21 @@ internal use only, or for invocation by Fuse::Class.
 =cut
 
 sub new { # {{{1
-    my ($class, $url, $pw_cb) = @_;
+    my ($class, $url, $pw_cb, %opts) = @_;
 
     my $obj = $class->SUPER::new();
     $$obj{'topDirID'} = 2;
     $$obj{'volID'} = undef;
     $$obj{'DTRefNum'} = undef;
     $$obj{'afpconn'} = undef;
-    # open fork numbers for files that have been opened via afp_open()
-    $$obj{'ofcache'} = {};
 
     my($session, %urlparms);
     my $callback = sub {
         my(%values) = @_;
         return &$pw_cb(@values{'username', 'host', 'password'});
     };
-    ($session, %urlparms) = do_afp_connect($callback, $url);
+    my $srvInfo;
+    ($session, %urlparms) = do_afp_connect($callback, $url, \$srvInfo);
     unless (ref($session) && $session->isa('Net::AFP')) {
         exit($session);
     }
@@ -148,6 +150,31 @@ sub new { # {{{1
         return EACCES;
     }
     $$obj{'timedelta'} = time() - $$srvParms{'ServerTime'};
+
+    my $selfinfo;
+    $$obj{'afpconn'}->FPGetUserInfo(0x1, 0, 0x3, \$selfinfo);
+    # This is sort of a hack. Seems that instead of returning '0' as the
+    # user ID from the FPGetUserInfo call, the AFP server tells us the
+    # user ID is 1. What is this crap. But anyway.
+    if ($srvInfo->{'MachineType'} =~ m{^AirPort}) {
+        $selfinfo->{'UserID'} = 0;
+    }
+    
+    my $uidmap = {};
+    $$uidmap{$$selfinfo{'UserID'}} = $<;
+    if (exists $opts{'uid'}) {
+        $$uidmap{$$selfinfo{'UserID'}} = int($opts{'uid'});
+    }
+    $$obj{'uidmap'} = $uidmap;
+    $$obj{'uidmap_r'} = { reverse %$uidmap };
+
+    my $gidmap = {};
+    $$gidmap{$$selfinfo{'UserID'}} = (split(m{\s+}, $())[0];
+    if (exists $opts{'gid'}) {
+        $$gidmap{$$selfinfo{'UserID'}} = int($opts{'gid'});
+    }
+    $$obj{'gidmap'} = $gidmap;
+    $$obj{'gidmap_r'} = { reverse %$gidmap };
 
     # Open the volume indicated at start time, and abort if the server bitches
     # at us.
@@ -212,6 +239,15 @@ sub new { # {{{1
     $$obj{'ReadFn'}         = \&Net::AFP::FPRead;
     $$obj{'WriteFn'}        = \&Net::AFP::FPWrite;
     $$obj{'EnumFn'}         = \&Net::AFP::FPEnumerate;
+    # AFP prior to 2.0 doesn't provide any locking semantics, so just use
+    # a bullshit empty function ref.
+    $$obj{'LockFn'}         = sub { };
+
+    if (Net::AFP::Versions::CompareByVersionNum($$obj{'afpconn'}, 2, 0,
+            kFPVerAtLeast)) {
+        $$obj{'LockFn'}         = \&Net::AFP::FPByteRangeLock;
+    }
+
     # I *think* large file support entered the picture as of AFP 3.0...
     if (Net::AFP::Versions::CompareByVersionNum($$obj{'afpconn'}, 3, 0,
             kFPVerAtLeast)) {
@@ -222,7 +258,9 @@ sub new { # {{{1
         $$obj{'UseExtOps'}      = 1;
         $$obj{'ReadFn'}         = \&Net::AFP::FPReadExt;
         $$obj{'WriteFn'}        = \&Net::AFP::FPWriteExt;
+        $$obj{'LockFn'}         = \&Net::AFP::FPByteRangeLockExt;
     }
+
     if (Net::AFP::Versions::CompareByVersionNum($$obj{'afpconn'}, 3, 1,
             kFPVerAtLeast)) {
         $$obj{'EnumFn'}         = \&Net::AFP::FPEnumerateExt2;
@@ -277,7 +315,7 @@ sub new { # {{{1
                 if defined $::_DEBUG;
     } # }}}2
 
-    # purify URL # {{{2
+    # purify URL {{{2
     my $scrubbed_url = $urlparms{'protocol'} . ':/';
     if ($urlparms{'atalk_transport'}) {
         $scrubbed_url .= $urlparms{'atalk_transport'};
@@ -331,9 +369,19 @@ sub getattr { # {{{1
     my $fileName = translate_path($file);
 
     my ($rc, $resp) = $self->lookup_afp_entry($fileName);
-    return $rc if $rc != kFPNoErr;
+    return $rc if $rc;
 
     return -&ENOENT if $$resp{'NodeID'} == 0;
+
+    my $uid = exists($$resp{'UnixUID'}) ? $$resp{'UnixUID'} : 0;
+    if (exists $$self{'uidmap'}->{$uid}) {
+        $uid = $$self{'uidmap'}->{$uid};
+    }
+
+    my $gid = exists($$resp{'UnixGID'}) ? $$resp{'UnixGID'} : 0;
+    if (exists $$self{'gidmap'}->{$gid}) {
+        $gid = $$self{'gidmap'}->{$gid};
+    }
 
     # assemble stat record {{{2
     my @stat = (
@@ -351,9 +399,9 @@ sub getattr { # {{{1
         # does too, instead of walking the dir.
         $$resp{'FileIsDir'} ? $$resp{'OffspringCount'} + 2 : 1,
         # UID number
-        exists($$resp{'UnixUID'}) ? $$resp{'UnixUID'} : 0,
+        $uid,
         # GID number
-        exists($$resp{'UnixGID'}) ? $$resp{'UnixGID'} : 0,
+        $gid,
         # device special major/minor number
         0,
         # file size in bytes
@@ -366,11 +414,10 @@ sub getattr { # {{{1
         $$resp{'ModDate'} + $$self{'timedelta'},
         #$$resp{'CreateDate'} + $$self{'timedelta'},
         # preferred block size
-        512,
+        IO_BLKSIZE,
         # size in blocks
         $$resp{'FileIsDir'} ? 1 : int(($$resp{$$self{'DForkLenKey'}} - 1) / 512) + 1
-    );
-    # }}}2
+    ); # }}}2
     return(@stat);
 } # }}}1
 
@@ -526,12 +573,13 @@ sub mknod { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    my $file_n = $file;
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
 
     if (S_ISREG($mode)) {
         my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
-        return $rc if $rc != kFPNoErr;
+        return $rc if $rc;
         if (defined $$self{'client_uuid'}) {
             $rc = $$self{'afpconn'}->FPAccess(
                     'VolumeID'      => $$self{'volID'},
@@ -548,8 +596,8 @@ sub mknod { # {{{1
         $rc = $$self{'afpconn'}->FPCreateFile(
                 'VolumeID'      => $$self{'volID'},
                 'DirectoryID'   => $$resp{'NodeID'},
-                 'PathType'     => $$self{'pathType'},
-                 'Pathname'     => node_name($fileName));
+                'PathType'      => $$self{'pathType'},
+                'Pathname'      => node_name($fileName));
         return -&EACCES if $rc == kFPAccessDenied;
         return -&ENOSPC if $rc == kFPDiskFull;
         return -&EBUSY  if $rc == kFPFileBusy;
@@ -558,7 +606,10 @@ sub mknod { # {{{1
         return -&EINVAL if $rc == kFPParamErr;
         return -&EROFS  if $rc == kFPVolLocked;
         return -&EBADF  if $rc != kFPNoErr;
-        return 0;
+
+        # Need to set the file mode (if possible) to the mode requested by
+        # the call...
+        return $self->chmod($file_n, $mode & 07777);
     }
     return -&EOPNOTSUPP;
 } # }}}1
@@ -572,7 +623,7 @@ sub mkdir { # {{{1
     my $fileName = translate_path($file);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
-    return $rc if $rc != kFPNoErr;
+    return $rc if $rc;
     if (defined $$self{'client_uuid'}) {
         $rc = $$self{'afpconn'}->FPAccess(
                 'VolumeID'      => $$self{'volID'},
@@ -612,12 +663,7 @@ sub unlink { # {{{1
     my $fileName = translate_path($file);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
-    return $rc if $rc != kFPNoErr;
-
-    if (exists $$self{'ofcache'}{$fileName}) {
-        $$self{'afpconn'}->FPCloseFork($$self{'ofcache'}{$fileName}{'refnum'});
-        delete $$self{'ofcache'}{$fileName};
-    }
+    return $rc if $rc;
 
     if (defined $$self{'client_uuid'}) {
         $rc = $$self{'afpconn'}->FPAccess(
@@ -670,7 +716,7 @@ sub symlink { # {{{1
     my $fileName = translate_path($linkname);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
-    return $rc if $rc != kFPNoErr;
+    return $rc if $rc;
     if (defined $$self{'client_uuid'}) {
         $rc = $$self{'afpconn'}->FPAccess(
                 'VolumeID'      => $$self{'volID'},
@@ -818,22 +864,15 @@ sub rename { # {{{1
                 $$self{'pathType'}, $newRealName);
         $rc = $$self{'afpconn'}->FPMoveAndRename(%arglist);
     }
-    if ($rc == kFPNoErr) {
-        # Move the open filehandle for the renamed file to the new name,
-        # if there is one.
-        if (exists $$self{'ofcache'}{$oldXlated}) {
-            $$self{'ofcache'}{$newXlated} = $$self{'ofcache'}{$oldXlated};
-            delete $$self{'ofcache'}{$oldXlated};
-        }
-        return 0;
-    }
+    print "FPMoveAndRename returned $rc\n";
     return -&EACCES if $rc == kFPAccessDenied;
     return -&EINVAL if $rc == kFPCantMove;
     return -&EBUSY  if $rc == kFPObjectLocked;
     return -&ENOENT if $rc == kFPObjectNotFound;
     return -&EINVAL if $rc == kFPParamErr;
     return -&EROFS  if $rc == kFPVolLocked;
-    return -&EBADF;
+    return -&EBADF  if $rc != kFPNoErr;
+    return 0;
 } # }}}1
 
 sub link { # {{{1
@@ -905,6 +944,14 @@ sub chown { # {{{1
         return -&EBADF  if $rc != kFPNoErr;
     }
 
+    if (exists $$self{'uidmap_r'}->{$uid}) {
+        $uid = $$self{'uidmap_r'}->{$uid};
+    }
+
+    if (exists $$self{'gidmap_r'}->{$gid}) {
+        $gid = $$self{'gidmap_r'}->{$gid};
+    }
+
     $rc = $$self{'afpconn'}->FPSetFileDirParms(
             'VolumeID'          => $$self{'volID'},
             'DirectoryID'       => $$self{'topDirID'},
@@ -931,8 +978,6 @@ sub truncate { # {{{1
 
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
-    my $ofork;
-    my $close_fork = 0;
 
     if (defined $$self{'client_uuid'}) {
         my $rc = $$self{'afpconn'}->FPAccess(
@@ -947,43 +992,34 @@ sub truncate { # {{{1
         return -&EBADF  if $rc != kFPNoErr;
     }
 
-    my $rc;
-    if (exists $$self{'ofcache'}{$fileName}) {
-        $ofork = $$self{'ofcache'}{$fileName}{'refnum'};
-    } else {
-        my %resp;
-        ($rc, %resp) = $$self{'afpconn'}->FPOpenFork(
-                'VolumeID'      => $$self{'volID'},
-                'DirectoryID'   => $$self{'topDirID'},
-                'AccessMode'    => 0x3,
-                'PathType'      => $$self{'pathType'},
-                'Pathname'      => $fileName);
-        return -&EPERM  if $rc == kFPAccessDenied;
-        return -&EPERM  if $rc == kFPDenyConflict;
-        return -&ENOENT if $rc == kFPObjectNotFound;
-        return -&EPERM  if $rc == kFPObjectLocked;
-        return -&EISDIR if $rc == kFPObjectTypeErr;
-        return -&EINVAL if $rc == kFPParamErr;
-        return -&EMFILE if $rc == kFPTooManyFilesOpen;
-        return -&EROFS  if $rc == kFPVolLocked;
-        return -&EBADF  if $rc != kFPNoErr;
+    my ($rc, %resp) = $$self{'afpconn'}->FPOpenFork(
+            'VolumeID'      => $$self{'volID'},
+            'DirectoryID'   => $$self{'topDirID'},
+            'AccessMode'    => 0x3,
+            'PathType'      => $$self{'pathType'},
+            'Pathname'      => $fileName);
+    return -&EPERM  if $rc == kFPAccessDenied;
+    return -&EPERM  if $rc == kFPDenyConflict;
+    return -&ENOENT if $rc == kFPObjectNotFound;
+    return -&EPERM  if $rc == kFPObjectLocked;
+    return -&EISDIR if $rc == kFPObjectTypeErr;
+    return -&EINVAL if $rc == kFPParamErr;
+    return -&EMFILE if $rc == kFPTooManyFilesOpen;
+    return -&EROFS  if $rc == kFPVolLocked;
+    return -&EBADF  if $rc != kFPNoErr;
 
-        $ofork = $resp{'OForkRefNum'};
-        $close_fork = 1;
-    }
+    $rc = $$self{'afpconn'}->FPSetForkParms($resp{'OForkRefNum'},
+            $$self{'DForkLenFlag'}, $length);
 
-    $rc = $$self{'afpconn'}->FPSetForkParms($ofork, $$self{'DForkLenFlag'},
-            $length);
+    $$self{'afpconn'}->FPCloseFork($resp{'OForkRefNum'});
 
-    $$self{'afpconn'}->FPCloseFork($ofork) if $close_fork == 1;
-
-    return 0        if $rc == kFPNoErr;
     return -&EPERM  if $rc == kFPAccessDenied;
     return -&ENOSPC if $rc == kFPDiskFull;
     return -&EPERM  if $rc == kFPLockErr;
     return -&EINVAL if $rc == kFPParamErr;
     return -&EROFS  if $rc == kFPVolLocked;
-    return -&EBADF;
+    return -&EBADF  if $rc != kFPNoErr;
+    return 0;
 } # }}}1
 
 sub utime { # {{{1
@@ -1016,40 +1052,42 @@ sub open { # {{{1
     print 'called ', (caller(0))[3], "('", $file, "', ", $mode, ")\n"
             if defined $::_DEBUG;
 
-    my $refcount = 0;
-    my $file_u = $file;
-    $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path(decode(ENCODING, $file));
 
-    my $accessBitmap = 0x1;
-    if (($mode & O_ACCMODE) == O_RDWR) {
-        $accessBitmap = 0x3;
-    } elsif (($mode & O_ACCMODE) == O_WRONLY) {
-        # HACK: Thanks Apple. Way to, I don't know, know how to IMPLEMENT
-        # YOUR OWN PROTOCOL. Seems if you open the file write-only, and
-        # then, oh, try to WRITE TO IT, the writes then fail. Wow. That
-        # makes so much sense!
-        $accessBitmap = 0x3;
-    } elsif (($mode & O_ACCMODE) == O_RDONLY) {
-        $accessBitmap = 0x1;
+    my $accmode = $mode & O_ACCMODE;
+    if (defined $$self{'client_uuid'}) {
+        my $reqacc = 0;
+        if ($accmode == O_RDONLY || $accmode == O_RDWR) {
+            $reqacc |= KAUTH_VNODE_READ_DATA;
+        }
+
+        if ($accmode == O_WRONLY || $accmode == O_RDWR) {
+            $reqacc |= KAUTH_VNODE_WRITE_DATA,
+        }
+
+        my $rc = $$self{'afpconn'}->FPAccess(
+                'VolumeID'      => $$self{'volID'},
+                'DirectoryID'   => $$self{'topDirID'},
+                'UUID'          => $$self{'client_uuid'},
+                'ReqAccess'     => $reqacc,
+                'PathType'      => $$self{'pathType'},
+                'Pathname'      => $fileName);
+        return -&EACCES if $rc == kFPAccessDenied;
+        return -&ENOENT if $rc == kFPObjectNotFound;
+        return -&EBADF  if $rc != kFPNoErr;
     }
 
-    # Speaking of being lied to, fuse claims release() doesn't get called
-    # until the last reference goes away. Um... not so much really. It
-    # happily closes and reopens filehandles mid-stream. This really
-    # breaks the model. Fortunately a little refcounting fixes it
-    # right up...
-    if (exists $$self{'ofcache'}{$fileName}) {
-        my $cachedBitmap = $$self{'ofcache'}{$fileName}{'mode'};
-        if (($cachedBitmap & $accessBitmap) == $cachedBitmap) {
-            $$self{'ofcache'}{$fileName}{'refcount'}++;
-            return 0;
-        }
-        $self->flush($file_u);
-        $refcount = $$self{'ofcache'}{$fileName}{'refcount'};
-        my $rc = $$self{'afpconn'}->FPCloseFork($$self{'ofcache'}{$fileName}{'refnum'});
-        delete $$self{'ofcache'}{$fileName};
+    my $accessBitmap = 0x1;
+    if ($accmode == O_RDWR) {
         $accessBitmap = 0x3;
+    } elsif ($accmode == O_WRONLY) {
+        # HACK: Thanks Apple. Way to, I don't know, know how to IMPLEMENT
+        # YOUR OWN PROTOCOL. Seems with Airport Disk, if you open a file
+        # write-only, and then, oh, try to WRITE TO IT, the writes then
+        # fail. Wow. That makes so much sense!
+        $accessBitmap = 0x3;
+    } elsif ($accmode == O_RDONLY) {
+        $accessBitmap = 0x1;
     }
 
     my($rc, %resp) = $$self{'afpconn'}->FPOpenFork(
@@ -1058,23 +1096,16 @@ sub open { # {{{1
             'AccessMode'    => $accessBitmap,
             'PathType'      => $$self{'pathType'},
             'Pathname'      => $fileName);
-    if ($rc == kFPNoErr) {
-        $$self{'ofcache'}{$fileName} = {
-                'ostamp'            => time(),
-                'astamp'            => time(),
-                'mode'              => $accessBitmap,
-                'refnum'            => $resp{'OForkRefNum'},
-                'coalesce_offset'   => undef,
-                'coalesce_len'      => undef,
-                'coalesce_buf'      => "\0" x COALESCE_MAX,
-                'refcount'          => $refcount + 1 };
-        return(0);
-    }
+
+    return(0, $resp{'OForkRefNum'})
+                     if $rc == kFPNoErr;
     return -&EACCES  if $rc == kFPAccessDenied;
     return -&ETXTBSY if $rc == kFPDenyConflict;
     return -&ENOENT  if $rc == kFPObjectNotFound;
     return -&EACCES  if $rc == kFPObjectLocked;
-    return -&EISDIR  if $rc == kFPObjectTypeErr;
+    # Yeah, this seems a little odd, but it appears to make more sense to
+    # have the return code mapped this way.
+    return -&ENOENT  if $rc == kFPObjectTypeErr;
     return -&EINVAL  if $rc == kFPParamErr;
     return -&EMFILE  if $rc == kFPTooManyFilesOpen;
     return -&EROFS   if $rc == kFPVolLocked;
@@ -1082,39 +1113,16 @@ sub open { # {{{1
 } # }}}1
 
 sub read { # {{{1
-    my ($self, $file, $len, $off) = @_;
+    my ($self, $file, $len, $off, $fh) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
-    $self->fsync($file);
-
-    $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
-
-    return -&EBADF unless exists $$self{'ofcache'}{$fileName};
-
-    if (defined $$self{'client_uuid'}) {
-        my $rc = $$self{'afpconn'}->FPAccess(
-                'VolumeID'      => $$self{'volID'},
-                'DirectoryID'   => $$self{'topDirID'},
-                'UUID'          => $$self{'client_uuid'},
-                'ReqAccess'     => KAUTH_VNODE_READ_DATA,
-                'PathType'      => $$self{'pathType'},
-                'Pathname'      => $fileName);
-        return -&EACCES if $rc == kFPAccessDenied;
-        return -&ENOENT if $rc == kFPObjectNotFound;
-        return -&EBADF  if $rc != kFPNoErr;
-    }
-
-    my $forkID = $$self{'ofcache'}{$fileName}{'refnum'};
-    $$self{'ofcache'}{$fileName}{'astamp'} = time();
     my($rc, $resp) = &{$$self{'ReadFn'}}($$self{'afpconn'},
-            'OForkRefNum'   => $forkID,
+            'OForkRefNum'   => $fh,
             'Offset'        => $off,
             'ReqCount'      => $len);
     return $resp     if $rc == kFPNoErr
             or $rc == kFPEOFErr;
-    #return -&ESPIPE  if $rc == kFPEOFErr;
     return -&EBADF   if $rc == kFPAccessDenied;
     return -&ETXTBSY if $rc == kFPLockErr;
     return -&EINVAL  if $rc == kFPParamErr;
@@ -1122,78 +1130,15 @@ sub read { # {{{1
 } # }}}1
 
 sub write { # {{{1
-    #my ($file, $data, $offset) = @_;
-    my ($self, $file, $offset) = @_[0,1,3];
+    my ($self, $file, $offset, $fh) = @_[0,1,3,4];
     my $data_r = \$_[2];
     print 'called ', (caller(0))[3], "('", $file, "', [data], ", $offset, ")\n"
             if defined $::_DEBUG;
 
-    my $file_u = $file;
-    $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
-
-    return -&EBADF unless exists $$self{'ofcache'}{$fileName};
-
-    my $of_ent = $$self{'ofcache'}{$fileName};
-    my $forkID = $$of_ent{'refnum'};
-    $$of_ent{'astamp'} = time();
-
-    # This code implements write coalescing. FUSE 2.8 is supposed to be
-    # implementing it at the libfuse level, but for now, doing lots of
-    # small writes sucks for performance. This allows lots of small writes
-    # to be bundled into fewer, large writes, which means less time spent
-    # waiting for remote calls to be processed and less protocol overhead
-    # to do it. Haven't yet benched it, but sequential write performance
-    # via wget is notably better - I can saturate my Internet connection
-    # with a download while writing to an AFP volume now.
-
-    # coalesce writes {{{2
-    if (defined $$of_ent{'coalesce_offset'} &&
-            $$of_ent{'coalesce_len'} >= COALESCE_MAX) {
-        my $rv = $self->flush($file_u);
-        if ($rv != 0) {
-            return $rv;
-        }
-    }
-
-    if (defined $$self{'client_uuid'}) {
-        my $rc = $$self{'afpconn'}->FPAccess(
-                'VolumeID'      => $$self{'volID'},
-                'DirectoryID'   => $$self{'topDirID'},
-                'UUID'          => $$self{'client_uuid'},
-                'ReqAccess'     => KAUTH_VNODE_WRITE_DATA,
-                'PathType'      => $$self{'pathType'},
-                'Pathname'      => $fileName);
-        return -&EACCES if $rc == kFPAccessDenied;
-        return -&ENOENT if $rc == kFPObjectNotFound;
-        return -&EBADF  if $rc != kFPNoErr;
-    }
-
-    my $dlen = length($$data_r);
-    if (defined $$of_ent{'coalesce_offset'}) {
-        if ($offset == ($$of_ent{'coalesce_offset'} +
-                $$of_ent{'coalesce_len'})) {
-            substr($$of_ent{'coalesce_buf'}, $$of_ent{'coalesce_len'},
-                    $dlen, $$data_r);
-            $$of_ent{'coalesce_len'} += $dlen;
-            return $dlen;
-        } else {
-            my $rv = $self->flush($file_u);
-            if ($rv != 0) {
-                return $rv;
-            }
-        }
-    } else {
-        substr($$of_ent{'coalesce_buf'}, 0, $dlen, $$data_r);
-        $$of_ent{'coalesce_len'} = $dlen;
-        $$of_ent{'coalesce_offset'} = $offset;
-        return length($$data_r);
-    }
-    # }}}2
     my($rc, $lastWritten) = &{$$self{'WriteFn'}}($$self{'afpconn'},
-            'OForkRefNum'   => $forkID,
+            'OForkRefNum'   => $fh,
             'Offset'        => $offset,
-            'ReqCount'      => $dlen,
+            'ReqCount'      => length($$data_r),
             'ForkData'      => $data_r);
     
     return($lastWritten - $offset) if $rc == kFPNoErr;
@@ -1247,74 +1192,34 @@ sub statfs { # {{{1
 } # }}}1
 
 sub flush { # {{{1
-    my ($self, $file) = @_;
+    my ($self, $file, $fh) = @_;
     print 'called ', (caller(0))[3], "('", $file, "')\n"
             if defined $::_DEBUG;
 
-    $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
-    if (exists $$self{'ofcache'}{$fileName}) {
-        # This is the second (and critical) part of write coalescing -
-        # flushing the writes out to the remote volume. I'm probably
-        # implementing this in a rather naive fashion, but it works so
-        # far...
-        if (defined $$self{'ofcache'}{$fileName}{'coalesce_offset'}) {
-            my($forkID, $offset, $len) =
-                    @{$$self{'ofcache'}{$fileName}}{'refnum', 'coalesce_offset',
-                                              'coalesce_len'};
-            my $data_ref = \$$self{'ofcache'}{$fileName}{'coalesce_buf'};
-#           if ($$self{'ofcache'}{$fileName}{'coalesce_len'} < COALESCE_MAX) {
-#               my $data = substr($$data_ref, 0, $$self{'ofcache'}{$fileName}{'coalesce_len'});
-#               $data_ref = \$data;
-#           }
+    my $rc = $$self{'afpconn'}->FPFlushFork($fh);
 
-            # Try to zero-copy whenever possible...
-            my ($rc, $lastwr)= &{$$self{'WriteFn'}}($$self{'afpconn'},
-                    'OForkRefNum'   => $forkID,
-                    'Offset'        => $offset,
-                    'ReqCount'      => $len,
-                    'ForkData'      => $data_ref);
-            # Continue writing if needed.
-            while ($lastwr < ($offset + $len) && $rc == kFPNoErr) {
-                my $dchunk = substr($$data_ref, $lastwr - $offset,
-                        $offset + $len - $lastwr);
-                ($rc, $lastwr) = &{$$self{'WriteFn'}}($$self{'afpconn'},
-                        'OForkRefNum'   => $forkID,
-                        'Offset'        => $lastwr,
-                        'ForkData'      => \$dchunk);
-            }
-            undef $$self{'ofcache'}{$fileName}{'coalesce_offset'};
-        }
-    }
-
-    return(0);
+    return -&EBADF if $rc != kFPNoErr;
+    return 0;
 } # }}}1
 
 sub release { # {{{1
-    my ($self, $file, $mode) = @_;
+    my ($self, $file, $mode, $fh) = @_;
     print 'called ', (caller(0))[3], "('", $file, "', ", $mode, ")\n"
             if defined $::_DEBUG;
 
-    my $file_u = $file;
-    $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
-    if (exists $$self{'ofcache'}{$fileName}) {
-        # If the reference count is not 0, just play along.
-        return(0) if --$$self{'ofcache'}{$fileName}{'refcount'};
-        $self->flush($file_u);
-        $$self{'afpconn'}->FPCloseFork($$self{'ofcache'}{$fileName}{'refnum'});
-        delete $$self{'ofcache'}{$fileName};
-        return 0;
-    }
-    return -&EBADF;
+    $$self{'afpconn'}->FPCloseFork($fh);
+    return 0;
 } # }}}1
 
 sub fsync { # {{{1
-    my ($self, $file, $flags) = @_;
+    my ($self, $file, $flags, $fh) = @_;
     print 'called ', (caller(0))[3], "('", $file, "')\n"
             if defined $::_DEBUG;
 
-    return $self->flush($file);
+    if (!$flags) {
+        return $self->flush($file, $fh);
+    }
+    return 0;
 } # }}}1
 
 sub setxattr { # {{{1
@@ -1527,22 +1432,28 @@ sub getxattr { # {{{1
             return -&EBADF   if $rc != kFPNoErr;
         }
 
-        # FIXME: Should probably call this twice, once to get attr data size,
-        # then once to get actual attr data, rather than hoping our assumed
-        # size is enough...
-        my($rc, %resp) = $$self{'afpconn'}->FPGetExtAttr(
+        my %xaopts = (
                 'VolumeID'      => $$self{'volID'},
                 'DirectoryID'   => $$self{'topDirID'},
                 'Bitmap'        => kXAttrNoFollow,
-                'MaxReplySize'  => 131072,
                 'PathType'      => $$self{'pathType'},
                 'Pathname'      => $fileName,
                 'Name'          => $attr);
+
+        # Ask the server for the length of the extended attribute data.
+        my($rc, %resp) = $$self{'afpconn'}->FPGetExtAttr(%xaopts);
         return -&ENODATA if $rc == kFPAccessDenied;
         return -&ENODATA if $rc == kFPObjectNotFound;
         # hopefully this is correct...
         return -&ENODATA if $rc == kFPMiscErr;
         return -&EBADF   if $rc != kFPNoErr;
+
+        my $dlen = $resp{'DataLength'};
+        # Get the real data from the server. Add 6 bytes to the length to
+        # cover the bitmap and length values.
+        ($rc, %resp) = $$self{'afpconn'}->FPGetExtAttr(%xaopts,
+                'MaxReplySize'  => $dlen + 6);
+
         if (defined $resp{'AttributeData'} &&
                 $resp{'AttributeData'} ne '') {
             return $resp{'AttributeData'};
@@ -1577,20 +1488,24 @@ sub listxattr { # {{{1
             return -&EBADF  if $rc != kFPNoErr;
         }
 
-        # Ask the server what extended attributes it knows for the file.
-        # FIXME: Should probably request this twice, once with no
-        # MaxReplySize to get the length, then once with the appropriate
-        # size, instead of guessing and hoping.
-        my ($rc, %resp) = $$self{'afpconn'}->FPListExtAttrs(
+        my %xaopts = (
                 'VolumeID'      => $$self{'volID'},
                 'DirectoryID'   => $$self{'topDirID'},
                 'Bitmap'        => kXAttrNoFollow,
-                'MaxReplySize'  => 131072,
                 'PathType'      => $$self{'pathType'},
                 'Pathname'      => $fileName);
+
+        # Ask the server for the length of the extended attribute list.
+        my ($rc, %resp) = $$self{'afpconn'}->FPListExtAttrs(%xaopts);
         return -&EACCES if $rc == kFPAccessDenied;
         return -&ENOENT if $rc == kFPObjectNotFound;
         return -&EBADF  if $rc != kFPNoErr;
+
+        my $dlen = $resp{'DataLength'};
+        # Get the real data from the server. Add 6 bytes to the length to
+        # cover the bitmap and length values.
+        ($rc, %resp) = $$self{'afpconn'}->FPListExtAttrs(%xaopts,
+                'MaxReplySize'  => $dlen + 6);
         @attrs = map { 'user.' . $_ } @{$resp{'AttributeNames'}};
     } # }}}2
 
@@ -1720,11 +1635,495 @@ sub removexattr { # {{{1
     return -&ENODATA;
 } # }}}1
 
+sub opendir { # {{{1
+    my ($self, $dirname) = @_;
+    print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
+
+    $dirname = decode(ENCODING, $dirname);
+    my $fileName = translate_path($dirname);
+
+    if (defined $$self{'client_uuid'}) {
+        my $rc = $$self{'afpconn'}->FPAccess(
+                'VolumeID'      => $$self{'volID'},
+                'DirectoryID'   => $$self{'topDirID'},
+                'UUID'          => $$self{'client_uuid'},
+                'ReqAccess'     => KAUTH_VNODE_LIST_DIRECTORY,
+                'PathType'      => $$self{'pathType'},
+                'Pathname'      => $fileName);
+        return -&EACCES if $rc == kFPAccessDenied;
+        return -&ENOENT if $rc == kFPObjectNotFound;
+        return -&EBADF  if $rc != kFPNoErr;
+    }
+
+    my ($rc, $cdir) = $self->lookup_afp_entry($fileName);
+    return $rc if $rc;
+    return(0, $$cdir{'NodeID'});
+} # }}}1
+
+sub readdir { # {{{1
+    my ($self, $dirname, $offset, $dh) = @_;
+    print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
+
+    $dirname = decode(ENCODING, $dirname);
+    my $fileName = translate_path($dirname);
+    my @filesList;
+
+    # Set the result set size limit; if there are more entries in the
+    # directory, extra requests will have to be sent. Larger set sizes
+    # mean less time spent waiting around for responses.
+    my $entrycount = 100;
+
+    # Avoid some extra dereferencing by getting the hash refs into local
+    # variables.
+    my $uidmap = $$self{'uidmap'};
+    my $gidmap = $$self{'gidmap'};
+
+    # Add '.' and '..' entries {{{2
+    if (!$offset) {
+        # If offset is 0, this is the first request, so '.' and '..' should
+        # definitely be passed
+        my($rc, $cdir, $pdir);
+        # Push an entry for '.' (current dir)
+        ($rc, $cdir) = $self->lookup_afp_entry($fileName);
+
+        my $cdir_uid = exists($$cdir{'UnixUID'}) ? $$cdir{'UnixUID'} : 0;
+        if (exists $uidmap->{$cdir_uid}) {
+            $cdir_uid = $uidmap->{$cdir_uid};
+        }
+
+        my $cdir_gid = exists($$cdir{'UnixGID'}) ? $$cdir{'UnixGID'} : 0;
+        if (exists $gidmap->{$cdir_gid}) {
+            $cdir_gid = $gidmap->{$cdir_gid};
+        }
+
+        my $stat = [ 0, $$cdir{'NodeID'}, 
+                     exists($$cdir{'UnixPerms'}) ? $$cdir{'UnixPerms'} : 040755,
+                     $$cdir{'OffspringCount'} + 2,
+                     $cdir_uid,
+                     $cdir_gid,
+                     0, 4096,
+                     $$cdir{'ModDate'} + $$self{'timedelta'},
+                     $$cdir{'ModDate'} + $$self{'timedelta'},
+                     $$cdir{'ModDate'} + $$self{'timedelta'},
+                     IO_BLKSIZE, 1 ];
+        push(@filesList, [++$offset, '.', $stat]);
+
+        # Push an entry for '..' (parent dir)
+        ($rc, $pdir) = $self->lookup_afp_entry(path_parent($fileName));
+
+        my $pdir_uid = exists($$pdir{'UnixUID'}) ? $$pdir{'UnixUID'} : 0;
+        if (exists $uidmap->{$pdir_uid}) {
+            $pdir_uid = $uidmap->{$pdir_uid};
+        }
+
+        my $pdir_gid = exists($$pdir{'UnixGID'}) ? $$pdir{'UnixGID'} : 0;
+        if (exists $gidmap->{$pdir_gid}) {
+            $pdir_gid = $gidmap->{$pdir_gid};
+        }
+
+        $stat = [ 0, $$pdir{'NodeID'}, 
+                  exists($$pdir{'UnixPerms'}) ? $$pdir{'UnixPerms'} : 040755,
+                  $$pdir{'OffspringCount'} + 2,
+                  $pdir_uid,
+                  $pdir_gid,
+                  0, 4096,
+                  $$pdir{'ModDate'} + $$self{'timedelta'},
+                  $$pdir{'ModDate'} + $$self{'timedelta'},
+                  $$pdir{'ModDate'} + $$self{'timedelta'},
+                  IO_BLKSIZE, 1 ];
+        push(@filesList, [++$offset, '..', $stat]);
+        $entrycount -= 2;
+    } # }}}2
+
+    my $resp;
+    my $fileBitmap = $$self{'pathFlag'} | kFPModDateBit | kFPNodeIDBit |
+                     kFPParentDirIDBit | $$self{'DForkLenFlag'};
+    my $dirBitmap = $$self{'pathFlag'} | kFPModDateBit | kFPNodeIDBit |
+                    kFPOffspringCountBit | kFPParentDirIDBit;
+    if ($$self{'volAttrs'} & kSupportsUnixPrivs) {
+        $fileBitmap |= kFPUnixPrivsBit;
+        $dirBitmap |= kFPUnixPrivsBit;
+    }
+
+    # Request entry list from server {{{2
+    my %arglist = ( 'VolumeID'          => $$self{'volID'},
+                    'DirectoryID'       => $dh,
+                    'FileBitmap'        => $fileBitmap,
+                    'DirectoryBitmap'   => $dirBitmap,
+                    'ReqCount'          => $entrycount,
+                    'StartIndex'        => $offset - 1,
+                    'MaxReplySize'      => 32767,
+                    'PathType'          => $$self{'pathType'},
+                    'Pathname'          => '',
+                    'Entries_ref'       => \$resp);
+    my $rc = &{$$self{'EnumFn'}}($$self{'afpconn'}, %arglist);
+
+    return -&EACCES  if $rc == kFPAccessDenied;
+    return -&ENOENT  if $rc == kFPDirNotFound;
+    return -&ENOTDIR if $rc == kFPObjectTypeErr;
+    return -&EINVAL  if $rc == kFPParamErr;
+    return -&EACCES  if $rc != kFPNoErr and $rc != kFPObjectNotFound;
+    # }}}2
+
+    # Process entries {{{2
+    foreach my $elem (@$resp) {
+        my $name = $$elem{$$self{'pathkey'}};
+        $name =~ tr|/|:|;
+
+        my $uid = exists($$elem{'UnixUID'}) ? $$elem{'UnixUID'} : 0;
+        if (exists $uidmap->{$uid}) {
+            $uid = $uidmap->{$uid};
+        }
+
+        my $gid = exists($$elem{'UnixGID'}) ? $$elem{'UnixGID'} : 0;
+        if (exists $gidmap->{$gid}) {
+            $gid = $gidmap->{$gid};
+        }
+
+        my $stat = [
+                     0,
+                     $$elem{'NodeID'},
+                     exists($$elem{'UnixPerms'}) ? $$elem{'UnixPerms'} :
+                            ($$elem{'FileIsDir'} ? 040755 : 0100644),
+                     $$elem{'FileIsDir'} ? $$elem{'OffspringCount'} + 2 : 1,
+                     $uid, $gid, 0,
+                     $$elem{'FileIsDir'} ? 4096 : $$elem{$$self{'DForkLenKey'}},
+                     $$elem{'ModDate'} + $$self{'timedelta'},
+                     $$elem{'ModDate'} + $$self{'timedelta'},
+                     $$elem{'ModDate'} + $$self{'timedelta'},
+                     IO_BLKSIZE,
+                     $$elem{'FileIsDir'} ? 1 :
+                            int(($$elem{$$self{'DForkLenKey'}} - 1) / 512) + 1
+                   ];
+                     
+        push(@filesList, [++$offset, encode(ENCODING, $name), $stat]);
+    } # }}}2
+
+    return(@filesList, 0);
+} # }}}1
+
+sub releasedir { # {{{1
+    my ($self, $dirname, $dh) = @_;
+    print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
+
+    # Not really anything to do; mostly just here to complement opendir().
+
+    return 0;
+} # }}}1
+
+sub fsyncdir { # {{{1
+    my ($self, $dirname, $flags, $dh) = @_;
+    print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
+
+    if (!$flags) {
+        my $rc = $self->FPSyncDir($$self{'volID'}, $dh);
+        return -&ENOENT if $rc == kFPParamErr;
+        return -&EACCES if $rc == kFPAccessDenied;
+        return -&EBADF  if $rc != kFPNoErr;
+    }
+
+    return 0;
+} # }}}1
+
+sub access { # {{{1
+    my ($self, $file, $mode) = @_;
+    print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
+
+    $file = decode(ENCODING, $file);
+    my $fileName = translate_path($file);
+
+    if ($mode == F_OK) {
+        my ($rc, $stat) = $self->lookup_afp_entry($fileName);
+        return $rc;
+    }
+    elsif (defined $$self{'client_uuid'}) {
+        my $reqacc = 0;
+        if ($mode & R_OK) {
+            $reqacc |= KAUTH_VNODE_GENERIC_READ_BITS;
+        }
+        if ($mode & W_OK) {
+            $reqacc |= KAUTH_VNODE_GENERIC_WRITE_BITS;
+        }
+        if ($mode & X_OK) {
+            $reqacc |= KAUTH_VNODE_GENERIC_EXECUTE_BITS;
+        }
+
+        my $rc = $$self{'afpconn'}->FPAccess(
+                'VolumeID'      => $$self{'volID'},
+                'DirectoryID'   => $$self{'topDirID'},
+                'UUID'          => $$self{'client_uuid'},
+                'ReqAccess'     => $reqacc,
+                'PathType'      => $$self{'pathType'},
+                'Pathname'      => $fileName);
+        return -&EACCES if $rc == kFPAccessDenied;
+        return -&ENOENT if $rc == kFPObjectNotFound;
+        return -&EBADF  if $rc != kFPNoErr;
+        return 0;
+    }
+    return 0;
+} # }}}1
+
+sub create { # {{{1
+    my ($self, $file, $mode, $flags) = @_;
+    printf("called %s('\%s', \%o, \%d)\n", (caller(0))[3], $file, $mode, $flags);
+    print 'called ', (caller(0))[3], "('", $file, "', ", $mode, ")\n"
+            if defined $::_DEBUG;
+
+    my $file_n = $file;
+    $file = decode(ENCODING, $file);
+    my $fileName = translate_path($file);
+
+    # afaik this should only ever happen for a plain file...
+    return -&EOPNOTSUPP if !S_ISREG($mode);
+
+    my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
+    return $rc if $rc;
+    if (defined $$self{'client_uuid'}) {
+        $rc = $$self{'afpconn'}->FPAccess(
+                'VolumeID'      => $$self{'volID'},
+                'DirectoryID'   => $$self{'topDirID'},
+                'UUID'          => $$self{'client_uuid'},
+                'ReqAccess'     => KAUTH_VNODE_ADD_FILE,
+                'PathType'      => $$self{'pathType'},
+                'Pathname'      => path_parent($fileName));
+        return -&EACCES if $rc == kFPAccessDenied;
+        return -&ENOENT if $rc == kFPObjectNotFound;
+        return -&EBADF  if $rc != kFPNoErr;
+    }
+
+    $rc = $$self{'afpconn'}->FPCreateFile(
+            'VolumeID'      => $$self{'volID'},
+            'DirectoryID'   => $$resp{'NodeID'},
+            'PathType'      => $$self{'pathType'},
+            'Pathname'      => node_name($fileName));
+    return -&EACCES if $rc == kFPAccessDenied;
+    return -&ENOSPC if $rc == kFPDiskFull;
+    return -&EBUSY  if $rc == kFPFileBusy;
+    return -&EEXIST if $rc == kFPObjectExists;
+    return -&ENOENT if $rc == kFPObjectNotFound;
+    return -&EINVAL if $rc == kFPParamErr;
+    return -&EROFS  if $rc == kFPVolLocked;
+    return -&EBADF  if $rc != kFPNoErr;
+
+    my $fh;
+    ($rc, $fh) = $self->open($file_n, $flags);
+
+    return $rc if $rc;
+
+    # We're ignoring this call's return value intentionally; on an AirPort
+    # Disk device, UNIX modes are provided, but you can't change them, so
+    # if this fails, it's acceptable.
+    $self->chmod($file_n, $mode & 07777);
+    #return $rc if $rc;
+
+    return($rc, $fh);
+} # }}}1
+
+sub ftruncate { # {{{1
+    my ($self, $file, $length, $fh) = @_;
+    print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
+
+    my $rc = $$self{'afpconn'}->FPSetForkParms($fh,
+            $$self{'DForkLenFlag'}, $length);
+    
+    return -&EPERM  if $rc == kFPAccessDenied;
+    return -&ENOSPC if $rc == kFPDiskFull;
+    return -&EPERM  if $rc == kFPLockErr;
+    return -&EINVAL if $rc == kFPParamErr;
+    return -&EROFS  if $rc == kFPVolLocked;
+    return -&EBADF  if $rc != kFPNoErr;
+    return 0;
+} # }}}1
+
+sub fgetattr { # {{{1
+    my ($self, $file, $fh) = @_;
+    print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
+
+    # Get the filename and parent dir ID from the server, so we can turn around
+    # and make an FPGetFileDirParms() call for it. Unfortunately most of the
+    # info we want can't be got from FPGetForkParms(), so this is how it
+    # has to be done.
+    my $bitmap = kFPParentDirIDBit | kFPUTF8NameBit;
+    my $resp;
+    my $rc = $$self{'afpconn'}->FPGetForkParms($fh, $bitmap, \$resp);
+
+    return -&EBADF unless $rc == kFPNoErr;
+
+    # Was going to go ahead and add support for directories, but with an
+    # open filehandle, that really makes no sense here at all.
+    $bitmap = kFPModDateBit | kFPNodeIDBit | kFPParentDirIDBit |
+            $$self{'DForkLenFlag'};
+    if ($$self{'volAttrs'} & kSupportsUnixPrivs) {
+        $bitmap |= kFPUnixPrivsBit;
+    }
+
+    my $sresp;
+    ($rc, $sresp) = $$self{'afpconn'}->FPGetFileDirParms(
+            'VolumeID'      => $$self{'volID'},
+            'DirectoryID'   => $$resp{'ParentDirID'},
+            'PathType'      => $$self{'pathType'},
+            'Pathname'      => $$resp{'UTF8Name'},
+            'FileBitmap'    => $bitmap);
+
+    return -&EBADF unless $rc == kFPNoErr;
+
+    # assemble stat record {{{2
+    my $uid = exists($$sresp{'UnixUID'}) ? $$sresp{'UnixUID'} : 0;
+    if (exists $$self{'uidmap'}->{$uid}) {
+        $uid = $$self{'uidmap'}->{$uid};
+    }
+
+    my $gid = exists($$sresp{'UnixGID'}) ? $$sresp{'UnixGID'} : 0;
+    if (exists $$self{'gidmap'}->{$gid}) {
+        $gid = $$self{'gidmap'}->{$gid};
+    }
+
+    my @stat = (
+        # device number (just make it 0, since it's not a real device)
+        0,
+        # inode number (node ID works fine)
+        $$sresp{'NodeID'},
+        # permission mask
+        exists($$sresp{'UnixPerms'}) ? $$sresp{'UnixPerms'} : 0100644,
+        # link count
+        1,
+        # UID number
+        $uid,
+        # GID number
+        $gid,
+        # device special major/minor number
+        0,
+        # file size in bytes
+        $$sresp{$$self{'DForkLenKey'}},
+        # last accessed time
+        $$sresp{'ModDate'} + $$self{'timedelta'},
+        # data modified time
+        $$sresp{'ModDate'} + $$self{'timedelta'},
+        # inode changed time
+        $$sresp{'ModDate'} + $$self{'timedelta'},
+        # preferred block size
+        IO_BLKSIZE,
+        # size in blocks
+        int(($$sresp{$$self{'DForkLenKey'}} - 1) / 512) + 1
+    ); # }}}2
+    return(@stat)
+} # }}}1
+
+sub lock { # {{{1
+    my ($self, $file, $cmd, $lkparms, $fh) = @_;
+    print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n";
+#            if defined $::_DEBUG;
+
+    my($rc, $rstart);
+    if ($$lkparms{'l_whence'} == SEEK_CUR) {
+        # I doubt this will ever happen, but gotta be sure...
+        print "ERROR: l_whence was SEEK_CUR, we have no way of knowing its current offset?\n";
+        return -&EBADF;
+    }
+
+    # AFP gets cranky if the lock range length is 0 (it considers that a
+    # bullshit parameter, and returns kFPParamErr).
+    if (!$lkparms->{'l_len'}) {
+        $lkparms->{'l_len'} = 1;
+    }
+
+    if ($cmd == F_SETLK || $cmd == F_SETLKW) {
+        my $flags = 0;
+        if ($lkparms->{'l_type'} == F_UNLCK) {
+            $flags |= kFPLockUnlockFlag;
+        }
+        if ($lkparms->{'l_whence'} == SEEK_END) {
+            $flags |= kFPStartEndFlag;
+        }
+        ($rc, $rstart) = $$self{'LockFn'}(
+                                $self->{'afpconn'},
+                                'Flags'         => $flags,
+                                'OForkRefNum'   => $fh,
+                                'Offset'        => $lkparms->{'l_start'},
+                                'Length'        => $lkparms->{'l_len'},
+                              );
+        return -&ENOLCK if $rc == kFPNoMoreLocks;
+        return -&EACCES if $rc == kFPLockErr;
+        return -&EACCES if $rc == kFPRangeOverlap;
+        return -&EAGAIN if $rc == kFPRangeNotLocked;
+        return -&EBADF  if $rc != kFPNoErr;
+        return 0;
+    }
+    elsif ($cmd == F_GETLK) {
+        my $flags = 0;
+        if ($lkparms->{'l_whence'} == SEEK_END) {
+            $flags |= kFPStartEndFlag;
+        }
+        # Since AFP doesn't have a concept of "hey, man, I just want to know
+        # if I *could* get a lock", we'll just lock it and then unlock it
+        # right away...
+        ($rc, $rstart) = $$self{'LockFn'}(
+                                $self,
+                                'Flags'         => $flags,
+                                'OForkRefNum'   => $fh,
+                                'Offset'        => $lkparms->{'l_start'},
+                                'Length'        => $lkparms->{'l_len'},
+                              );
+        if ($rc == kFPLockErr || $rc == kFPRangeOverlap ||
+                $rc == kFPRangeNotLocked) {
+            # Couldn't actually set the lock. FPByteRangeLock{,Ext} doesn't
+            # tell us what the specific range of the conflicting lock is, so
+            # we just won't change it (thus assuming it's the whole range).
+            # We don't actually know the PID either, but since it's not on
+            # this system anyway, it wouldn't really matter, so we'll just
+            # lie and say it's us holding it.
+            $$lkparms{'l_pid'} = $$;
+            return 0;
+        }
+        return -&ENOLCK if $rc == kFPNoMoreLocks;
+        return -&EBADF  if $rc != kFPNoErr;
+
+        # Unlock the speculative lock.
+        ($rc, $rstart) = $$self{'LockFn'}(
+                                $self,
+                                'Flags'         => kFPLockUnlockFlag | $flags,
+                                'OForkRefNum'   => $fh,
+                                'Offset'        => $lkparms->{'l_start'},
+                                'Length'        => $lkparms->{'l_len'},
+                              );
+        
+        $lkparms->{'l_type'} = F_UNLCK;
+        return 0;
+    }
+} # }}}1
+
+sub utimens { # {{{1
+    my ($self, $file, $actime, $modtime) = @_;
+    print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n";
+#            if defined $::_DEBUG;
+    
+    # Mostly to test that things work. AFP doesn't really support sub-second
+    # time resolution anyway.
+    return $self->utime($file, $actime, $modtime);
+} # }}}1
+
+sub bmap { # {{{1
+    my ($self, $file, $blksz, $blkno) = @_;
+    print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
+
+    # This is not a local filesystem that lives on a block device, so bmap()
+    # is nonsensical.
+    return -&ENOSYS;
+} # }}}1
+
 
 # misc. helper functions below:
 
 sub lookup_afp_entry { # {{{1
-    my ($self, $fileName, $deleteEntry) = @_;
+    my ($self, $fileName) = @_;
 
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
