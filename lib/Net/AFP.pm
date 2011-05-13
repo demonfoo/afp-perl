@@ -15,6 +15,7 @@ use Net::AFP::ExtAttrs;
 use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 use Net::AFP::MapParms;
+use Net::AFP::Versions;
 use Encode;
 use Unicode::Normalize qw(compose decompose);
 use Exporter qw(import);
@@ -874,7 +875,7 @@ sub FPByteRangeLockExt { # {{{1
     croak('Length must be provided')
             unless exists $options{'Length'};
 
-    my $msg = pack('CCnNNNN', kFPByteRangeLock,
+    my $msg = pack('CCnNNNN', kFPByteRangeLockExt,
             @options{'Flags', 'OForkRefNum'},
             ll_convert($options{'Offset'}),
             ll_convert($options{'Length'}));
@@ -3766,15 +3767,24 @@ sub FPGetUserInfo { # {{{1
     my $offset = 2;
     ${$resp_r} = {};
     if ($rbmp & 0x1) { # Get User ID bit
-        ${$resp_r}{'UserID'} = unpack('x[' . $offset . ']N', $resp);
+        ${$resp_r}->{'UserID'} = unpack('x[' . $offset . ']N', $resp);
         $offset += 4;
     }
     if ($rbmp & 0x2) {
-        ${$resp_r}{'PrimaryGroupID'} = unpack('x[' . $offset . ']N', $resp);
-        $offset += 4;
+        if (Net::AFP::Versions::CompareByVersionNum($self, 2, 1,
+                kFPVerAtLeast)) {
+            if (exists ${$resp_r}->{'UserID'}) {
+                ${$resp_r}->{'PrimaryGroupID'} = ${$resp_r}->{'UserID'};
+            }
+        }
+        else {
+            ${$resp_r}->{'PrimaryGroupID'} =
+                    unpack('x[' . $offset . ']N', $resp);
+            $offset += 4;
+        }
     }
     if ($rbmp & 0x4) {
-        ${$resp_r}{'UUID'} = uuid_unpack(unpack('x['.$offset.']a[16]', $resp));
+        ${$resp_r}->{'UUID'} = uuid_unpack(unpack('x['.$offset.']a[16]', $resp));
         $offset += 16;
     }
 
