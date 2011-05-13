@@ -108,7 +108,7 @@ use constant kNoNetworkUserIDs          => 0x0080;  # AFP 3.1
 If set, directories inherit default privileges from the parent directory.
 
 =cut
-use constant kDefaultPrivsFromParent    => 0x0100;  # AFP 3.1
+use constant kDefaultPrivsFromParent    => 0x0100;  # AFP 3.1+ (10.3)
 =item kNoExchangeFiles
 
 If set, exchange files is not supported.
