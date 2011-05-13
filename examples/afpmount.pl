@@ -191,6 +191,11 @@ unless (-d $mountpoint) {
     exit(&ENOTDIR); 
 }
 
+my %options;
+if ($options) {
+    %options = map { my($o, $v) = split(/=/, $_); $o, $v } split(/,/, $options);
+}
+
 # make the parent process into a really simple rpc server that handles
 # messages from the actual client process (which will go into the
 # background), for things like getting the user's password.
@@ -211,7 +216,8 @@ if ($pid > 0) {
         if ($poll->events(\*CHILD) & POLLIN) {
             # process received message {{{2
             my $data = '';
-            sysread(CHILD, $data, MSGLEN);
+            my $len = sysread(CHILD, $data, MSGLEN);
+            last unless $len;
             my %msg;
             @msg{@msgfields} = unpack(MSGFORMAT, $data);
             my $payload;
@@ -297,7 +303,7 @@ eval {
                 $password = '';
             }
             return $password;
-        });
+        }, %options);
 } or do {
     # If an exception does happen, it's probably due to an invalid URL...
     print STDERR "Error while invoking Net::AFP::Fuse:\n", $@;
@@ -332,8 +338,30 @@ close(PARENT);
 my $script_name = $0;
 $0 = join(' ', $script_name, $path, $mountpoint);
 
-$fuse->main( 'mountpoint'   => $mountpoint,
-             'mountopts'    => 'allow_other,subtype=pafpfs,fsname=' . $path );
+# Fixed options that we always want passed...
+$options{'allow_other'} = undef;
+$options{'subtype'}     = 'pafpfs';
+$options{'fsname'}      = $path;
+
+my $debug;
+our $_DEBUG;
+
+if (exists $options{'debug'}) {
+    $debug = 1;
+    delete $options{'debug'};
+    $_DEBUG = 1;
+}
+
+my %mainopts = (
+                 'mountpoint' => $mountpoint,
+                 'mountopts'  => join(',', map { $_ . (defined($options{$_}) ? '=' . $options{$_} : '') } keys(%options) ),
+               );
+
+if ($debug) {
+    $mainopts{'debug'} = 1;
+}
+
+$fuse->main(%mainopts);
 
 # If we reach this point, the FUSE mountpoint has been released, so exit
 # quietly...
