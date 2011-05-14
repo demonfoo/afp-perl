@@ -1891,7 +1891,6 @@ sub access { # {{{1
 
 sub create { # {{{1
     my ($self, $file, $mode, $flags) = @_;
-    printf("called %s('\%s', \%o, \%d)\n", (caller(0))[3], $file, $mode, $flags);
     print 'called ', (caller(0))[3], "('", $file, "', ", $mode, ")\n"
             if defined $::_DEBUG;
 
