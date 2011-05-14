@@ -100,7 +100,8 @@ create a file in a directory.
 use constant KAUTH_VNODE_WRITE_DATA         => (1<<2);
 =item KAUTH_VNODE_ADD_FILE
 
-For a file, the same as KAUTH_VNODE_WRITE_DATA; the right to write to a file.
+For a directory, the same as KAUTH_VNODE_WRITE_DATA; the right to create
+a file in a directory.
 
 =cut
 use constant KAUTH_VNODE_ADD_FILE           => KAUTH_VNODE_WRITE_DATA;
@@ -112,7 +113,8 @@ Right to execute a program.
 use constant KAUTH_VNODE_EXECUTE            => (1<<3);
 =item KAUTH_VNODE_SEARCH
 
-Same as C<KAUTH_VNODE_EXECUTE>.
+For a directory, same as C<KAUTH_VNODE_EXECUTE> - the right to search
+the contents of a directory.
 
 =cut
 use constant KAUTH_VNODE_SEARCH             => KAUTH_VNODE_EXECUTE;
