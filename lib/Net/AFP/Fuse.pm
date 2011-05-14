@@ -110,7 +110,7 @@ internal use only, or for invocation by Fuse::Class.
 
 =over
 
-=item new( URL, PW_CB )
+=item new( URL, PW_CB, OPTIONS )
 
 =cut
 
@@ -831,10 +831,12 @@ sub rename { # {{{1
     return $rc if $rc != kFPNoErr;
     my $new_stat;
     ($rc, $new_stat) = $self->lookup_afp_entry($newXlated);
-    return $rc if $rc != kFPNoErr;
+    return $rc if $rc;
 
-    # FIXME: is this the right access check to request? I'm really not
-    # sure, but it seems to be the most sensible choice...
+    # FIXME: Actually this should probably be two access checks, either a
+    # KAUTH_VNODE_DELETE check on the file itself, or a
+    # KAUTH_VNODE_DELETE_CHILD check on the parent dir, and a
+    # KAUTH_VNODE_ADD_FILE check on the dest dir...
     if (defined $$self{'client_uuid'}) {
         $rc = $$self{'afpconn'}->FPAccess(
                 'VolumeID'      => $$self{'volID'},
@@ -843,6 +845,21 @@ sub rename { # {{{1
                 'ReqAccess'     => KAUTH_VNODE_DELETE,
                 'PathType'      => $$self{'pathType'},
                 'Pathname'      => $oldRealName);
+        return -&EACCES if $rc == kFPAccessDenied;
+        return -&ENOENT if $rc == kFPObjectNotFound;
+        return -&EBADF  if $rc != kFPNoErr;
+
+        my $np_stat;
+        ($rc, $np_stat) = $self->lookup_afp_entry(path_parent($newXlated));
+        return $rc if $rc;
+
+        $rc = $self->{'afpconn'}->FPAccess(
+                'VolumeID'      => $self->{'volID'},
+                'DirectoryID'   => $np_stat->{'NodeID'},
+                'UUID'          => $self->{'client_uuid'},
+                'ReqAccess'     => KAUTH_VNODE_ADD_FILE,
+                'PathType'      => $$self{'pathType'},
+                'Pathname'      => '');
         return -&EACCES if $rc == kFPAccessDenied;
         return -&ENOENT if $rc == kFPObjectNotFound;
         return -&EBADF  if $rc != kFPNoErr;
@@ -886,6 +903,8 @@ sub chmod { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
     
+    return -&EINVAL unless $$self{'volAttrs'} & kSupportsUnixPrivs;
+
     my $fileName = translate_path(decode(ENCODING, $file));
     my ($rc, $resp) = $self->lookup_afp_entry($fileName, 1);
     return $rc if $rc != kFPNoErr;
@@ -926,6 +945,8 @@ sub chown { # {{{1
     my ($self, $file, $uid, $gid) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    return -&EINVAL unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
     my $fileName = translate_path(decode(ENCODING, $file));
     my ($rc, $resp) = $self->lookup_afp_entry($fileName, 1);
@@ -1950,7 +1971,7 @@ sub fgetattr { # {{{1
     # and make an FPGetFileDirParms() call for it. Unfortunately most of the
     # info we want can't be got from FPGetForkParms(), so this is how it
     # has to be done.
-    my $bitmap = kFPParentDirIDBit | kFPUTF8NameBit;
+    my $bitmap = kFPParentDirIDBit | $self->{'pathFlag'};
     my $resp;
     my $rc = $$self{'afpconn'}->FPGetForkParms($fh, $bitmap, \$resp);
 
@@ -1969,7 +1990,7 @@ sub fgetattr { # {{{1
             'VolumeID'      => $$self{'volID'},
             'DirectoryID'   => $$resp{'ParentDirID'},
             'PathType'      => $$self{'pathType'},
-            'Pathname'      => $$resp{'UTF8Name'},
+            'Pathname'      => $$resp{$self->{'pathkey'}},
             'FileBitmap'    => $bitmap);
 
     return -&EBADF unless $rc == kFPNoErr;
@@ -2101,8 +2122,8 @@ sub lock { # {{{1
 
 sub utimens { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n";
-#            if defined $::_DEBUG;
+    print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
     
     # Mostly to test that things work. AFP doesn't really support sub-second
     # time resolution anyway.
@@ -2289,7 +2310,7 @@ sub urlencode { # {{{1
 
 This package derives from, and thus depends on, the Fuse::Class package.
 By proxy, it also depends on the Fuse package, specifically version
-0.09_5 or later, as it includes certain necessary fixes. The Net::AFP::TCP
+0.10_1 or later, as it includes certain necessary fixes. The Net::AFP::TCP
 and Net::AFP::Atalk packages are included in this code release.
 
 =head1 BUGS AND LIMITATIONS
