@@ -1966,6 +1966,8 @@ sub fgetattr { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    return $self->getattr($file);
+
     # Get the filename and parent dir ID from the server, so we can turn around
     # and make an FPGetFileDirParms() call for it. Unfortunately most of the
     # info we want can't be got from FPGetForkParms(), so this is how it
