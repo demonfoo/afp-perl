@@ -48,7 +48,7 @@ my $has_Data__UUID = 0;
 eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
 
 # Use a nice learge blocksize to require fewer transactions with the server.
-use constant IO_BLKSIZE       => 131072;
+use constant IO_BLKSIZE         => 131072;
 
 # What character encoding we should be pushing out to the virtual filesystem
 # for paths? This is it.
@@ -154,8 +154,8 @@ sub new { # {{{1
     my $selfinfo;
     $$obj{'afpconn'}->FPGetUserInfo(0x1, 0, 0x3, \$selfinfo);
     # This is sort of a hack. Seems that instead of returning '0' as the
-    # user ID from the FPGetUserInfo call, the AFP server tells us the
-    # user ID is 1. What is this crap. But anyway.
+    # user ID from the FPGetUserInfo call, the AirPort Disk AFP server
+    # tells us the user ID is 1. What is this crap. But anyway.
     if ($srvInfo->{'MachineType'} =~ m{^AirPort}) {
         $selfinfo->{'UserID'} = 0;
     }
@@ -678,7 +678,8 @@ sub unlink { # {{{1
         # HACK ALERT: Seems FPAccess() always follows links, so I can't
         # remove a dead symlink because the FPAccess() call always fails.
         # This works around that, but it's probably not the best solution.
-        return -&EBADF  if $rc != kFPNoErr and $rc != kFPObjectNotFound;
+        return -&EBADF  if $rc != kFPNoErr and $rc != kFPObjectNotFound
+                and $rc != kFPParamErr;
     }
 
     # don't have to worry about checking to ensure we're 'rm'ing a file;
@@ -881,7 +882,6 @@ sub rename { # {{{1
                 $$self{'pathType'}, $newRealName);
         $rc = $$self{'afpconn'}->FPMoveAndRename(%arglist);
     }
-    print "FPMoveAndRename returned $rc\n";
     return -&EACCES if $rc == kFPAccessDenied;
     return -&EINVAL if $rc == kFPCantMove;
     return -&EBUSY  if $rc == kFPObjectLocked;
@@ -1966,7 +1966,12 @@ sub fgetattr { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
-    return $self->getattr($file);
+    if ($file && $file ne '-') {
+        # If the path is provided, just use that to call out to getattr().
+        # Should be sufficient most of the time, and it seems Jaffer is
+        # too retarded to properly return any info via FPGetForkParms().
+        return $self->getattr($file);
+    }
 
     # Get the filename and parent dir ID from the server, so we can turn around
     # and make an FPGetFileDirParms() call for it. Unfortunately most of the
@@ -2040,8 +2045,8 @@ sub fgetattr { # {{{1
 
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
-    print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n";
-#            if defined $::_DEBUG;
+    print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n"
+            if defined $::_DEBUG;
 
     my($rc, $rstart);
     if ($$lkparms{'l_whence'} == SEEK_CUR) {
