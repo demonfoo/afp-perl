@@ -69,7 +69,7 @@ Options:
     -i|--interactive
         Mount interactively; if a password is required, prompt for it.
     -o|--options [options]
-        Pass mount options; currently accepted but not used.
+        Pass mount options, comma separated, like mount(8).
     -h|--help
         This help summary.
     --list-servers
