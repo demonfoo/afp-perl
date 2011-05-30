@@ -36,6 +36,7 @@ use Data::Dumper;               # for diagnostic output when debugging is on
 use Fuse qw(:all);              # Still need this for extended attribute
                                 # related macros.
 use POSIX;                      # Standard error codes, access() modes, etc.
+use Time::HiRes qw(gettimeofday);
 
 # FreeBSD oh-so-handily names this error code differently, so I'm going
 # to cheat just slightly...
@@ -149,7 +150,17 @@ sub new { # {{{1
         $obj->disconnect();
         return EACCES;
     }
-    $$obj{'timedelta'} = time() - $$srvParms{'ServerTime'};
+
+    # This is a bit hackish, but it seems to be the best way to make sure
+    # that times are (most likely) consistent across mount sessions. Round
+    # to the nearest half-hour.
+    my $delta = time() - $$srvParms{'ServerTime'};
+    my $neg = $delta < 0;
+    $delta = abs($delta) / 1800.0;
+    $delta = ($delta - int($delta) >= 0.5) ? ceil($delta) : floor($delta);
+    $delta *= 1800;
+    if ($neg) { $delta *= -1; }
+    $$obj{'timedelta'} = $delta;
 
     my $selfinfo;
     $$obj{'afpconn'}->FPGetUserInfo(0x1, 0, 0x3, \$selfinfo);
@@ -343,6 +354,17 @@ sub new { # {{{1
     $_[1] = $scrubbed_url;
     # }}}2
 
+    $$obj{'callcount'} = {};
+    $$obj{'metrics'} = {
+                         'wr_maxsize'   => 0,
+                         'wr_minsize'   => 2 ** 31,
+                         'wr_totalsz'   => 0,
+                         'wr_count'     => 0,
+                         'wr_totaltime' => 0,
+                         'wr_maxtime'   => 0,
+                         'wr_mintime'   => 2 ** 31,
+                       };
+
     return $obj;
 } # }}}1
 
@@ -364,8 +386,42 @@ sub getattr { # {{{1
     my ($self, $file) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+    
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
+    if ($file eq '/._metrics') {
+        my $timest = time();
+        my @stat = (
+            # device number (just make it 0, since it's not a real device)
+            0,
+            # inode number (node ID works fine)
+            0,
+            # permission mask
+            0100444,
+            # link count
+            1,
+            # UID number
+            0,
+            # GID number
+            0,
+            # device special major/minor number
+            0,
+            # file size in bytes
+            4096,
+            # last accessed time
+            $timest,
+            # data modified time
+            $timest,
+            # inode changed time
+            $timest,
+            # preferred block size
+            IO_BLKSIZE,
+            # size in blocks
+            1
+        ); # }}}2
+        return @stat;
+    }
     my $fileName = translate_path($file);
 
     my ($rc, $resp) = $self->lookup_afp_entry($fileName);
@@ -425,6 +481,8 @@ sub readlink { # {{{1
     my ($self, $file) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     # Classic MacOS' concept of an "alias", so far as I can tell, doesn't
     # really translate to the UNIX concept of a symlink; I might be able
@@ -492,9 +550,15 @@ sub getdir { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     $dirname = decode(ENCODING, $dirname);
     my $fileName = translate_path($dirname);
     my @filesList = ('.', '..');
+
+    if ($dirname eq '/') {
+        push(@filesList, '._metrics');
+    }
 
     if (defined $$self{'client_uuid'}) {
         my $rc = $$self{'afpconn'}->FPAccess(
@@ -573,6 +637,8 @@ sub mknod { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     my $file_n = $file;
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
@@ -619,6 +685,8 @@ sub mkdir { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
 
@@ -658,6 +726,8 @@ sub unlink { # {{{1
 
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
@@ -710,6 +780,8 @@ sub symlink { # {{{1
     my ($self, $target, $linkname) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     return -&EPERM unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
@@ -814,6 +886,8 @@ sub rename { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     $oldName = decode(ENCODING, $oldName);
     $newName = decode(ENCODING, $newName);
     my @elems = split(/\//, $newName);
@@ -895,6 +969,9 @@ sub rename { # {{{1
 sub link { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    #$$self{'callcount'}{(caller(0))[3]}++;
+
     return -&EOPNOTSUPP;
 } # }}}1
 
@@ -903,6 +980,8 @@ sub chmod { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
     
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     return -&EINVAL unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
     my $fileName = translate_path(decode(ENCODING, $file));
@@ -945,6 +1024,8 @@ sub chown { # {{{1
     my ($self, $file, $uid, $gid) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     return -&EINVAL unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
@@ -997,6 +1078,8 @@ sub truncate { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
 
@@ -1048,6 +1131,8 @@ sub utime { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
 
@@ -1073,7 +1158,15 @@ sub open { # {{{1
     print 'called ', (caller(0))[3], "('", $file, "', ", $mode, ")\n"
             if defined $::_DEBUG;
 
-    my $fileName = translate_path(decode(ENCODING, $file));
+    $$self{'callcount'}{(caller(0))[3]}++;
+
+    $file = decode(ENCODING, $file);
+    if ($file eq '/._metrics') {
+        my $data = $self->generate_metrics_data();
+        return(0, \$data);
+    }
+
+    my $fileName = translate_path($file);
 
     my $accmode = $mode & O_ACCMODE;
     if (defined $$self{'client_uuid'}) {
@@ -1138,6 +1231,12 @@ sub read { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
+    if (ref($fh)) {
+        return substr($$fh, $off, $len);
+    }
+
     my($rc, $resp) = &{$$self{'ReadFn'}}($$self{'afpconn'},
             'OForkRefNum'   => $fh,
             'Offset'        => $off,
@@ -1156,24 +1255,54 @@ sub write { # {{{1
     print 'called ', (caller(0))[3], "('", $file, "', [data], ", $offset, ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
+    if (ref($fh)) {
+        return -&EBADF;
+    }
+
+    my $ts_start = gettimeofday();
     my($rc, $lastWritten) = &{$$self{'WriteFn'}}($$self{'afpconn'},
             'OForkRefNum'   => $fh,
             'Offset'        => $offset,
             'ReqCount'      => length($$data_r),
             'ForkData'      => $data_r);
+    my $wr_time = gettimeofday() - $ts_start;
+
+    return -&EACCES     if $rc == kFPAccessDenied;
+    return -&ENOSPC     if $rc == kFPDiskFull;
+    return -&ETXTBSY    if $rc == kFPLockErr;
+    return -&EINVAL     if $rc == kFPParamErr;
+    return -&EBADF      if $rc != kFPNoErr;
+
+    $self->{'metrics'}->{'wr_totaltime'} += $wr_time;
+    $self->{'metrics'}->{'wr_count'}++;
+    if ($wr_time > $self->{'metrics'}->{'wr_maxtime'}) {
+        $self->{'metrics'}->{'wr_maxtime'} = $wr_time;
+    }
+    if ($wr_time < $self->{'metrics'}->{'wr_mintime'}) {
+        $self->{'metrics'}->{'wr_mintime'} = $wr_time;
+    }
     
-    return($lastWritten - $offset) if $rc == kFPNoErr;
-    return -&EACCES      if $rc == kFPAccessDenied;
-    return -&ENOSPC      if $rc == kFPDiskFull;
-    return -&ETXTBSY     if $rc == kFPLockErr;
-    return -&EINVAL      if $rc == kFPParamErr;
-    return -&EBADF;
+    my $wr_size = $lastWritten - $offset;
+    $self->{'metrics'}->{'wr_totalsz'} += $wr_size;
+    if ($wr_size > $self->{'metrics'}->{'wr_maxsize'}) {
+        $self->{'metrics'}->{'wr_maxsize'} = $wr_size;
+    }
+    if ($wr_size < $self->{'metrics'}->{'wr_minsize'}) {
+        $self->{'metrics'}->{'wr_minsize'} = $wr_size;
+    }
+
+    return $wr_size;
 } # }}}1
 
 sub statfs { # {{{1
     my ($self) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     my $VolBitmap;
     my $bf_key;
     my $bt_key;
@@ -1217,6 +1346,12 @@ sub flush { # {{{1
     print 'called ', (caller(0))[3], "('", $file, "')\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
+    if (ref($fh)) {
+        return 0;
+    }
+
     my $rc = $$self{'afpconn'}->FPFlushFork($fh);
 
     return -&EBADF if $rc != kFPNoErr;
@@ -1228,6 +1363,12 @@ sub release { # {{{1
     print 'called ', (caller(0))[3], "('", $file, "', ", $mode, ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
+    if (ref($fh)) {
+        return 0;
+    }
+
     $$self{'afpconn'}->FPCloseFork($fh);
     return 0;
 } # }}}1
@@ -1236,6 +1377,12 @@ sub fsync { # {{{1
     my ($self, $file, $flags, $fh) = @_;
     print 'called ', (caller(0))[3], "('", $file, "')\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
+
+    if (ref($fh)) {
+        return 0;
+    }
 
     if (!$flags) {
         return $self->flush($file, $fh);
@@ -1247,6 +1394,8 @@ sub setxattr { # {{{1
     my ($self, $file, $attr, $value, $flags) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
@@ -1387,6 +1536,8 @@ sub getxattr { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
     $attr = decode(ENCODING, $attr);
@@ -1488,6 +1639,8 @@ sub listxattr { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     return -&EOPNOTSUPP unless $$self{'volAttrs'} & kSupportsExtAttrs;
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
@@ -1578,6 +1731,8 @@ sub removexattr { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
     $attr = decode(ENCODING, $attr);
@@ -1661,6 +1816,8 @@ sub opendir { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     $dirname = decode(ENCODING, $dirname);
     my $fileName = translate_path($dirname);
 
@@ -1687,99 +1844,44 @@ sub readdir { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
-    $dirname = decode(ENCODING, $dirname);
-    my $fileName = translate_path($dirname);
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     my @filesList;
 
     # Set the result set size limit; if there are more entries in the
     # directory, extra requests will have to be sent. Larger set sizes
     # mean less time spent waiting around for responses.
-    my $entrycount = 100;
-
-    # Avoid some extra dereferencing by getting the hash refs into local
-    # variables.
-    my $uidmap = $$self{'uidmap'};
-    my $gidmap = $$self{'gidmap'};
+    my $entrycount = 50;
 
     # Add '.' and '..' entries {{{2
     if (!$offset) {
         # If offset is 0, this is the first request, so '.' and '..' should
         # definitely be passed
-        my($rc, $cdir, $pdir);
-        # Push an entry for '.' (current dir)
-        ($rc, $cdir) = $self->lookup_afp_entry($fileName);
-
-        my $cdir_uid = exists($$cdir{'UnixUID'}) ? $$cdir{'UnixUID'} : 0;
-        if (exists $uidmap->{$cdir_uid}) {
-            $cdir_uid = $uidmap->{$cdir_uid};
-        }
-
-        my $cdir_gid = exists($$cdir{'UnixGID'}) ? $$cdir{'UnixGID'} : 0;
-        if (exists $gidmap->{$cdir_gid}) {
-            $cdir_gid = $gidmap->{$cdir_gid};
-        }
-
-        my $stat = [ 0, $$cdir{'NodeID'}, 
-                     exists($$cdir{'UnixPerms'}) ? $$cdir{'UnixPerms'} : 040755,
-                     $$cdir{'OffspringCount'} + 2,
-                     $cdir_uid,
-                     $cdir_gid,
-                     0, 4096,
-                     $$cdir{'ModDate'} + $$self{'timedelta'},
-                     $$cdir{'ModDate'} + $$self{'timedelta'},
-                     $$cdir{'ModDate'} + $$self{'timedelta'},
-                     IO_BLKSIZE, 1 ];
-        push(@filesList, [++$offset, '.', $stat]);
-
-        # Push an entry for '..' (parent dir)
-        ($rc, $pdir) = $self->lookup_afp_entry(path_parent($fileName));
-
-        my $pdir_uid = exists($$pdir{'UnixUID'}) ? $$pdir{'UnixUID'} : 0;
-        if (exists $uidmap->{$pdir_uid}) {
-            $pdir_uid = $uidmap->{$pdir_uid};
-        }
-
-        my $pdir_gid = exists($$pdir{'UnixGID'}) ? $$pdir{'UnixGID'} : 0;
-        if (exists $gidmap->{$pdir_gid}) {
-            $pdir_gid = $gidmap->{$pdir_gid};
-        }
-
-        $stat = [ 0, $$pdir{'NodeID'}, 
-                  exists($$pdir{'UnixPerms'}) ? $$pdir{'UnixPerms'} : 040755,
-                  $$pdir{'OffspringCount'} + 2,
-                  $pdir_uid,
-                  $pdir_gid,
-                  0, 4096,
-                  $$pdir{'ModDate'} + $$self{'timedelta'},
-                  $$pdir{'ModDate'} + $$self{'timedelta'},
-                  $$pdir{'ModDate'} + $$self{'timedelta'},
-                  IO_BLKSIZE, 1 ];
-        push(@filesList, [++$offset, '..', $stat]);
+        push(@filesList, [++$offset, '.'], [++$offset, '..']);
         $entrycount -= 2;
+
+        if ($dirname eq '/') {
+            push(@filesList, [++$offset, '._metrics']);
+        }
     } # }}}2
 
     my $resp;
-    my $fileBitmap = $$self{'pathFlag'} | kFPModDateBit | kFPNodeIDBit |
-                     kFPParentDirIDBit | $$self{'DForkLenFlag'};
-    my $dirBitmap = $$self{'pathFlag'} | kFPModDateBit | kFPNodeIDBit |
-                    kFPOffspringCountBit | kFPParentDirIDBit;
-    if ($$self{'volAttrs'} & kSupportsUnixPrivs) {
-        $fileBitmap |= kFPUnixPrivsBit;
-        $dirBitmap |= kFPUnixPrivsBit;
-    }
+    my $bitmap = $$self{'pathFlag'};
 
+    my $delta = 1;
+    if ($dirname eq '/') { $delta++; }
     # Request entry list from server {{{2
-    my %arglist = ( 'VolumeID'          => $$self{'volID'},
+    my $rc = &{$$self{'EnumFn'}}($$self{'afpconn'},
+                    'VolumeID'          => $$self{'volID'},
                     'DirectoryID'       => $dh,
-                    'FileBitmap'        => $fileBitmap,
-                    'DirectoryBitmap'   => $dirBitmap,
+                    'FileBitmap'        => $bitmap,
+                    'DirectoryBitmap'   => $bitmap,
                     'ReqCount'          => $entrycount,
-                    'StartIndex'        => $offset - 1,
+                    'StartIndex'        => $offset - $delta,
                     'MaxReplySize'      => 32767,
                     'PathType'          => $$self{'pathType'},
                     'Pathname'          => '',
                     'Entries_ref'       => \$resp);
-    my $rc = &{$$self{'EnumFn'}}($$self{'afpconn'}, %arglist);
 
     return -&EACCES  if $rc == kFPAccessDenied;
     return -&ENOENT  if $rc == kFPDirNotFound;
@@ -1789,38 +1891,11 @@ sub readdir { # {{{1
     # }}}2
 
     # Process entries {{{2
-    foreach my $elem (@$resp) {
-        my $name = $$elem{$$self{'pathkey'}};
-        $name =~ tr|/|:|;
-
-        my $uid = exists($$elem{'UnixUID'}) ? $$elem{'UnixUID'} : 0;
-        if (exists $uidmap->{$uid}) {
-            $uid = $uidmap->{$uid};
-        }
-
-        my $gid = exists($$elem{'UnixGID'}) ? $$elem{'UnixGID'} : 0;
-        if (exists $gidmap->{$gid}) {
-            $gid = $gidmap->{$gid};
-        }
-
-        my $stat = [
-                     0,
-                     $$elem{'NodeID'},
-                     exists($$elem{'UnixPerms'}) ? $$elem{'UnixPerms'} :
-                            ($$elem{'FileIsDir'} ? 040755 : 0100644),
-                     $$elem{'FileIsDir'} ? $$elem{'OffspringCount'} + 2 : 1,
-                     $uid, $gid, 0,
-                     $$elem{'FileIsDir'} ? 4096 : $$elem{$$self{'DForkLenKey'}},
-                     $$elem{'ModDate'} + $$self{'timedelta'},
-                     $$elem{'ModDate'} + $$self{'timedelta'},
-                     $$elem{'ModDate'} + $$self{'timedelta'},
-                     IO_BLKSIZE,
-                     $$elem{'FileIsDir'} ? 1 :
-                            int(($$elem{$$self{'DForkLenKey'}} - 1) / 512) + 1
-                   ];
-                     
-        push(@filesList, [++$offset, encode(ENCODING, $name), $stat]);
-    } # }}}2
+    my $name;
+    push(@filesList, map {
+            ($name = $_->{$self->{'pathkey'}}) =~ tr{/}{:};
+            [++$offset, encode(ENCODING, $name)]; } @$resp);
+    # }}}2
 
     return(@filesList, 0);
 } # }}}1
@@ -1829,6 +1904,8 @@ sub releasedir { # {{{1
     my ($self, $dirname, $dh) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     # Not really anything to do; mostly just here to complement opendir().
 
@@ -1839,6 +1916,8 @@ sub fsyncdir { # {{{1
     my ($self, $dirname, $flags, $dh) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     if (!$flags) {
         my $rc = $self->FPSyncDir($$self{'volID'}, $dh);
@@ -1854,6 +1933,8 @@ sub access { # {{{1
     my ($self, $file, $mode) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
     my $fileName = translate_path($file);
@@ -1893,6 +1974,8 @@ sub create { # {{{1
     my ($self, $file, $mode, $flags) = @_;
     print 'called ', (caller(0))[3], "('", $file, "', ", $mode, ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
 
     my $file_n = $file;
     $file = decode(ENCODING, $file);
@@ -1949,6 +2032,12 @@ sub ftruncate { # {{{1
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
+    if (ref($fh)) {
+        return -&EBADF;
+    }
+
     my $rc = $$self{'afpconn'}->FPSetForkParms($fh,
             $$self{'DForkLenFlag'}, $length);
     
@@ -1965,6 +2054,41 @@ sub fgetattr { # {{{1
     my ($self, $file, $fh) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
+
+    if (ref($fh)) {
+        my $timest = time();
+        my @stat = (
+            # device number (just make it 0, since it's not a real device)
+            0,
+            # inode number (node ID works fine)
+            0,
+            # permission mask
+            0100444,
+            # link count
+            1,
+            # UID number
+            0,
+            # GID number
+            0,
+            # device special major/minor number
+            0,
+            # file size in bytes
+            length($$fh),
+            # last accessed time
+            $timest,
+            # data modified time
+            $timest,
+            # inode changed time
+            $timest,
+            # preferred block size
+            IO_BLKSIZE,
+            # size in blocks
+            1
+        ); # }}}2
+        return(@stat)
+    }
 
     if ($file && $file ne '-') {
         # If the path is provided, just use that to call out to getattr().
@@ -2047,6 +2171,12 @@ sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
     print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n"
             if defined $::_DEBUG;
+
+    $$self{'callcount'}{(caller(0))[3]}++;
+
+    if (ref($fh)) {
+        return -&EOPNOTSUPP;
+    }
 
     my($rc, $rstart);
     if ($$lkparms{'l_whence'} == SEEK_CUR) {
@@ -2131,6 +2261,8 @@ sub utimens { # {{{1
     print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n"
             if defined $::_DEBUG;
     
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     # Mostly to test that things work. AFP doesn't really support sub-second
     # time resolution anyway.
     return $self->utime($file, $actime, $modtime);
@@ -2141,6 +2273,8 @@ sub bmap { # {{{1
     print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
+    $$self{'callcount'}{(caller(0))[3]}++;
+
     # This is not a local filesystem that lives on a block device, so bmap()
     # is nonsensical.
     return -&ENOSYS;
@@ -2148,6 +2282,39 @@ sub bmap { # {{{1
 
 
 # misc. helper functions below:
+
+sub generate_metrics_data { # {{{1
+    my ($self) = @_;
+
+    my $data = __PACKAGE__ . " collected client statistics\n\n";
+
+    $data .= "FUSE API version " . Fuse::fuse_version() . "\n";
+    $data .= "Net::AFP version " . $Net::AFP::VERSION . "\n";
+    $data .= "Calls made:\n\n";
+
+    my $callcount = $$self{'callcount'};
+    foreach my $key (sort {$a cmp $b} keys %$callcount) {
+        $data .= (split(/::/, $key))[-1] . ":\t" . $callcount->{$key} . "\n";
+    }
+
+    $data .= "\n";
+
+    $data .= "Average write size:\t";
+    if ($self->{'metrics'}->{'wr_count'}) {
+        $data .= int($self->{'metrics'}->{'wr_totalsz'} / $self->{'metrics'}->{'wr_count'});
+    }
+    else {
+        $data .= "0";
+    }
+    $data .= " bytes\n";
+    $data .= "Largest write size:\t" . $self->{'metrics'}->{'wr_maxsize'} . " bytes\n";
+    $data .= "Smallest write size:\t" . $self->{'metrics'}->{'wr_minsize'} . " bytes\n";
+    $data .= sprintf("Average write time:\t\%.3f seconds\n", $self->{'metrics'}->{'wr_count'} ? ($self->{'metrics'}->{'wr_totaltime'} / $self->{'metrics'}->{'wr_count'}) : 0);
+    $data .= sprintf("Longest write time:\t\%.3f seconds\n", $self->{'metrics'}->{'wr_maxtime'});
+    $data .= sprintf("Shortest write time:\t\%.3f seconds\n", $self->{'metrics'}->{'wr_mintime'});
+
+    return $data;
+} # }}}1
 
 sub lookup_afp_entry { # {{{1
     my ($self, $fileName) = @_;
