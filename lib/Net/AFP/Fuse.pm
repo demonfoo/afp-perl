@@ -171,6 +171,10 @@ sub new { # {{{1
         $selfinfo->{'UserID'} = 0;
     }
     
+    # FIXME: Should probably do the same for user/group UUIDs; get our
+    # UID and GID (or the supplied ones), resolve to names, and prepopulate
+    # override maps with the UUIDs that belong to the user we're attached
+    # to the server as...
     my $uidmap = {};
     $$uidmap{$$selfinfo{'UserID'}} = $<;
     if (exists $opts{'uid'}) {
@@ -864,7 +868,7 @@ sub symlink { # {{{1
 
     # apparently this is the magic to transmute a file into a symlink...
     $rc = $$self{'afpconn'}->FPSetFileParms(
-            'VolumeID'      =>$$self{'volID'},
+            'VolumeID'      => $$self{'volID'},
             'DirectoryID'   => $$self{'topDirID'},
             'Bitmap'        => $bitmap,
             'PathType'      => $$self{'pathType'},
@@ -933,7 +937,7 @@ sub rename { # {{{1
                 'DirectoryID'   => $np_stat->{'NodeID'},
                 'UUID'          => $self->{'client_uuid'},
                 'ReqAccess'     => KAUTH_VNODE_ADD_FILE,
-                'PathType'      => $$self{'pathType'},
+                'PathType'      => $self->{'pathType'},
                 'Pathname'      => '');
         return -&EACCES if $rc == kFPAccessDenied;
         return -&ENOENT if $rc == kFPObjectNotFound;
@@ -1482,9 +1486,65 @@ sub setxattr { # {{{1
         return 0;
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ /^user\./) {
-        $attr =~ s/^user\.//;
+    elsif ($attr =~ /^user\./ || $^O eq 'darwin') {
+        if ($^O ne 'darwin') {
+            $attr =~ s/^user\.//;
+        }
 
+        if ($attr eq 'com.apple.FinderInfo') {
+            # FIXME: Check and handle XATTR_{CREATE,REPLACE} for these
+            # magic attributes.
+            my $rc = $self->{'afpconn'}->FPSetFileDirParms(
+                    'VolumeID'          => $self->{'volID'},
+                    'DirectoryID'       => $self->{'topDirID'},
+                    'Bitmap'            => kFPFinderInfoBit,
+                    'FinderInfo'        => $value,
+                    'PathType'          => $self->{'pathType'},
+                    'Pathname'          => $fileName);
+            return -&EPERM  if $rc == kFPAccessDenied;
+            return -&ENOENT if $rc == kFPObjectNotFound;
+            return -&EINVAL if $rc == kFPParamErr;
+            return -&EROFS  if $rc == kFPVolLocked;
+            return 0;        
+        }
+        elsif ($attr eq 'com.apple.ResourceFork') {
+            my ($rc, %resp) = $self->{'afpconn'}->FPOpenFork(
+                    'VolumeID'      => $self->{'volID'},
+                    'DirectoryID'   => $self->{'topDirID'},
+                    'AccessMode'    => 0x3,
+                    'Flag'          => 0x80,
+                    'PathType'      => $self->{'pathType'},
+                    'Pathname'      => $fileName);
+            return -&EACCES if $rc == kFPAccessDenied;
+            return -&ENOENT if $rc == kFPObjectNotFound;
+            return -&EINVAL if $rc == kFPParamErr;
+            return -&EMFILE if $rc == kFPTooManyFilesOpen;
+            return -&EBADF  if $rc != kFPNoErr;
+
+            $rc = $self->{'afpconn'}->FPSetForkParms($resp{'OForkRefNum'},
+                    $self->{'RForkLenFlag'}, 0);
+            return -&EPERM  if $rc == kFPAccessDenied;
+            return -&ENOSPC if $rc == kFPDiskFull;
+            return -&EPERM  if $rc == kFPLockErr;
+            return -&EINVAL if $rc == kFPParamErr;
+            return -&EROFS  if $rc == kFPVolLocked;
+            return -&EBADF  if $rc != kFPNoErr;
+
+            $rc = &{$self->{'WriteFn'}}($self->{'afpconn'},
+                    'OForkRefNum'   => $resp{'OForkRefNum'},
+                    'Offset'        => 0,
+                    'ReqCount'      => length($value),
+                    'ForkData'      => \$value);
+            return -&EACCES  if $rc == kFPAccessDenied;
+            return -&ENOSPC  if $rc == kFPDiskFull;
+            return -&ETXTBSY if $rc == kFPLockErr;
+            return -&EINVAL  if $rc == kFPParamErr;
+            return -&EBADF   if $rc != kFPNoErr;
+
+            $self->{'afpconn'}->FPCloseFork($resp{'OForkRefNum'});
+
+            return 0;
+        }
         return -&EOPNOTSUPP unless $$self{'volAttrs'} & kSupportsExtAttrs;
 
         if (defined $$self{'client_uuid'}) {
@@ -1586,9 +1646,65 @@ sub getxattr { # {{{1
         }
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ /^user\./) {
-        $attr =~ s/^user\.//;
+    elsif ($attr =~ /^user\./ || $^O eq 'darwin') {
+        if ($^O ne 'darwin') {
+            $attr =~ s/^user\.//;
+        }
 
+        if ($attr eq 'com.apple.FinderInfo') {
+            my($rc, $resp) = $self->{'afpconn'}->FPGetFileDirParms(
+                    'VolumeID'          => $self->{'volID'},
+                    'DirectoryID'       => $self->{'topDirID'},
+                    'FileBitmap'        => kFPFinderInfoBit,
+                    'DirectoryBitmap'   => kFPFinderInfoBit,
+                    'PathType'          => $self->{'pathType'},
+                    'Pathname'          => $fileName);
+            return -&EPERM   if $rc == kFPAccessDenied;
+            return -&ENOENT  if $rc == kFPObjectNotFound;
+            return -&EBADF   if $rc != kFPNoErr;
+            return "\0" x 32 unless exists $resp->{'FinderInfo'};
+            my $finfo = $resp->{'FinderInfo'};
+            $finfo .= "\0" x (32 - length($finfo));
+            return $resp->{'FinderInfo'};
+        }
+        elsif ($attr eq 'com.apple.ResourceFork') {
+            my($rc, $resp) = $self->{'afpconn'}->FPGetFileParms(
+                    'VolumeID'          => $self->{'volID'},
+                    'DirectoryID'       => $self->{'topDirID'},
+                    'Bitmap'            => $self->{'RForkLenFlag'},
+                    'PathType'          => $self->{'pathType'},
+                    'Pathname'          => $fileName);
+            return -&EPERM   if $rc == kFPAccessDenied;
+            return -&ENOENT  if $rc == kFPObjectNotFound;
+            return -&EBADF   if $rc != kFPNoErr;
+            my $rforklen = $resp->{$self->{'RForkLenKey'}};
+
+            my %resp;
+            ($rc, %resp) = $self->{'afpconn'}->FPOpenFork(
+                    'VolumeID'      => $self->{'volID'},
+                    'DirectoryID'   => $self->{'topDirID'},
+                    'AccessMode'    => 0x1,
+                    'Flag'          => 0x80,
+                    'PathType'      => $self->{'pathType'},
+                    'Pathname'      => $fileName);
+            return -&EACCES if $rc == kFPAccessDenied;
+            return -&ENOENT if $rc == kFPObjectNotFound;
+            return -&EINVAL if $rc == kFPParamErr;
+            return -&EMFILE if $rc == kFPTooManyFilesOpen;
+            return -&EBADF  if $rc != kFPNoErr;
+
+            my $readText;
+            ($rc, $readText) = &{$$self{'ReadFn'}}($self->{'afpconn'},
+                    'OForkRefNum'   => $resp{'OForkRefNum'},
+                    'Offset'        => 0,
+                    'ReqCount'      => $rforklen);
+            return -&EACCES if $rc == kFPAccessDenied;
+            return -&EINVAL unless $rc == kFPNoErr or $rc == kFPEOFErr;
+
+            $self->{'afpconn'}->FPCloseFork($resp{'OForkRefNum'});
+
+            return $readText;
+        }
         return -&EOPNOTSUPP unless $$self{'volAttrs'} & kSupportsExtAttrs;
 
         if (defined $$self{'client_uuid'}) {
@@ -1599,8 +1715,8 @@ sub getxattr { # {{{1
                     'ReqAccess'     => KAUTH_VNODE_READ_EXTATTRIBUTES,
                     'PathType'      => $$self{'pathType'},
                     'Pathname'      => $fileName);
-            return -&ENODATA if $rc == kFPAccessDenied;
-            return -&ENODATA if $rc == kFPObjectNotFound;
+            return -&EPERM   if $rc == kFPAccessDenied;
+            return -&ENOENT  if $rc == kFPObjectNotFound;
             return -&EBADF   if $rc != kFPNoErr;
         }
 
@@ -1614,10 +1730,10 @@ sub getxattr { # {{{1
 
         # Ask the server for the length of the extended attribute data.
         my($rc, %resp) = $$self{'afpconn'}->FPGetExtAttr(%xaopts);
-        return -&ENODATA if $rc == kFPAccessDenied;
-        return -&ENODATA if $rc == kFPObjectNotFound;
+        return -&EPERM   if $rc == kFPAccessDenied;
+        return -&ENOENT  if $rc == kFPObjectNotFound;
         # hopefully this is correct...
-        return -&ENODATA if $rc == kFPMiscErr;
+        return -&ENODATA if $rc == kFPParamErr;
         return -&EBADF   if $rc != kFPNoErr;
 
         my $dlen = $resp{'DataLength'};
@@ -1680,8 +1796,29 @@ sub listxattr { # {{{1
         # cover the bitmap and length values.
         ($rc, %resp) = $$self{'afpconn'}->FPListExtAttrs(%xaopts,
                 'MaxReplySize'  => $dlen + 6);
-        @attrs = map { 'user.' . $_ } @{$resp{'AttributeNames'}};
+        @attrs = @{$resp{'AttributeNames'}};
     } # }}}2
+
+    my($rc, $resp) = $self->{'afpconn'}->FPGetFileDirParms(
+            'VolumeID'          => $self->{'volID'},
+            'DirectoryID'       => $self->{'topDirID'},
+            'FileBitmap'        => kFPFinderInfoBit | $self->{'RForkLenFlag'},
+            'DirectoryBitmap'   => kFPFinderInfoBit,
+            'PathType'          => $self->{'pathType'},
+            'Pathname'          => $fileName);
+
+    if (exists $resp->{'FinderInfo'}) {
+        push(@attrs, 'com.apple.FinderInfo');
+    }
+
+    if (exists($resp->{$self->{'RForkLenKey'}}) &&
+            $resp->{$self->{'RForkLenKey'}} > 0) {
+        push(@attrs, 'com.apple.ResourceFork');
+    }
+
+    if ($^O ne 'darwin') {
+        @attrs = map { 'user.' . $_ } @attrs;
+    }
 
     # Try getting the ACL for the indicated file; if there's an ACL
     # present, then include the special name in the list of extended
@@ -1776,9 +1913,53 @@ sub removexattr { # {{{1
         return 0;
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ /^user\./) {
-        $attr =~ s/^user\.//;
+    elsif ($attr =~ /^user\./ || $^O eq 'darwin') {
+        if ($^O ne 'darwin') {
+            $attr =~ s/^user\.//;
+        }
 
+        if ($attr eq 'com.apple.FinderInfo') {
+            my $rc = $self->{'afpconn'}->FPSetFileDirParms(
+                    'VolumeID'          => $self->{'volID'},
+                    'DirectoryID'       => $self->{'topDirID'},
+                    'Bitmap'            => kFPFinderInfoBit,
+                    'FinderInfo'        => "\0" x 32,
+                    'PathType'          => $self->{'pathType'},
+                    'Pathname'          => $fileName);
+            return -&EPERM  if $rc == kFPAccessDenied;
+            return -&ENOENT if $rc == kFPObjectNotFound;
+            return -&EINVAL if $rc == kFPParamErr;
+            return -&EROFS  if $rc == kFPVolLocked;
+            return 0;        
+        }
+        elsif ($attr eq 'com.apple.ResourceFork') {
+            my ($rc, %resp) = $self->{'afpconn'}->FPOpenFork(
+                    'VolumeID'      => $self->{'volID'},
+                    'DirectoryID'   => $self->{'topDirID'},
+                    'AccessMode'    => 0x3,
+                    'Flag'          => 0x80,
+                    'PathType'      => $self->{'pathType'},
+                    'Pathname'      => $fileName);
+            return -&EACCES if $rc == kFPAccessDenied;
+            return -&ENOENT if $rc == kFPObjectNotFound;
+            return -&EINVAL if $rc == kFPParamErr;
+            return -&EMFILE if $rc == kFPTooManyFilesOpen;
+            return -&EBADF  if $rc != kFPNoErr;
+
+            $rc = $self->{'afpconn'}->FPSetForkParms($resp{'OForkRefNum'},
+                    $self->{'RForkLenFlag'}, 0);
+
+            $self->{'afpconn'}->FPCloseFork($resp{'OForkRefNum'});
+
+            return -&EPERM  if $rc == kFPAccessDenied;
+            return -&ENOSPC if $rc == kFPDiskFull;
+            return -&EPERM  if $rc == kFPLockErr;
+            return -&EINVAL if $rc == kFPParamErr;
+            return -&EROFS  if $rc == kFPVolLocked;
+            return -&EBADF  if $rc != kFPNoErr;
+
+            return 0;
+        }
         return -&EOPNOTSUPP unless $$self{'volAttrs'} & kSupportsExtAttrs;
         if (defined $$self{'client_uuid'}) {
             my $rc = $$self{'afpconn'}->FPAccess(
