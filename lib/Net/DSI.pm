@@ -72,7 +72,8 @@ sub session_thread { # {{{1
                          'PeerPort'     => $port,
                          'HostPort'     => 0,
                          'Proto'        => 'tcp',
-                         'Type'         => SOCK_STREAM );
+                         'Type'         => SOCK_STREAM,
+                         'Timeout'      => 5 );
     if ($has_IO__Socket__INET6 == 1) {
         $conn = new IO::Socket::INET6(%connect_args);
     }
