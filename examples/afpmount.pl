@@ -72,6 +72,11 @@ Options:
         Pass mount options, comma separated, like mount(8).
     -h|--help
         This help summary.
+    -4|--prefer-v4
+        Use IPv4 connectivity before IPv6, if available.
+    --atalk-first
+        Use AppleTalk transport before IP transport, if available; normally
+        IP transport is used first, for performance reasons.
     --list-servers
         Query for AFP servers via mDNS if Net::Bonjour is available,
         and via NBP if Net::Atalk is available.
@@ -115,7 +120,7 @@ sub list_mounts {
         return '';
     };
 
-    my $session = do_afp_connect($pw_cb, $url);
+    my $session = do_afp_connect($pw_cb, $url, undef);
     unless (ref($session) && $session->isa('Net::AFP')) {
         exit($session);
     }
@@ -168,14 +173,16 @@ _EOT_
 }
 
 # Handle the command line args.
-my($interactive, $options);
+my($interactive, $options, $prefer_v4, $atalk_first);
 # For now accept --options/-o, and just don't do anything with the option
 # string we get, that allows mounting via fstab to work.
 exit(&EINVAL) unless GetOptions('interactive'   => \$interactive,
                                 'options=s'     => \$options,
                                 'help'          => \&usage,
                                 'list-mounts=s' => \&list_mounts,
-                                'list-servers'  => \&list_servers);
+                                'list-servers'  => \&list_servers,
+                                '4|prefer-v4'   => \$prefer_v4,
+                                'atalk-first'   => \$atalk_first);
 my($path, $mountpoint) = @ARGV;
 
 unless ($path) {
@@ -195,6 +202,8 @@ my %options;
 if ($options) {
     %options = map { my($o, $v) = split(/=/, $_); $o, $v } split(/,/, $options);
 }
+
+my @aforder = ( AF_INET );
 
 # make the parent process into a really simple rpc server that handles
 # messages from the actual client process (which will go into the
@@ -303,7 +312,7 @@ eval {
                 $password = '';
             }
             return $password;
-        }, %options);
+        }, %options, 'aforder' => [ @aforder ]);
 } or do {
     # If an exception does happen, it's probably due to an invalid URL...
     print STDERR "Error while invoking Net::AFP::Fuse:\n", $@;

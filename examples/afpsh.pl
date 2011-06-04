@@ -22,6 +22,7 @@ use Net::AFP::MapParms;
 use Net::AFP::Versions;
 use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
+use Socket;
 
 use Term::ReadLine;     # for reading input from user
 
@@ -56,8 +57,24 @@ my %UUID_cache = ();
 our $__AFP_DEBUG;
 our $__DSI_DEBUG;
 
+my %afpopts;
+my($atalk_first, $prefer_v4);
 GetOptions( 'debug-afp' => sub { $__AFP_DEBUG = 1; },
-            'debug-dsi' => sub { $__DSI_DEBUG = 1; } );
+            'debug-dsi' => sub { $__DSI_DEBUG = 1; },
+            'atalk-first' => \$atalk_first,
+            'prefer-v4' => \$prefer_v4);
+
+$afpopts{'aforder'} = [AF_INET];
+if ($prefer_v4) {
+    push(@{$afpopts{'aforder'}}, AF_INET6);
+} else {
+    unshift(@{$afpopts{'aforder'}}, AF_INET6);
+}
+if ($atalk_first) {
+    unshift(@{$afpopts{'aforder'}}, AF_APPLETALK);
+} else {
+    push(@{$afpopts{'aforder'}}, AF_APPLETALK);
+}
 
 my($path) = @ARGV;
 
@@ -67,7 +84,7 @@ my $pw_cb = sub {
     return $values{'password'} if defined $values{'password'};
     return read_password($prompt);
 };
-my($session, %values) = do_afp_connect($pw_cb, $path);
+my($session, %values) = do_afp_connect($pw_cb, $path, undef, %afpopts);
 unless (ref($session) && $session->isa('Net::AFP')) {
     exit($session);
 }

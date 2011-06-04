@@ -130,7 +130,12 @@ sub new { # {{{1
         return &$pw_cb(@values{'username', 'host', 'password'});
     };
     my $srvInfo;
-    ($session, %urlparms) = do_afp_connect($callback, $url, \$srvInfo);
+    my %connopts;
+    if (exists $opts{'aforder'}) {
+        $connopts{'aforder'} = $opts{'aforder'};
+    }
+    ($session, %urlparms) = do_afp_connect($callback, $url, \$srvInfo,
+            %connopts);
     unless (ref($session) && $session->isa('Net::AFP')) {
         exit($session);
     }
