@@ -3,11 +3,11 @@ Section: perl
 Priority: optional
 Maintainer: Derrik Pates <demon@now.ai>
 Standards-Version: 3.8.0
-Build-Depends: debhelper (>= 7), perl (>= 5.10.0), quilt (>= 0.46-7)
+Build-Depends: debhelper (>= 7), perl (>= 5.8.0), quilt (>= 0.46-7)
 
 Package: libnet-afp-perl
 Architecture: all
-Depends: perl (>= 5.10.0), perl-modules, liblog-log4perl-perl,
+Depends: perl (>= 5.8.0), perl-modules, liblog-log4perl-perl,
  libmath-bigint-gmp-perl, libdata-uuid-perl, libcrypt-cbc-perl,
  libcrypt-cast5-perl | libcrypt-cast5-pp-perl, liblog-dispatch-perl,
  libfuse-class-perl
@@ -33,7 +33,7 @@ Description: Apple Filing Protocol implementation in Perl
 
 Package: afp-perl
 Architecture: all
-Depends: perl (>= 5.10.0), libnet-afp-perl, libfile-extattr-perl,
+Depends: perl (>= 5.8.0), libnet-afp-perl, libfile-extattr-perl,
  libterm-readpassword-perl
 Suggests: libnet-bonjour-perl
 Description: Apple Filing Protocol FUSE client in Perl
@@ -44,7 +44,7 @@ Description: Apple Filing Protocol FUSE client in Perl
 
 Package: afpsh-perl
 Architecture: all
-Depends: perl (>= 5.10.0), libnet-afp-perl, libtext-glob-perl,
+Depends: perl (>= 5.8.0), libnet-afp-perl, libtext-glob-perl,
  libterm-readpassword-perl
 Suggests: libarchive-tar-perl, libterm-readline-gnu-perl
 Description: An FTP-style client for accessing AFP shares

@@ -13,7 +13,7 @@
 
 name:      perl-Net-AFP
 summary:   Net-AFP - Apple Filing Protocol implementation in Perl
-version:   0.62.2
+version:   0.70.0
 release:   1
 vendor:    Derrik Pates <demon@now.ai>
 packager:  Derrik Pates <demon@now.ai>
@@ -24,7 +24,7 @@ buildarch: noarch
 prefix:    %(echo %{_prefix})
 source:    Net-AFP-%{version}.tar.gz
 autoreq:   0
-requires:  perl >= 5.10.0, perl(Log::Log4perl), perl(Math::BigInt::GMP), perl(Data::UUID), perl(Crypt::CBC), perl(Crypt::CAST5_PP), perl(Log::Dispatch), perl(Fuse), perl(Fuse::Class)
+requires:  perl >= 5.8.0, perl(Log::Log4perl), perl(Math::BigInt::GMP), perl(Data::UUID), perl(Crypt::CBC), perl(Crypt::CAST5_PP), perl(Log::Dispatch), perl(Fuse), perl(Fuse::Class)
 #suggests: perl(Net::Atalk), perl(Crypt::DES), perl(IO::Socket::INET6), nss-mdns
 
 %description
@@ -53,9 +53,9 @@ requires:  perl >= 5.10.0, perl(Net::AFP), perl(File::ExtAttr), perl(Term::ReadP
 group:     Applications/Perl
 %description -n afp-perl
 A command line tool which uses Net::AFP to mount an AFP share. This package
-also includes a tool (afp_acl.pl) for managing ACLs on remote Apple Filing
-Protocol shares, if your server supports ACLs (OS X 10.3 and later), and a
-tool for changing user passwords on AFP servers (afp_chpass.pl).
+also includes an additional tool (afp_acl.pl) for managing ACLs on remote
+Apple Filing Protocol shares, if your server supports ACLs (OS X 10.3 and
+later).
 
 %package -n afpsh-perl
 summary:   An FTP-style client for accessing AFP shares
@@ -169,6 +169,73 @@ if [ ! -e /etc/fuse.conf ] ; then
 fi
 
 %changelog
+* [release date here] demon@now.ai
+- Regex workaround to improve compatibility with Perl 5.8.
+- Moved connection code into a separate module (Net::AFP::Helpers), to
+  keep everything using a consistent code path for server connections.
+- Added 'afp_chpass.pl' command line tool, for changing passwords on
+  AFP servers.
+- Fix unlink() implementation in Net::AFP::Fuse to work around FPAccess()
+  always dereferencing symlinks.
+- Documentation cleanups.
+- Corrected some flag names.
+- Simplified some of the parsing loops in Net::AFP::Parsers, and made better
+  use of Perl functionality in certain places.
+- Fail more quietly if Socket6 isn't available.
+- Fixed up error return mappings in extended attribute handling code.
+- Use the ModTime field for all of atime, mtime and ctime. Don't update any
+  time fields for atimes.
+- Fixed FPGetUserInfo() implementation.
+- Added handling of the -o switch in afpmount.pl (more than just "we accept
+  it, and ignore it"). Handle the 'debug' mount option.
+- Implemented opendir(), readdir(), releasedir(), fsyncdir(), access(),
+  create(), ftruncate(), fgetattr(), lock(), utimens() and bmap() operations,
+  since Fuse 0.12 and up (and an update of Fuse::Class that's coming) support
+  these operations.
+- Better handling of request lengths for listxattr() and getxattr()
+  implementations in Net::AFP::Fuse.
+- Now using filehandles for file operations, instead of always keying on path.
+  Support added as of Fuse 0.09_4; this eliminates a lot of unnecessary
+  access checking, and simplifies read() and write() code a lot.
+- Removed write coalescing code; use '-o big_writes' instead (as of Fuse 0.12,
+  option parsing fixes are included that make '-o big_writes' actually work).
+- Added some simple metrics collection code to Net::AFP::Fuse. The '._metrics'
+  file is associated with the metrics collection code; cat that file to see
+  the collected metrics data.
+- Round time offsets to the nearest half-hour, to keep the times on files
+  consistent.
+- Added special support for 'com.apple.ResourceFork' and 'com.apple.FinderInfo'
+  xattrs; Mac OS X/MacFUSE use those for accessing those features, since the
+  FUSE API doesn't provide mechanisms for them natively.
+- Improve compatibility with pre-AFP 3.0 (and especially pre-AFP 2.2)
+  implementations.
+- Use the list of addresses passed by the server in the GetStatus() call
+  to determine what service to connect to for our transport session. This
+  allows us to use NBP names for service discovery, and still connect via
+  TCP/IP for performance when servers know how to.
+- Added '-4'/'--prefer-v4' and '--atalk-first' options to afpsh.pl and
+  afpmount.pl.
+
+
+* Fri Feb  4 2011 demon@now.ai
+- Correct the return code from removexattr() in the case where the
+  attribute to be removed is not present.
+- Correct notes about an issue with '.DS_Store' to reference the
+  actual cause.
+- Fix the time handling to get all 3 times from the 'ModTime' field, and
+  ignore the last-accessed time in the utime() call. This appears to be
+  how Apple's AFP client does things.
+
+* Sun Jan 23 2011 demon@now.ai
+- Fix a deadlock condition caused by unsafe/unnecessary use of decode().
+- Pull in a fix for password changing in the DHCAST128 and DHX2 UAMs.
+- Correct a few typos.
+- Update the README with a known issue related to rsync and .DS_Store
+  files.
+- Use AF_APPLETALK instead of a numeric value in Net::AFP::Parsers.
+- Pull in a fix for unlink() of a dangling symlink on an AFP volume
+  with ACL support.
+
 * Sun Dec 19 2010 demon@now.ai
 - Fix dead peer detection.
 

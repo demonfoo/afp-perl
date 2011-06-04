@@ -1,8 +1,7 @@
-- Use the list of network addresses the server provides us to figure out the
-  best way to connect for actual file service.
 - Handle shutdown announcements better (we currently receive them, but don't
   really do anything with them).
-- Maybe see about AppleDouble-style resource fork support?
+- Maybe see about AppleDouble-style resource fork support? (Supports xattr
+  based access for OS X compatibility.)
 - Kerberos support?
 - Reconnect UAM support?
 - Maybe DBus integration so we can call FPZzzzz() appropriately before the
