@@ -30,14 +30,6 @@ eval {
     Net::Atalk::NBP->import;
 };
 
-my $has_IO__Socket__INET6 = 0;
-eval {
-    require IO::Socket::INET6;
-    1;
-} and do {
-    $has_IO__Socket__INET6 = 1;
-};
-
 # Set up the pattern to use for breaking the AFP URL into its components.
 our $url_rx;
 if ($] >= 5.010) {
@@ -83,10 +75,7 @@ sub do_afp_connect {
     my($pw_cb, $url, $srvInfo_r, %options) = @_;
 
     # Establish the preferred address family selection order.
-    my @af_order = (AF_INET);
-    if ($has_IO__Socket__INET6) {
-        unshift(@af_order, AF_INET6);
-    }
+    my @af_order = (AF_INET6, AF_INET);
     if ($has_atalk) {
         push(@af_order, AF_APPLETALK);
     }
