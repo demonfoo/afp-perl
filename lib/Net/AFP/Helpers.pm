@@ -17,6 +17,7 @@ use Net::AFP::TCP;
 use Net::AFP::Result;
 use Net::AFP::Versions;
 use Net::AFP::UAMs;
+use Socket;
 
 my $has_atalk = 0;
 eval {
@@ -79,7 +80,23 @@ our @args = qw(protocol atalk_transport username UAM password host port
                volume subpath);
 
 sub do_afp_connect {
-    my($pw_cb, $url, $srvInfo_r) = @_;
+    my($pw_cb, $url, $srvInfo_r, %options) = @_;
+
+    # Establish the preferred address family selection order.
+    my @af_order = (AF_INET);
+    if ($has_IO__Socket__INET6) {
+        unshift(@af_order, AF_INET6);
+    }
+    if ($has_atalk) {
+        push(@af_order, AF_APPLETALK);
+    }
+
+    if (exists $options{'aforder'}) {
+        unless (ref($options{'aforder'}) eq 'ARRAY') {
+            croak('Invalid \'aforder\' passed, please correct');
+        }
+        @af_order = @{$options{'aforder'}};
+    }
 
     my %values;
     unless (@values{@args} = $url =~ $url_rx) {
@@ -121,29 +138,62 @@ sub do_afp_connect {
         $$srvInfo_r = $srvInfo;
     }
 
-    # FIXME: Should actually look at $srvInfo->{'NetworkAddresses'}; we
-    # could then acquire an IPv6 address (or a v4 address for a server we
-    # queried via AppleTalk) and use that...
-#    if ($has_IO__Socket__INET6) {
-#        my @hosts = map { if ($_->{'family'} == AF_INET6) { $_ } }
-#                @{$srvInfo->{'NetworkAddresses'}};
-#        print Dumper($srvInfo->{'NetworkAddresses'});
-#    }
+    # Should probably handle the 'NetworkAddresses' item being nonexistant or
+    # empty. Prior to AFP 2.2, that data didn't even exist. Of course, prior
+    # to AFP 2.2, there was no TCP socket support, so that kind of simplifies
+    # matters.
+    if (!exists($srvInfo->{'NetworkAddresses'}) ||
+            !scalar(@{$srvInfo->{'NetworkAddresses'}})) {
+        $srvInfo->{'NetworkAddresses'} = [
+            'family'    => AF_APPLETALK,
+            'address'   => $host,
+            'port'      => $port,
+        ];
+    }
 
     my $session;
-    if ($values{'atalk_transport'}) {
-        $session = new Net::AFP::Atalk($host, $port);
+    my $using_atalk = 0;
+TRY_AFS:
+    foreach my $af (@af_order) {
+        my @sa_list;
+        foreach (@{$srvInfo->{'NetworkAddresses'}}) {
+            next unless exists $_->{'family'};
+            if ($_->{'family'} == $af) {
+                push(@sa_list, $_)
+            }
+        }
+
+TRY_SOCKADDRS:
+        foreach my $sa (@sa_list) {
+#            print "Trying addr ", $sa->{'address'}, (exists $sa->{'port'} ? ", port " . $sa->{'port'} : ''), ", family ", $sa->{'family'}, "\n";
+            if ($af == AF_APPLETALK) {
+                unless ($has_atalk) {
+                    carp('AF_APPLETALK endpoint selected, but atalk support not available');
+                    next TRY_SOCKADDRS;
+                }
+                $session = new Net::AFP::Atalk($sa->{'address'}, $sa->{'port'});
+                $using_atalk = 1;
+            }
+            else {
+                my $port = 548;
+                if (exists $sa->{'port'}) {
+                    $port = $sa->{'port'};
+                }
+                $session = new Net::AFP::TCP($sa->{'address'}, $port);
+                $using_atalk = 0;
+            }
+
+            last TRY_AFS if ref($session) and $session->isa('Net::AFP');
+        }
     }
-    else {
-        $session = new Net::AFP::TCP(@values{'host', 'port'});
-    }
+
     unless (ref($session) and $session->isa('Net::AFP')) {
-        print STDERR "Could not connect via AFP to ", $values{'host'}, "\n";
+        print STDERR "Failed connecting to all endpoints supplied by server?\n";
         return &ENODEV;
     }
 
     my $cv = Net::AFP::Versions::GetPreferredVersion($$srvInfo{'AFPVersions'},
-            $values{'atalk_transport'});
+            $using_atalk);
     unless ($cv) {
         print STDERR "Couldn't agree on an AFP protocol version with the " .
                 "server\n";
