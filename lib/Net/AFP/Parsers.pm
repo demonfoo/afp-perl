@@ -186,9 +186,19 @@ sub _ParseSrvrInfo { # {{{1
 
     my $resp = {};
 
-    my ($machtype_off, $afpvers_off, $uams_off, $icon_off, $flags,
-            $srvname, $sig_off, $addrs_off, $dirserv_off, $utf8name_off) =
-            unpack('nnnnnC/a*x![s]nnnn', $data);
+    my ($machtype_off, $afpvers_off, $uams_off, $icon_off, $flags, $srvname) =
+            unpack('nnnnnC/a*', $data);
+
+    my($sig_off, $addrs_off, $dirserv_off, $utf8name_off);
+    # The machine type field comes right after the server name; if the offset
+    # is large enough to leave room, it's at least AFP 2.2.
+    if ($machtype_off > (12 + length($srvname))) {
+        ($sig_off, $addrs_off) = unpack('x[10]C/xx![s]nn', $data);
+    }
+    # Enough room for the AFP 3.0-specific fields.
+    if ($machtype_off > (16 + length($srvname))) {
+        ($dirserv_off, $utf8name_off) = unpack('x[10]C/xx![s]x[4]nn', $data);
+    }
 
     $$resp{'ServerName'} = $srvname;
     $$resp{'Flags'} = $flags;
