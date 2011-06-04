@@ -93,7 +93,11 @@ sub new { # {{{1
 
 	$$obj{'Session'} = new Net::Atalk::ASP($host, $port);
 	my $rc = $$obj{'Session'}->SPOpenSession();
-	return($rc == kFPNoErr ? $obj : $rc);
+    if ($rc != kFPNoErr) {
+        $$obj{'Session'}->close();
+        return $rc;
+    }
+	return $obj;
 } # }}}1
 
 =item close()
