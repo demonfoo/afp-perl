@@ -97,7 +97,11 @@ sub new { # {{{1
     my $obj = $class->SUPER::new($host, $port);
 
 	$$obj{'Session'} = new Net::DSI($host, $port);
-	my $rc = $$obj{'Session'}->DSIOpenSession('AttentionQuanta' => 2);
+	my($rc, %opts) = $$obj{'Session'}->DSIOpenSession('AttentionQuanta' => 2);
+    if (exists $opts{'ServerReplayCacheSize'}) {
+        $obj->{'ReplayCacheSize'} = $opts{'ServerReplayCacheSize'};
+        $obj->{'ReplayCache'} = [];
+    }
     if ($rc != kFPNoErr) {
         $$obj{'Session'}->close();
         return $rc;
@@ -183,10 +187,17 @@ AFP requests. Do not use.
 # This is a virtual method which is not for public consumption. Only
 # Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
-	my ($self, $payload, $resp_r) = @_;
+	my ($self, $payload, $resp_r, $can_cache) = @_;
 
 	DEBUG('called ', (caller(0))[3]);
 	$self->CheckAttnQueue();
+    if ($can_cache && exists $self->{'ReplayCache'}) {
+        do {
+            shift(@{$self->{'ReplayCache'}});
+        } until ((scalar(@{$self->{'ReplayCache'}}) + 1) <
+                $self->{'ReplayCacheSize'});
+        push(@{$self->{'ReplayCache'}}, $payload);
+    }
 	return $$self{'Session'}->DSICommand($payload, $resp_r);
 } # }}}1
 
