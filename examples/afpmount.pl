@@ -151,7 +151,8 @@ _EOT_
         my $discover = new Net::Bonjour('afpovertcp', 'tcp');
         $discover->discover();
 
-        push(@servers, map { 'afp://' . $_->hostname() . '/' } $discover->entries());
+        push(@servers, map { 'afp://' . urlencode($_->hostname()) . '/' }
+                $discover->entries());
     }
 
     if ($has_atalk) {
@@ -164,7 +165,8 @@ _EOT_
             @NBPResults = NBPLookup(undef, 'AFPServer');
         };
 
-        push(@servers, map { 'afp:/at/' . $_->[3] . '/' } @NBPResults);
+        push(@servers, map { 'afp:/at/' . urlencode($_->[3]) . '/' }
+                @NBPResults);
     }
 
     print map { $_ . "\n" } @servers;

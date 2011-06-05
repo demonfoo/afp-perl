@@ -11,7 +11,7 @@ use v5.8;
 
 use Exporter qw(import);
 
-our @EXPORT = qw(do_afp_connect);
+our @EXPORT = qw(do_afp_connect urldecode urlencode);
 
 use Net::AFP::TCP;
 use Net::AFP::Result;
@@ -227,6 +227,15 @@ sub urldecode { # {{{1
     if (defined $string) {
         $string =~ tr/+/ /;
         $string =~ s/\%([0-9a-f]{2})/chr(hex($1))/gei;
+    }
+    return $string;
+} # }}}1
+
+sub urlencode { # {{{1
+    my ($string) = @_;
+    if (defined $string) {
+        $string =~ s/([^\w\/_\-. ])/sprintf('%%%02x',ord($1))/gei;
+        $string =~ tr/ /+/;
     }
     return $string;
 } # }}}1
