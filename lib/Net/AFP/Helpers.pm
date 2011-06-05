@@ -154,7 +154,6 @@ TRY_AFS:
 
 TRY_SOCKADDRS:
         foreach my $sa (@sa_list) {
-#            print "Trying addr ", $sa->{'address'}, (exists $sa->{'port'} ? ", port " . $sa->{'port'} : ''), ", family ", $sa->{'family'}, "\n";
             if ($af == AF_APPLETALK) {
                 unless ($has_atalk) {
                     carp('AF_APPLETALK endpoint selected, but atalk support not available');
