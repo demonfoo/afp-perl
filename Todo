@@ -1,7 +1,5 @@
 - Handle shutdown announcements better (we currently receive them, but don't
   really do anything with them).
-- Maybe see about AppleDouble-style resource fork support? (Supports xattr
-  based access for OS X compatibility.)
 - Kerberos support?
 - Reconnect UAM support?
 - Maybe DBus integration so we can call FPZzzzz() appropriately before the
