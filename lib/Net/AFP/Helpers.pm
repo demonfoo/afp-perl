@@ -164,11 +164,8 @@ TRY_SOCKADDRS:
                 $using_atalk = 1;
             }
             else {
-                my $port = 548;
-                if (exists $sa->{'port'}) {
-                    $port = $sa->{'port'};
-                }
-                $session = new Net::AFP::TCP($sa->{'address'}, $port);
+                $session = new Net::AFP::TCP($sa->{'address'},
+						$sa->{'port'} || 548);
                 $using_atalk = 0;
             }
 
