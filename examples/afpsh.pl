@@ -328,7 +328,6 @@ my %commands = (
     },
     'get' => sub {
         my @words = @_;
-        print "note that the resource fork isn't handled yet!\n";
         if (scalar(@words) < 2 or scalar(@words) > 3) {
             print <<'_EOT_';
 Error: Specify the name of the file to retrieve, and optionally the name of
@@ -372,8 +371,11 @@ _EOT_
         }
 
         my $sresp = '';
-        my $bitmap = $DForkLenFlag;
+        my $bitmap = $DForkLenFlag | $RForkLenFlag;
         $rc = $session->FPGetForkParms($resp{'OForkRefNum'}, $bitmap, \$sresp);
+        if ($sresp->{$RForkLenKey} > 0) {
+            print "note that the resource fork isn't handled yet!\n";
+        }
         local $| = 1;
         my $pos = 0;
         my(%time, %lasttime, %starttime);
@@ -692,6 +694,9 @@ while (1) {
 	}
 }
 
+my %uidmap;
+my %gidmap;
+
 sub do_listentries {
 	my ($results, $volID) = @_;
 	@$results = sort { $$a{$pathkey} cmp $$b{$pathkey} } @$results;
@@ -708,8 +713,28 @@ sub do_listentries {
 		else {
 			$up = $$ent{'FileIsDir'} ? 0755 : 0644;
 		}
+        my $uid = $$ent{'UnixUID'} || 0;
+        my $user;
+        if (exists $uidmap{$uid}) {
+            $user = $uidmap{$uid};
+        }
+        else {
+            $session->FPMapID(kUserIDToName, $uid, \$user);
+            $uidmap{$uid} = $user;
+        }
+
+        my $gid = $$ent{'UnixGID'} || 0;
+        my $group;
+        if (exists $gidmap{$gid}) {
+            $group = $gidmap{$gid};
+        }
+        else {
+            $session->FPMapID(kGroupIDToName, $gid, \$group);
+            $gidmap{$gid} = $group;
+        }
+
 		$$ent{$pathkey} =~ tr/\//:/;
-		printf('%s%s%s%s%s%s%s%s%s%s %3d %5d %5d %8s %-11s %s' . "\n",
+		printf('%s%s%s%s%s%s%s%s%s%s %3d %-8s %-8s %8s %-11s %s' . "\n",
 			($$ent{'FileIsDir'} == 1 ? 'd' : '-'),
 			($up & 0400 ? 'r' : '-'),
 			($up & 0200 ? 'w' : '-'),
@@ -721,7 +746,7 @@ sub do_listentries {
 			($up & 0002 ? 'w' : '-'),
 			($up & 01000 ? ($up & 0001 ? 't' : 'T') : ($up & 0001 ? 'x' : '-')),
 			($$ent{'FileIsDir'} == 1 ? $$ent{'OffspringCount'} + 2 : 1),
-			$$ent{'UnixUID'} || 0, $$ent{'UnixGID'} || 0,
+			$user || $uid, $group || $gid,
 			($$ent{'FileIsDir'} == 1 ? 0 : $$ent{$DForkLenKey}),
 			strftime($tfmt, localtime($fmodtime)),
 			$$ent{$pathkey});
