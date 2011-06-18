@@ -178,25 +178,57 @@ sub new { # {{{1
         $obj->{'dotdothack'} = 1;
     }
     
-    # FIXME: Should probably do the same for user/group UUIDs; get our
-    # UID and GID (or the supplied ones), resolve to names, and prepopulate
-    # override maps with the UUIDs that belong to the user we're attached
-    # to the server as...
+    # Map UIDs and GIDs for the user we're mounting this for to the UID and
+    # GID of the remote user. Also, establish maps of the local user's name
+    # and primary group to the UUIDs for the remote user and primary group,
+    # for ACL handling.
     my $uidmap = {};
-    $$uidmap{$$selfinfo{'UserID'}} = $<;
+    my $u_uuidmap = {};
+    my $mapped_uid = $<;
     if (exists $opts{'uid'}) {
-        $$uidmap{$$selfinfo{'UserID'}} = int($opts{'uid'});
+        $mapped_uid = int($opts{'uid'});
     }
+    $$uidmap{$$selfinfo{'UserID'}} = $mapped_uid;
     $$obj{'uidmap'} = $uidmap;
     $$obj{'uidmap_r'} = { reverse %$uidmap };
 
-    my $gidmap = {};
-    $$gidmap{$$selfinfo{'UserID'}} = (split(m{\s+}, $())[0];
-    if (exists $opts{'gid'}) {
-        $$gidmap{$$selfinfo{'UserID'}} = int($opts{'gid'});
+    my $local_username = getpwuid($mapped_uid);
+    if ($local_username) {
+        print "\$local_username is \"", $local_username, "\"\n";
+        my $u_uuid;
+        $rc = $obj->{'afpconn'}->FPMapName(kUTF8NameToUserUUID,
+                $local_username, \$u_uuid);
+        if ($rc == kFPNoErr) {
+            print "\$u_uuid is ", $u_uuid, "\n";
+            $u_uuidmap->{$local_username} = $u_uuid;
+        }
     }
+    $obj->{'u_uuidmap'} = $u_uuidmap;
+    $obj->{'u_uuidmap_r'} = { reverse %$u_uuidmap };
+
+    my $gidmap = {};
+    my $g_uuidmap = {};
+    my $mapped_gid = (split(m{\s+}, $())[0];
+    if (exists $opts{'gid'}) {
+        $mapped_gid = int($opts{'gid'});
+    }
+    $$gidmap{$$selfinfo{'UserID'}} = $mapped_gid;
     $$obj{'gidmap'} = $gidmap;
     $$obj{'gidmap_r'} = { reverse %$gidmap };
+
+    my $local_grpname = getgrgid($mapped_gid);
+    if ($local_grpname) {
+        print "\$local_grpname is \"", $local_grpname, "\"\n";
+        my $g_uuid;
+        $rc = $obj->{'afpconn'}->FPMapName(kUTF8NameToGroupUUID,
+                $local_grpname, \$g_uuid);
+        if ($rc == kFPNoErr) {
+            print "\$g_uuid is ", $g_uuid, "\n";
+            $g_uuidmap->{$local_grpname} = $g_uuid;
+        }
+    }
+    $obj->{'g_uuidmap'} = $g_uuidmap;
+    $obj->{'g_uuidmap_r'} = { reverse %$g_uuidmap };
 
     # Open the volume indicated at start time, and abort if the server bitches
     # at us.
@@ -297,7 +329,8 @@ sub new { # {{{1
         if ($has_Data__UUID) {
             my $uo = new Data::UUID;
             $$obj{'client_uuid'} = $uo->create();
-        } else {
+        }
+        else {
             print "Need Data::UUID class for full ACL functionality, ACL checking disabled\n";
         }
     }
@@ -555,7 +588,7 @@ sub readlink { # {{{1
             # make sure any elements of the path that start with .. get fixed
             # up appropriately.
             my @parts = split(m{/}, $linkPath);
-            grep(s{^\.!\.\.}{..}, @parts);
+            grep(s{^\.!\.\.(.)}{..$1}, @parts);
             $linkPath = join('/', @parts);
         }
         return encode(ENCODING, $linkPath);
@@ -628,7 +661,7 @@ sub getdir { # {{{1
         foreach my $elem (@$resp) {
             my $name = $$elem{$$self{'pathkey'}};
             $name =~ tr{/}{:};
-            if ($self->{'dotdothack'}) { $name =~ s{^\.!\.\.}{..}; }
+            if ($self->{'dotdothack'}) { $name =~ s{^\.!\.\.(.)}{..$1}; }
             push(@filesList, encode(ENCODING, $name));
         }
         #push(@filesList, map {
@@ -867,7 +900,7 @@ sub symlink { # {{{1
         # make sure any elements of the path that start with .. get fixed
         # up appropriately.
         my @parts = split(m{/}, $target);
-        grep(s{^\.\.}{.!..}, @parts);
+        grep(s{^\.\.(.)}{.!..$1}, @parts);
         $target = join('/', @parts);
     }
     my $forkID = $sresp{'OForkRefNum'};
@@ -936,10 +969,6 @@ sub rename { # {{{1
     ($rc, $new_stat) = $self->lookup_afp_entry($newXlated);
     return $rc if $rc;
 
-    # FIXME: Actually this should probably be two access checks, either a
-    # KAUTH_VNODE_DELETE check on the file itself, or a
-    # KAUTH_VNODE_DELETE_CHILD check on the parent dir, and a
-    # KAUTH_VNODE_ADD_FILE check on the dest dir...
     if (defined $$self{'client_uuid'}) {
         $rc = $$self{'afpconn'}->FPAccess(
                 'VolumeID'      => $$self{'volID'},
@@ -1222,13 +1251,15 @@ sub open { # {{{1
     my $accessBitmap = 0x1;
     if ($accmode == O_RDWR) {
         $accessBitmap = 0x3;
-    } elsif ($accmode == O_WRONLY) {
+    }
+    elsif ($accmode == O_WRONLY) {
         # HACK: Thanks Apple. Way to, I don't know, know how to IMPLEMENT
         # YOUR OWN PROTOCOL. Seems with Airport Disk, if you open a file
         # write-only, and then, oh, try to WRITE TO IT, the writes then
         # fail. Wow. That makes so much sense!
         $accessBitmap = 0x3;
-    } elsif ($accmode == O_RDONLY) {
+    }
+    elsif ($accmode == O_RDONLY) {
         $accessBitmap = 0x1;
     }
 
@@ -1340,7 +1371,8 @@ sub statfs { # {{{1
                       kFPVolBlockSizeBit;
         $bf_key = 'ExtBytesFree';
         $bt_key = 'ExtBytesTotal';
-    } else {
+    }
+    else {
         $VolBitmap |= kFPVolBytesFreeBit | kFPVolBytesTotalBit;
         $bf_key = 'BytesFree';
         $bt_key = 'BytesTotal';
@@ -2144,7 +2176,7 @@ sub readdir { # {{{1
     my $name;
     push(@filesList, map {
             ($name = $_->{$self->{'pathkey'}}) =~ tr{/}{:};
-            if ($self->{'dotdothack'}) { $name =~ s{^\.!\.\.}{..}; }
+            if ($self->{'dotdothack'}) { $name =~ s{^\.!\.\.(.)}{..$1}; }
             [++$offset, encode(ENCODING, $name)]; } @$resp);
     # }}}2
 
@@ -2630,7 +2662,7 @@ sub translate_path { # {{{1
             next;
         }
         $elem =~ tr{:}{/};
-        if ($sessobj->{'dotdothack'}) { $elem =~ s{^\.\.}{.!..}; }
+        if ($sessobj->{'dotdothack'}) { $elem =~ s{^\.\.(.)}{.!..$1}; }
         push(@afp_path, $elem);
     }
     return join("\0", @afp_path);
@@ -2667,18 +2699,42 @@ sub acl_from_xattr { # {{{1
         my($uuid, $rc);
         # do the appropriate type of name lookup based on the attributes
         # given in the bitmap field.
+        $rc = kFPNoErr; # <- in case we happen to get it from a local
+                        # mapping first...
         if ($bitmap == kFileSec_UUID) {
-            $rc = $$self{'afpconn'}->FPMapName(kUTF8NameToUserUUID, $utf8name,
-                    \$uuid);
-        } elsif ($bitmap == kFileSec_GRPUUID) {
-            $rc = $$self{'afpconn'}->FPMapName(kUTF8NameToGroupUUID, $utf8name,
-                    \$uuid);
-        } else {
-            $rc = $$self{'afpconn'}->FPMapName(kUTF8NameToUserUUID, $utf8name,
-                    \$uuid);
-            if ($rc == kFPItemNotFound) {
+            if (exists $self->{'u_uuidmap'}->{$utf8name}) {
+                $uuid = $self->{'u_uuidmap'}->{$utf8name};
+            }
+            else {
+                $rc = $$self{'afpconn'}->FPMapName(kUTF8NameToUserUUID,
+                        $utf8name, \$uuid);
+            }
+        }
+        elsif ($bitmap == kFileSec_GRPUUID) {
+            if (exists $self->{'g_uuidmap'}->{$utf8name}) {
+                $uuid = $self->{'g_uuidmap'}->{$utf8name};
+            }
+            else {
                 $rc = $$self{'afpconn'}->FPMapName(kUTF8NameToGroupUUID,
                         $utf8name, \$uuid);
+            }
+        }
+        else {
+            if (exists $self->{'u_uuidmap'}->{$utf8name}) {
+                $uuid = $self->{'u_uuidmap'}->{$utf8name};
+            }
+            else {
+                $rc = $$self{'afpconn'}->FPMapName(kUTF8NameToUserUUID,
+                        $utf8name, \$uuid);
+                if ($rc == kFPItemNotFound) {
+                    if (exists $self->{'g_uuidmap'}->{$utf8name}) {
+                        $uuid = $self->{'g_uuidmap'}->{$utf8name};
+                    }
+                    else {
+                        $rc = $$self{'afpconn'}->FPMapName(kUTF8NameToGroupUUID,
+                                $utf8name, \$uuid);
+                    }
+                }
             }
         }
         # if we can't map a name to a UUID, then just tell the client
@@ -2708,9 +2764,17 @@ sub acl_to_xattr { # {{{1
         # map the UUID (this actually works for both user and group
         # UUIDs, the FPMapID docs are useless) to a corresponding
         # user or group name.
-        my $rc = $$self{'afpconn'}->FPMapID(kUserUUIDToUTF8Name,
-                $$entry{'ace_applicable'}, \$name);
-        return -&EBADF if $rc != kFPNoErr;
+        if (exists $self->{'u_uuidmap_r'}->{$entry->{'ace_applicable'}}) {
+            $name = $self->{'u_uuidmap_r'}->{$entry->{'ace_applicable'}};
+        }
+        elsif (exists $self->{'g_uuidmap_r'}->{$entry->{'ace_applicable'}}) {
+            $name = $self->{'g_uuidmap_r'}->{$entry->{'ace_applicable'}};
+        }
+        else {
+            my $rc = $$self{'afpconn'}->FPMapID(kUserUUIDToUTF8Name,
+                    $$entry{'ace_applicable'}, \$name);
+            return -&EBADF if $rc != kFPNoErr;
+        }
         push(@acl_parts, pack('LS/aLL', $$name{'Bitmap'},
                 encode_utf8($$name{'UTF8Name'}),
                 @$entry{'ace_flags', 'ace_rights'}));
