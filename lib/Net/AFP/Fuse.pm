@@ -1497,8 +1497,29 @@ sub setxattr { # {{{1
         }
 
         if ($attr eq 'com.apple.FinderInfo') {
-            # FIXME: Check and handle XATTR_{CREATE,REPLACE} for these
-            # magic attributes.
+            # If FinderInfo is already set to something (there's always data
+            # there, but I'm interpreting "existence" to mean "data is there
+            # and it's something that's not 32 bytes of 0"), apply special
+            # handling for the XATTR_{CREATE,REPLACE} cases.
+            if ($flags) {
+                my($rc, $resp) = $self->{'afpconn'}->FPGetFileDirParms(
+                        'VolumeID'          => $self->{'volID'},
+                        'DirectoryID'       => $self->{'topDirID'},
+                        'FileBitmap'        => kFPFinderInfoBit,
+                        'DirectoryBitmap'   => kFPFinderInfoBit,
+                        'PathType'          => $self->{'pathType'},
+                        'Pathname'          => $fileName);
+                return -&EPERM   if $rc == kFPAccessDenied;
+                return -&ENOENT  if $rc == kFPObjectNotFound;
+                return -&EBADF   if $rc != kFPNoErr;
+
+                if ($flags & XATTR_CREATE) {
+                    return -&EEXIST if $resp->{'FinderData'} ne "\0" x 32;
+                }
+                elsif ($flags & XATTR_REPLACE) {
+                    return -&ENODATA if $resp->{'FinderData'} eq "\0" x 32;
+                }
+            }
             my $rc = $self->{'afpconn'}->FPSetFileDirParms(
                     'VolumeID'          => $self->{'volID'},
                     'DirectoryID'       => $self->{'topDirID'},
@@ -1513,6 +1534,29 @@ sub setxattr { # {{{1
             return 0;        
         }
         elsif ($attr eq 'com.apple.ResourceFork') {
+            # Apply special handling for XATTR_{CREATE,REPLACE} cases. It's
+            # more clear-cut if there's "something" or "nothing" here, since
+            # if there's "something", the resource fork length will be
+            # non-zero.
+            if ($flags) {
+                my($rc, $resp) = $self->{'afpconn'}->FPGetFileDirParms(
+                        'VolumeID'      => $self->{'volID'},
+                        'DirectoryID'   => $self->{'topDirID'},
+                        'FileBitmap'    => $self->{'RForkLenFlag'},
+                        'PathType'      => $self->{'pathType'},
+                        'Pathname'      => $fileName);
+                return -&EPERM   if $rc == kFPAccessDenied;
+                return -&ENOENT  if $rc == kFPObjectNotFound;
+                return -&EBADF   if $rc != kFPNoErr;
+                return -&EISDIR  if $resp->{'FileIsDir'} == 1;
+
+                if ($flags & XATTR_CREATE) {
+                    return -&EEXIST if $resp->{$self->{'RForkLenKey'}} != 0;
+                }
+                elsif ($flags & XATTR_REPLACE) {
+                    return -&ENODATA if $resp->{$self->{'RForkLenKey'}} == 0;
+                }
+            }
             my ($rc, %resp) = $self->{'afpconn'}->FPOpenFork(
                     'VolumeID'      => $self->{'volID'},
                     'DirectoryID'   => $self->{'topDirID'},
@@ -1520,6 +1564,7 @@ sub setxattr { # {{{1
                     'Flag'          => 0x80,
                     'PathType'      => $self->{'pathType'},
                     'Pathname'      => $fileName);
+            return -&EISDIR if $rc == kFPObjectTypeErr;
             return -&EACCES if $rc == kFPAccessDenied;
             return -&ENOENT if $rc == kFPObjectNotFound;
             return -&EINVAL if $rc == kFPParamErr;
@@ -2652,15 +2697,6 @@ sub acl_to_xattr { # {{{1
     # Pack the ACL into a single byte sequence, and push it to
     # the client.
     return pack('LS/(a*)', $$acldata{'acl_flags'}, @acl_parts);
-} # }}}1
-
-sub urlencode { # {{{1
-    my ($string) = @_;
-    if (defined $string) {
-        $string =~ s/([^\w\/_\-. ])/sprintf('%%%02x',ord($1))/gei;
-        $string =~ tr/ /+/;
-    }
-    return $string;
 } # }}}1
 
 =back
