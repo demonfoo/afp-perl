@@ -167,6 +167,7 @@ sub new { # {{{1
     if ($neg) { $delta *= -1; }
     $$obj{'timedelta'} = $delta;
 
+    $obj->{'dotdothack'} = 0;
     my $selfinfo;
     $$obj{'afpconn'}->FPGetUserInfo(0x1, 0, 0x3, \$selfinfo);
     # This is sort of a hack. Seems that instead of returning '0' as the
@@ -174,6 +175,7 @@ sub new { # {{{1
     # tells us the user ID is 1. What is this crap. But anyway.
     if ($srvInfo->{'MachineType'} =~ m{^AirPort}) {
         $selfinfo->{'UserID'} = 0;
+        $obj->{'dotdothack'} = 1;
     }
     
     # FIXME: Should probably do the same for user/group UUIDs; get our
@@ -307,7 +309,7 @@ sub new { # {{{1
     if (defined $urlparms{'subpath'}) {
         print 'Looking up directory \'', $urlparms{'subpath'},
                 "' as pivot point for root node\n" if defined $::_DEBUG;
-        my $realDirPath = translate_path($urlparms{'subpath'});
+        my $realDirPath = translate_path($urlparms{'subpath'}, $obj);
         my $dirBitmap = kFPNodeIDBit;
 
         my $resp;
@@ -431,7 +433,7 @@ sub getattr { # {{{1
         ); # }}}2
         return @stat;
     }
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     my ($rc, $resp) = $self->lookup_afp_entry($fileName);
     return $rc if $rc;
@@ -501,7 +503,7 @@ sub readlink { # {{{1
 
     $file = decode(ENCODING, $file);
     # Break the provided path down into a directory ID and filename.
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     # Get the UNIX privilege info for the file.
     my $fileBitmap = kFPUnixPrivsBit;
@@ -548,6 +550,14 @@ sub readlink { # {{{1
             $linkPath .= $readText;
         } until ($rc == kFPEOFErr);
         $$self{'afpconn'}->FPCloseFork($sresp{'OForkRefNum'});
+        if ($self->{'dotdothack'}) {
+            # If this hack is active (for AirPort Disk volumes only, currently),
+            # make sure any elements of the path that start with .. get fixed
+            # up appropriately.
+            my @parts = split(m{/}, $linkPath);
+            grep(s{^\.!\.\.}{..}, @parts);
+            $linkPath = join('/', @parts);
+        }
         return encode(ENCODING, $linkPath);
     } # }}}2
 
@@ -562,7 +572,7 @@ sub getdir { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $dirname = decode(ENCODING, $dirname);
-    my $fileName = translate_path($dirname);
+    my $fileName = translate_path($dirname, $self);
     my @filesList = ('.', '..');
 
     if ($dirname eq '/') {
@@ -617,12 +627,13 @@ sub getdir { # {{{1
         # order, for some odd reason; bug in FUSE driver/libfuse/Fuse module?
         foreach my $elem (@$resp) {
             my $name = $$elem{$$self{'pathkey'}};
-            $name =~ tr|/|:|;
+            $name =~ tr{/}{:};
+            if ($self->{'dotdothack'}) { $name =~ s{^\.!\.\.}{..}; }
             push(@filesList, encode(ENCODING, $name));
         }
         #push(@filesList, map {
         #                my $name = $$_{$$self{'pathkey'}};
-        #                $name =~ tr/\//:/;
+        #                $name =~ tr{/}{:};
         #                encode(ENCODING, $name); } @$resp);
 
         # Set up for a subsequent call to get directory entries.
@@ -650,7 +661,7 @@ sub mknod { # {{{1
 
     my $file_n = $file;
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     if (S_ISREG($mode)) {
         my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
@@ -697,7 +708,7 @@ sub mkdir { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
     return $rc if $rc;
@@ -739,7 +750,7 @@ sub unlink { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
     return $rc if $rc;
@@ -795,7 +806,7 @@ sub symlink { # {{{1
     return -&EPERM unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
     $linkname = decode(ENCODING, $linkname);
-    my $fileName = translate_path($linkname);
+    my $fileName = translate_path($linkname, $self);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
     return $rc if $rc;
@@ -851,6 +862,14 @@ sub symlink { # {{{1
     return -&EMFILE  if $rc == kFPTooManyFilesOpen;
     return -&EROFS   if $rc == kFPVolLocked;
     return -&EBADF   if $rc != kFPNoErr;
+    if ($self->{'dotdothack'}) {
+        # If this hack is active (for AirPort Disk volumes only, currently),
+        # make sure any elements of the path that start with .. get fixed
+        # up appropriately.
+        my @parts = split(m{/}, $target);
+        grep(s{^\.\.}{.!..}, @parts);
+        $target = join('/', @parts);
+    }
     my $forkID = $sresp{'OForkRefNum'};
 
     my $lastWritten;
@@ -908,8 +927,8 @@ sub rename { # {{{1
     @elems = split(/\//, $oldName);
     my $oldRealName = $elems[-1];
 
-    my $oldXlated = translate_path($oldName);
-    my $newXlated = translate_path($newPath);
+    my $oldXlated = translate_path($oldName, $self);
+    my $newXlated = translate_path($newPath, $self);
     
     my ($rc, $old_stat) = $self->lookup_afp_entry($oldXlated, 1);
     return $rc if $rc != kFPNoErr;
@@ -993,7 +1012,7 @@ sub chmod { # {{{1
 
     return -&EINVAL unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
-    my $fileName = translate_path(decode(ENCODING, $file));
+    my $fileName = translate_path(decode(ENCODING, $file), $self);
     my ($rc, $resp) = $self->lookup_afp_entry($fileName, 1);
     return $rc if $rc != kFPNoErr;
 
@@ -1038,7 +1057,7 @@ sub chown { # {{{1
 
     return -&EINVAL unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
-    my $fileName = translate_path(decode(ENCODING, $file));
+    my $fileName = translate_path(decode(ENCODING, $file), $self);
     my ($rc, $resp) = $self->lookup_afp_entry($fileName, 1);
     return $rc if $rc != kFPNoErr;
 
@@ -1090,7 +1109,7 @@ sub truncate { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     if (defined $$self{'client_uuid'}) {
         my $rc = $$self{'afpconn'}->FPAccess(
@@ -1143,7 +1162,7 @@ sub utime { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     my $rc = $$self{'afpconn'}->FPSetFileDirParms(
             'VolumeID'      => $$self{'volID'},
@@ -1175,7 +1194,7 @@ sub open { # {{{1
         return(0, \$data);
     }
 
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     my $accmode = $mode & O_ACCMODE;
     if (defined $$self{'client_uuid'}) {
@@ -1407,7 +1426,7 @@ sub setxattr { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
     $attr = decode(ENCODING, $attr);
 
     # handle ACL xattr {{{2
@@ -1649,7 +1668,7 @@ sub getxattr { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
     $attr = decode(ENCODING, $attr);
     # handle ACL xattr {{{2
     if ($attr eq ACL_XATTR &&
@@ -1809,7 +1828,7 @@ sub listxattr { # {{{1
 
     return -&EOPNOTSUPP unless $$self{'volAttrs'} & kSupportsExtAttrs;
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     my @attrs;
 
@@ -1921,7 +1940,7 @@ sub removexattr { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
     $attr = decode(ENCODING, $attr);
     # handle ACL xattr {{{2
     if ($attr eq ACL_XATTR &&
@@ -2050,7 +2069,7 @@ sub opendir { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $dirname = decode(ENCODING, $dirname);
-    my $fileName = translate_path($dirname);
+    my $fileName = translate_path($dirname, $self);
 
     if (defined $$self{'client_uuid'}) {
         my $rc = $$self{'afpconn'}->FPAccess(
@@ -2125,6 +2144,7 @@ sub readdir { # {{{1
     my $name;
     push(@filesList, map {
             ($name = $_->{$self->{'pathkey'}}) =~ tr{/}{:};
+            if ($self->{'dotdothack'}) { $name =~ s{^\.!\.\.}{..}; }
             [++$offset, encode(ENCODING, $name)]; } @$resp);
     # }}}2
 
@@ -2168,7 +2188,7 @@ sub access { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     if ($mode == F_OK) {
         my ($rc, $stat) = $self->lookup_afp_entry($fileName);
@@ -2210,7 +2230,7 @@ sub create { # {{{1
 
     my $file_n = $file;
     $file = decode(ENCODING, $file);
-    my $fileName = translate_path($file);
+    my $fileName = translate_path($file, $self);
 
     # afaik this should only ever happen for a plain file...
     return -&EOPNOTSUPP if !S_ISREG($mode);
@@ -2595,7 +2615,7 @@ sub lookup_afp_entry { # {{{1
 } # }}}1
 
 sub translate_path { # {{{1
-    my ($path) = @_;
+    my ($path, $sessobj) = @_;
     print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
     
@@ -2609,7 +2629,8 @@ sub translate_path { # {{{1
             pop(@afp_path);
             next;
         }
-        $elem =~ tr/:/\//;
+        $elem =~ tr{:}{/};
+        if ($sessobj->{'dotdothack'}) { $elem =~ s{^\.\.}{.!..}; }
         push(@afp_path, $elem);
     }
     return join("\0", @afp_path);

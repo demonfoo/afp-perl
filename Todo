@@ -4,6 +4,3 @@
 - Reconnect UAM support?
 - Maybe DBus integration so we can call FPZzzzz() appropriately before the
   machine goes to sleep?
-- Possibly work around issue with Apple AirPort Disk with any file starting
-  with the characters '..' - thought this was something with the '.DS_Store'
-  string being magic, but that doesn't seem to be it.
