@@ -139,6 +139,17 @@ If set, volume supports Time Machine lock stealing.
 
 =cut
 use constant kSupportsTMLockSteal       => 0x2000;  # AFP 3.2+ (10.5)
+=back
+
+=head1 AUTHOR
+
+Derrik Pates <demon@now.ai>
+
+=head1 SEE ALSO
+
+C<Net::AFP>
+
+=cut
 
 1;
 # vim: ts=4
