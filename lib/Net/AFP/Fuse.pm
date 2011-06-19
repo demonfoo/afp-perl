@@ -194,12 +194,10 @@ sub new { # {{{1
 
     my $local_username = getpwuid($mapped_uid);
     if ($local_username) {
-        print "\$local_username is \"", $local_username, "\"\n";
         my $u_uuid;
         $rc = $obj->{'afpconn'}->FPMapName(kUTF8NameToUserUUID,
                 $local_username, \$u_uuid);
         if ($rc == kFPNoErr) {
-            print "\$u_uuid is ", $u_uuid, "\n";
             $u_uuidmap->{$local_username} = $u_uuid;
         }
     }
@@ -218,12 +216,10 @@ sub new { # {{{1
 
     my $local_grpname = getgrgid($mapped_gid);
     if ($local_grpname) {
-        print "\$local_grpname is \"", $local_grpname, "\"\n";
         my $g_uuid;
         $rc = $obj->{'afpconn'}->FPMapName(kUTF8NameToGroupUUID,
                 $local_grpname, \$g_uuid);
         if ($rc == kFPNoErr) {
-            print "\$g_uuid is ", $g_uuid, "\n";
             $g_uuidmap->{$local_grpname} = $g_uuid;
         }
     }
@@ -1908,7 +1904,8 @@ sub listxattr { # {{{1
             'PathType'          => $self->{'pathType'},
             'Pathname'          => $fileName);
 
-    if (exists $resp->{'FinderInfo'}) {
+    if (exists($resp->{'FinderInfo'})
+            && $resp->{'FinderInfo'} ne "\0" x 32) {
         push(@attrs, 'com.apple.FinderInfo');
     }
 
