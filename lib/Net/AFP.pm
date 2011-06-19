@@ -4458,10 +4458,15 @@ sub FPMapID { # {{{1
         ${$resp_r} = {};
         @{${$resp_r}}{'Bitmap', 'NumericID', 'UTF8Name'} =
                 unpack('NNn/a', $resp);
-        ${${$resp_r}}{'UTF8Name'} = compose(decode_utf8(${${$resp_r}}{'UTF8Name'}));
+        ${${$resp_r}}{'UTF8Name'} =
+                compose(decode_utf8(${${$resp_r}}{'UTF8Name'}));
+    }
+    elsif ($Subfunction == kUserIDToUTF8Name ||
+            $Subfunction == kGroupIDToUTF8Name) {
+        (${$resp_r}) = compose(decode_utf8(unpack('C/a', $resp)));
     }
     else {
-        (${$resp_r}) = unpack('C/a', $resp);
+        (${$resp_r}) = decode('MacRoman', unpack('C/a', $resp));
     }
     return $rc;
 } # }}}1
@@ -4528,6 +4533,13 @@ sub FPMapName { # {{{1
     }
     else {
         $pack_mask .= 'C/a';
+        if ($Subfunction == kUTF8NameToUserID ||
+                $Subfunction == kUTF8NameToGroupID) {
+            $name = encode_utf8(decompose($Name));
+        }
+        else {
+            $name = encode('MacRoman', $Name);
+        }
     }
     my $msg = pack($pack_mask, kFPMapName, $Subfunction, $Name);
     my $rc = $self->SendAFPMessage($msg, \$resp);
@@ -6872,7 +6884,7 @@ to date).
 
 =head1 AUTHOR
 
-Derrik Pates <demon@devrandom.net>.
+Derrik Pates <demon@now.ai>.
 
 =head1 SEE ALSO
 
