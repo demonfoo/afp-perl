@@ -133,11 +133,21 @@ sub do_afp_connect {
     # matters.
     if (!exists($srvInfo->{'NetworkAddresses'}) ||
             !scalar(@{$srvInfo->{'NetworkAddresses'}})) {
-        $srvInfo->{'NetworkAddresses'} = [ {
-            'family'    => AF_APPLETALK,
-            'address'   => $host,
-            'port'      => $port,
-        } ];
+        if ($values{'atalk_transport'}) {
+            $srvInfo->{'NetworkAddresses'} = [ {
+                'family'    => AF_APPLETALK,
+                'address'   => $host,
+                'port'      => $port,
+            } ];
+        }
+        else {
+            # This is a crappy workaround for Jaffer being stupid.
+            $srvInfo->{'NetworkAddresses'} = [ {
+                'family'    => AF_INET,
+                'address'   => $values{'host'},
+                'port'      => $values{'port'},
+            } ];
+        }
     }
 
     my $session;
