@@ -133,11 +133,11 @@ sub do_afp_connect {
     # matters.
     if (!exists($srvInfo->{'NetworkAddresses'}) ||
             !scalar(@{$srvInfo->{'NetworkAddresses'}})) {
-        $srvInfo->{'NetworkAddresses'} = [
+        $srvInfo->{'NetworkAddresses'} = [ {
             'family'    => AF_APPLETALK,
             'address'   => $host,
             'port'      => $port,
-        ];
+        } ];
     }
 
     my $session;
