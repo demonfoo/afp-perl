@@ -4535,10 +4535,10 @@ sub FPMapName { # {{{1
         $pack_mask .= 'C/a';
         if ($Subfunction == kUTF8NameToUserID ||
                 $Subfunction == kUTF8NameToGroupID) {
-            $name = encode_utf8(decompose($Name));
+            $Name = encode_utf8(decompose($Name));
         }
         else {
-            $name = encode('MacRoman', $Name);
+            $Name = encode('MacRoman', $Name);
         }
     }
     my $msg = pack($pack_mask, kFPMapName, $Subfunction, $Name);
