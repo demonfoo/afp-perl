@@ -37,6 +37,7 @@ use Fuse qw(:all);              # Still need this for extended attribute
                                 # related macros.
 use POSIX;                      # Standard error codes, access() modes, etc.
 use Time::HiRes qw(gettimeofday);
+use URI::Escape;
 
 # FreeBSD oh-so-handily names this error code differently, so I'm going
 # to cheat just slightly...
@@ -373,22 +374,22 @@ sub new { # {{{1
     }
     $scrubbed_url .= '/';
     if (defined $urlparms{'username'}) {
-        $scrubbed_url .= urlencode($urlparms{'username'}) . '@';
+        $scrubbed_url .= uri_escape($urlparms{'username'}) . '@';
     }
     if ($urlparms{'host'} =~ /:/) {
         $scrubbed_url .= '[' . $urlparms{'host'} . ']';
     }
     else {
-        $scrubbed_url .= urlencode($urlparms{'host'});
+        $scrubbed_url .= uri_escape($urlparms{'host'});
     }
     if (defined $urlparms{'port'}) {
         $scrubbed_url .= ':' . $urlparms{'port'};
     }
     $scrubbed_url .= '/';
     if (defined $urlparms{'volume'}) {
-        $scrubbed_url .= urlencode($urlparms{'volume'});
+        $scrubbed_url .= uri_escape($urlparms{'volume'});
         if (defined $urlparms{'subpath'}) {
-            $scrubbed_url .= urlencode($urlparms{'subpath'});
+            $scrubbed_url .= uri_escape($urlparms{'subpath'});
         }
     }
     $_[1] = $scrubbed_url;

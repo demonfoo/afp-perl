@@ -16,6 +16,7 @@ use IO::Poll qw(POLLIN POLLERR);
 use Getopt::Long;                   # for parsing command line options
 use Socket;
 use Errno qw(:POSIX);
+use URI::Escape;
 
 # Do conditional includes of several modules, and denote to ourselves
 # if they got imported or not.
@@ -151,7 +152,7 @@ _EOT_
         my $discover = new Net::Bonjour('afpovertcp', 'tcp');
         $discover->discover();
 
-        push(@servers, map { 'afp://' . urlencode($_->hostname()) . '/' }
+        push(@servers, map { 'afp://' . uri_escape($_->hostname()) . '/' }
                 $discover->entries());
     }
 
@@ -165,7 +166,7 @@ _EOT_
             @NBPResults = NBPLookup(undef, 'AFPServer');
         };
 
-        push(@servers, map { 'afp:/at/' . urlencode($_->[3]) . '/' }
+        push(@servers, map { 'afp:/at/' . uri_escape($_->[3]) . '/' }
                 @NBPResults);
     }
 

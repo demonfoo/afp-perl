@@ -11,13 +11,14 @@ use v5.8;
 
 use Exporter qw(import);
 
-our @EXPORT = qw(do_afp_connect urldecode urlencode);
+our @EXPORT = qw(do_afp_connect);
 
 use Net::AFP::TCP;
 use Net::AFP::Result;
 use Net::AFP::Versions;
 use Net::AFP::UAMs;
 use Socket;
+use URI::Escape;
 
 my $has_atalk = 0;
 eval {
@@ -94,7 +95,7 @@ sub do_afp_connect {
     }
 
     foreach (keys(%values)) {
-        $values{$_} = urldecode($values{$_});
+        $values{$_} = uri_unescape($values{$_});
     }
 
     unless (defined $values{'host'}) {
@@ -227,21 +228,3 @@ TRY_SOCKADDRS:
         return $session;
     }
 }
-
-sub urldecode { # {{{1
-    my ($string) = @_;
-    if (defined $string) {
-        $string =~ tr/+/ /;
-        $string =~ s/\%([0-9a-f]{2})/chr(hex($1))/gei;
-    }
-    return $string;
-} # }}}1
-
-sub urlencode { # {{{1
-    my ($string) = @_;
-    if (defined $string) {
-        $string =~ s/([^\w\/_\-. ])/sprintf('%%%02x',ord($1))/gei;
-        $string =~ tr/ /+/;
-    }
-    return $string;
-} # }}}1
