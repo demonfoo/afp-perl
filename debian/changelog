@@ -46,6 +46,11 @@ libnet-afp-perl (0.70-1) unstable; urgency=medium
     TCP/IP for performance when servers know how to.
   * Added '-4'/'--prefer-v4' and '--atalk-first' options to afpsh.pl and
     afpmount.pl.
+  * Compatibility hack for AirPort Disk devices, to avoid a leading '..'
+    on any file names.
+  * More inline docs.
+  * Present resource fork and finder data via extended attributes. Also
+    improves OS X compatibility.
 
  -- Derrik Pates <demon@now.ai>  [release date here]
 

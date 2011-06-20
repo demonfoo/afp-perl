@@ -215,7 +215,11 @@ fi
   TCP/IP for performance when servers know how to.
 - Added '-4'/'--prefer-v4' and '--atalk-first' options to afpsh.pl and
   afpmount.pl.
-
+- Compatibility hack for AirPort Disk devices, to avoid a leading '..'
+  on any file names.
+- More inline docs.
+- Present resource fork and finder data via extended attributes. Also
+  improves OS X compatibility.
 
 * Fri Feb  4 2011 demon@now.ai
 - Correct the return code from removexattr() in the case where the
