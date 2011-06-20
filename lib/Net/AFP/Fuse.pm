@@ -389,7 +389,8 @@ sub new { # {{{1
     if (defined $urlparms{'volume'}) {
         $scrubbed_url .= uri_escape($urlparms{'volume'});
         if (defined $urlparms{'subpath'}) {
-            $scrubbed_url .= uri_escape($urlparms{'subpath'});
+            $scrubbed_url .= join('/', map { uri_escape($_) } split(m{/},
+                    $urlparms{'subpath'}));
         }
     }
     $_[1] = $scrubbed_url;
