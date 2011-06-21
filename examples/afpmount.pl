@@ -8,7 +8,7 @@ use diagnostics;
 use Carp ();
 local $SIG{'__WARN__'} = \&Carp::cluck;
 
-use Net::AFP::Fuse;
+use Fuse::AFP;
 use Net::AFP;                       # just for its $VERSION...
 use Net::AFP::Result;
 use Net::AFP::Helpers;
@@ -294,7 +294,7 @@ sub END {
 
 # instantiate fuse object {{{1
 eval {
-    $fuse = new Net::AFP::Fuse($path, sub {
+    $fuse = new Fuse::AFP($path, sub {
             my ($username, $hostname, $password) = @_;
             if (!defined $password && defined $interactive) {
                 my $sp = pack('S/a*S/a*', $username, $hostname);
@@ -318,7 +318,7 @@ eval {
         }, %options, 'aforder' => [ @aforder ]);
 } or do {
     # If an exception does happen, it's probably due to an invalid URL...
-    print STDERR "Error while invoking Net::AFP::Fuse:\n", $@;
+    print STDERR "Error while invoking Fuse::AFP:\n", $@;
     syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, &EINVAL));
     exit(1);
 }; # }}}1

@@ -1,4 +1,4 @@
-package Net::AFP::Fuse;
+package Fuse::AFP;
 
 # Declare ourselves as a derivate of Fuse::Class.
 use base qw(Fuse::Class);
@@ -65,7 +65,7 @@ use constant COMMENT_XATTR      => 'system.comment';
 
 =head1 NAME
 
-Net::AFP::Fuse - An AFP filesystem implementation in Perl
+Fuse::AFP - An AFP filesystem implementation in Perl
 
 =head1 SYNOPSIS
 
@@ -74,9 +74,9 @@ Fuse::Class package, implementing the major FUSE operations as methods.
 
 The following is a trivial use case:
 
-    use Net::AFP::Fuse;
+    use Fuse::AFP;
 
-    my $fuse = new Net::AFP::Fuse($afp_url, $pw_cb);
+    my $fuse = new Fuse::AFP($afp_url, $pw_cb);
     $fuse->main('mountpoint' => $mountpoint, 'mountopts' => '...');
 
 =head1 DESCRIPTION
@@ -822,7 +822,7 @@ sub unlink { # {{{1
     return -&EBADF;
 } # }}}1
 
-sub rmdir { return Net::AFP::Fuse::unlink(@_); }
+sub rmdir { return Fuse::AFP::unlink(@_); }
 
 # seems OS X 10.4 causes the newly created symlink to be locked, so once
 # you create it, you can't remove it via AFP until you unmount the volume
