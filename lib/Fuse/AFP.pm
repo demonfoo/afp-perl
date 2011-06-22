@@ -2798,13 +2798,7 @@ None currently known.
 
 =head1 INCOMPATIBILITIES
 
-Attempting to create a file with a leading '..' in the name causes Apple
-AirPort Disk devices to always return an error indicating the file already
-exists. This can have problematic side effects when rsync'ing a directory
-tree onto an AFP mountpoint that contains dot files (files with names
-starting with the '.' character). Rsync will keep trying to create the
-file, and every time get told that the file already exists, trying new
-names literally forever.
+None currently known.
 
 =head1 AUTHOR
 
