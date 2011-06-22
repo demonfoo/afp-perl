@@ -220,6 +220,7 @@ fi
 - More inline docs.
 - Present resource fork and finder data via extended attributes. Also
   improves OS X compatibility.
+- Renamed Net::AFP::Fuse to Fuse::AFP.
 
 * Fri Feb  4 2011 demon@now.ai
 - Correct the return code from removexattr() in the case where the

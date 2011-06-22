@@ -9,7 +9,7 @@ that allow it to do its work:
     Net::AFP - A superclass implementing generic AFP operations
     Net::AFP::TCP - A derivative of Net::AFP implementing TCP transport
     Net::AFP::Atalk - A derivative of Net::AFP implementing AppleTalk transport
-    Net::AFP::Fuse - A derivative of Fuse::Class implementing a Fuse filesystem
+    Fuse::AFP - A derivative of Fuse::Class implementing a Fuse filesystem
     Net::AFP::UAMs - A utility module for calling User Authentication Methods
     Net::AFP::Versions - A utility module for protocol version agreement
                          and checking
@@ -46,7 +46,7 @@ This module requires or encourages use of these other modules and libraries:
 
     Log::Log4perl is used for some message logging
     Log::Dispatch::Syslog is used for routing log messages to syslog
-    Fuse::Class is used as the superclass for Net::AFP::Fuse
+    Fuse::Class is used as the superclass for Fuse::AFP
     Fuse is depended upon by Fuse::Class, need version 0.10_1 or later
     Data::UUID is recommended, used internally for access checking
     Crypt::CBC is recommended, needed for advanced UAMs

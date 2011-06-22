@@ -51,6 +51,7 @@ libnet-afp-perl (0.70-1) unstable; urgency=medium
   * More inline docs.
   * Present resource fork and finder data via extended attributes. Also
     improves OS X compatibility.
+  * Renamed Net::AFP::Fuse to Fuse::AFP.
 
  -- Derrik Pates <demon@now.ai>  [release date here]
 
