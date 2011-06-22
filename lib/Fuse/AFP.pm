@@ -2372,13 +2372,6 @@ sub fgetattr { # {{{1
         return(@stat)
     }
 
-    if ($file && $file ne '-') {
-        # If the path is provided, just use that to call out to getattr().
-        # Should be sufficient most of the time, and it seems Jaffer is
-        # too retarded to properly return any info via FPGetForkParms().
-        return $self->getattr($file);
-    }
-
     # Get the filename and parent dir ID from the server, so we can turn around
     # and make an FPGetFileDirParms() call for it. Unfortunately most of the
     # info we want can't be got from FPGetForkParms(), so this is how it
