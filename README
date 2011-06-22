@@ -63,7 +63,7 @@ FREQUENTLY ASKED QUESTIONS
   Q: What is this useful for?
 
   A: If you have a Macintosh computer, or Apple hardware (like an Apple
-     AirPort Extreme with AirDisk), and want to share files with the
+     AirPort Extreme with AirPort Disk), and want to share files with the
      device, you can use these tools to do so. Also, it's kind of fun to
      have a filesystem where you can run the code, and still see how it's
      implemented.
@@ -191,18 +191,22 @@ FREQUENTLY ASKED QUESTIONS
 
   A: Really, less than you'd think. I used to have extensive metadata
      caching, but once the DSI layer's performance became decent, that
-     was mostly unnecessary. Currently the only measure being applied
-     is write coalescing, since Fuse still wants to write out in 4K
-     blocks. I found that made write performance poor, so now, writes
-     are buffered to allow long runs (up to 128 KB) to be collected
-     before being sent to the AFP server in one big write. This change
-     allowed me to go from tripping over ~1 Mbit via a wget download
-     to saturating my home cable connection. This isn't a Perl-specific
-     optimization. That said, due to the fact that AFP and Linux have
-     slightly different ideas about directory enumeration and metadata
-     retrieval, I may resurrect a bit of the caching code to retrieve
-     both metadata and entry lists in one go, and return the cached
-     metadata to save a bunch of transactions.
+     was mostly unnecessary. I recommend mounting with '-o big_writes',
+     to support the use of large write block sizes (up to 128 KB per
+     write) with FUSE; this substantially speeds up writes.
+
+
+  Q: I tried the open-source Jaffer AFP file server, and it doesn't work
+     right with your client! What's the problem?
+
+  A: The author of Jaffer is no longer maintaining his code. Even when he
+     was, his implementation was pretty broken, completely ignoring the
+     proper syntax for several calls, particularly certain fork state
+     get/set operations. He even says that mounting an export provided by
+     Jaffer can, and has been known to, crash Finder on OS X. So no, the
+     fact that his "AFP server" code is broken is *not* a reflection on
+     my code; I've been as careful as possible in following the AFP
+     specifications provided by Apple.
 
 
 COPYRIGHT AND LICENSE
