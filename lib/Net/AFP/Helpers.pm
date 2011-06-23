@@ -142,12 +142,7 @@ sub do_afp_connect {
             } ];
         }
         else {
-            # This is a crappy workaround for Jaffer being stupid.
-            $srvInfo->{'NetworkAddresses'} = [ {
-                'family'    => AF_INET,
-                'address'   => $values{'host'},
-                'port'      => $values{'port'},
-            } ];
+            croak("Server supplied no NetworkAddresses, but using IP transport; server is broken");
         }
     }
 
