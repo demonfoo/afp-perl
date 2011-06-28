@@ -2795,7 +2795,7 @@ None currently known.
 
 =head1 AUTHOR
 
-Derrik Pates <demon@devrandom.net>
+Derrik Pates <demon@now.ai>
 
 =head1 SEE ALSO
 

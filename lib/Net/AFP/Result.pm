@@ -20,65 +20,256 @@ our @EXPORT = qw(kFPNoErr kASPBadVersNum kASPBufTooSmall kFPNoMoreSessions
                  kFPInsideSharedErr kFPInsideTrashErr kFPPwdNeedsChangeErr
                  kFPPwdPolicyErr kFPDiskQuotaExceeded afp_strerror);
 
+=head1 NAME
+
+Net::AFP::Result - Perl module containing AFP error symbol information
+
+=head1 SYNOPSIS
+
+This package contains symbol defintions for all known AFP error condition
+codes, as well as a helper function to transform an error code into its
+plain English equivalent.
+
+=head1 ERROR SYMBOLS
+
+=over
+
+=item kFPNoErr
+
+=cut
 use constant kFPNoErr               => 0;
+=item kASPBadVersNum
+
+=cut
 use constant kASPBadVersNum         => -1066;
+=item kASPBufTooSmall
+
+=cut
 use constant kASPBufTooSmall        => -1067;
+=item kFPNoMoreSessions
+
+=cut
 use constant kFPNoMoreSessions      => -1068;
+=item kASPNoServers
+
+=cut
 use constant kASPNoServers          => -1069;
+=item kASPParamErr
+
+=cut
 use constant kASPParamErr           => -1070;
+=item kASPServerBusy
+
+=cut
 use constant kASPServerBusy         => -1071;
+=item kASPSessClosed
+
+=cut
 use constant kASPSessClosed         => -1072;
+=item kASPSizeErr
+
+=cut
 use constant kASPSizeErr            => -1073;
+=item kASPTooManyClients
+
+=cut
 use constant kASPTooManyClients     => -1074;
+=item kASPNoAck
+
+=cut
 use constant kASPNoAck              => -1075;
+=item kFPAccessDenied
+
+=cut
 use constant kFPAccessDenied        => -5000;
+=item kFPAuthContinue
+
+=cut
 use constant kFPAuthContinue        => -5001;
+=item kFPBadUAM
+
+=cut
 use constant kFPBadUAM              => -5002;
+=item kFPBadVersNum
+
+=cut
 use constant kFPBadVersNum          => -5003;
+=item kFPBitmapErr
+
+=cut
 use constant kFPBitmapErr           => -5004;
+=item kFPCantMove
+
+=cut
 use constant kFPCantMove            => -5005;
+=item kFPDenyConflict
+
+=cut
 use constant kFPDenyConflict        => -5006;
+=item kFPDirNotEmpty
+
+=cut
 use constant kFPDirNotEmpty         => -5007;
+=item kFPDiskFull
+
+=cut
 use constant kFPDiskFull            => -5008;
+=item kFPEOFErr
+
+=cut
 use constant kFPEOFErr              => -5009;
+=item kFPFileBusy
+
+=cut
 use constant kFPFileBusy            => -5010;
+=item kFPFlatVol
+
+=cut
 use constant kFPFlatVol             => -5011;
+=item kFPItemNotFound
+
+=cut
 use constant kFPItemNotFound        => -5012;
+=item kFPLockErr
+
+=cut
 use constant kFPLockErr             => -5013;
+=item kFPMiscErr
+
+=cut
 use constant kFPMiscErr             => -5014;
+=item kFPNoMoreLocks
+
+=cut
 use constant kFPNoMoreLocks         => -5015;
+=item kFPNoServer
+
+=cut
 use constant kFPNoServer            => -5016;
+=item kFPObjectExists
+
+=cut
 use constant kFPObjectExists        => -5017;
+=item kFPObjectNotFound
+
+=cut
 use constant kFPObjectNotFound      => -5018;
+=item kFPParamErr
+
+=cut
 use constant kFPParamErr            => -5019;
+=item kFPRangeNotLocked
+
+=cut
 use constant kFPRangeNotLocked      => -5020;
+=item kFPRangeOverlap
+
+=cut
 use constant kFPRangeOverlap        => -5021;
+=item kFPSessClosed
+
+=cut
 use constant kFPSessClosed          => -5022;
+=item kFPUserNotAuth
+
+=cut
 use constant kFPUserNotAuth         => -5023;
+=item kFPCallNotSupported
+
+=cut
 use constant kFPCallNotSupported    => -5024;
+=item kFPObjectTypeErr
+
+=cut
 use constant kFPObjectTypeErr       => -5025;
+=item kFPTooManyFilesOpen
+
+=cut
 use constant kFPTooManyFilesOpen    => -5026;
+=item kFPServerGoingDown
+
+=cut
 use constant kFPServerGoingDown     => -5027;
+=item kFPCantRename
+
+=cut
 use constant kFPCantRename          => -5028;
+=item kFPDirNotFound
+
+=cut
 use constant kFPDirNotFound         => -5029;
+=item kFPIconTypeError
+
+=cut
 use constant kFPIconTypeError       => -5030;
+=item kFPVolLocked
+
+=cut
 use constant kFPVolLocked           => -5031;
+=item kFPObjectLocked
+
+=cut
 use constant kFPObjectLocked        => -5032;
+=item kFPContainsSharedErr
+
+=cut
 use constant kFPContainsSharedErr   => -5033;
+=item kFPIDNotFound
+
+=cut
 use constant kFPIDNotFound          => -5034;   # AFP 2.1
+=item kFPIDExists
+
+=cut
 use constant kFPIDExists            => -5035;   # AFP 2.1
+=item kFPDiffVolErr
+
+=cut
 use constant kFPDiffVolErr          => -5036;   # AFP 2.1
+=item kFPCatalogChanged
+
+=cut
 use constant kFPCatalogChanged      => -5037;   # AFP 2.1
+=item kFPSameObjectErr
+
+=cut
 use constant kFPSameObjectErr       => -5038;   # AFP 2.1
+=item kFPBadIDErr
+
+=cut
 use constant kFPBadIDErr            => -5039;   # AFP 2.1
+=item kFPPwdSameErr
+
+=cut
 use constant kFPPwdSameErr          => -5040;   # AFP 2.1
+=item kFPPwdTooShortErr
+
+=cut
 use constant kFPPwdTooShortErr      => -5041;   # AFP 2.1
+=item kFPPwdExpiredErr
+
+=cut
 use constant kFPPwdExpiredErr       => -5042;   # AFP 2.1
+=item kFPInsideSharedErr
+
+=cut
 use constant kFPInsideSharedErr     => -5043;   # AFP 2.1
+=item kFPInsideTrashErr
+
+=cut
 use constant kFPInsideTrashErr      => -5044;   # AFP 2.1
+=item kFPPwdNeedsChangeErr
+
+=cut
 use constant kFPPwdNeedsChangeErr   => -5045;   # AFP 2.2
+=item kFPPwdPolicyErr
+
+=cut
 use constant kFPPwdPolicyErr        => -5046;   # AFP 3.0
-use constant kFPDiskQuotaExceeded=> -5047;   # AFP 3.1
+=item kFPDiskQuotaExceeded
+
+=cut
+use constant kFPDiskQuotaExceeded   => -5047;   # AFP 3.1
 
 our %errorcodes = (
     0       => 'No error occurred',
@@ -142,10 +333,33 @@ our %errorcodes = (
     -5047   => 'Disk quota exceeded',
 );
 
+=back
+
+=head1 FUNCTIONS
+
+=over
+
+=item afp_strerror (ERRNO)
+
+Return a string containing the description of the error code ERRNO.
+
+=cut
 sub afp_strerror {
     my ($rc) = @_;
     return $errorcodes{$rc};
 }
+
+=back
+
+=head1 AUTHOR
+
+Derrik Pates <demon@now.ai>
+
+=head1 SEE ALSO
+
+C<Net::AFP>
+
+=cut
 
 1;
 # vim: ts=4

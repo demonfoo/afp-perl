@@ -12,6 +12,7 @@ examples/afp_acl.pl
 examples/afp_chpass.pl
 examples/afpmount.pl
 examples/afpsh.pl
+lib/Fuse/AFP.pm
 lib/Net/AFP/ACL.pm
 lib/Net/AFP/Atalk.pm
 lib/Net/AFP/DirAttrs.pm
@@ -19,7 +20,6 @@ lib/Net/AFP/DirParms.pm
 lib/Net/AFP/ExtAttrs.pm
 lib/Net/AFP/FileAttrs.pm
 lib/Net/AFP/FileParms.pm
-lib/Net/AFP/Fuse.pm
 lib/Net/AFP/Helpers.pm
 lib/Net/AFP/MapParms.pm
 lib/Net/AFP/Parsers.pm

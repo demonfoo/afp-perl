@@ -272,6 +272,14 @@ sub GetStatus { # {{{1
 
 =back
 
+=item AUTHOR
+
+Derrik Pates <demon@now.ai>
+
+=head1 SEE ALSO
+
+C<Net::AFP>, C<Net::DSI>
+
 =cut
 1;
 # vim: ts=4 ai fdm=marker

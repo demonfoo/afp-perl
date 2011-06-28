@@ -77,7 +77,14 @@ Perform simple anonymous (guest) authentication with the server.
 
 =item $session
 
+An object derived from Net::AFP, for an active but not yet authenticated
+AFP server connection.
+
 =item $AFPVersion
+
+A string containing the AFP version identifier for the highest protocol
+version both sides can agree on. See
+L<Net::AFP::Versions/GetPreferredVersion()> for more information.
 
 =back
 
@@ -99,13 +106,28 @@ Perform password-based authentication with the server.
 
 =item $session
 
+An object derived from Net::AFP, for an active but not yet authenticated
+AFP server connection.
+
 =item $AFPVersion
+
+A string containing the AFP version identifier for the highest protocol
+version both sides can agree on. See
+L<Net::AFP::Versions/GetPreferredVersion()> for more information.
 
 =item $SupportedUAMs
 
+An array ref containing the list of supported UAMs which should be tried.
+Normally this should be the 'UAMs' structure element returned from
+L<Net::AFP/FPGetSrvrInfo>.
+
 =item $UserName
 
+A string containing the username to log in as.
+
 =item $PwCallback
+
+A subroutine reference which is to be used to acquire the user's password.
 
 =back
 
@@ -141,6 +163,34 @@ sub PasswordAuth($$$$$) {
 
 =item ChangePassword()
 
+=over
+
+=item $session
+
+An object derived from Net::AFP, for an active but not yet authenticated
+AFP server connection.
+
+=item $SupportedUAMs
+
+An array ref containing the list of supported UAMs which should be tried.
+Normally this should be the 'UAMs' structure element returned from
+L<Net::AFP/FPGetSrvrInfo>.
+
+=item $UserName
+
+A string containing the username whose password is to be changed. Ignored
+as of AFP 3.0.
+
+=item $OldPW
+
+A string containing the user's current password.
+
+=item $NewPW
+
+A string containing the new password to be set for the user.
+
+=back
+
 =cut
 sub ChangePassword {
     my($session, $SupportedUAMs, $UserName, $OldPW, $NewPW) = @_;
@@ -163,6 +213,14 @@ sub ChangePassword {
 }
 
 =back
+
+=item AUTHOR
+
+Derrik Pates <demon@now.ai>
+
+=head1 SEE ALSO
+
+C<Net::AFP>
 
 =cut
 
