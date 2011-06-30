@@ -19,6 +19,15 @@ our @EXPORT = qw(globalTimeOffset long_convert long_unconvert ll_convert
                  _ParseSrvrInfo _ParseFileDirParms _ParseFileParms
                  _ParseDirParms);
 
+my $has_Socket6 = 0;
+eval {
+    require Socket6;
+    1;
+} and do {
+    $has_Socket6 = 1;
+    Socket6->import();
+};
+
 # This is zero time for AFP - 1 Jan 2000 00:00 GMT.
 sub globalTimeOffset { return 946684800; }
 
@@ -277,10 +286,12 @@ _EOT_
                 $$addrEnt{'ssh_tunnel'} = 1;
             }
             elsif ($entryType == 6) { # Packed IPv6 address
+                next unless $has_Socket6;
                 $$addrEnt{'family'} = AF_INET6;
                 $$addrEnt{'address'} = inet_ntop(AF_INET6, $packed);
             }
             elsif ($entryType == 7) { # Packed IPv6 address + port
+                next unless $has_Socket6;
                 $$addrEnt{'family'} = AF_INET6;
                 my($addr, $port) = unpack('a16n', $packed);
                 $$addrEnt{'address'} = inet_ntop(AF_INET6, $addr);
