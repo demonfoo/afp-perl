@@ -5,6 +5,8 @@ use base qw(Fuse::Class);
 
 # imports {{{1
 use strict;
+no strict qw(refs); # for looser handling of subroutine refs, since proper
+                    # CODE refs don't work across threads
 use warnings;
 no warnings qw(redefine);
 use diagnostics;
@@ -287,16 +289,16 @@ sub new { # {{{1
     $$obj{'DForkLenKey'}    = 'DataForkLen';
     $$obj{'RForkLenKey'}    = 'RsrcForkLen';
     $$obj{'UseExtOps'}      = 0;
-    $$obj{'ReadFn'}         = \&Net::AFP::FPRead;
-    $$obj{'WriteFn'}        = \&Net::AFP::FPWrite;
-    $$obj{'EnumFn'}         = \&Net::AFP::FPEnumerate;
+    $$obj{'ReadFn'}         = 'Net::AFP::FPRead';
+    $$obj{'WriteFn'}        = 'Net::AFP::FPWrite';
+    $$obj{'EnumFn'}         = 'Net::AFP::FPEnumerate';
     # AFP prior to 2.0 doesn't provide any locking semantics, so just use
     # a bullshit empty function ref.
     $$obj{'LockFn'}         = sub { };
 
     if (Net::AFP::Versions::CompareByVersionNum($$obj{'afpconn'}, 2, 0,
             kFPVerAtLeast)) {
-        $$obj{'LockFn'}         = \&Net::AFP::FPByteRangeLock;
+        $$obj{'LockFn'}         = 'Net::AFP::FPByteRangeLock';
     }
 
     # I *think* large file support entered the picture as of AFP 3.0...
@@ -307,14 +309,15 @@ sub new { # {{{1
         $$obj{'DForkLenKey'}    = 'ExtDataForkLen';
         $$obj{'RForkLenKey'}    = 'ExtRsrcForkLen';
         $$obj{'UseExtOps'}      = 1;
-        $$obj{'ReadFn'}         = \&Net::AFP::FPReadExt;
-        $$obj{'WriteFn'}        = \&Net::AFP::FPWriteExt;
-        $$obj{'LockFn'}         = \&Net::AFP::FPByteRangeLockExt;
+        $$obj{'ReadFn'}         = 'Net::AFP::FPReadExt';
+        $$obj{'WriteFn'}        = 'Net::AFP::FPWriteExt';
+        $$obj{'LockFn'}         = 'Net::AFP::FPByteRangeLockExt';
+        $$obj{'EnumFn'}         = 'Net::AFP::FPEnumerateExt';
     }
 
     if (Net::AFP::Versions::CompareByVersionNum($$obj{'afpconn'}, 3, 1,
             kFPVerAtLeast)) {
-        $$obj{'EnumFn'}         = \&Net::AFP::FPEnumerateExt2;
+        $$obj{'EnumFn'}         = 'Net::AFP::FPEnumerateExt2';
     }
 
     # Not checking the return code here. If this fails, $$self{'DTRefNum'}
@@ -636,12 +639,11 @@ sub getdir { # {{{1
                     'StartIndex'        => 1,
                     'MaxReplySize'      => 32767,
                     'PathType'          => $$self{'pathType'},
-                    'Pathname'          => $fileName,
-                    'Entries_ref'       => \$resp);
+                    'Pathname'          => $fileName);
     my $rc = undef;
     # loop reading entries {{{2
     while (1) {
-        $rc = &{$$self{'EnumFn'}}($$self{'afpconn'}, %arglist);
+        ($rc, $resp) = &{$$self{'EnumFn'}}($$self{'afpconn'}, %arglist);
 
         last unless $rc == kFPNoErr;
 
@@ -2146,13 +2148,12 @@ sub readdir { # {{{1
         }
     } # }}}2
 
-    my $resp;
     my $bitmap = $$self{'pathFlag'};
 
     my $delta = 1;
     if ($dirname eq '/') { $delta++; }
     # Request entry list from server {{{2
-    my $rc = &{$$self{'EnumFn'}}($$self{'afpconn'},
+    my($rc, $resp) = &{$$self{'EnumFn'}}($$self{'afpconn'},
                     'VolumeID'          => $$self{'volID'},
                     'DirectoryID'       => $dh,
                     'FileBitmap'        => $bitmap,
@@ -2161,8 +2162,7 @@ sub readdir { # {{{1
                     'StartIndex'        => $offset - $delta,
                     'MaxReplySize'      => 32767,
                     'PathType'          => $$self{'pathType'},
-                    'Pathname'          => '',
-                    'Entries_ref'       => \$resp);
+                    'Pathname'          => '');
 
     return -&EACCES  if $rc == kFPAccessDenied;
     return -&ENOENT  if $rc == kFPDirNotFound;

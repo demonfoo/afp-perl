@@ -1883,10 +1883,13 @@ possible values.
 
 Pathname to the desired directory.
 
-=item Entries_ref
+=back
 
-A reference to a scalar that can be used to contain an array of parsed
-data structures containing information about remote files.
+Returns:
+
+A scalar indicating the error code from the call. If successful, returns
+the error code followed by an array ref containing the parsed data structures
+for the returned entries describing remote files.
 
  [
    {
@@ -1905,12 +1908,6 @@ data structures containing information about remote files.
    },
    ...
  ]
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -1967,11 +1964,7 @@ sub FPEnumerate { # {{{1
             unless exists $options{'PathType'};
     croak('Pathname must be provided')
             unless exists $options{'Pathname'};
-    # FIXME: Maybe we should just return this rather than having to take a
-    # ref and screw with that?
-    croak('Entries_ref must be a scalar ref')
-            unless ref($options{'Entries_ref'}) eq 'SCALAR'
-                or ref($options{'Entries_ref'}) eq 'REF';
+    croak('Must accept array return') unless wantarray();
 
     my $msg = pack('CxnNnnnnna*', kFPEnumerate,
             @options{'VolumeID', 'DirectoryID', 'FileBitmap', 'DirectoryBitmap',
@@ -2000,8 +1993,7 @@ sub FPEnumerate { # {{{1
             push(@results, _ParseFileParms($FileBitmap, $OffspringParameters));
         }
     }
-    ${$options{'Entries_ref'}} = [@results];
-    return $rc;
+    return($rc, [@results]);
 } # }}}1
 
 =item FPEnumerateExt()
@@ -2062,10 +2054,13 @@ possible values.
 
 Pathname to the desired directory.
 
-=item Entries_ref
+=back
 
-A reference to a scalar that can be used to contain an array of parsed
-data structures containing information about remote files.
+Returns:
+
+A scalar indicating the error code from the call. If successful, returns
+the error code followed by an array ref containing the parsed data structures
+for the returned entries describing remote files.
 
  [
    {
@@ -2084,12 +2079,6 @@ data structures containing information about remote files.
    },
    ...
  ]
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -2146,11 +2135,7 @@ sub FPEnumerateExt { # {{{1
             unless exists $options{'PathType'};
     croak('Pathname must be provided')
             unless exists $options{'Pathname'};
-    # FIXME: Maybe we should just return this rather than having to take a
-    # ref and screw with that?
-    croak('Entries_ref must be a scalar ref')
-            unless ref($options{'Entries_ref'}) eq 'SCALAR'
-                or ref($options{'Entries_ref'}) eq 'REF';
+    croak('Must accept array return') unless wantarray();
 
     my $msg = pack("CxnNnnnnna*", kFPEnumerateExt,
             @options{'VolumeID', 'DirectoryID', 'FileBitmap', 'DirectoryBitmap',
@@ -2177,8 +2162,7 @@ sub FPEnumerateExt { # {{{1
             push(@results, _ParseFileParms($FileBitmap, $OffspringParameters));
         }
     }
-    ${$options{'Entries_ref'}} = [@results];
-    return $rc;
+    return($rc, [@results]);
 } # }}}1
 
 =item FPEnumerateExt2()
@@ -2237,10 +2221,13 @@ possible values.
 
 Pathname to the desired directory.
 
-=item Entries_ref
+=back
 
-A reference to a scalar that can be used to contain an array of parsed
-data structures containing information about remote files.
+Returns:
+
+A scalar indicating the error code from the call. If successful, returns
+the error code followed by an array ref containing the parsed data structures
+for the returned entries describing remote files.
 
  [
    {
@@ -2259,12 +2246,6 @@ data structures containing information about remote files.
    },
    ...
  ]
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
 
 Error replies:
 
@@ -2322,11 +2303,7 @@ sub FPEnumerateExt2 { # {{{1
             unless exists $options{'PathType'};
     croak('Pathname must be provided')
             unless exists $options{'Pathname'};
-    # FIXME: Maybe we should just return this rather than having to take a
-    # ref and screw with that?
-    croak('Entries_ref must be a scalar ref')
-            unless ref($options{'Entries_ref'}) eq 'SCALAR'
-                or ref($options{'Entries_ref'}) eq 'REF';
+    croak('Must accept array return') unless wantarray();
 
     my $msg = pack('CxnNnnnNNa*', kFPEnumerateExt2,
             @options{'VolumeID', 'DirectoryID', 'FileBitmap', 'DirectoryBitmap',
@@ -2353,8 +2330,7 @@ sub FPEnumerateExt2 { # {{{1
             push(@results, _ParseFileParms($FileBitmap, $OffspringParameters));
         }
     }
-    ${$options{'Entries_ref'}} = [@results];
-    return $rc;
+    return($rc, [@results]);
 } # }}}1
 
 =item FPExchangeFiles()

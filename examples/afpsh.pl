@@ -173,6 +173,7 @@ if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
     $RForkLenKey    = 'ExtRsrcForkLen';
     $ReadFn         = \&Net::AFP::FPReadExt;
     $WriteFn        = \&Net::AFP::FPWriteExt;
+    $EnumFn         = \&Net::AFP::FPEnumerateExt;
 }
 
 if (Net::AFP::Versions::CompareByVersionNum($session, 3, 1,
@@ -240,7 +241,7 @@ my %commands = (
                 my $offset = 1;
                 do {
                     $results = undef;
-                    $rc = &$EnumFn($session,
+                    ($rc, $results) = &$EnumFn($session,
                                    'VolumeID'       => $volID,
                                    'DirectoryID'    => $dirId,
                                    'FileBitmap'     => $fileBmp,
@@ -249,8 +250,7 @@ my %commands = (
                                    'StartIndex'     => $offset,
                                    'MaxReplySize'   => 32767,
                                    'PathType'       => $pathType,
-                                   'Pathname'       => '',
-                                   'Entries_ref'    => \$results);
+                                   'Pathname'       => '');
                     if (ref($results) eq 'ARRAY') {
                         push(@records, @$results);
                         $offset += scalar(@$results);
@@ -891,7 +891,7 @@ sub expand_globbed_path {
 		foreach my $expath (@expanded_paths) {
 			my ($rc, $resp, %entries);
 			do {
-				$rc = &$EnumFn($session,
+				($rc, $resp) = &$EnumFn($session,
                                'VolumeID'       => $volid,
                                'DirectoryID'    => $$expath[0],
                                'FileBitmap'     => $fileBmp,
@@ -900,8 +900,7 @@ sub expand_globbed_path {
                                'StartIndex'     => scalar(keys %entries) + 1,
                                'MaxReplySize'   => 32767,
 						       'PathType'       => $pathType,
-                               'Pathname'       => $$expath[1],
-                               'Entries_ref'    => \$resp);
+                               'Pathname'       => $$expath[1]);
 				if ($rc == kFPNoErr || $rc == kFPObjectNotFound) {
 					foreach my $elem (@$resp) {
 						$entries{$$elem{$pathkey}} = $elem;
