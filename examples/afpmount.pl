@@ -207,6 +207,18 @@ if ($options) {
 }
 
 my @aforder = ( AF_INET );
+if ($prefer_v4) {
+    push(@aforder, AF_INET6);
+}
+else {
+    unshift(@aforder, AF_INET6);
+}
+if ($atalk_first) {
+    unshift(@aforder, AF_APPLETALK);
+}
+else {
+    push(@aforder, AF_APPLETALK);
+}
 
 # make the parent process into a really simple rpc server that handles
 # messages from the actual client process (which will go into the
