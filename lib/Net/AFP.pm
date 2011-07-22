@@ -4504,11 +4504,11 @@ sub FPMapName { # {{{1
     my $pack_mask = 'CC';
     if ($Subfunction == kUTF8NameToUserUUID ||
             $Subfunction == kUTF8NameToGroupUUID) {
-        $pack_mask .= 'n/a';
+        $pack_mask .= 'n/a*';
         $Name = encode_utf8(decompose($Name));
     }
     else {
-        $pack_mask .= 'C/a';
+        $pack_mask .= 'C/a*';
         if ($Subfunction == kUTF8NameToUserID ||
                 $Subfunction == kUTF8NameToGroupID) {
             $Name = encode_utf8(decompose($Name));
