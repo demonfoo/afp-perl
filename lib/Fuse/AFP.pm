@@ -1550,7 +1550,8 @@ sub setxattr { # {{{1
             $attr =~ s/^user\.//;
         }
 
-        if ($attr eq 'com.apple.FinderInfo') {
+        if ($attr eq 'com.apple.FinderInfo' &&
+                !($$self{'volAttrs'} & kSupportsExtAttrs)) {
             # If FinderInfo is already set to something (there's always data
             # there, but I'm interpreting "existence" to mean "data is there
             # and it's something that's not 32 bytes of 0"), apply special
@@ -1755,7 +1756,8 @@ sub getxattr { # {{{1
             $attr =~ s/^user\.//;
         }
 
-        if ($attr eq 'com.apple.FinderInfo') {
+        if ($attr eq 'com.apple.FinderInfo' &&
+                !($$self{'volAttrs'} & kSupportsExtAttrs)) {
             my($rc, $resp) = $self->{'afpconn'}->FPGetFileDirParms(
                     'VolumeID'          => $self->{'volID'},
                     'DirectoryID'       => $self->{'topDirID'},
@@ -1906,12 +1908,14 @@ sub listxattr { # {{{1
     my($rc, $resp) = $self->{'afpconn'}->FPGetFileDirParms(
             'VolumeID'          => $self->{'volID'},
             'DirectoryID'       => $self->{'topDirID'},
+            'FileBitmap'        => $self->{'RForkLenFlag'},
             'FileBitmap'        => kFPFinderInfoBit | $self->{'RForkLenFlag'},
             'DirectoryBitmap'   => kFPFinderInfoBit,
             'PathType'          => $self->{'pathType'},
             'Pathname'          => $fileName);
 
-    if (exists($resp->{'FinderInfo'})
+    if (!($$self{'volAttrs'} & kSupportsExtAttrs)
+            && exists($resp->{'FinderInfo'})
             && $resp->{'FinderInfo'} ne "\0" x 32) {
         push(@attrs, 'com.apple.FinderInfo');
     }
@@ -2023,7 +2027,8 @@ sub removexattr { # {{{1
             $attr =~ s/^user\.//;
         }
 
-        if ($attr eq 'com.apple.FinderInfo') {
+        if ($attr eq 'com.apple.FinderInfo' &&
+                !($$self{'volAttrs'} & kSupportsExtAttrs)) {
             my $rc = $self->{'afpconn'}->FPSetFileDirParms(
                     'VolumeID'          => $self->{'volID'},
                     'DirectoryID'       => $self->{'topDirID'},
