@@ -34,6 +34,7 @@ eval {
 # Set up the pattern to use for breaking the AFP URL into its components.
 our $url_rx;
 if ($] >= 5.010) {
+    eval '
     $url_rx = qr{^
                   (afps?):/             # protocol specific prefix
                   (at)?/                # optionally specify atalk transport
@@ -48,7 +49,7 @@ if ($] >= 5.010) {
                       ([^:/;]+)         # first path element is vol name
                       (/.*)?            # rest of path is local subpath
                   )?)?                  # closure of path capture
-                  $}xs;
+                  $}xs';
 }
 elsif ($] >= 5.008) {
     # Since we can't do (?|...) in Perl 5.8.x (didn't get added till 5.10),
