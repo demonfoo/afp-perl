@@ -12,7 +12,7 @@ no warnings qw(redefine);
 use diagnostics;
 
 # Tell Perl we need to be run in at least v5.8.
-use v5.8;
+use 5.008;
 
 # Enables a nice call trace on warning events.
 use Carp;
@@ -589,7 +589,7 @@ sub readlink { # {{{1
             # make sure any elements of the path that start with .. get fixed
             # up appropriately.
             my @parts = split(m{/}, $linkPath);
-            grep(s{^\.!\.\.(.)}{..$1}, @parts);
+            foreach (@parts) { s{^\.!\.\.(.)}{..$1}; }
             $linkPath = join('/', @parts);
         }
         return encode(ENCODING, $linkPath);
@@ -900,7 +900,7 @@ sub symlink { # {{{1
         # make sure any elements of the path that start with .. get fixed
         # up appropriately.
         my @parts = split(m{/}, $target);
-        grep(s{^\.\.(.)}{.!..$1}, @parts);
+        foreach (@parts) { s{^\.\.(.)}{.!..$1}; }
         $target = join('/', @parts);
     }
     my $forkID = $sresp{'OForkRefNum'};
@@ -951,22 +951,17 @@ sub rename { # {{{1
 
     $oldName = decode(ENCODING, $oldName);
     $newName = decode(ENCODING, $newName);
-    my @elems = split(/\//, $newName);
-    my $newPath = join('/', @elems[0 .. ($#elems - 1)]);
-    if ($newPath eq '') {
-        $newPath = '/';
-    }
-    my $newRealName = $elems[-1];
-    @elems = split(/\//, $oldName);
-    my $oldRealName = $elems[-1];
 
     my $oldXlated = translate_path($oldName, $self);
-    my $newXlated = translate_path($newPath, $self);
+    my $newXlated = translate_path($newName, $self);
     
+    my $oldRealName = node_name($oldXlated);
+    my $newRealName = node_name($newXlated);
+
     my ($rc, $old_stat) = $self->lookup_afp_entry($oldXlated, 1);
     return $rc if $rc != kFPNoErr;
     my $new_stat;
-    ($rc, $new_stat) = $self->lookup_afp_entry($newXlated);
+    ($rc, $new_stat) = $self->lookup_afp_entry(path_parent($newXlated));
     return $rc if $rc;
 
     if (defined $$self{'client_uuid'}) {
@@ -1934,7 +1929,7 @@ sub listxattr { # {{{1
     # attributes.
     # handle ACL xattr {{{2
     if (defined $$self{'client_uuid'}) {
-        my $rc = $$self{'afpconn'}->FPAccess(
+        $rc = $$self{'afpconn'}->FPAccess(
                 'VolumeID'      => $$self{'volID'},
                 'DirectoryID'   => $$self{'topDirID'},
                 'UUID'          => $$self{'client_uuid'},
@@ -1960,7 +1955,8 @@ sub listxattr { # {{{1
     # handle comment xattr {{{2
     # comment stuff is deprecated as of AFP 3.3...
     if (defined $$self{'DTRefNum'}) {
-        my($rc, $comment) = $$self{'afpconn'}->FPGetComment(
+        my $comment;
+        ($rc, $comment) = $$self{'afpconn'}->FPGetComment(
                 'DTRefNum'      => $$self{'DTRefNum'},
                 'DirectoryID'   => $$self{'topDirID'},
                 'PathType'      => $$self{'pathType'},
