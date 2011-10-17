@@ -433,7 +433,7 @@ elsif (scalar(@insert)) { # {{{1
     # Parse the textual ACE, and get the offset to add the new one at.
     my $ace = make_ace($insert[1]);
     my $offset = int($insert[0]);
-    die() unless $offset >= 0;
+    die() if $offset < 0;
 
     foreach my $file (@ARGV) { # {{{2
         # Get the file's ACL. Parse it if there is one; if not, just set
@@ -455,7 +455,7 @@ elsif (scalar(@insert)) { # {{{1
         my $new_rawacl = assemble_xattr($acl_flags, $acl);
         my $rv = setfattr($file, XATTR_NAME, $new_rawacl,
                 { 'namespace' => XATTR_NS });
-        unless ($rv) {
+        if (!$rv) {
             print "Error while updating ACL on \"", $file, "\": ",
                     $errors{int($!)},"\n";
         }
@@ -465,7 +465,7 @@ elsif (scalar(@replace)) { # {{{1
     # Parse the textual ACE, and the offset of the ACE to replace.
     my $ace = make_ace($replace[1]);
     my $offset = int($replace[0]);
-    die() unless $offset >= 0;
+    die() if $offset < 0;
 
     foreach my $file (@ARGV) { # {{{2
         # Get the ACL for the file. If it's present, parse it out; otherwise,
