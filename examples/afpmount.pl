@@ -62,7 +62,7 @@ use constant MSGLEN             => 3;
 my @msgfields = ('msg', 'payloadlen');
 # }}}1
 
-sub usage {
+sub usage { #{{{1
     print "\nafp-perl version ", $Net::AFP::VERSION, " - Apple Filing Protocol mount tool\n";
     print "\nUsage: ", $0, " [options] [AFP URL] [mount point]\n\n";
     print <<'_EOT_';
@@ -105,9 +105,9 @@ Items in [] are optional; they are as follows:
 
 _EOT_
     exit(&EINVAL);
-}
+} #}}}1
 
-sub list_mounts {
+sub list_mounts { #{{{1
     my($callback, $url) = @_;
     # See if there's a URL on @ARGV with at least a hostname (and possibly
     # user creds), and try to get a mount list from the server.
@@ -133,9 +133,9 @@ sub list_mounts {
     $session->FPLogout();
     $session->close();
     exit(0);
-}
+} #}}}1
 
-sub list_servers {
+sub list_servers { #{{{1
     # Try to use Bonjour (and NBP, if it's available?) to get a list of
     # available AFP servers that one *could* mount shares from...
 
@@ -173,9 +173,9 @@ _EOT_
     print map { $_ . "\n" } @servers;
 
     exit(0);
-}
+} #}}}1
 
-# Handle the command line args.
+# Handle the command line args. {{{1
 my($interactive, $options, $prefer_v4, $atalk_first);
 # For now accept --options/-o, and just don't do anything with the option
 # string we get, that allows mounting via fstab to work.
@@ -188,24 +188,21 @@ exit(&EINVAL) unless GetOptions('interactive'   => \$interactive,
                                 'atalk-first'   => \$atalk_first);
 my($path, $mountpoint) = @ARGV;
 
-unless ($path) {
-    usage();
-}
-
-unless ($mountpoint) {
+unless ($path && $mountpoint) {
     usage();
 }
 
 unless (-d $mountpoint) {
     print STDERR "ERROR: attempted to mount to non-directory\n";
     exit(&ENOTDIR); 
-}
+}#}}}1
 
 my %options;
 if ($options) {
     %options = map { my($o, $v) = split(/=/, $_); $o, $v } split(/,/, $options);
 }
 
+# Set up address family order {{{1
 my @aforder = ( AF_INET );
 if ($prefer_v4) {
     push(@aforder, AF_INET6);
@@ -218,7 +215,7 @@ if ($atalk_first) {
 }
 else {
     push(@aforder, AF_APPLETALK);
-}
+} #}}}1
 
 # make the parent process into a really simple rpc server that handles
 # messages from the actual client process (which will go into the
@@ -333,31 +330,26 @@ eval {
     print STDERR "Error while invoking Fuse::AFP:\n", $@;
     syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, &EINVAL));
     exit(1);
-}; # }}}1
+};
 
 unless (ref($fuse)) {
     # if this happens, an error code was returned, so pass that back to
     # the parent process...
     syswrite(PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, $fuse));
     exit(1);
-}
+} #}}}1
 
 # Send a love note to the folks saying "wish you were here, everything's
 # fine".
 syswrite(PARENT, pack(MSGFORMAT, MSG_RUNNING, 0));
 close(PARENT);
 
-# Close all FDs.
-#for (my $i = 0; $i < 1024; $i++) {
-#   open(HANDLE, '<&=', $i);
-#   close(HANDLE);
-#}
 # reopen the standard FDs onto /dev/null; they have to be open, since if
 # anything writes to the default FDs after they get opened to by something
 # else, things can break badly.
-#open(STDIN, '<', '/dev/null');
-#open(STDOUT, '>', '/dev/null');
-#open(STDERR, '>&', \*STDOUT);
+open(STDIN, '<', '/dev/null');
+open(STDOUT, '>', '/dev/null');
+open(STDERR, '>&', \*STDOUT);
 
 my $script_name = $0;
 $0 = join(' ', $script_name, $path, $mountpoint);
@@ -391,4 +383,4 @@ $fuse->main(%mainopts);
 # quietly...
 exit(0);
 
-# vim: ts=4 fdm=marker sw=4 et
+# vim: ts=4 fdm=marker sw=4 et hls
