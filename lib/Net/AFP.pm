@@ -203,7 +203,7 @@ sub new { # {{{1
     DEBUG('called ', (caller(0))[3]);
     my $obj = {};
     bless $obj, $class;
-    my $logparms = <<_EOT_;
+    my $logparms = <<'_EOT_';
 log4perl.logger = INFO, status
 log4perl.appender.status = Log::Dispatch::Syslog
 log4perl.appender.status.Facility = user
