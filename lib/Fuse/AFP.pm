@@ -1288,6 +1288,9 @@ sub read { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     if (ref($fh)) {
+        if ($off > length($$fh)) {
+            return q{};
+        }
         if ($off + $len > length($$fh)) {
             $len = length($$fh) - $off;
         }
