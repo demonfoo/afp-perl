@@ -320,7 +320,7 @@ sub close { # {{{1
     return;
 } # }}}1
 
-=item SendMessage (CMD, MESSAGE, DATA_R, D_LEN, SEM_R, RC_R, RESP_R)
+=item SendMessage (CMD, MESSAGE, DATA_R, D_LEN, SEM_R, RESP_R, RC_R)
 
 =cut
 # Arguments:
@@ -337,7 +337,9 @@ sub close { # {{{1
 #   $resp_r:    A reference to a scalar, which will be made shared and will
 #               receive the response when one is received. If no response is
 #               expected, this should be undef.
-#   $rc_r:      A reference to a scalar,
+#   $rc_r:      A reference to a scalar, which will be made shared and will
+#               receive the return code from the callout. If no response is
+#               desired, this should be undef.
 sub SendMessage { # {{{1
     my ($self, $cmd, $message, $data_r, $d_len, $sem_r, $resp_r, $rc_r) = @_;
 
@@ -451,8 +453,8 @@ sub DSICommand { # {{{1
 The C<DSIGetStatus> call is used by a DSI client to obtain status
 information for a particular server.
 
-RESP_R must be a scalar ref which will contain a hash ref with the
-parsed structure data from the DSIGetStatus call.
+RESP_R must be a scalar ref which will contain the raw binary data returned
+from the DSIGetStatus call.
 
 =cut
 sub DSIGetStatus { # {{{1
@@ -596,7 +598,7 @@ Seems to happen with both Strawberry Perl and ActivePerl.
 
 =head1 AUTHOR
 
-Derrik Pates <demon@devrandom.net>
+Derrik Pates <demon@now.ai>
 
 =head1 SEE ALSO
 
