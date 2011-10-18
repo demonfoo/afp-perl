@@ -47,7 +47,7 @@ use Net::AFP::Result;
 # Provides large-integer mathematics features, necessary for the
 # cryptographic exchanges and derivation of the key.
 use Math::BigInt lib => 'GMP';
-use Digest::MD5 qw(md5);
+#use Digest::MD5 qw(md5);
 use Net::AFP::Versions;
 use Log::Log4perl qw(:easy);
 
@@ -223,8 +223,8 @@ sub Authenticate {
     DEBUG('$K is ', $K->as_hex());
     my $K_binary = pack('H*', zeropad(substr($K->as_hex(), 2), $len * 2));
     undef $K;
-    my $K_hash = md5($K_binary);
-    undef $K_binary;
+    #my $K_hash = md5($K_binary);
+    #undef $K_binary;
 
     # Get our nonce, which we'll send to the server in the ciphertext.
     my $clientNonce_binary = Crypt::CBC->_get_random_bytes(16);
@@ -234,13 +234,13 @@ sub Authenticate {
     
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
-    my $ctx = new Crypt::CBC( { 'key'               => $K_hash,
+    my $ctx = new Crypt::CBC( { 'key'               => $K_binary,
                                 'cipher'            => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
                                 'padding'           => 'null',
-                                'regenerate_key'    => 0,
+                                'literal_key'       => 0,
                                 'prepend_iv'        => 0,
                                 'iv'                => C2SIV } );
-    undef $K_hash;
+    #undef $K_hash;
     $$session{'cryptctx'} = $ctx;
 
     # Encrypt the random nonce value we fetched above, then assemble the
@@ -395,7 +395,7 @@ sub ChangePassword {
     my $ctx = new Crypt::CBC( { 'key'               => $K_binary,
                                 'cipher'            => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
                                 'padding'           => 'null',
-                                'regenerate_key'    => 1,
+                                'literal_key'       => 0,
                                 'prepend_iv'        => 0,
                                 'iv'                => C2SIV } );
     undef $K_binary;

@@ -136,7 +136,7 @@ sub Authenticate {
     my $ctx = new Crypt::CBC( { 'key'               => $K_binary,
                                 'cipher'            => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
                                 'padding'           => 'null',
-                                'regenerate_key'    => 0,
+                                'literal_key'       => 1,
                                 'prepend_iv'        => 0,
                                 'iv'                => S2CIV } );
     undef $K_binary;
@@ -245,7 +245,7 @@ sub ChangePassword {
     my $ctx = new Crypt::CBC( { 'key'               => $K_binary,
                                 'cipher'            => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
                                 'padding'           => 'null',
-                                'regenerate_key'    => 0,
+                                'literal_key'       => 1,
                                 'prepend_iv'        => 0,
                                 'iv'                => S2CIV } );
     undef $K_binary;
