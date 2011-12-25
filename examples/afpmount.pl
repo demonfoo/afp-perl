@@ -358,6 +358,7 @@ $0 = join(' ', $script_name, $path, $mountpoint);
 $options{'allow_other'} = undef;
 $options{'subtype'}     = 'pafpfs';
 $options{'fsname'}      = $path;
+delete $options{'encoding'};
 
 my $debug;
 our $_DEBUG;
