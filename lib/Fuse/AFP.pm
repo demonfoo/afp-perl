@@ -40,6 +40,14 @@ use Fuse qw(:all);              # Still need this for extended attribute
 use POSIX;                      # Standard error codes, access() modes, etc.
 use Time::HiRes qw(gettimeofday);
 use URI::Escape;
+my $has_I18N__Langinfo = 0;
+eval {
+    require I18N::Langinfo;
+    1;
+} and do {
+    $has_I18N__Langinfo = 1;
+    I18N::Langinfo->import(qw(langinfo CODESET));
+};
 
 # FreeBSD oh-so-handily names this error code differently, so I'm going
 # to cheat just slightly...
@@ -51,12 +59,8 @@ sub ENODATA { return($^O eq 'freebsd' ? &Errno::ENOATTR : &Errno::ENODATA); }
 my $has_Data__UUID = 0;
 eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
 
-# Use a nice learge blocksize to require fewer transactions with the server.
+# Use a nice large blocksize to require fewer transactions with the server.
 use constant IO_BLKSIZE         => 131072;
-
-# What character encoding we should be pushing out to the virtual filesystem
-# for paths? This is it.
-use constant ENCODING           => 'utf8';
 
 # Special magic extended attribute names to take advantage of certain
 # AFP features.
@@ -121,11 +125,28 @@ internal use only, or for invocation by Fuse::Class.
 sub new { # {{{1
     my ($class, $url, $pw_cb, %opts) = @_;
 
+    # By default, assume utf8 encoding. This is only used if we can't figure
+    # it out using I18N::Langinfo, and the user doesn't override it.
+    my $encoding = 'utf8';
+    # If the appropriate module is available to us, try to figure out what
+    # character set the system is using.
+    if ($has_I18N__Langinfo) {
+        $encoding = langinfo(CODESET());
+    }
     my $obj = $class->SUPER::new();
-    $$obj{'topDirID'} = 2;
-    $$obj{'volID'} = undef;
-    $$obj{'DTRefNum'} = undef;
-    $$obj{'afpconn'} = undef;
+    $obj->{'topDirID'}  = 2;
+    $obj->{'volID'}     = undef;
+    $obj->{'DTRefNum'}  = undef;
+    $obj->{'afpconn'}   = undef;
+
+    if (exists $opts{'encoding'}) {
+        $encoding = $opts{'encoding'};
+        delete $opts{'encoding'};
+    }
+    $obj->{'local_encode'} = find_encoding($encoding);
+    unless (ref($obj->{'local_encode'})) {
+        croak "Encoding " . $encoding . " was not known";
+    }
 
     my($session, %urlparms);
     my $callback = sub {
@@ -145,7 +166,7 @@ sub new { # {{{1
 
     unless (defined $urlparms{'volume'}) {
         $session->close();
-        croak('Unable to extract volume from AFP URL')
+        croak('Unable to extract volume from AFP URL');
     }
     $$obj{'afpconn'} = $session;
 
@@ -434,7 +455,7 @@ sub getattr { # {{{1
     
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     if ($file eq '/._metrics') {
         my $timest = time();
         my @stat = (
@@ -535,7 +556,7 @@ sub readlink { # {{{1
     # aren't present, this won't work.
     return -&EINVAL unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     # Break the provided path down into a directory ID and filename.
     my $fileName = translate_path($file, $self);
 
@@ -592,7 +613,7 @@ sub readlink { # {{{1
             foreach (@parts) { s{^\.!\.\.(.)}{..$1}; }
             $linkPath = join('/', @parts);
         }
-        return encode(ENCODING, $linkPath);
+        return $self->{'local_encode'}->encode($linkPath);
     } # }}}2
 
     return -&EINVAL;
@@ -605,7 +626,7 @@ sub getdir { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $dirname = decode(ENCODING, $dirname);
+    $dirname = $self->{'local_encode'}->decode($dirname);
     my $fileName = translate_path($dirname, $self);
     my @filesList = ('.', '..');
 
@@ -662,12 +683,12 @@ sub getdir { # {{{1
             my $name = $$elem{$$self{'pathkey'}};
             $name =~ tr{/}{:};
             if ($self->{'dotdothack'}) { $name =~ s{^\.!\.\.(.)}{..$1}; }
-            push(@filesList, encode(ENCODING, $name));
+            push(@filesList, $self->{'local_encode'}->encode($name));
         }
         #push(@filesList, map {
         #                my $name = $$_{$$self{'pathkey'}};
         #                $name =~ tr{/}{:};
-        #                encode(ENCODING, $name); } @$resp);
+        #                $self->{'local_encode'}->encode($name); } @$resp);
 
         # Set up for a subsequent call to get directory entries.
         $arglist{'StartIndex'} += scalar(@$resp);
@@ -693,7 +714,7 @@ sub mknod { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     my $file_n = $file;
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
 
     if (S_ISREG($mode)) {
@@ -740,7 +761,7 @@ sub mkdir { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
@@ -782,7 +803,7 @@ sub unlink { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
@@ -838,7 +859,7 @@ sub symlink { # {{{1
 
     return -&EPERM unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
-    $linkname = decode(ENCODING, $linkname);
+    $linkname = $self->{'local_encode'}->decode($linkname);
     my $fileName = translate_path($linkname, $self);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($fileName));
@@ -949,8 +970,8 @@ sub rename { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $oldName = decode(ENCODING, $oldName);
-    $newName = decode(ENCODING, $newName);
+    $oldName = $self->{'local_encode'}->decode($oldName);
+    $newName = $self->{'local_encode'}->decode($newName);
 
     my $oldXlated = translate_path($oldName, $self);
     my $newXlated = translate_path($newName, $self);
@@ -958,7 +979,7 @@ sub rename { # {{{1
     my $oldRealName = node_name($oldXlated);
     my $newRealName = node_name($newXlated);
 
-    my ($rc, $old_stat) = $self->lookup_afp_entry($oldXlated, 1);
+    my ($rc, $old_stat) = $self->lookup_afp_entry($oldXlated);
     return $rc if $rc != kFPNoErr;
     my $new_stat;
     ($rc, $new_stat) = $self->lookup_afp_entry(path_parent($newXlated));
@@ -1036,7 +1057,7 @@ sub chmod { # {{{1
 
     return -&EINVAL unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
-    my $fileName = translate_path(decode(ENCODING, $file), $self);
+    my $fileName = translate_path($self->{'local_encode'}->decode($file), $self);
     my ($rc, $resp) = $self->lookup_afp_entry($fileName, 1);
     return $rc if $rc != kFPNoErr;
 
@@ -1081,7 +1102,7 @@ sub chown { # {{{1
 
     return -&EINVAL unless $$self{'volAttrs'} & kSupportsUnixPrivs;
 
-    my $fileName = translate_path(decode(ENCODING, $file), $self);
+    my $fileName = translate_path($self->{'local_encode'}->decode($file), $self);
     my ($rc, $resp) = $self->lookup_afp_entry($fileName, 1);
     return $rc if $rc != kFPNoErr;
 
@@ -1132,7 +1153,7 @@ sub truncate { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
 
     if (defined $$self{'client_uuid'}) {
@@ -1185,7 +1206,7 @@ sub utime { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
 
     my $rc = $$self{'afpconn'}->FPSetFileDirParms(
@@ -1212,7 +1233,7 @@ sub open { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     if ($file eq '/._metrics') {
         my $data = $self->generate_metrics_data();
         return(0, \$data);
@@ -1458,9 +1479,9 @@ sub setxattr { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
-    $attr = decode(ENCODING, $attr);
+    $attr = $self->{'local_encode'}->decode($attr);
 
     # handle ACL xattr {{{2
     if ($attr eq ACL_XATTR && defined($$self{'client_uuid'})) {
@@ -1701,9 +1722,9 @@ sub getxattr { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
-    $attr = decode(ENCODING, $attr);
+    $attr = $self->{'local_encode'}->decode($attr);
     # handle ACL xattr {{{2
     if ($attr eq ACL_XATTR &&
             defined($$self{'client_uuid'})) {
@@ -1862,7 +1883,7 @@ sub listxattr { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     return -&EOPNOTSUPP unless $$self{'volAttrs'} & kSupportsExtAttrs;
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
 
     my @attrs;
@@ -1978,9 +1999,9 @@ sub removexattr { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
-    $attr = decode(ENCODING, $attr);
+    $attr = $self->{'local_encode'}->decode($attr);
     # handle ACL xattr {{{2
     if ($attr eq ACL_XATTR &&
             defined($$self{'client_uuid'})) {
@@ -2108,7 +2129,7 @@ sub opendir { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $dirname = decode(ENCODING, $dirname);
+    $dirname = $self->{'local_encode'}->decode($dirname);
     my $fileName = translate_path($dirname, $self);
 
     if (defined $$self{'client_uuid'}) {
@@ -2183,7 +2204,7 @@ sub readdir { # {{{1
     push(@filesList, map {
             ($name = $_->{$self->{'pathkey'}}) =~ tr{/}{:};
             if ($self->{'dotdothack'}) { $name =~ s{^\.!\.\.(.)}{..$1}; }
-            [++$offset, encode(ENCODING, $name)]; } @$resp);
+            [++$offset, $self->{'local_encode'}->encode($name)]; } @$resp);
     # }}}2
 
     return(@filesList, 0);
@@ -2225,7 +2246,7 @@ sub access { # {{{1
 
     $$self{'callcount'}{(caller(0))[3]}++;
 
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
 
     if ($mode == F_OK) {
@@ -2267,7 +2288,7 @@ sub create { # {{{1
     $$self{'callcount'}{(caller(0))[3]}++;
 
     my $file_n = $file;
-    $file = decode(ENCODING, $file);
+    $file = $self->{'local_encode'}->decode($file);
     my $fileName = translate_path($file, $self);
 
     # afaik this should only ever happen for a plain file...
