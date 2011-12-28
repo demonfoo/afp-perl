@@ -372,7 +372,13 @@ _EOT_
 
         my $sresp = '';
         my $bitmap = $DForkLenFlag | $RForkLenFlag;
-        $rc = $session->FPGetForkParms($resp{'OForkRefNum'}, $bitmap, \$sresp);
+        ($rc, $sresp) = $session->FPGetFileDirParms(
+                'VolumeID'      => $volID,
+                'DirectoryID'   => $dirId,
+                'PathType'      => $pathType,
+                'Pathname'      => $fileName,
+                'FileBitmap'    => $bitmap);
+
         if ($sresp->{$RForkLenKey} > 0) {
             print "note that the resource fork isn't handled yet!\n";
         }
