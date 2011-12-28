@@ -134,10 +134,11 @@ sub new { # {{{1
         $encoding = langinfo(CODESET());
     }
     my $obj = $class->SUPER::new();
-    $obj->{'topDirID'}  = 2;
-    $obj->{'volID'}     = undef;
-    $obj->{'DTRefNum'}  = undef;
-    $obj->{'afpconn'}   = undef;
+    $obj->{'topDirID'}          = 2;
+    $obj->{'volID'}             = undef;
+    $obj->{'DTRefNum'}          = undef;
+    $obj->{'afpconn'}           = undef;
+    $obj->{'_getattr_cache'}    = {};
 
     if (exists $opts{'encoding'}) {
         $encoding = $opts{'encoding'};
@@ -490,6 +491,16 @@ sub getattr { # {{{1
     }
     my $fileName = translate_path($file, $self);
 
+    if (exists $self->{'_getattr_cache'}->{$fileName}) {
+        my $entry = $self->{'_getattr_cache'}->{$fileName};
+        if ($entry->{'good_until'} > time()) {
+            return @{$entry->{'data'}};
+        }
+        else {
+            delete $self->{'_getattr_cache'}->{$fileName};
+        }
+    }
+
     my ($rc, $resp) = $self->lookup_afp_entry($fileName);
     return $rc if $rc;
 
@@ -540,6 +551,22 @@ sub getattr { # {{{1
         # size in blocks
         $$resp{'FileIsDir'} ? 1 : int(($$resp{$$self{'DForkLenKey'}} - 1) / 512) + 1
     ); # }}}2
+    my $now = time();
+    my $ttl;
+    my $entryage = $now - $stat[9];
+    if ($entryage < 50) {
+        $ttl = 5;
+    }
+    elsif ($entryage >= 50 && $entryage < 600) {
+        $ttl = int($entryage / 10);
+    }
+    else {
+        $ttl = 60;
+    }
+    $self->{'_getattr_cache'}->{$fileName} = {
+            'good_until'    => $now + $ttl,
+            'data'          => [ @stat ],
+    };
     return(@stat);
 } # }}}1
 
