@@ -4,17 +4,6 @@ use Net::AFP::TokenTypes;
 use Net::AFP::Result;
 use Log::Log4perl qw(:easy);
 
-=head1 NAME
-
-Net::AFP::UAMs - AFP authentication helper functions
-
-=head1 DESCRIPTION
-
-This package contains convenience functions for calling User
-Authentication Method code on an AFP connection.
-
-=cut
-
 # Try to import classes for the password based auth methods. If they can't
 # be imported, it probably means they have dependencies that can't be
 # fulfilled.
@@ -65,30 +54,6 @@ foreach my $uampath (@uampaths) {
 #    }
 }
 
-=head1 FUNCTIONS
-
-=over
-
-=item GuestAuth()
-
-Perform simple anonymous (guest) authentication with the server.
-
-=over
-
-=item $session
-
-An object derived from Net::AFP, for an active but not yet authenticated
-AFP server connection.
-
-=item $AFPVersion
-
-A string containing the AFP version identifier for the highest protocol
-version both sides can agree on. See
-L<Net::AFP::Versions/GetPreferredVersion()> for more information.
-
-=back
-
-=cut
 sub GuestAuth($$) {
     my($session, $AFPVersion) = @_;
     my $rc = Net::AFP::UAMs::Anonymous::Authenticate($session, $AFPVersion);
@@ -98,40 +63,6 @@ sub GuestAuth($$) {
     return $rc;
 }
 
-=item PasswordAuth()
-
-Perform password-based authentication with the server.
-
-=over
-
-=item $session
-
-An object derived from Net::AFP, for an active but not yet authenticated
-AFP server connection.
-
-=item $AFPVersion
-
-A string containing the AFP version identifier for the highest protocol
-version both sides can agree on. See
-L<Net::AFP::Versions/GetPreferredVersion()> for more information.
-
-=item $SupportedUAMs
-
-An array ref containing the list of supported UAMs which should be tried.
-Normally this should be the 'UAMs' structure element returned from
-L<Net::AFP/FPGetSrvrInfo>.
-
-=item $UserName
-
-A string containing the username to log in as.
-
-=item $PwCallback
-
-A subroutine reference which is to be used to acquire the user's password.
-
-=back
-
-=cut
 sub PasswordAuth($$$$$) {
     my($session, $AFPVersion, $SupportedUAMs, $UserName, $PwCallback) = @_;
 #    die('Need a function ref for password callback')
@@ -161,37 +92,6 @@ sub PasswordAuth($$$$$) {
     return kFPBadUAM;
 }
 
-=item ChangePassword()
-
-=over
-
-=item $session
-
-An object derived from Net::AFP, for an active but not yet authenticated
-AFP server connection.
-
-=item $SupportedUAMs
-
-An array ref containing the list of supported UAMs which should be tried.
-Normally this should be the 'UAMs' structure element returned from
-L<Net::AFP/FPGetSrvrInfo>.
-
-=item $UserName
-
-A string containing the username whose password is to be changed. Ignored
-as of AFP 3.0.
-
-=item $OldPW
-
-A string containing the user's current password.
-
-=item $NewPW
-
-A string containing the new password to be set for the user.
-
-=back
-
-=cut
 sub ChangePassword {
     my($session, $SupportedUAMs, $UserName, $OldPW, $NewPW) = @_;
 
@@ -211,18 +111,6 @@ sub ChangePassword {
             " Could not find valid password changing UAM\n");
     return kFPBadUAM;
 }
-
-=back
-
-=item AUTHOR
-
-Derrik Pates <demon@now.ai>
-
-=head1 SEE ALSO
-
-C<Net::AFP>
-
-=cut
 
 1;
 # vim: ts=4

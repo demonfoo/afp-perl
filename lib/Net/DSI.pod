@@ -1,0 +1,149 @@
+=head1 NAME
+
+Net::DSI - Object interface for Apple Data Stream Interface protocol
+
+=head1 SYNOPSIS
+
+    use Net::DSI;
+
+=head1 DESCRIPTION
+
+C<Net::DSI> provides an object-based interface to interacting with
+Data Stream Interface-based services, specifically AFP over TCP. The
+protocol acts as a mid-layer between the bidirectional stream semantics
+provided by TCP, and the transactional interface AFP requires.
+
+=head1 CONSTRUCTOR
+
+=over
+
+=item new (CLASS, HOST[, PORT])
+
+Create a new DSI session object which will connect to the indicated host,
+and (optionally) the indicated port. If no port is specified, the default
+TCP port will be used for the connection. The host may be an IPv4 or
+IPv6 (if L<IO::Socket::INET6> is present) address, or a DNS name.
+
+=back
+
+=head1 SUBROUTINES/METHODS
+
+=over
+
+=item close
+
+=item DSICloseSession ()
+
+The C<DSICloseSession> call can be issued at any time by the DSI client to
+close a session previously opened through an C<DSIOpenSession> call. As a
+result of the call, all pending activity on the session is immediately
+canceled.
+
+=item DSICommand (MESSAGE, RESP_R)
+
+Once a session has been opened, the workstation end client can send a
+command to the server end by issuing an C<DSICommand> call.
+
+MESSAGE contains the binary data for the outgoing request. RESP_R must
+be a scalar ref that will contain the reassembled response data, if any,
+received from the server in response to the request sent.
+
+=item DSIGetStatus (RESP_R)
+
+The C<DSIGetStatus> call is used by a DSI client to obtain status
+information for a particular server.
+
+RESP_R must be a scalar ref which will contain the raw binary data returned
+from the DSIGetStatus call.
+
+=item DSIOpenSession ( [OPTIONS] )
+
+The C<DSIOpenSession> call is issued by a client to begin a DSI session with
+the connected server.
+
+OPTIONS are passed as a hash of values. These are optional. If the return
+context is an array (C<wantarray()> returns C<true>), a hash of values
+returned from the server will also be provided. These same keys will be
+used.
+
+=over
+
+=item RequestQuanta
+
+The size of the largest request packet the server can handle. Only comes
+from the server to the client.
+
+=item AttentionQuanta
+
+The size of the largest attention packet the client can handle. Only to
+be sent by the client to the server.
+
+=item ServerReplayCacheSize
+
+The size, in number of commands, of the replay cache. New feature, only
+supported/acknowledged as of AFP 3.3. Can be passed by the client; the
+server will return a value it wants, based on the value supplied, if the
+server supports it.
+
+=back
+
+=item DSITickle
+
+This call is used to keep an existing DSI connection alive. It should not
+be called directly in your code; this operation is handled internally.
+
+=item DSIWrite (MESSAGE, DATA_R, D_LEN, RESP_R)
+
+Used for sending write requests to the server. This is only applicable for
+the L<Net::AFP/"FPWrite">, L<Net::AFP/"FPWriteExt">, and
+L<Net::AFP/"FPAddIcon"> operations.
+
+MESSAGE contains the binary request packet to be passed to the server.
+DATA_R should be a reference to the string containing the write buffer
+to use to pass data to the AFP server. D_LEN indicates how many bytes
+from the buffer to send. RESP_R should be a scalar ref which will contain
+the binary response data from the server, if any.
+
+=back
+
+=head1 REFERENCES
+
+The Data Stream Interface protocol implementation contained herein is based
+on the protocol description as provided by Apple, in the "AppleShare IP
+6.3 Developer's Kit". The document is available freely via the Internet
+in PDF form, at:
+
+L<http://developer.apple.com/documentation/macos8/pdf/ASAppleTalkFiling2.1_2.2.pdf>
+
+=head1 DEPENDENCIES
+
+Requires a threaded version of Perl to run.
+
+Most of the required packages are included in the Perl distribution, so
+they do not need to be installed on your system.
+
+IO::Socket::INET6 can optionally be used. It adds the ability to connect
+to AFP servers that listen on IPv6 sockets.
+
+=head1 BUGS AND LIMITATIONS
+
+None currently known.
+
+=head1 INCOMPATIBILITIES
+
+Does not work on Nexenta. Don't currently know if it will work on any version
+of Solaris.
+
+Has some sort of socket/threading interaction on Windows systems. It gets
+connected, but sending packets gets slower and slower the more it does it.
+Seems to happen with both Strawberry Perl and ActivePerl.
+
+=head1 AUTHOR
+
+Derrik Pates <demon@now.ai>
+
+=head1 SEE ALSO
+
+C<IO::Socket::INET>, C<IO::Socket::INET6>, C<Net::AFP>, C<Net::AFP::TCP>
+
+=cut

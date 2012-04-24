@@ -1,0 +1,140 @@
+=head1 NAME
+
+Net::AFP::Versions - AFP version agreement and comparison utility functions
+
+=head1 DESCRIPTION
+
+This package contains several convenience functions for establishing
+version agreement with an AFP server, as well as comparing versions
+by either major and minor number, or the symbolic version string, for
+e.g., enabling features based on the version of the AFP protocol in use.
+
+=head1 COMPARISON CONSTANTS
+
+For some of the provided functions, the type of version comparison desired
+can be indicated with the following constants.
+
+=over
+
+=item kFPVerNewerThan
+
+The protocol version in use for the active connection must be newer than
+the one passed.
+
+=item kFPVerAtLeast
+
+The protocol version in use for the active connection must be equivalent
+to, or newer than, the one passed.
+
+=item kFPVerEqual
+
+The protocol version in use for the active connection must be exactly
+the one passed.
+
+=item kFPVerNoNewerThan
+
+The protocol version in use for the active connection must be older than
+or equivalent to, the one passed.
+
+=item kFPVerOlderThan
+
+The protocol version in use for the active connection must be older than
+the one passed.
+
+=back
+
+=head1 VERSION STRINGS
+
+AFP supports various versions, which are used internally by AFP to
+establish agreement on the AFP version-specific behavior the two ends
+expect. See the source of this module for a full list of the known
+versions as of the released version of this code. Version agreement is
+generally established using the L</GetPreferredVersion()> call in this
+module.
+
+=head1 FUNCTIONS
+
+=over
+
+=item CompareByString()
+
+Compare the AFP version being used in an open AFP session to a given
+version string, and determine their relationship.
+
+=over
+
+=item $session
+
+The AFP connection object for the server connection to check.
+
+=item $verstring
+
+The version string for the AFP version to compare against.
+
+=item $cmptype
+
+The comparison type to be used. See L</"COMPARISON CONSTANTS"> for the
+values to be passed.
+
+=back
+
+The return value will be true or false, depending on if the connected
+server's established protocol version meets the requirements provided.
+
+=item CompareByVersionNum()
+
+Compare the AFP version being used in an open AFP session to a given
+major and minor version number pair, and determine their relationship.
+
+=over
+
+=item $session
+
+The AFP connection object for the server connection to check.
+
+=item $major
+
+The AFP major version number.
+
+=item $minor
+
+The AFP minor version number.
+
+=item $cmptype
+
+The comparison type to be used. See L</"COMPARISON CONSTANTS"> for the
+values to be passed.
+
+=back
+
+The return value will be true or false, depending on if the connected
+server's established protocol version meets the requirements provided.
+
+=item GetPreferredVersion()
+
+Given a list of version strings, pick the highest supported one, and return
+it to the caller.
+
+=over
+
+=item $ver_list
+
+An array reference, as appears in the structure returned from the
+L<Net::AFP/FPGetSrvrInfo()> call (the same structure is returned from
+the L<Net::DSI/DSIGetStatus> and L<Net::Atalk::ASP/SPGetStatus> calls).
+It contains the list of AFP version strings the server knows how to
+use.
+
+=back
+
+=back
+
+=head1 AUTHOR
+
+Derrik Pates <demon@now.ai>
+
+=head1 SEE ALSO
+
+C<Net::AFP>
+
+=cut

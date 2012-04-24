@@ -103,97 +103,15 @@ use constant kFPZzzzz                   => 122; # AFP 2.3
 use constant kFPAddIcon                 => 192; # AFP 2.0
 # }}}1
 
-=head1 NAME
-
-Net::AFP - Perl module implementing an interface for accessing Apple File Protocol exports
-
-=head1 SYNOPSIS
-
-This package should not be used directly in most cases. It implements only
-the methods to support general AFP operations. Low-level details of the
-transport/connection setup/etc. are handled by the protocol-specific
-packages C<Net::AFP::TCP> and C<Net::AFP::Atalk>. Use them instead.
-
-=head1 DESCRIPTION
-
-This package forms the basis for a Perl class providing an interface to
-connect to an AFP server and perform operations on remote files and
-directories within an exported share.
-
-This class is not intended for direct use - currently, the
-C<Net::AFP::TCP> and C<Net::AFP::Atalk> packages derive this class.
-This class implements generalized functionality; protocol-specific
-functionality is completely abstracted out from this class.
-
-Note that not all AFP operations are implemented. The documentation describes
-a few functions which I have not implemented due to lack of need.
-
-=head2 Path Type Constants
-
-Constants indicating the type of names in a C<$Pathname> parameter.
-
-=over
-
-=item kFPShortName
-
-Indicates that a C<$Pathname> parameter contains Short Names.
-
-=cut
 use constant kFPShortName       => 1;
-=item kFPLongName
-
-Indicates that a C<$Pathname> parameter contains Long Names.
-
-=cut
 use constant kFPLongName        => 2;
-=item kFPUTF8Name
-
-Indicates that a C<$Pathname> parameter contains an AFPName, which
-consists of a four-byte text encoding hint followed a two-byte length,
-followed by a UTF-8 encoded pathname.
-
-=cut
 use constant kFPUTF8Name        => 3;   # AFP 3.0
 
-=back
-
-=head2 File Creation Constants
-
-Constants used when creating files. These constants are used in the
-C<Flag> parameter for the L</FPCreateFile()> command.
-
-=over
-
-=item kFPSoftCreate
-
-Indicates soft file creation.
-
-=cut
 use constant kFPSoftCreate      => 0;
-=item kFPHardCreate
-
-Indicates hard file creation.
-
-=cut
 use constant kFPHardCreate      => 0x80;
-
 
 use constant kFPStartEndFlag    => 0x80;
 use constant kFPLockUnlockFlag  => 1;
-=back
-
-=head2 Catalog Node Names
-
-
-
-=head1 SUBROUTINES/METHODS
-
-These are the actual AFP server commands which can be issued to an open
-AFP server object.
-
-=over
-
-=cut
 
 # This class is only to be inherited. It uses virtual methods to talk to
 # the server by whatever protocol the inheriting class is supposed to
@@ -325,79 +243,6 @@ sub PackSetParams { # {{{1
     return $ParamsBlock;
 } # }}}1
 
-=item FPAccess( [ARGS] )
-
-Requests access to a file or directory on a volume for which ACLs are
-enabled.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume identifier; required.
-
-=item DirectoryID
-
-Directory identifier; required.
-
-=item Bitmap
-
-Reserved.
-
-=item UUID
-
-Universally Unique Identifier (UUID) of the process sending this command;
-required.
-
-=item ReqAccess
-
-Requested access; required. For definitions, see
-L<Net::AFP::ACL/"ACL Access Rights">.
-
-=item PathType
-
-Type of names in C<Pathname>; required. See L</"Path Type Constants"> for possible
-values.
-
-=item Pathname
-
-Pathname to the file or directory for which access is being requested;
-required.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to request access to
-the file or directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-A parameter is invalid.
-
-=back
-
-=cut
 sub FPAccess { # {{{1
     my($self, %options) = @_;
 
@@ -423,79 +268,7 @@ sub FPAccess { # {{{1
     return $self->SendAFPMessage($msg);
 } # }}}1
 
-=item FPAddAPPL( [ARGS] )
-
-Adds an APPL mapping to the Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item DTRefNum
-
-Desktop database reference number; required.
-
-=item DirectoryID
-
-Directory ID; required.
-
-=item FileCreator
-
-File creator of the application corresponding to the APPL mapping being
-added; required.
-
-=item ApplTag
-
-User-defined tag stored with the APPL mapping; required.
-
-=item PathType
-
-Type of names in C<Pathname>; required. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to desired file or directory; required.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to add an APPL mapping.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file.
-
-=item kFPObjectTypeErr
-
-Input parameters point to a directory.
-
-=item kFPParamErr
-
-Session reference or Desktop database reference number is unknown;
-pathname is invalid.
-
-=back
-
-=cut
-sub FPAddAPPL {
+sub FPAddAPPL { # {{{1
     my($self, %options) = @_;
     
     DEBUG('called ', (caller(0))[3]);
@@ -516,67 +289,8 @@ sub FPAddAPPL {
             @options{'DTRefNum', 'DirectoryID', 'FileCreator', 'ApplTag'},
             PackagePath(@options{'PathType', 'Pathname'}));
     return $self->SendAFPMessage($msg);
-}
+} # }}}1
 
-=item FPAddComment()
-
-Adds a comment for a file or directory to a volume's Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item DTRefNum
-
-Desktop database reference number; required.
-
-=item DirectoryID
-
-Directory ID; required.
-
-=item PathType
-
-Type of names in C<Pathname>; required. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to desired file or directory; required.
-
-=item Comment
-
-Comment data to be associated with the specified file or directory;
-required.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPAddComment { # {{{1
     my($self, %options) = @_;
 
@@ -599,69 +313,7 @@ sub FPAddComment { # {{{1
     return $self->SendAFPMessage($msg);
 } # }}}1
 
-=item FPAddIcon()
-
-Adds an icon bitmap to a volume's Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item DTRefNum
-
-Desktop database reference number.
-
-=item FileCreator
-
-File creator associated with the icon that is to be added.
-
-=item FileType
-
-File type associated with the icon that is to be added.
-
-=item IconType
-
-Type of icon that is to be added.
-
-=item IconTag
-
-Tag information to be stored with the icon.
-
-=item BitmapSize
-
-Size of the bitmap for this icon.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-Session reference number or Desktop database reference number is
-unknown, or pathname is invalid.
-
-=item kFPIconTypeErr
-
-New icon's size does not match that of the existing icon.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
-sub FPAddIcon {
+sub FPAddIcon { # {{{1
     my($self, %options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
@@ -684,85 +336,8 @@ sub FPAddIcon {
             @options{'DTRefNum', 'FileCreator', 'FileType', 'IconType',
                      'IconTag', 'BitmapSize'});
     return $self->SendAFPWrite($msg, \$options{'IconBitmap'});
-}
+} # }}}1
 
-=item FPByteRangeLock()
-
-Locks or unlocks a specified range of bytes within an open fork.
-
-Deprecated; use C<FPByteRangeLockExt()> instead.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item Flags
-
-Bit 0 is the C<LockUnlock> bit, where 0 indicates lock and 1 indicates
-unlock. Bit 7 is the C<StartEndFlag> bit, where 0 indicates that
-C<Offset> is relative to the beginning of the fork and 1 indicates
-that C<Offset> is relative to the end of the fork. The C<StartEndFlag>
-bit is only used when locking a range.
-
-=item OForkRefNum
-
-Open fork reference number.
-
-=item Offset
-
-Offset to the first byte of the range to be locked or unlocked (can
-be negative if the C<StartEndFlag> bit is set to 1).
-
-=item Length
-
-Number of bytes to be locked or unlocked (a signed, positive long
-integer; cannot be negative except for the special value -1).
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call, and upon success, an
-additional scalar corresponding to the byte offset of the start of the
-locked range.
-
-Error replies:
-
-=over
-
-=item kFPLockErr
-
-Some or all of the requested range is locked by another user.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPNoMoreLocks
-
-Server's maximum lock count has been reached.
-
-=item kFPParamErr
-
-Session reference number or open fork reference number is unknown; a
-combination of the C<StartEndFlag> bit and C<Offset> specifies a range
-that starts before byte zero.
-
-=item kFPRangeNotLocked
-
-User tried to unlock a range that is locked by another user or that
-is not locked at all.
-
-=item kFPRangeOverlap
-
-User tried to lock some or all of a range that the user has already
-locked.
-
-=back
-
-=cut
 sub FPByteRangeLock { # {{{1
     my($self, %options) = @_;
 
@@ -788,81 +363,6 @@ sub FPByteRangeLock { # {{{1
     return $rc;
 } # }}}1
 
-=item FPByteRangeLockExt()
-
-Locks or unlocks a specified range of bytes within an open fork.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item Flags
-
-Bit 0 is the C<LockUnlock> bit, where 0 indicates lock and 1 indicates
-unlock. Bit 7 is the C<StartEndFlag> bit, where 0 indicates that
-C<Offset> is relative to the beginning of the fork and 1 indicates
-that C<Offset> is relative to the end of the fork. The C<StartEndFlag>
-bit is only used when locking a range.
-
-=item OForkRefNum
-
-Open fork reference number.
-
-=item Offset
-
-Offset to the first byte of the range to be locked or unlocked (can
-be negative if the C<StartEndFlag> bit is set to 1).
-
-=item Length
-
-Number of bytes to be locked or unlocked (a signed, positive long
-integer; cannot be negative except for the special value -1).
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call, and upon success, an
-additional scalar corresponding to the byte offset of the start of the
-locked range.
-
-Error replies:
-
-=over
-
-=item kFPLockErr
-
-Some or all of the requested range is locked by another user.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPNoMoreLocks
-
-Server's maximum lock count has been reached.
-
-=item kFPParamErr
-
-Session reference number or open fork reference number is unknown; a
-combination of the C<StartEndFlag> bit and C<Offset> specifies a range
-that starts before byte zero.
-
-=item kFPRangeNotLocked
-
-User tried to unlock a range that is locked by another user or that
-is not locked at all.
-
-=item kFPRangeOverlap
-
-User tried to lock some or all of a range that the user has already
-locked.
-
-=back
-
-=cut
 sub FPByteRangeLockExt { # {{{1
     my($self, %options) = @_;
 
@@ -888,15 +388,6 @@ sub FPByteRangeLockExt { # {{{1
     return $rc;
 } # }}}1
 
-=item FPCatSearch()
-
-Searches a volume for files and directories that match specified criteria.
-
-Deprecated; use C<FPCatSearchExt()> instead.
-
-Not yet implemented.
-
-=cut
 sub FPCatSearch {
     my ($self, %options) = @_;
 
@@ -918,96 +409,12 @@ sub FPCatSearch {
                      'ReqBitmap'});
 }
 
-=item FPCatSearchExt()
-
-Searches a volume for files and directories that match specified criteria.
-
-Not yet implemented.
-
-=cut
 sub FPCatSearchExt {
     DEBUG('called ', (caller(0))[3]);
     ERROR('called function ', (caller(0))[3], ' not implemented');
     croak('Not yet implemented');
 }
 
-=item FPChangePassword()
-
-Allow users to change their passwords.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $UAM
-
-String specifying the UAM to use.
-
-=item $UserName
-
-Name of the user whose password is to be changed. Starting with AFP 3.0,
-C<$UserName> is two bytes with each byte set to zero. The first byte
-indicates a zero length string, and the second byte is a pad byte.
-
-Please pass C<undef> or an empty string.
-
-=item $UserAuthInfo
-
-UAM-specific information.
-
-=item $resp_r
-
-A reference to a scalar that can be used to return a reference to a hash containing information about the authentication process. This is UAM-specific.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPUserNotAuth
-
-UAM failed (the specified old password doesn't match) or no user is logged in yet for the specified session.
-
-=item kFPBadUAM
-
-Specified UAM is not a UAM that FPChangePassword supports.
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPParamErr
-
-User name is null, exceeds the UAM's user name length limit, or does not exist.
-
-=item kFPPwdSameErr
-
-User attempted to change his or her password to the same password that he or she previously had. This error occurs only if the password expiration feature is enabled on the server.
-
-=item kFPPwdTooShortErr
-
-User password is shorter than the server's minimum password length, or user attempted to change password to a password that is shorter than the server's minimum password length.
-
-=item kFPPwdPolicyErr
-
-New password does not conform to the server's password policy.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=back
-
-=cut
 sub FPChangePassword { # {{{1
     my ($self, $UAM, $UserName, $UserAuthInfo, $resp_r) = @_;
     DEBUG('called ', (caller(0))[3]);
@@ -1023,45 +430,6 @@ sub FPChangePassword { # {{{1
     return $self->SendAFPMessage($msg, $resp_r, 1);
 } # }}}1
 
-=item FPCloseDir()
-
-Closes a directory and invalidates its Directory ID.
-
-Deprecated; variable directory IDs are no longer supported.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-Volume ID.
-
-=item $DirectoryID
-
-Directory ID.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-The session reference number, Volume ID, or Directory ID is null or invalid.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=back
-
-=cut
 sub FPCloseDir { # {{{1
     my ($self, $VolumeID, $DirectoryID) = @_;
 
@@ -1071,41 +439,6 @@ sub FPCloseDir { # {{{1
             $DirectoryID));
 } # }}}1
 
-=item FPCloseDT()
-
-Close a volume's Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $DTRefNum
-
-Desktop database reference number.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-Session reference number or Desktop database reference number was invalid.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPCloseDT { # {{{1
     my($self, $DTRefNum) = @_;
 
@@ -1114,39 +447,6 @@ sub FPCloseDT { # {{{1
     return $self->SendAFPMessage(pack('Cxn', kFPCloseDT, $DTRefNum));
 } # }}}1
 
-=item FPCloseFork()
-
-Closes a fork.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $OForkRefNum
-
-Open fork reference number.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-The session reference number or open fork number is null or invalid.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=back
-
-=cut
 sub FPCloseFork { # {{{1
     my($self, $OForkRefNum) = @_;
 
@@ -1156,39 +456,6 @@ sub FPCloseFork { # {{{1
             undef, 1);
 } # }}}1
 
-=item FPCloseVol()
-
-Close a volume.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-Volume ID.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-Session reference number or Volume ID is null or invalid.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=back
-
-=cut
 sub FPCloseVol { # {{{1
     my ($self, $VolumeID) = @_;
 
@@ -1197,111 +464,6 @@ sub FPCloseVol { # {{{1
     return $self->SendAFPMessage(pack('Cxn', kFPCloseVol, $VolumeID), undef, 1);
 } # }}}1
 
-=item FPCopyFile()
-
-Copies a file from one location to another on the same file server.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item SourceVolumeID
-
-Source Volume ID.
-
-=item SourceDirectoryID
-
-Source ancestor Directory ID.
-
-=item DestVolumeID
-
-Destination Volume ID.
-
-=item DestDirectoryID
-
-Destination ancestor Directory ID.
-
-=item SourcePathType
-
-Type of names in C<SourcePathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item SourcePathname
-
-Pathname of the file to be copied (cannot be null).
-
-=item DestPathType
-
-Type of names in C<DestPathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item DestPathname
-
-Pathname to the destination parent directory (may be null).
-
-=item NewType
-
-Type of names in C<NewName>. See L</"Path Type Constants"> for
-possible values.
-
-=item NewName
-
-Name to be given to the copy (may be null).
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to read the file
-or write to the destination.
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPDenyConflict
-
-File cannot be opened for Read, DenyWrite.
-
-=item kFPDiskFull
-
-No more space exists on the destination volume.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectExists
-
-File or directory of the name specified by C<NewName> already exists
-in the destination parent directory.
-
-=item kFPObjectNotFound
-
-The source file does not exist; ancestor directory is unknown.
-
-=item kFPObjectTypeErr
-
-Source parameters point to a directory.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or a pathname type is unknown;
-source or destination pathname is invalid.
-
-=back
-
-=cut
 sub FPCopyFile { # {{{1
     my($self, %options) = @_;
 
@@ -1336,80 +498,6 @@ sub FPCopyFile { # {{{1
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
-=item FPCreateDir()
-
-Creates a new directory.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Ancestor Directory ID.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname, including the name of the new directory (cannot be null).
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, the return
-is a list, containing both the error code and the Directory ID of the
-newly created directory.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPDiskFull
-
-No more space exists on the volume.
-
-=item kFPFlatVol
-
-Volume is flat and does not support directories.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Ancestor directory is unknown.
-
-=item kFPObjectExists
-
-File or directory of the specified name already exists.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname is null or invalid.
-
-=item kFPVolLocked
-
-Destination volume is read-only.
-
-=back
-
-=cut
 sub FPCreateDir { # {{{1
     my($self, %options) = @_;
     
@@ -1432,83 +520,6 @@ sub FPCreateDir { # {{{1
     return $rc;
 } # }}}1
 
-=item FPCreateFile()
-
-Creates a new file.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item Flag
-
-Bit 7 of the Flag parameter is the C<CreateFlag> bit, where 0 indicates
-a soft create and 1 indicates a hard create.
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Ancestor directory ID.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname, including the name of the new file (cannot be null).
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPDiskFull
-
-No more space exists on the volume.
-
-=item kFPFileBusy
-
-If attempting a hard create, the file already exists and is open.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=item kFPObjectExists
-
-If attempting a soft create, a file of the specified name already exists.
-
-=item kFPObjectNotFound
-
-Ancestor directory is unknown.
-
-=item kFPVolLocked
-
-Destination volume is read-only.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname is null or invalid.
-
-=back
-
-=cut
 sub FPCreateFile { # {{{1
     my($self, %options) = @_;
 
@@ -1528,78 +539,7 @@ sub FPCreateFile { # {{{1
             PackagePath(@options{'PathType', 'Pathname'})), undef, 1);
 } # }}}1
 
-=item FPCreateID()
-
-Creates a unique File ID for a file.
-
-Deprecated; Mac OS X AFP clients assume that all files and directories
-have assigned IDs that are unique and are not reused when the item is
-deleted.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Directory ID containing the referenced file.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</Path Type Constants> for possible
-values.
-
-=item Pathname
-
-Name of the file that is the target of the File ID (that is, the filename
-of the file for which a File ID is being created).
-
-=item $resp_r
-
-A reference to a scalar which will contain the new File ID.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, and the new File ID.
-
-Error replies:
-
-=over
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Target file does not exist.
-
-=item kFPObjectTypeErr
-
-Object defined was a directory, not a file.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown;
-pathname is null or bad.
-
-=item kFPVolLocked
-
-Destination volume is read-only.
-
-=back
-
-=cut
-sub FPCreateID {
+sub FPCreateID { # {{{1
     my($self, %options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
@@ -1620,83 +560,8 @@ sub FPCreateID {
     return($rc) unless $rc == kFPNoErr;
     croak('Need to accept returned list') unless wantarray();
     return($rc, unpack('N', $resp));
-}
+} # }}}1
 
-=item FPDelete()
-
-Deletes a file or directory.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-Volume ID.
-
-=item $DirectoryID
-
-Ancestor Directory ID.
-
-=item $PathType
-
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item $Pathname
-
-Pathname of the file or directory to be deleted (may be null if a
-directory is to be deleted).
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPDirNotEmpty
-
-Directory is not empty.
-
-=item kFPFileBusy
-
-The file to be deleted is open by another process.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=item kFPObjectLocked
-
-File or directory is marked DeleteInhibit.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPObjectTypeErr
-
-Object defined was a directory, not a file.
-
-=item kFPVolLocked
-
-Volume is read=only.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname is null or invalid.
-
-=back
-
-=cut
 sub FPDelete { # {{{1
     my($self, $VolumeID, $DirectoryID, $PathType, $Pathname) = @_;
 
@@ -1706,244 +571,22 @@ sub FPDelete { # {{{1
             $DirectoryID, PackagePath($PathType, $Pathname)), undef, 1);
 } # }}}1
 
-=item FPDeleteID()
-
-Invalidates all instances of the specified File ID.
-
-Deprecated; Mac OS X AFP clients assume that all files and directories
-have assigned IDs that are unique and are not reused when the item is
-deleted.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-Volume ID.
-
-=item $FileID
-
-File ID that is to be deleted.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPIDNotFound
-
-File ID was not found. (No file thread exists.)
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Target file does not exist.
-
-=item kFPObjectTypeErr
-
-Object defined was a directory, not a file.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown;
-pathname is null or bad.
-
-=item kFPVolLocked
-
-Destination volume is read-only.
-
-=back
-
-=cut
-sub FPDeleteID {
+sub FPDeleteID { # {{{1
     my($self, $VolumeID, $FileID) = @_;
 
     DEBUG('called ', (caller(0))[3]);
     return $self->SendAFPMessage(pack('CxnN', kFPDeleteID, $VolumeID, $FileID));
-}
+} # }}}1
 
-=item FPDisconnectOldSession()
-
-Disconnects an old session and transfers its resources to a new session.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Type
-
-Reserved; currently always zero (0).
-
-=item $Token
-
-Token previously obtained by calling L</FPGetSessionToken>.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=back
-
-=cut
-sub FPDisconnectOldSession {
+sub FPDisconnectOldSession { # {{{1
     my($self, $Type, $Token) = @_;
 
     DEBUG('called ', (caller(0))[3]);
 
     return $self->SendAFPMessage(pack('CxnN/a', kFPDisconnectOldSession, $Type,
             $Token));
-}
+} # }}}1
 
-=item FPEnumerate()
-
-List the contents of a directory.
-
-Deprecated; use C<FPEnumerateExt2()> instead.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Identifier for the directory to list.
-
-=item FileBitmap
-
-Bitmap describing the parameters to return if the enumerated offspring is
-a file. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<FileBitmap> parameter of the
-L</FPGetFileDirParms> command and can be null. For bit definitions for
-this bitmap, see L<Net::AFP::FileParms>.
-
-=item DirectoryBitmap
-
-Bitmap describing the parameters to return if the enumerated offspring is
-a directory. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<DirectoryBitmap> parameter of the
-L</FPGetFileDirParms> command and can be null. For bit definitions for
-this bitmap, see L<Net::AFP::DirParms>.
-
-=item ReqCount
-
-Maximum number of C<ResultsRecord> structures for which information is
-to be returned.
-
-=item StartIndex
-
-Directory offspring index. (Starts at 1.)
-
-=item MaxReplySize
-
-Maximum size of the reply block.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to the desired directory.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. If successful, returns
-the error code followed by an array ref containing the parsed data structures
-for the returned entries describing remote files.
-
- [
-   {
-     'CreateDate' => 1231627038,
-     'ModDate' => 1231627038,
-     'UTF8Hint' => 0,
-     'DataForkLen' => 2987,
-     'NodeID' => 6233527,
-     'UnixGID' => 501,
-     'UTF8Name' => 'rename.pl',
-     'FileIsDir' => 0,
-     'UnixPerms' => 33261,
-     'ParentDirID' => 2,
-     'UnixUID' => 501,
-     'UnixAccessRights' => 2265121543
-   },
-   ...
- ]
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPBitmapErr
-
-Attempt was made to retrieve a parameter that cannot be retrieved by this command, an attempt was made to retrieve the Directory ID for a directory on a variable Directory ID volume, or both bitmaps are empty.
-
-=item kFPDirNotFound
-
-Input parameters do not point to an existing directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-No more offspring exist to be enumerated.
-
-item kFPObjectTypeErr
-
-Input parameters point to a file.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown, pathname is bad, or MaxReplySize is too small to hold a single offspring structure.
-
-=back
-
-=cut
 sub FPEnumerate { # {{{1
     my($self, %options) = @_;
 
@@ -1996,125 +639,6 @@ sub FPEnumerate { # {{{1
     return($rc, [@results]);
 } # }}}1
 
-=item FPEnumerateExt()
-
-Lists the contents of a directory.
-
-Deprecated; use C<FPEnumerateExt2()> instead.
-
-Arguments are passed as key-value pair for this method.
-
-Arguments:
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Identifier for the directory to list.
-
-=item FileBitmap
-
-Bitmap describing the parameters to return if the enumerated offspring is
-a file. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<FileBitmap> parameter of the
-L</FPGetFileDirParms> command and can be null. For bit definitions for
-this bitmap, see L<Net::AFP::FileParms>.
-
-=item DirectoryBitmap
-
-Bitmap describing the parameters to return if the enumerated offspring is
-a directory. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<DirectoryBitmap> parameter of the
-L</FPGetFileDirParms> command and can be null. For bit definitions for
-this bitmap, see L<Net::AFP::DirParms>.
-
-=item ReqCount
-
-Maximum number of C<ResultsRecord> structures for which information is
-to be returned.
-
-=item StartIndex
-
-Directory offspring index. (Starts at 1.)
-
-=item MaxReplySize
-
-Maximum size of the reply block.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to the desired directory.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. If successful, returns
-the error code followed by an array ref containing the parsed data structures
-for the returned entries describing remote files.
-
- [
-   {
-     'CreateDate' => 1231627038,
-     'ModDate' => 1231627038,
-     'UTF8Hint' => 0,
-     'DataForkLen' => 2987,
-     'NodeID' => 6233527,
-     'UnixGID' => 501,
-     'UTF8Name' => 'rename.pl',
-     'FileIsDir' => 0,
-     'UnixPerms' => 33261,
-     'ParentDirID' => 2,
-     'UnixUID' => 501,
-     'UnixAccessRights' => 2265121543
-   },
-   ...
- ]
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPBitmapErr
-
-Attempt was made to retrieve a parameter that cannot be retrieved by this command, an attempt was made to retrieve the Directory ID for a directory on a variable Directory ID volume, or both bitmaps are empty.
-
-=item kFPDirNotFound
-
-Input parameters do not point to an existing directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-No more offspring exist to be enumerated.
-
-=item kFPObjectTypeErr
-
-Input parameters point to a file.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown, pathname is bad, or MaxReplySize is too small to hold a single offspring structure.
-
-=back
-
-=cut
 sub FPEnumerateExt { # {{{1
     my($self, %options) = @_;
 
@@ -2165,124 +689,6 @@ sub FPEnumerateExt { # {{{1
     return($rc, [@results]);
 } # }}}1
 
-=item FPEnumerateExt2()
-
-List the contents of a directory.
-
-Arguments are passed as key-value pair for this method.
-
-Arguments:
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Identifier for the directory to list.
-
-=item FileBitmap
-
-Bitmap describing the parameters to return if the enumerated offspring is
-a file. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<FileBitmap> parameter of the
-L</FPGetFileDirParms> command and can be null. For bit definitions for
-this bitmap, see L<Net::AFP::FileParms>.
-
-=item DirectoryBitmap
-
-Bitmap describing the parameters to return if the enumerated offspring is
-a directory. Set the bit that corresponds to each desired parameter. This
-bitmap is the same as the C<DirectoryBitmap> parameter of the
-L</FPGetFileDirParms> command and can be null. For bit definitions for
-this bitmap, see L<Net::AFP::DirParms>.
-
-=item ReqCount
-
-Maximum number of C<ResultsRecord> structures for which information is
-to be returned.
-
-=item StartIndex
-
-Directory offspring index. (Starts at 1.)
-
-=item MaxReplySize
-
-Maximum size of the reply block.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to the desired directory.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. If successful, returns
-the error code followed by an array ref containing the parsed data structures
-for the returned entries describing remote files.
-
- [
-   {
-     'CreateDate' => 1231627038,
-     'ModDate' => 1231627038,
-     'UTF8Hint' => 0,
-     'DataForkLen' => 2987,
-     'NodeID' => 6233527,
-     'UnixGID' => 501,
-     'UTF8Name' => 'rename.pl',
-     'FileIsDir' => 0,
-     'UnixPerms' => 33261,
-     'ParentDirID' => 2,
-     'UnixUID' => 501,
-     'UnixAccessRights' => 2265121543
-   },
-   ...
- ]
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPBitmapErr
-
-Attempt was made to retrieve a parameter that cannot be retrieved by this command, an attempt was made to retrieve the Directory ID for a directory on a variable Directory ID volume, or both bitmaps are empty.
-
-=item kFPDirNotFound
-
-Input parameters do not point to an existing directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-No more offspring exist to be enumerated.
-
-=item kFPObjectTypeErr
-
-Input parameters point to a file.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown, pathname
-is bad, or MaxReplySize is too small to hold a single offspring structure.
-
-=back
-
-=cut
 sub FPEnumerateExt2 { # {{{1
     my($self, %options) = @_;
 
@@ -2333,89 +739,7 @@ sub FPEnumerateExt2 { # {{{1
     return($rc, [@results]);
 } # }}}1
 
-=item FPExchangeFiles()
-
-Exchanges file metadata between two files.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item SourceDirectoryID
-
-Identifier of the directory containing the source file.
-
-=item DestDirectoryID
-
-Identifier of the directory containing the destination file.
-
-=item SourcePathType
-
-Type of names in C<SourcePathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item SourcePathname
-
-Pathname of the source file.
-
-=item DestPathType
-
-Type of names in C<SourcePathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item DestPathname
-
-Pathname of the destination file.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPBadIDErr
-
-File ID is not valid.
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPIDNotFound
-
-File ID was not found. (No file thread exists.)
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectTypeErr
-
-Object defined was a directory, not a file.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown; pathname
-is null or bad.
-
-=back
-
-=cut
-sub FPExchangeFiles {
+sub FPExchangeFiles { # {{{1
     my($self, %options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
@@ -2439,41 +763,8 @@ sub FPExchangeFiles {
             PackagePath(@options{'SourcePathType', 'SourcePathname'}),
             PackagePath(@options{'DestPathType', 'DestPathname'}));
     return $self->SendAFPMessage($msg, undef, 1);
-}
+} # }}}1
 
-=item FPFlush()
-
-Writes any volume data that has been modified.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-Volume ID.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-Session reference number or Volume ID is unknown.
-
-=back
-
-=cut
 sub FPFlush { # {{{1
     my ($self, $VolumeID) = @_;
 
@@ -2482,39 +773,6 @@ sub FPFlush { # {{{1
     return $self->SendAFPMessage(pack('Cxn', kFPFlush, $VolumeID), undef, 1);
 } # }}}1
 
-=item FPFlushFork()
-
-Write any data buffered from previous write commands.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $OForkRefNum
-
-Open fork reference number.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-Session reference number or fork reference number is unknown.
-
-=back
-
-=cut
 sub FPFlushFork { # {{{1
     my ($self, $OForkRefNum) = @_;
 
@@ -2524,94 +782,6 @@ sub FPFlushFork { # {{{1
             undef, 1);
 } # }}}1
 
-=item FPGetACL()
-
-Gets the access control list for a file or directory.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume identifier.
-
-=item DirectoryID
-
-Directory identifier.
-
-=item Bitmap
-
-Bits that specify the values that are to be obtained. Specify
-C<kFileSec_UUID> to get the UUID of the specified file or directory.
-Specify C<kFileSec_GRPUUID> to get the Group UUID of the specified
-file or directory, or specify kFileSec_ACL to get the ACL of the
-specified file or directory. For declarations of these constants,
-see L<Net::AFP::ACL/Access Control List Bitmap>.
-
-=item MaxReplySize
-
-Reserved. Set this parameter to zero.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname of the file or directory for which the access control list (ACL)
-is to be obtained.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call; upon success, a list
-containing the error code, followed by key-value pairs containing ACL
-related fields about the requested file, like the following:
-
- (
-   'acl_ace' => [
-                  {
-                    'ace_flags' => 1,
-                    'ace_rights' => 4,
-                    'ace_applicable' => 'abcdefab-cdef-abcd-efab-cdef00000050'
-                  },
-                  ...
-                ],
-   'Bitmap' => 7,
-   'acl_flags' => 0,
-   'UUID' => 'abcdefab-cdef-abcd-efab-cdef00000050',
-   'GRPUUID' => 'abcdefab-cdef-abcd-efab-cdef00000050',
- )
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access rights required to get the ACL for the
-specified file or directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-A parameter is invalid.
-
-=back
-
-=cut
 sub FPGetACL { # {{{1
     my($self, %options) = @_;
 
@@ -2664,69 +834,7 @@ sub FPGetACL { # {{{1
     return($rc, %rvals);
 } # }}}1
 
-=item FPGetAPPL()
-
-Retrieves an APPL mapping from a volume's Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item DTRefNum
-
-Desktop database reference number.
-
-=item FileCreator
-
-File creator of the application corresponding to the APPL mapping
-to be retrieved.
-
-=item Index
-
-Index of the APPL mapping to be retrieved.
-
-=item Bitmap
-
-Parameters to retrieve about the application to be used to open the file
-with the indicated Creator ID. See C<Net::AFP::FileParms> for the parameter
-bits which can be set.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-will be returned containing the error call, and a set of key/value pairs
-with the returned parameters.
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-Session reference number or Desktop database reference was unknown.
-
-=item kFPItemNotFound
-
-No entries in the Desktop database matched the given parameters.
-
-=item kFPBitmapErr
-
-A parameter was requested which could not be retrieved using this operation.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
-sub FPGetAPPL {
+sub FPGetAPPL { # {{{1
     my($self, %options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
@@ -2753,65 +861,8 @@ sub FPGetAPPL {
                   'FileParameters'  => $info,
                 );
     return($rc, %rvals);
-}
+} # }}}1
 
-=item FPGetAuthMethods()
-
-Get the UAMs that an Open Directory domain supports.
-
-Deprecated (?).
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Flags
-
-Flags providing additional information. (No flags are currently defined.)
-
-=item $PathType
-
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item $Pathname
-
-Pathname of the Open Directory domain for which UAMs are to be obtained.
-
-=item $resp_r
-
-A reference to a scalar that can be used to contain a hash reference, which
-will contain the list of supported UAMs for the given Open Directory domain.
-
- {
-   'Flags' => 0,
-   'UAMStrings' => [
-                     'DHX2',
-                     ...
-                   ],
- }
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPObjectNotFound
-
-The specified Open Directory server was not known.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPGetAuthMethods { # {{{1
     my($self, $Flags, $PathType, $Pathname, $resp_r) = @_;
     DEBUG('called ', (caller(0))[3]);
@@ -2828,71 +879,6 @@ sub FPGetAuthMethods { # {{{1
     return $rc;
 } # }}}1
 
-=item FPGetComment()
-
-Gets the comment associated with a file or directory from the volume's
-Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item DTRefNum
-
-Desktop database reference number.
-
-=item DirectoryID
-
-Directory ID.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to desired file or directory.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-will be returned, containing the error code and a string containing the
-comment text (if any was present) for the referenced file.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPItemNotFound
-
-No comment was found in the Desktop database.
-
-=item kFPParamErr
-
-Session reference number or Desktop database reference number is unknown.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPGetComment { # {{{1
     my($self, %options) = @_;
 
@@ -2916,93 +902,6 @@ sub FPGetComment { # {{{1
     return($rc, unpack('C/a', $resp));
 } # }}}1
 
-=item FPGetExtAttr()
-
-Gets the value of an extended attribute.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume identifier.
-
-=item DirectoryID
-
-Directory identifier.
-
-=item Bitmap
-
-Bitmap specifying the desired behavior when getting the value of an
-extended attribute. For this command, only kAttrDontFollow is valid.
-For details, see L<Net::AFP::ExtAttrs/"Extended Attributes Bitmap">.
-
-=item Offset
-
-Always zero; reserved for future use.
-
-=item ReqCount
-
-Always -1; reserved for future use.
-
-=item MaxReplySize
-
-Size in bytes of the reply that your application can handle; set to zero
-to get the size of the reply without actually getting the attributes.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to desired file or directory.
-
-=item Name
-
-UTF-8 encoded name of the extended attribute whose value is to be
-obtained.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, followed by key-value pairs containing the
-requested information about the supplied extended attribute.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to get the contents of
-an extended attribute for the specified file or directory.
-
-=item kFPBitmapErr
-
-Bitmap is null or specifies a value that is invalid for this command.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-A parameter is invalid.
-
-=back
-
-=cut
 sub FPGetExtAttr { # {{{1
     my($self, %options) = @_;
 
@@ -3043,81 +942,6 @@ sub FPGetExtAttr { # {{{1
     return($rc, %rvals);
 } # }}}1
 
-=item FPGetFileDirParms()
-
-Gets the parameters for a file or a directory.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Directory ID.
-
-=item FileBitmap
-
-Bitmap describing the parameters to return for a file. Set the bit that
-corresponds to each desired parameter. For the bit definitions of this
-bitmap, see L<Net::AFP::FileParms>.
-
-=item DirectoryBitmap
-
-Bitmap describing the parameters to return for a directory. Set the bit
-that corresponds to each desired parameter. For the bit definitions of
-this bitmap, see L<Net::AFP::DirParms>.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to desired file or directory.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, followed by key-value pairs containing the
-requested parameters about the indicated file or directory.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPBitmapErr
-
-Attempt was made to retrieve a parameter that cannot be obtained with this command.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown;
-pathname is invalid.
-
-=back
-
-=cut
 sub FPGetFileDirParms { # {{{1
     my($self, %options) = @_;
 
@@ -3143,50 +967,6 @@ sub FPGetFileDirParms { # {{{1
     return($rc, _ParseFileDirParms($resp));
 } # }}}1
 
-=item FPGetForkParms()
-
-Get the parameters for a fork.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $OForkRefNum
-
-Open fork reference number.
-
-=item $Bitmap
-
-Bitmap describing the parameters to be returned. Set the bits that
-correspond to each desired parameter. This bitmap is the same as the
-C<FileBitmap> parameter of the L</FPGetFileDirParms> command. For
-bit definitions for this bitmap, see L<Net::AFP::FileParms>.
-
-=item $resp_r
-
-A scalar reference which will contain a hash reference containing the information indicated in $Bitmap on success.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-The open fork reference number provided is invalid.
-
-=item kFPBitmapErr
-
-The request attempted to get information about the opened file's other fork.
-
-=back
-
-=cut
 sub FPGetForkParms { # {{{1
     my ($self, $OForkRefNum, $Bitmap, $resp_r) = @_;
 
@@ -3202,69 +982,7 @@ sub FPGetForkParms { # {{{1
     return $rc;
 } # }}}1
 
-=item FPGetIcon()
-
-Gets an icon from the Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item DTRefNum
-
-Desktop database reference number.
-
-=item FileCreator
-
-File creator associated with the icon that is to be added.
-
-=item FileType
-
-File type associated with the icon that is to be added.
-
-=item IconType
-
-Type of icon that is to be added.
-
-=item Length
-
-Number of bytes the caller expects the icon bitmap to require in the
-reply block.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, followed by a string containing the binary
-icon data.
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-Session reference number or Desktop database reference number is
-unknown.
-
-=item kFPItemNotFound
-
-No icon corresponding to the input parameters was found in the
-Desktop database.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
-sub FPGetIcon {
+sub FPGetIcon { # {{{1
     my($self, %options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
@@ -3286,63 +1004,9 @@ sub FPGetIcon {
     my $rdata;
     my $rc = $self->SendAFPMessage($msg, \$rdata);
     return($rc, $rdata);
-}
+} # }}}1
 
-=item FPGetIconInfo()
-
-Gets icon information from the Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $DTRefNum
-
-Desktop database reference number.
-
-=item $FileCreator
-
-File creator associated with the icon that is to be added.
-
-=item $IconIndex
-
-Index of the requested icon.
-
-=item $resp_r
-
-A reference to a scalar which will contain a hash with information
-about the indicated icon.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-Session reference number or Desktop database reference number is
-unknown.
-
-=item kFPItemNotFound
-
-No icon corresponding to the input parameters was found in the
-Desktop database.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
-sub FPGetIconInfo {
+sub FPGetIconInfo { # {{{1
     my($self, $DTRefNum, $FileCreator, $IconIndex, $resp_r) = @_;
 
     DEBUG('called ', (caller(0))[3]);
@@ -3358,68 +1022,8 @@ sub FPGetIconInfo {
     @{${$resp_r}}{'IconTag', 'FileType', 'IconType', 'Size'} =
             unpack('NNCxn', $resp);
     return $rc;
-}
+} # }}}1
 
-=item FPGetSessionToken()
-
-Gets a session token.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Type
-
-The value of this parameter is C<kLoginWithoutID> (0) if the client supports
-an earlier version of AFP that does not send an C<$IDLength> and an C<$ID>
-parameter. If is C<kLoginWithTimeAndID> (3) if the client is sending an
-C<$IDLength>, an C<$ID>, and a C<$timeStamp> parameter and the client wants
-its old session to be discarded. It is C<kReconnWithTimeAndID> (4) if the
-client has just finished a successful reconnect, is sending an C<$IDLength>,
-an C<$ID>, and a C<$timeStamp> parameter, and wants to be updated with the
-C<$ID> parameter. It is C<kGetKerberosSessionKey> (8) if the client is
-logging in using Kerberos v5. See L<Net::AFP::TokenTypes> for the
-definitions of the constants for this parameter.
-
-=item $timeStamp
-
-Optional time stamp specified only if the value of C<$ID> is
-C<kLoginWithTimeAndID> or C<kReconnWithTimeAndID>.
-
-=item $ID
-
-A client-defined value that uniquely identifies this session.
-
-=item $resp_r
-
-A scalar reference which will be assigned a scalar reference containing
-the retrieved token data.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-Session reference number is null or invalid.
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=back
-
-=cut
 sub FPGetSessionToken { # {{{1
     my ($self, $Type, $timeStamp, $ID, $resp_r) = @_;
 
@@ -3446,41 +1050,6 @@ sub FPGetSessionToken { # {{{1
     return $rc;
 } # }}}1
 
-=item FPGetSrvrInfo()
-
-Gets information about a server.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $resp_r
-
-A scalar reference which will have a hash reference placed in it,
-containing information about the server.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPNoServer
-
-The server name could not be resolved, or the server would not accept
-the connection.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPGetSrvrInfo { # {{{1
     my ($self, $resp_r) = @_;
 
@@ -3497,57 +1066,6 @@ sub FPGetSrvrInfo { # {{{1
     return $rc;
 } # }}}1
 
-=item FPGetSrvrMsg()
-
-Gets a message from a server.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $MessageType
-
-Type of message, where 0 indicates a login message, and 1 indicates a
-server message. (Set C<$MessageType> to 1 when the Server Message bit
-in the attention code is set.)
-
-=item $MessageBitmap
-
-Bitmap providing additional information. The client sets bit 0 of this
-bitmap to indicate it is requesting a message. Starting with AFP 3.0,
-the client can set bit 1 of this bitmap to indicate that it supports
-UTF-8 messages.
-
-=item $resp_r
-
-A reference to a scalar which will contain the message returned from
-the server upon success.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPBitmapErr
-
-Flags passed in $MessageBitmap were not recognized.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPGetSrvrMsg { # {{{1
     my($self, $MessageType, $MessageBitmap, $resp_r) = @_;
 
@@ -3579,40 +1097,6 @@ sub FPGetSrvrMsg { # {{{1
     return $rc;
 } # }}}1
 
-=item FPGetSrvrParms()
-
-Get a list of volumes that the server is willing to offer for sharing.
-Must be authenticated.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $resp_r
-
-A reference to a scalar that can be used to return a reference to a hash containing information about the server.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-Session reference number or Volume ID is unknown.
-
-=back
-
-=cut
 sub FPGetSrvrParms { # {{{1
     my ($self, $resp_r) = @_;
 
@@ -3646,88 +1130,6 @@ sub FPGetSrvrParms { # {{{1
     return $rc;
 } # }}}1
 
-=item FPGetUserInfo()
-
-Retrieve certain information about a user from an AFP server. Must be
-authenticated.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Flags
-
-If the lowest bit (0x1) is set (the C<ThisUser> flag), information is
-obtained about the current user and the C<$UserID> field is ignored.
-
-=item $UserID
-
-ID of user for whom information is to be retrieved. (Not valid if the
-C<ThisUser> bit is set in the C<$Flags> field.)
-
-This field is deprecated for security reasons. The C<ThisUser> bit should
-always be set in the flags field.
-
-=item $Bitmap
-
-Bitmap describing which IDs to retrieve, where bit zero (0x1) is set to get
-the user's User ID, bit 1 (0x2) is set to get the user's Primary Group ID,
-and bit 2 (0x4) is set to get the user's UUID.
-
-=item $resp_r
-
-A scalar reference to contain a hash ref, which will contain returned data.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to
-get information about the specified user.
-
-=item kFPBitmapErr
-
-Attempt was made to retrieve a parameter that can not
-be obtained with this command.
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPItemNotFound
-
-Specified User ID is unknown.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-ThisUser bit is not set.
-
-=item kFPPwdExpiredErr
-
-User's password has expired. User is required to change his or her password.
-The user is logged on but can only change his or her password or log out.
-
-=item kFPPwdNeedsChangeErr
-
-User's password needs to be changed. User is required to change his or her
-password. The user is logged on but can only change his or her password or
-log out.
-
-=back
-
-=cut
 sub FPGetUserInfo { # {{{1
     my ($self, $Flags, $UserID, $Bitmap, $resp_r) = @_;
 
@@ -3769,55 +1171,6 @@ sub FPGetUserInfo { # {{{1
     return $rc;
 } # }}}1
 
-=item FPGetVolParms()
-
-Get the volume parameter information from an AFP server for a volume
-previously opened with FPOpenVol(). Must be authenticated.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-The numeric volume ID returned as part of FPOpenVol().
-
-=item $Bitmap
-
-A Volume bitmap. See the Net::AFP::VolParms package.
-
-=item $resp_r
-
-A reference to a scalar that can be used to return
-a reference to a hash containing information about
-the server.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPBitmapErr
-
-Attempt was made to retrieve a parameter that can not
-be obtained with this command.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-The session reference number or Volume ID is unknown.
-
-=back
-
-=cut
 sub FPGetVolParms { # {{{1
     my($self, $VolumeID, $Bitmap, $resp_r) = @_;
 
@@ -3833,93 +1186,6 @@ sub FPGetVolParms { # {{{1
     return $rc;
 } # }}}1
 
-=item FPListExtAttrs()
-
-Gets the names of extended attributes for a file or directory.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume identifier.
-
-=item DirectoryID
-
-Directory identifier.
-
-=item Bitmap
-
-Bitmap describing the desired behavior when getting the names of extended
-attributes. For this command C<kAttrDontFollow> is the only valid bit.
-For details, see L<Net::AFP::ExtAttrs/"Extended Attributes Bitmap">.
-
-=item ReqCount
-
-Reserved for future use. For AFP 3.2, clients can set this parameter to
-any numeric value. Servers should ignore this parameter and return all
-extended attribute names.
-
-=item StartIndex
-
-Reserved for future use. For AFP 3.2, set C<$StartIndex> to zero.
-Servers should ignore this parameter.
-
-=item MaxReplySize
-
-Size in bytes of the reply that your application can handle, including
-the size of the C<$Bitmap> and C<$DataLength> parameters. Set this
-parameter to zero to get the size of the reply block that would be
-returned without actually getting the names of the extended attributes.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to desired file or directory.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, followed by key-value pairs containing the
-returned information about the extended attributes list.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to list the extended
-attribute names for the specified file or directory.
-
-=item kFPBitmapErr
-
-Bitmap is null or specifies a value that is invalid for this command.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-A parameter is invalid.
-
-=back
-
-=cut
 sub FPListExtAttrs { # {{{1
     my($self, %options) = @_;
 
@@ -3958,95 +1224,6 @@ sub FPListExtAttrs { # {{{1
     return($rc, %rvals);
 } # }}}1
 
-=item FPLogin()
-
-Establishes a session with a server.
-
-Deprecated in AFP 3.x; use C<FPLoginExt()> instead.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $AFPVersion
-
-String indicating which AFP version to use. For possible values, see
-L</"AFP Version Strings">.
-
-=item $UAM
-
-String indicating which UAM to use. For possible values, see
-L</"AFP UAM Strings">.
-
-=item $UserAuthInfo
-
-UAM-dependent information required to authenticate the user (can be null).
-The data type of C<$UserAuthInfo> depends on the UAM specified by C<$UAM>.
-
-=item $resp_r
-
-A reference to a scalar that can be used to return
-a reference to a hash containing information
-relevant to the login process.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAuthContinue
-
-Authentication is not yet complete. (Not an error, just
-a status reply.)
-
-=item kFPBadUAM
-
-Specified UAM is unknown.
-
-=item kFPBadVersNum
-
-Server does not support the specified AFP version.
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPMiscErr
-
-User is already authenticated.
-
-=item kFPNoServer
-
-Server is not responding.
-
-=item kFPPwdExpiredErr
-
-User's password has expired. User is required to change
-his or her password. The user is logged on but can only
-change his or her password or log out.
-
-=item kFPPwdNeedsChangeErr
-
-User's password needs to be changed. User is required
-to change his or her password. The user is logged on
-but can only change his or her password or log out.
-
-=item kFPServerGoingDown
-
-Server is shutting down.
-
-=item kFPUserNotAuth
-
-Authentication failed.
-
-=back
-
-=cut
 sub FPLogin { # {{{1
     my ($self, $AFPVersion, $UAM, $UserAuthInfo) = @_;
 
@@ -4068,79 +1245,6 @@ sub FPLogin { # {{{1
     return($rc, %rvals);
 } # }}}1
 
-=item FPLoginCont()
-
-Continues the login and user authentication process started by a login
-command.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $ID
-
-Number returned by a previous call to L</FPLogin>, L</FPLoginExt>, or
-L</FPLoginCont>.
-
-=item $UserAuthInfo
-
-UAM-dependent information required to authenticate the user (can be null).
-The data type of C<$UserAuthInfo> depends on the UAM that was specified
-when L</FPLogin> or L</FPLoginExt> was called.
-
-=item $resp_r
-
-A reference to a scalar that can be used to return
-a reference to a hash containing information relevant
-to the login process.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAuthContinue
-
-Authentication is not yet complete. (Not an error, just
-a status reply.)
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPNoServer
-
-Server is not responding.
-
-=item kFPParamErr
-
-Authentication failed for an unknown reason.
-
-=item kFPPwdExpiredErr
-
-User's password has expired. User is required to change
-his or her password. The user is logged on but can only
-change his or her password or log out.
-
-=item kFPPwdNeedsChangeErr
-
-User's password needs to be changed. User is required
-to change his or her password. The user is logged on
-but can only change his or her password or log out.
-
-=item kFPUserNotAuth
-
-User was not authenticated because the password is
-incorrect.
-
-=back
-
-=cut
 sub FPLoginCont { # {{{1
     my ($self, $ID, $UserAuthInfo, $resp_r) = @_;
 
@@ -4174,120 +1278,6 @@ sub FPLoginCont { # {{{1
     return $rc;
 } # }}}1
 
-=item FPLoginExt()
-
-Establishes a session with a server using an Open Directory domain.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item AFPVersion
-
-String indicating which AFP version to use. For possible values, see
-L</"AFP Version Strings">.
-
-=item UAM
-
-String indicating which UAM to use. For possible values, see
-L</"AFP UAM Strings">.
-
-=item UserNameType
-
-Type of name in C<UserName>; always 3.
-
-=item UserName
-
-UTF-8 encoded name of the user.
-
-=item PathType
-
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname for the Open Directory domain in which the user specified by
-C<$UserName> can be found.
-
-=item UserAuthInfo
-
-UAM-dependent information required to authenticate the user (can be null).
-The data type of C<UserAuthInfo> is dependent on the UAM specified by
-C<UAM>.
-
-=item $resp_r
-
-A reference to a scalar that can be used to return
-a reference to a hash containing information
-relevant to the login process.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, followed by key-value pairs containing
-information relevant to the login process.
-
-Error replies:
-
-=over
-
-=item kFPAuthContinue
-
-Authentication is not yet complete. (Not an error, just
-a status reply.)
-
-=item kFPBadUAM
-
-Specified UAM is unknown.
-
-=item kFPBadVersNum
-
-Server does not support the specified AFP version.
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPMiscErr
-
-User is already authenticated.
-
-=item kFPNoServer
-
-Server is not responding.
-
-=item kFPPwdExpiredErr
-
-User's password has expired. User is required to change
-his or her password. The user is logged on but can only
-change his or her password or log out.
-
-=item kFPPwdNeedsChangeErr
-
-User's password needs to be changed. User is required
-to change his or her password. The user is logged on
-but can only change his or her password or log out.
-
-=item kFPServerGoingDown
-
-Server is shutting down.
-
-=item kFPUserNotAuth
-
-Authentication failed.
-
-=back
-
-=cut
 sub FPLoginExt { # {{{1
     my($self, %options) = @_;
 
@@ -4326,35 +1316,6 @@ sub FPLoginExt { # {{{1
     return($rc, %rvals);
 } # }}}1
 
-=item FPLogout()
-
-Terminates a session with a server.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-The session reference number is unknown.
-
-=back
-
-=cut
 sub FPLogout { # {{{1
     my ($self) = @_;
 
@@ -4363,52 +1324,6 @@ sub FPLogout { # {{{1
     return $self->SendAFPMessage(pack('Cx', kFPLogout));
 } # }}}1
 
-=item FPMapID()
-
-Maps a User ID to a user name or a Group ID to a group name.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Subfunction
-
-Subfunction code. See L<Net::AFP::MapParms/"FPMapID Constants"> for
-more information.
-
-=item $ID
-
-The ID to be resolved.
-
-=item $resp_r
-
-A reference to a scalar that can be used to return the resolved name.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-The session number or indicated subfunction is unknown.
-
-=item kFPItemNotFound
-
-The ID passed could not be found.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPMapID { # {{{1
     my($self, $Subfunction, $ID, $resp_r) = @_;
 
@@ -4449,52 +1364,6 @@ sub FPMapID { # {{{1
     return $rc;
 } # }}}1
 
-=item FPMapName()
-
-Maps a user name to a User ID or a group name to a Group ID.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Subfunction
-
-Subfunction code. See L<Net::AFP::MapParms/"FPMapName Constants"> for
-more information.
-
-=item $Name
-
-The ID to be resolved.
-
-=item $resp_r
-
-A reference to a scalar that can be used to return the resolved ID.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-The session number or indicated subfunction is unknown.
-
-=item kFPItemNotFound
-
-The name passed could not be found.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPMapName { # {{{1
     my($self, $Subfunction, $Name, $resp_r) = @_;
 
@@ -4532,103 +1401,6 @@ sub FPMapName { # {{{1
     return $rc;
 } # }}}1
 
-=item FPMoveAndRename()
-
-Moves a CNode to another location on a volume or renames a CNode.
-
-Arguments:
-
-=over
-
-=item VolumeID
-
-The numeric volume ID returned as part of FPOpenVol().
-
-=item SourceDirectoryID
-
-Source ancestor Directory ID.
-
-=item DestDirectoryID
-
-Destination ancestor Directory ID.
-
-=item SourcePathType
-
-Type of names in C<SourcePathname>. See L</"Path Type Constants"> for more information.
-
-=item SourcePathname
-
-Pathname of the file or directory to be moved (may be null if a directory is being moved).
-
-=item DestPathType
-
-Type of names in C<DestPathname>. See L</"Path Type Constants"> for more information.
-
-=item DestPathname
-
-Pathname of the file or directory to be moved to. (may be null if a directory is being moved).
-
-=item NewType
-
-Type of names in C<NewName>. See L</"Path Type Constants"> for more information.
-
-=item NewName
-
-New name of file or directory (may be null).
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to move or rename the specified file or directory.
-
-=item kFPCantMove
-
-Attempt was made to move a directory into one of its descendent directories.
-
-=item kFPInsideSharedErr
-
-Directory being moved contains a share point and is being moved into a directory that is shared or is the descendent of a directory that is shared.
-
-=item kFPInsideTrashErr
-
-Shared directory is being moved into the Trash; a directory is being moved to the trash and it contains a shared folder.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectExists
-
-File or directory having the same name specified by C<$NewName> already exists.
-
-=item kFPObjectLocked
-
-Directory being moved, renamed or moved and renamed is marked RenameInhibit; file being moved and renamed is marked RenameInhibit.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown; a pathname or C<$NewName> is invalid.
-
-=item kFPVolLocked
-
-Volume is ReadOnly.
-
-=back
-
-=cut
 # Note that there is no mechanism here for returning a value from this
 # call; I'm not sure there ever was one, the docs seem pretty wishy-washy
 # about this, and so far I'm not seeing anything in packet dumps to
@@ -4668,72 +1440,6 @@ sub FPMoveAndRename { # {{{1
     return $rc;
 } # }}}1
 
-=item FPOpenDir()
-
-Opens a directory on a variable Directory ID volume and returns its
-Directory ID.
-
-Deprecated in Mac OS X.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Ancestor Directory ID.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname of the file or directory to be moved (may be null if a directory
-is being moved).
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, followed by the returned Directory ID.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to open the directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing directory.
-
-=item kFPObjectTypeErr
-
-Input parameters point to a file.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown; a
-pathname is invalid.
-
-=back
-
-=cut
 sub FPOpenDir { # {{{1
     my($self, %options) = @_;
 
@@ -4756,46 +1462,6 @@ sub FPOpenDir { # {{{1
     return($rc, unpack('N', $resp));
 } # }}}1
 
-=item FPOpenDT()
-
-Opens the Desktop database on a particular volume.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-Volume ID.
-
-=item $resp_r
-
-A reference to a scalar that can be used to contain the C<DTRefNum>
-returned from the server.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPParamErr
-
-Session reference number or Volume ID was invalid.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPOpenDT { # {{{1
     my($self, $VolumeID, $resp_r) = @_;
 
@@ -4810,121 +1476,6 @@ sub FPOpenDT { # {{{1
     return $rc;
 } # }}}1
 
-=item FPOpenFork()
-
-Opens a fork of an existing file for reading or writing.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item Flag
-
-Bit 7 of the Flag parameter is the ResourceDataFlag bit, and
-it indicates which fork to open, where 0 specifies the data
-fork and 1 specifies the resource fork.
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Ancestor Directory ID.
-
-=item Bitmap
-
-Bitmap describing the fork parameters to be returned. Set the bit that
-corresponds to each desired parameter. This bitmap is the same as the
-C<FileBitmap> parameter of the L</FPGetFileDirParms> command and can
-be null. For bit definitions for the File bitmap, see
-L<Net::AFP::FileParms>.
-
-=item AccessMode
-
-Desired access and deny modes, specified by any combination of the
-following bits:
-
- 0 = Read - allows the fork to be read
- 1 = Write - allows the fork to be written
- 4 = DenyRead - prevents others from reading the fork while it is open
- 5 = DenyWrite - prevents others from writing the fork while it is open
-
-For more information on access and deny modes, see L</"File Sharing Modes">.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to the desired file (cannot be null).
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, followed by key-value pairs containing
-information returned from the server about the opened fork.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required
-to open the specified fork.
-
-=item kFPBitmapErr
-
-Attempt was made to retrieve a parameter that
-cannot be obtained with this command (the fork is
-not opened).
-
-=item kFPDenyConflict
-
-File or fork cannot be opened because of a deny
-modes conflict.
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file.
-
-=item kFPObjectLocked
-
-Attempt was made to open a file for writing that
-is marked WriteInhibit.
-
-=item kFPObjectTypeErr
-
-Input parameters point to a directory.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname
-type is unknown; a pathname is invalid.
-
-=item kFPTooManyFilesOpen
-
-Server cannot open another fork.
-
-=item kFPVolLocked
-
-Attempt was made to open for writing a file on a
-volume that is marked ReadOnly.
-
-=back
-
-=cut
 sub FPOpenFork { # {{{1
     my($self, %options) = @_;
 
@@ -4958,69 +1509,6 @@ sub FPOpenFork { # {{{1
     return($rc, %rvals);
 } # }}}1
 
-=item FPOpenVol()
-
-Opens a volume.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Bitmap
-
-Bitmap describing the parameters that are to be returned. Set the bit that
-corresponds to each desired parameter. The bitmap is the same as the Volume
-bitmap used by the L</FPGetVolParms> command and cannot be null. For bit
-definitions, see L<Net::AFP::VolParms>.
-
-=item $VolumeName
-
-Name of the volume as returned by L</FPGetSrvrParms>.
-
-=item $Password
-
-Optional volume password.
-
-=item $resp_r
-
-A reference to a scalar that can be used to return
-a reference to a hash containing information about
-the server.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-Password was not supplied or does not match.
-
-=item kFPBitmapErr
-
-Attempt was made to retrieve a parameter that cannot
-be retrieved with this command. (The bitmap is null.)
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing volume.
-
-=item kFPParamErr
-
-Session reference number or volume name is unknown.
-
-=back
-
-=cut
 sub FPOpenVol { # {{{1
     my ($self, $Bitmap, $VolumeName, $Password, $resp_r) = @_;
 
@@ -5051,80 +1539,6 @@ sub FPOpenVol { # {{{1
     return $rc;
 } # }}}1
 
-=item FPRead()
-
-Reads a block of data.
-
-Deprecated; use C<FPReadExt()> instead.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item OForkRefNum
-
-Open fork reference number.
-
-=item Offset
-
-Number of the first byte to read.
-
-=item ReqCount
-
-Number of bytes to read.
-
-=item NewLineMask
-
-Mask for determining where the read should terminate.
-
-=item NewLineChar
-
-Character for determining where the read should terminate.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code and a string containing the data read from the
-referenced fork.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-Fork was not opened for read access.
-
-=item kFPEOFErr
-
-End of fork was reached. (This will be returned if
-the end of the fork is reached at any point during
-the read. Any data read will be returned.)
-
-=item kFPLockErr
-
-Some or all of the requested range is locked by
-another user. (This will be returned if the read is
-partially obscured by a locked range. Any data read
-will be returned.)
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=item kFPParamErr
-
-Session reference number or open fork reference number
-is unknown; ReqCount or Offset is negative; NewLineMask
-is invalid.
-
-=back
-
-=cut
 sub FPRead { # {{{1
     my($self, %options) = @_;
     
@@ -5148,72 +1562,6 @@ sub FPRead { # {{{1
     return($rc, $rdata);
 } # }}}1
 
-=item FPReadExt()
-
-Reads a block of data.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item OForkRefNum
-
-Open fork reference number.
-
-=item Offset
-
-Number of the first byte to read.
-
-=item ReqCount
-
-Number of bytes to read.
-
-=item $resp_r
-
-A reference to a scalar which will contain the data read from the
-referenced fork.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code and a string containing the data read from the
-referenced fork.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-Fork was not opened for read access.
-
-=item kFPEOFErr
-
-End of fork was reached. (This will be returned if the end of the fork
-is reached at any point during the read. Any data read will be returned.)
-
-=item kFPLockErr
-
-Some or all of the requested range is locked by another user. (This
-will be returned if the read is partially obscured by a locked range.
-Any data read will be returned.)
-
-=item kFPMiscErr
-
-A non-AFP error occurred.
-
-=item kFPParamErr
-
-Session reference number or open fork reference number is unknown;
-ReqCount or Offset is negative; NewLineMask is invalid.
-
-=back
-
-=cut
 sub FPReadExt { # {{{1
     my($self, %options) = @_;
 
@@ -5234,75 +1582,7 @@ sub FPReadExt { # {{{1
     return($rc, $rdata);
 } # }}}1
 
-=item FPRemoveAPPL()
-
-Removes an APPL mapping from a volume's Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments are passed as key-value pair for this method.
-
-Arguments:
-
-=over
-
-=item DTRefNum
-
-Desktop database reference number.
-
-=item DirectoryID
-
-Directory ID.
-
-=item FileCreator
-
-File creator of the application corresponding to the APPL mapping that
-is to be removed.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to desired file or directory.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPItemNotFound
-
-No APPL mapping corresponding to the input parameters was found in the
-Desktop database.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file.
-
-=item kFPParamErr
-
-Session reference or Desktop database reference number is unknown.
-
-=back
-
-=cut
-sub FPRemoveAPPL {
+sub FPRemoveAPPL { # {{{1
     my($self, %options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
@@ -5321,69 +1601,8 @@ sub FPRemoveAPPL {
             @options{'DTRefNum', 'DirectoryID', 'FileCreator'},
             PackagePath(@options{'PathType', 'Pathname'}));
     return $self->SendAFPMessage($msg);
-}
+} # }}}1
 
-=item FPRemoveComment()
-
-Removes a comment from a volume's Desktop database.
-
-Deprecated as of Mac OS X 10.6.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $DTRefNum
-
-Desktop database reference number.
-
-=item $DirectoryID
-
-Directory ID.
-
-=item $PathType
-
-Type of names in C<$Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item $Pathname
-
-Pathname to desired file or directory.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPItemNotFound
-
-Comment was not found in the Desktop database.
-
-=item kFPParamErr
-
-Session reference number, Desktop database reference number, or
-pathname type is unknown; pathname is invalid.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=back
-
-=cut
 sub FPRemoveComment { # {{{1
     my($self, $DTRefNum, $DirectoryID, $PathType, $Pathname) = @_;
     DEBUG('called ', (caller(0))[3]);
@@ -5393,77 +1612,6 @@ sub FPRemoveComment { # {{{1
     return $self->SendAFPMessage($msg);
 } # }}}1
 
-=item FPRemoveExtAttr()
-
-Removes an extended attribute.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume identifier.
-
-=item DirectoryID
-
-Directory identifier.
-
-=item Bitmap
-
-Bitmap specifying the desired behavior when removing an extended attribute.
-For this command, C<kAttrDontFollow> is the only valid bit. For details,
-see L<Net::AFP::ExtAttrs/"Extended Attributes Bitmap">.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to desired file or directory.
-
-=item Name
-
-UTF-8 encoded name of the extended attribute that is to be removed.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to remove an extended
-attribute for the specified file or directory.
-
-=item kFPBitmapErr
-
-Bitmap is null or specifies a value that is invalid for this command.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-A parameter is invalid.
-
-=back
-
-=cut
 sub FPRemoveExtAttr { # {{{1
     my($self, %options) = @_;
 
@@ -5489,85 +1637,6 @@ sub FPRemoveExtAttr { # {{{1
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
-=item FPRename()
-
-Renames a file or directory.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Ancestor Directory ID.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for possible values.
-
-=item Pathname
-
-Pathname to the CNode whose name is being changed (cannot be null).
-
-=item NewType
-
-Type of names in C<NewName>. See L</"Path Type Constants"> for possible values.
-
-=item NewName
-
-Pathname to the CNode, including its new name (cannot be null).
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPCantRename
-
-Attempt was made to rename a volume or root directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectExists
-
-File or directory having the name specified by C<$NewName> already exists.
-
-=item kFPObjectLocked
-
-File or directory is marked RenameInhibit.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown; pathname or C<$NewName> is invalid.
-
-=item kFPVolLocked
-
-Volume is ReadOnly.
-
-=back
-
-=cut
 sub FPRename { # {{{1
     my($self, %options) = @_;
 
@@ -5592,77 +1661,7 @@ sub FPRename { # {{{1
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
-=item FPResolveID()
-
-Gets parameters for a file by File ID.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-Volume ID.
-
-=item $FileID
-
-File ID that is to be deleted.
-
-=item $Bitmap
-
-Bitmap describing the parameters to return. Set the bit that corresponds
-to each desired parameter. This bitmap is the same as the C<$FileBitmap>
-parameter of the L</FPGetFileDirParms> command. For bit definitions for
-the this bitmap, see L<Net::AFP::FileParms/File Bitmap>.
-
-=item $resp_r
-
-A reference to a scalar which will contain a hash reference with the
-requested file parameters.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPBadIDErr
-
-File ID is not valid.
-
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=item kFPIDNotFound
-
-File ID was not found. (No file thread exists.)
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectTypeErr
-
-Object defined was a directory, not a file.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown;
-pathname is null or bad.
-
-=back
-
-=cut
-sub FPResolveID {
+sub FPResolveID { # {{{1
     my($self, $VolumeID, $FileID, $Bitmap, $resp_r) = @_;
 
     DEBUG('called ', (caller(0))[3]);
@@ -5680,101 +1679,8 @@ sub FPResolveID {
                    'RequestedParameters'    => $info,
                  };
     return $rc;
-}
+} # }}}1
 
-=item FPSetACL()
-
-Sets the UUID, Group UUID, and ACL for a file or directory, or removes the
-ACL from a file or directory.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume identifier.
-
-=item DirectoryID
-
-Directory identifier.
-
-=item Bitmap
-
-Bits that specify the values that are to be set. Specify C<kFileSec_UUID>
-to set the UUID of the specified file or directory. Specify
-C<kFileSec_GRPUUID> to set the Group UUID of the specified file or
-directory. Specify C<kFileSec_ACL> to set the ACL of the specified file
-or directory or C<kFileSec_REMOVEACL> to remove the file or directory's
-ACL. If sending this command is part of the creation of a new item, set
-the C<kFileSec_Inherit> bit. When the server receives an L</FPSetACL>
-command having a Bitmap parameter in which the C<kFileSec_Inherit> bit
-is set, it scans the current item looking for access control entries
-(ACEs) in which the C<KAUTH_ACE_INHERITED> bit is set in its C<ace_flags>
-field. The server copies any currently inherited ACEs to the end of the
-incoming list of ACEs and sets the ACL on the item. For declarations of
-these constants, see L<Net::AFP::ACL/Access Control List Bitmap>.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname of the file or directory for which the access control list (ACL)
-is to be obtained.
-
-=item UUID
-
-If C<kFileSec_UUID> is set in the C<Bitmap> argument, this should contain
-the owner UUID.
-
-=item GRPUUID
-
-If C<kFileSec_GRPUUID> is set in the C<Bitmap> argument, this should contain
-the owning group UUID.
-
-=item acl_flags
-
-If C<kFileSec_ACL> is set, this should contain a list of ACE structures.
-
-=item acl_flags
-
-If C<kFileSec_ACL> is set, this should contain the ACL flag bitmask.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access rights required to get the ACL for the
-specified file or directory.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-A parameter is invalid.
-
-=back
-
-=cut
 sub FPSetACL { # {{{1
     my($self, %options) = @_;
 
@@ -5820,96 +1726,6 @@ sub FPSetACL { # {{{1
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
-=item FPSetDirParms()
-
-Sets parameters for a directory.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Ancestor Directory ID.
-
-=item Bitmap
-
-Bitmap describing the parameters to set. Set the bit that corresponds to
-each desired parameter. This bitmap is the same as the C<DirectoryBitmap>
-parameter of the L</FPGetFileDirParms> command. For bit defintions for
-this bitmap, see L<Net::AFP::DirParms>.
-
-=item PathType
-
-Type of name in C<Pathname>. See L</"Path Type Constants"> for possible values.
-
-=item Pathname
-
-Pathname to the desired directory.
-
-=item Other parameters
-
-Parameter values to set on the directory may be specified as part of the
-same set of key-value pairs. Only the values C<Attribute>,
-C<CreateDate>, C<ModDate>, C<BackupDate>, C<FinderInfo>, C<OwnerID>,
-C<GroupID>, C<AccessRights>, C<UnixUID>, C<UnixGID>, C<UnixPerms>,
-and C<UnixAccessRights> may be updated in this way. The corresponding
-bits must be set in the C<Bitmap> argument; see C<Net::AFP::DirParms>
-for the relevant flags.
-
-If any of the Unix* parameters are passed, they must all be passed at
-the same time, or C<kFPParamErr> will be returned.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to
-use this command.
-
-=item kFPBitmapErr
-
-Attempt was made to set a parameter that cannot be
-set by this command; bitmap is null.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing directory.
-
-=item kFPObjectTypeErr
-
-Input parameters point to a file.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown; pathname,
-Owner ID or Group ID is invalid or not specified.
-
-=item kFPVolLocked
-
-Volume is ReadOnly.
-
-=back
-
-=cut
 sub FPSetDirParms { # {{{1
     my($self, %options) = @_;
     
@@ -5943,85 +1759,6 @@ sub FPSetDirParms { # {{{1
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
-=item FPSetExtAttr()
-
-Sets the value of an extended attribute.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume identifier.
-
-=item DirectoryID
-
-Directory identifier.
-
-=item Bitmap
-
-Bitmap specifying the desired behavior when setting the value of an
-extended attribute. For details, see
-L<Net::AFP::ExtAttrs/"Extended Attributes Bitmap">.
-
-=item Offset
-
-Always zero; reserved for future use.
-
-=item PathType
-
-Type of names in C<Pathname>. See L</"Path Type Constants"> for
-possible values.
-
-=item Pathname
-
-Pathname to desired file or directory.
-
-=item Name
-
-UTF-8 encoded name of the extended attribute whose value is to be set.
-
-=item AttributeData
-
-Value to which the extended attribute is to be set.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to set an extended
-attribute for the specified file or directory.
-
-=item kFPBitmapErr
-
-Bitmap is null or specifies a value that is invalid for this command.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-A parameter is invalid.
-
-=back
-
-=cut
 sub FPSetExtAttr { # {{{1
     my($self, %options) = @_;
 
@@ -6050,92 +1787,6 @@ sub FPSetExtAttr { # {{{1
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
-=item FPSetFileDirParms()
-
-Sets parameters for a file or a directory.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Ancestor Directory ID.
-
-=item Bitmap
-
-Bitmap describing the parameters to set. Set the bit that corresponds to
-each desired parameter. This bitmap can be the same as the C<DirectoryBitmap>
-or the C<FileBitmap> parameter of the L</FPGetFileDirParms> command, but
-this command can only set the parameters common to both bitmaps. For bit
-definitions for the Directory bitmap, see L<Net::AFP::DirParms>; for bit
-definitions for the File bitmap, see L<Net::AFP::FileParms>.
-
-=item PathType
-
-Type of name in C<Pathname>. See L</"Path Type Constants"> for possible values.
-
-=item Pathname
-
-Pathname to the desired file or directory.
-
-=item Other parameters
-
-Parameter values to set on the directory may be specified as part of the
-same set of key-value pairs.  Only the values C<Attribute>,
-C<CreateDate>, C<ModDate>, C<BackupDate>, C<FinderInfo>, C<UnixUID>,
-C<UnixGID>, C<UnixPerms>, and C<UnixAccessRights> may be updated in
-this way. The corresponding bits must be set in the C<Bitmap> argument;
-see C<Net::AFP::DirParms> and C<Net::AFP::FileParms> for the relevant flags.
-
-If any of the Unix* parameters are passed, they must all be passed at
-the same time, or C<kFPParamErr> will be returned.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPBitmapErr
-
-Attempt was made to set a parameter that cannot be set by this command;
-bitmap is null.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file or directory.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown;
-C<$Pathname> is invalid.
-
-=item kFPVolLocked
-
-Volume is ReadOnly.
-
-=back
-
-=cut
 sub FPSetFileDirParms { # {{{1
     my($self, %options) = @_;
 
@@ -6168,94 +1819,6 @@ sub FPSetFileDirParms { # {{{1
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
-=item FPSetFileParms()
-
-Sets parameters for a file.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item VolumeID
-
-Volume ID.
-
-=item DirectoryID
-
-Ancestor Directory ID.
-
-=item Bitmap
-
-Bitmap describing the parameters to set. Set the bit that corresponds to
-each desired parameter. This bitmap can be the same as the C<FileBitmap>
-parameter of the L</FPGetFileDirParms> command. For bit definitions for
-the File bitmap, see L<Net::AFP::FileParms>.
-
-=item PathType
-
-Type of name in C<Pathname>. See L</"Path Type Constants"> for possible values.
-
-=item Pathname
-
-Pathname to the desired file or directory.
-
-=item Other parameters
-
-Parameter values to set on the directory may be specified as part of the
-same set of key-value pairs. Only the values C<Attribute>,
-C<CreateDate>, C<ModDate>, C<BackupDate>, C<FinderInfo>, C<UnixUID>,
-C<UnixGID>, C<UnixPerms>, and C<UnixAccessRights> may be updated in
-this way. The corresponding bits must be set in the C<Bitmap> argument;
-see C<Net::AFP::FileParms> for the relevant flags.
-
-If any of the Unix* parameters are passed, they must all be passed at
-the same time, or C<kFPParamErr> will be returned.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required to use this command.
-
-=item kFPBitmapErr
-
-Attempt was made to set a parameter that cannot be set by this command;
-bitmap is null.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing file.
-
-=item kFPObjectTypeErr
-
-Input parameters point to a directory.
-
-=item kFPParamErr
-
-Session reference number, Volume ID, or pathname type is unknown;
-C<$Pathname> is invalid.
-
-=item kFPVolLocked
-
-Volume is ReadOnly.
-
-=back
-
-=cut
 sub FPSetFileParms { # {{{1
     my($self, %options) = @_;
 
@@ -6289,75 +1852,6 @@ sub FPSetFileParms { # {{{1
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
-=item FPSetForkParms()
-
-Sets the length of a fork.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $OForkRefNum
-
-Open fork reference number.
-
-=item $Bitmap
-
-Bitmap describing the parameters to be set. Set the bit that corresponds
-to each desired parameter. This bitmap is the same as the C<$FileBitmap>
-of the L</FPGetFileDirParms> command, but only the Data Fork Length,
-Resource Fork Length, Extended Data Fork Length, and Extended Resource
-Fork Length parameters can be set. For bit definitions for this bitmap,
-see L<Net::AFP::FileParms>.
-
-=item $ForkLen
-
-New end-of-fork value.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required
-to use this command.
-
-=item kFPBitmapErr
-
-Attempt was made to set a parameter that cannot be
-set by this command; bitmap is null.
-
-=item kFPDiskFull
-
-No more space exists on the volume.
-
-=item kFPLockErr
-
-Range lock conflict exists.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-Session reference number or fork reference number
-is invalid.
-
-=item kFPVolLocked
-
-Volume is ReadOnly.
-
-=back
-
-=cut
 sub FPSetForkParms { # {{{1
     my ($self, $OForkRefNum, $Bitmap, $ForkLen) = @_;
     DEBUG('called ', (caller(0))[3]);
@@ -6376,64 +1870,6 @@ sub FPSetForkParms { # {{{1
             $Bitmap, $packed), undef, 1);
 } # }}}1
 
-=item FPSetVolParms()
-
-Set a volume's backup date.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-Volume ID.
-
-=item $Bitmap
-
-Bitmap describing the parameters to be set. This parameter is the same
-as the C<$Bitmap> parameter for the L</FPGetVolParms> command, but only
-the Backup Date bit can be set. For bit definitions for this bitmap,
-see L<Net::AFP::VolParms>.
-
-=item $BackupDate
-
-New backup date.
-
-=back
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-User does not have the access privileges required
-to use this command.
-
-=item kFPBitmapErr
-
-Attempt was made to set a parameter that cannot be
-set by this command; bitmap is null.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-Session reference number or Volume ID is unknown.
-
-=item kFPVolLocked
-
-Volume is ReadOnly.
-
-=back
-
-=cut
 sub FPSetVolParms { # {{{1
     my ($self, $VolumeID, $Bitmap, $BackupDate) = @_;
 
@@ -6442,35 +1878,6 @@ sub FPSetVolParms { # {{{1
             $Bitmap, $BackupDate), undef, 1);
 } # }}}1
 
-=item FPSyncDir()
-
-Synchronize changes to a directory out to physical storage.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $VolumeID
-
-Volume identifier.
-
-=item $DirectoryID
-
-Directory identifier.
-
-=back
-
-Error replies:
-
-=over
-
-=back
-
-=cut
 sub FPSyncDir { # {{{1
     my($self, $VolumeID, $DirectoryID) = @_;
     DEBUG('called ', (caller(0))[3]);
@@ -6479,31 +1886,6 @@ sub FPSyncDir { # {{{1
             $DirectoryID), undef, 1);
 } # }}}1
 
-=item FPSyncFork()
-
-Synchronize writes to an open file out to physical storage.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $OForkRefNum
-
-Open fork reference number.
-
-=back
-
-Error replies:
-
-=over
-
-=back
-
-=cut
 sub FPSyncFork { # {{{1
     my($self, $OForkRefNum) = @_;
     DEBUG('called ', (caller(0))[3]);
@@ -6512,79 +1894,6 @@ sub FPSyncFork { # {{{1
             undef, 1);
 } # }}}1
 
-=item FPWrite()
-
-Write a block of data to an open fork.
-
-Deprecated; use C<FPWriteExt()> instead.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item Flag
-
-Bit 7 is the C<StartEndFlag> bit, and indicates whether C<Offset> is
-relative to the beginning or end of the fork. A value of zero indicates
-that the start is relative to the beginning of the fork; a value of 1
-indicates that the start is relative to the end of the fork.
-
-=item OForkRefNum
-
-Open fork reference number.
-
-=item Offset
-
-Byte offset from the beginning or the end of the fork indicating where
-the write is to begin; a negative value indicates a byte within the
-fork relative to the end of the fork.
-
-=item ReqCount
-
-Number of bytes to be written.
-
-=item ForkData
-
-A reference to a scalar containing data to be written, which is not part
-of the request block. Instead, the data is transmitted to the server in
-an intermediate exchange of DSI packets.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, and the offset of the last written byte.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-Fork is not open for writing by this user.
-
-=item kFPDiskFull
-
-No space exists on this volume.
-
-=item kFPLockErr
-
-Some or all of the requested range is locked by another user.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-Session reference numer or open fork reference number is unknown.
-
-=back
-
-=cut
 sub FPWrite { # {{{1
     my($self, %options) = @_;
 
@@ -6610,77 +1919,6 @@ sub FPWrite { # {{{1
     return($rc);
 } # }}}1
 
-=item FPWriteExt()
-
-Writes a block of data to an open fork.
-
-Arguments:
-
-Arguments are passed as key-value pair for this method.
-
-=over
-
-=item Flag
-
-Bit 7 is the C<StartEndFlag> bit, and indicates whether C<$Offset> is
-relative to the beginning or end of the fork. A value of zero indicates
-that the start is relative to the beginning of the fork; a value of 1
-indicates that the start is relative to the end of the fork.
-
-=item OForkRefNum
-
-Open fork reference number.
-
-=item Offset
-
-Byte offset from the beginning or the end of the fork indicating where
-the write is to begin; a negative value indicates a byte within the
-fork relative to the end of the fork.
-
-=item ReqCount
-
-Number of bytes to be written.
-
-=item ForkData
-
-A reference to a scalar containing data to be written, which is not part of
-the request block. Instead, the data is transmitted to the server in an
-intermediate exchange of DSI packets.
-
-=back
-
-Returns:
-
-A scalar indicating the error code from the call. Upon success, a list
-containing the error code, and the offset of the last written byte.
-
-Error replies:
-
-=over
-
-=item kFPAccessDenied
-
-Fork is not open for writing by this user.
-
-=item kFPDiskFull
-
-No space exists on this volume.
-
-=item kFPLockErr
-
-Some or all of the requested range is locked by another user.
-
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=item kFPParamErr
-
-Session reference numer or open fork reference number is unknown.
-
-=back
-
-=cut
 sub FPWriteExt { # {{{1
     my($self, %options) = @_;
 
@@ -6706,29 +1944,6 @@ sub FPWriteExt { # {{{1
     return $rc;
 } # }}}1
 
-=item FPZzzzz()
-
-Notifies the server that the client is going to sleep.
-
-Arguments:
-
-=over
-
-=item $self
-
-An object that is a subclass of Net::AFP.
-
-=item $Flags
-
-Reserved.
-
-=back
-
-Error replies:
-
-None.
-
-=cut
 sub FPZzzzz { # {{{1
     my ($self, $Flags) = @_;
 
@@ -6736,138 +1951,5 @@ sub FPZzzzz { # {{{1
     return $self->SendAFPMessage(pack('CxN', kFPZzzzz, $Flags));
 } # }}}1
 
-=back
-
-=back
-
-=head1 REFERENCES
-
-The Apple Filing Protocol implementation contained herein is based on the
-protocol description as provided by Apple, in their online documentation.
-The HTML version of the conceptual documentation is available at:
-
-L<http://developer.apple.com/mac/library/documentation/Networking/Conceptual/AFP/Introduction/Introduction.html>
-
-and the PDF version is available at:
-
-L<http://developer.apple.com/documentation/Networking/Conceptual/AFP/AFP3_1.pdf>
-
-The reference for the actual AFP protocol operations, arguments and other
-information is available in HTML form at:
-
-L<http://developer.apple.com/mac/library/documentation/Networking/Reference/AFP_Reference/Reference/reference.html>
-
-and the PDF version is available at:
-
-L<http://developer.apple.com/mac/library/documentation/Networking/Reference/AFP_Reference/AFP_Reference.pdf>
-
-=head1 DEVELOPER NOTES
-
-Notes related to netatalk:
-
-- Netatalk sends its own DSICloseSession request packet to the client.
-This is not in keeping with the AFP and DSI protocol specs; the
-DSICloseSession packet from the server gets dropped because the
-FIN/ACK has already been sent by that time. It doesn't appear to
-bother the code, but it's weird.
-
-- Upon FPLogout, netatalk will send a DSICloseSession to the client
-and terminate the connection. Worked around easily, but still pretty
-goofy.
-
-- Also, Netatalk will in certain cases return a positive (undefined)
-error code; it uses the received data structure to assemble its
-reply, and the error code field is the same field that contains the
-data offset pointer. I've implemented a hack in Net::DSI::Session (in the
-thread main loop) to work around this.
-
-- Discovered that Netatalk's DSI implementation doesn't like getting
-Tickle packets before the session has been opened; made a little
-workaround for that.
-
-Notes on AFP:
-
-- Apple's documentation of the FPChangePassword method indicates that
-no response block will be returned; in the case of anything more
-complicated than the Plaintext UAM, this is categorically wrong. Most
-UAMs need to perform two-way conversations for their password change
-operations.
-
-- Apple's documentation of the FPLogin operation is wrong. Their docs
-indicate a pad byte after the command code byte. I have verified
-empirically that no server implementation does this.
-
-- Apple's documentation of the FPLoginCont operation indicates that the
-UserAuthInfo block will only be present if kFPAuthContinue is returned;
-the 2-way randnum UAM returns kFPNoErr and a UserAuthInfo block in the
-last stage of its authentication path.
-
-- Apple's documentation of the FPMapID and FPMapName operations was
-not properly updated in AFP 3.1 and 3.2 to cover the sending/receiving of
-UUIDs. The AFP 3.3 documentation does, but butchers the data type - a
-UUID is 128 bits, not 64, so a "uint64_t" isn't possibly large enough.
-Getting it as a 16-byte string instead, which works for us fine.
-
-- Apple's documentation of the FPSetACL operation provides a visual
-representation of the data layout in the kFPSetACL message. It claims
-there is a MaxReplySize field between the Bitmap and PathType fields.
-No such fields is present (verified empirically).
-
-- Apple's documentation of the FPSetForkParms operation indicates that
-the data field is only 4 bytes, while it also claims that it can be used
-to set the extended resource and data fork lengths. Code was altered to
-pass a 'long long' in the message payload when the extended params are
-to be set.
-
-- Apple's documentation for the FPWrite operation indicates it returns
-the number of bytes written. It does not, and has never done this;
-however, it does return an integer value (32 bits for FPWrite, 64
-bits for FPWriteExt) indicating the offset after the last write request.
-
-- It seems that Apple (as of the AFP implementation contained in their
-AirDisk devices, i.e., the Airport Express 802.11n Dualband) either forgot
-about or changed their minds about write-only files via AFP. Opening
-a fork with the "write-only" flag, and then attempting to write to that
-open handle, yields failed writes. Opening the file as read-write in
-that case allows successful writes.
-
-=head1 DEPENDENCIES
-
-C<Log::Log4perl> for message handling. Most other dependencies are
-endemic to the top-level modules that implement the specific transport
-layers, C<Net::AFP::TCP> and C<Net::AFP::Atalk>.
-
-=head1 BUGS AND LIMITATIONS
-
-Don't know of any bugs yet, but they're probably in there...
-
-My unicode handling is probably imperfect; some Korean scripts probably
-aren't handled right, along with certain characters that Mac OS prefers
-be composed instead of uncomposed (but most have to be uncomposed)...
-
-Also need to handle disconnections better.
-
-No clue how/if this will work with Fuse on Solaris. Theoretically should
-work...
-
-Unimplemented functions:
-
-- FPCatSearch{,Ext}
-
-=head1 INCOMPATIBILITIES
-
-None known; should work with all Perl modules and AFP server implementations
-(I've tested with netatalk, MacOS 9, OS X, Apple's AirDisk, and Jaffer
-to date).
-
-=head1 AUTHOR
-
-Derrik Pates <demon@now.ai>.
-
-=head1 SEE ALSO
-
-C<Net::AFP::TCP>, C<Net::AFP::Atalk>
-
-=cut
 1;
 # vim: ts=4 fdm=marker

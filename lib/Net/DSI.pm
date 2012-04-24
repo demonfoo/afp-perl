@@ -29,23 +29,6 @@ use threads::shared;
 use Thread::Semaphore;
 use Socket qw(TCP_NODELAY IPPROTO_TCP);
 
-=head1 NAME
-
-Net::DSI - Object interface for Apple Data Stream Interface protocol
-
-=head1 SYNOPSIS
-
-    use Net::DSI;
-
-=head1 DESCRIPTION
-
-C<Net::DSI> provides an object-based interface to interacting with
-Data Stream Interface-based services, specifically AFP over TCP. The
-protocol acts as a mid-layer between the bidirectional stream semantics
-provided by TCP, and the transactional interface AFP requires.
-
-=cut
-
 use constant OP_DSI_CLOSESESSION    => 1;   # to and from server
 use constant OP_DSI_COMMAND         => 2;   # to server only
 use constant OP_DSI_GETSTATUS       => 3;   # to server only
@@ -256,18 +239,6 @@ MAINLOOP:
     return;
 } # }}}1
 
-=head1 CONSTRUCTOR
-
-=over
-
-=item new (CLASS, HOST[, PORT])
-
-Create a new DSI session object which will connect to the indicated host,
-and (optionally) the indicated port. If no port is specified, the default
-TCP port will be used for the connection. The host may be an IPv4 or
-IPv6 (if L<IO::Socket::INET6> is present) address, or a DNS name.
-
-=cut
 sub new { # {{{1
     my ($class, $host, $port) = @_;
     $port ||= 548;
@@ -304,15 +275,6 @@ sub new { # {{{1
 
     return $obj;
 } # }}}1
-=back
-
-=head1 SUBROUTINES/METHODS
-
-=over
-
-=item close
-
-=cut
 sub close { # {{{1
     my ($self) = @_;
     $self->{'Shared'}{'exit'} = 1;
@@ -320,9 +282,6 @@ sub close { # {{{1
     return;
 } # }}}1
 
-=item SendMessage (CMD, MESSAGE, DATA_R, D_LEN, SEM_R, RESP_R, RC_R)
-
-=cut
 # Arguments:
 #   $self:      A Net::DSI instance.
 #   $cmd:       The numeric opcode of the command we wish to issue to the DSI
@@ -406,14 +365,6 @@ sub SendMessage { # {{{1
     return $reqId;
 } # }}}1
 
-=item DSICloseSession ()
-
-The C<DSICloseSession> call can be issued at any time by the DSI client to
-close a session previously opened through an C<DSIOpenSession> call. As a
-result of the call, all pending activity on the session is immediately
-canceled.
-
-=cut
 sub DSICloseSession { # {{{1
     my ($self) = @_;
 
@@ -423,16 +374,6 @@ sub DSICloseSession { # {{{1
     return;
 } # }}}1
 
-=item DSICommand (MESSAGE, RESP_R)
-
-Once a session has been opened, the workstation end client can send a
-command to the server end by issuing an C<DSICommand> call.
-
-MESSAGE contains the binary data for the outgoing request. RESP_R must
-be a scalar ref that will contain the reassembled response data, if any,
-received from the server in response to the request sent.
-
-=cut
 sub DSICommand { # {{{1
     my ($self, $message, $resp_r) = @_;
 
@@ -448,15 +389,6 @@ sub DSICommand { # {{{1
     return $rc;
 } # }}}1
 
-=item DSIGetStatus (RESP_R)
-
-The C<DSIGetStatus> call is used by a DSI client to obtain status
-information for a particular server.
-
-RESP_R must be a scalar ref which will contain the raw binary data returned
-from the DSIGetStatus call.
-
-=cut
 sub DSIGetStatus { # {{{1
     my ($self, $resp_r) = @_;
 
@@ -475,12 +407,6 @@ sub DSIGetStatus { # {{{1
     return $rc;
 } # }}}1
 
-=item DSIOpenSession ( [OPTIONS] )
-
-The C<DSIOpenSession> call is issued by a client to begin a DSI session with
-the connected server.
-
-=cut
 sub DSIOpenSession { # {{{1
     my ($self, %options) = @_;
 
@@ -529,12 +455,6 @@ sub DSIOpenSession { # {{{1
 # This issues a keep-alive message to the server. This really needs to be
 # done on a regular basis - hence why I want to have a separate thread to
 # do dispatch duty, so it can handle things like that.
-=item DSITickle
-
-This call is used to keep an existing DSI connection alive. It should not
-be called directly in your code; this operation is handled internally.
-
-=cut
 sub DSITickle { # {{{1
     my ($self) = @_;
 
@@ -542,13 +462,6 @@ sub DSITickle { # {{{1
     return;
 } # }}}1
 
-=item DSIWrite (MESSAGE, DATA_R, D_LEN, RESP_R)
-
-Used for sending write requests to the server. This is only applicable for
-the L<Net::AFP/"FPWrite">, L<Net::AFP/"FPWriteExt">, and
-L<Net::AFP/"FPAddIcon"> operations.
-
-=cut
 sub DSIWrite { # {{{1
     # This should only be used for FPWrite and FPAddIcon
     my ($self, $message, $data_r, $d_len, $resp_r) = @_;
@@ -561,50 +474,6 @@ sub DSIWrite { # {{{1
     $sem->down();
     return $rc;
 } # }}}1
-
-=back
-
-=head1 REFERENCES
-
-The Data Stream Interface protocol implementation contained herein is based
-on the protocol description as provided by Apple, in the "AppleShare IP
-6.3 Developer's Kit". The document is available freely via the Internet
-in PDF form, at:
-
-L<http://developer.apple.com/documentation/macos8/pdf/ASAppleTalkFiling2.1_2.2.pdf>
-
-=head1 DEPENDENCIES
-
-Requires a threaded version of Perl to run.
-
-Most of the required packages are included in the Perl distribution, so
-they do not need to be installed on your system.
-
-IO::Socket::INET6 can optionally be used. It adds the ability to connect
-to AFP servers that listen on IPv6 sockets.
-
-=head1 BUGS AND LIMITATIONS
-
-None currently known.
-
-=head1 INCOMPATIBILITIES
-
-Does not work on Nexenta. Don't currently know if it will work on any version
-of Solaris.
-
-Has some sort of socket/threading interaction on Windows systems. It gets
-connected, but sending packets gets slower and slower the more it does it.
-Seems to happen with both Strawberry Perl and ActivePerl.
-
-=head1 AUTHOR
-
-Derrik Pates <demon@now.ai>
-
-=head1 SEE ALSO
-
-C<IO::Socket::INET>, C<IO::Socket::INET6>, C<Net::AFP>, C<Net::AFP::TCP>
-
-=cut
 
 1;
 # vim: ts=4 fdm=marker ai et

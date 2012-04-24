@@ -11,19 +11,6 @@ use Exporter qw(import);
 our @EXPORT = qw(kFPVerNewerThan kFPVerAtLeast kFPVerEqual kFPVerNoNowerThan
                  kFPVerOlderThan);
 
-=head1 NAME
-
-Net::AFP::Versions - AFP version agreement and comparison utility functions
-
-=head1 DESCRIPTION
-
-This package contains several convenience functions for establishing
-version agreement with an AFP server, as well as comparing versions
-by either major and minor number, or the symbolic version string, for
-e.g., enabling features based on the version of the AFP protocol in use.
-
-=cut
-
 our @versions = (
     {
         'VersionString' => 'AFP3.3',
@@ -92,71 +79,12 @@ our @versions = (
 
 our %versionmap = map { $$_{'VersionString'}, $_ } @versions;
 
-=head1 COMPARISON CONSTANTS
-
-For some of the provided functions, the type of version comparison desired
-can be indicated with the following constants.
-
-=over
-
-=item kFPVerNewerThan
-
-The protocol version in use for the active connection must be newer than
-the one passed.
-
-=cut
 use constant kFPVerNewerThan    => 0;
-=item kFPVerAtLeast
-
-The protocol version in use for the active connection must be equivalent
-to, or newer than, the one passed.
-
-=cut
 use constant kFPVerAtLeast      => 1;
-=item kFPVerEqual
-
-The protocol version in use for the active connection must be exactly
-the one passed.
-
-=cut
 use constant kFPVerEqual        => 2;
-=item kFPVerNoNewerThan
-
-The protocol version in use for the active connection must be older than
-or equivalent to, the one passed.
-
-=cut
 use constant kFPVerNoNewerThan  => 3;
-=item kFPVerOlderThan
-
-The protocol version in use for the active connection must be older than
-the one passed.
-
-=cut
 use constant kFPVerOlderThan    => 4;
 
-=back
-
-=head1 FUNCTIONS
-
-=over
-
-=item CompareByString()
-
-Compare the AFP version being used in an open AFP session to a given
-version string, and determine their relationship.
-
-=over
-
-=item $session
-
-=item $verstring
-
-=item $cmptype
-
-=back
-
-=cut
 sub CompareByString {
     my($session, $verstring, $cmptype) = @_;
 
@@ -165,24 +93,6 @@ sub CompareByString {
     return CompareByVersionNum($session, $major, $minor, $cmptype);
 }
 
-=item CompareByVersionNum()
-
-Compare the AFP version being used in an open AFP session to a given
-major and minor version number pair, and determine their relationship.
-
-=over
-
-=item $session
-
-=item $major
-
-=item $minor
-
-=item $cmptype
-
-=back
-
-=cut
 sub CompareByVersionNum {
     my ($session, $major, $minor, $cmptype) = @_;
 
@@ -214,18 +124,6 @@ sub CompareByVersionNum {
     die("Invalid comparison type given");
 }
 
-=item GetPreferredVersion()
-
-Given a list of version strings, pick the highest supported one, and return
-it to the caller.
-
-=over
-
-=item $ver_list
-
-=back
-
-=cut
 sub GetPreferredVersion {
     my($ver_list, $using_atalk) = @_;
 
@@ -257,16 +155,5 @@ sub GetPreferredVersion {
     return undef;
 }
 
-=back
-
-=item AUTHOR
-
-Derrik Pates <demon@now.ai>
-
-=head1 SEE ALSO
-
-C<Net::AFP>
-
-=cut
 1;
-# vim: ts=4 ai fdm=marker
+# vim: ts=4 ai et fdm=marker
