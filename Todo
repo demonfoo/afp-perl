@@ -4,3 +4,7 @@
 - Reconnect UAM support?
 - Maybe DBus integration so we can call FPZzzzz() appropriately before the
   machine goes to sleep?
+- Metadata caching
+- Instead of unlinking a file that's open when unlinking/renaming over,
+  rename to .[key][random] and remove in release() handler upon last close.
+- Suicide main process if AFP connection goes bust?
