@@ -35,11 +35,15 @@ lib/Net/AFP/UAMs/DHX2.pm
 lib/Net/AFP/UAMs/Anonymous.pm
 lib/Net/AFP/UAMs/DHX.pm
 lib/Net/AFP/UAMs.pm
+lib/Net/AFP/UAMs.pod
 lib/Net/AFP/Versions.pm
+lib/Net/AFP/Versions.pod
 lib/Net/AFP/VolAttrs.pm
 lib/Net/AFP/VolParms.pm
 lib/Net/AFP.pm
+lib/Net/AFP.pod
 lib/Net/DSI.pm
+lib/Net/DSI.pod
 Makefile.PL
 MANIFEST
 Net-AFP.spec
