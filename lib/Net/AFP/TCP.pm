@@ -97,7 +97,7 @@ sub new { # {{{1
     my $obj = $class->SUPER::new($host, $port);
 
 	$$obj{'Session'} = new Net::DSI($host, $port);
-	my($rc, %opts) = $$obj{'Session'}->DSIOpenSession('AttentionQuanta' => 2);
+	my($rc, %opts) = $$obj{'Session'}->DSIOpenSession();
     if (exists $opts{'ServerReplayCacheSize'}) {
         $obj->{'ReplayCacheSize'} = $opts{'ServerReplayCacheSize'};
         $obj->{'ReplayCache'} = [];
