@@ -48,7 +48,7 @@ Updated by the server each time anything on the volume is modified. This paramet
 use constant kFPVolModDateBit       => 0x0008;
 =item kFPVolBackupDateBit
 
-Set by a backup program each time the volume¿s contents are backed up.
+Set by a backup program each time the volume's contents are backed up.
 When a volume is created, the Backup Date is set to 0x80000000 (the
 earliest representable date-time value).
 

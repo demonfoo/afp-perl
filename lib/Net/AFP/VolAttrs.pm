@@ -55,7 +55,7 @@ server to make this capability available on a per-volume basis.
 =cut
 # This bit was also added, along with FPCatSearch, as of AFP v2.1.
 use constant kSupportsCatSearch         => 0x0008;  # AFP 2.1
-=item kFPSupportsBlankAccesPrivs
+=item kFPSupportsBlankAccessPrivs
 
 If set, the volume has a Supports Blank Access Privileges bit that, when
 set for a directory, causes the directory to inherit its access
