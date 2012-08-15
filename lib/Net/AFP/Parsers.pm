@@ -2,6 +2,11 @@ package Net::AFP::Parsers;
 
 use strict;
 use warnings;
+use diagnostics;
+
+# Enables a nice call trace on warning events.
+use Carp ();
+local $SIG{'__WARN__'} = \&Carp::cluck;
 
 use Net::AFP::DirParms qw(:DEFAULT !:common);
 use Net::AFP::FileParms;
@@ -25,7 +30,7 @@ eval {
     1;
 } and do {
     $has_Socket6 = 1;
-    Socket6->import();
+    #Socket6->import();
 };
 
 # This is zero time for AFP - 1 Jan 2000 00:00 GMT.
@@ -287,14 +292,16 @@ _EOT_
             }
             elsif ($entryType == 6) { # Packed IPv6 address
                 next unless $has_Socket6;
-                $$addrEnt{'family'} = AF_INET6;
-                $$addrEnt{'address'} = inet_ntop(AF_INET6, $packed);
+                $$addrEnt{'family'} = &Socket6::AF_INET6();
+                $$addrEnt{'address'} = Socket6::inet_ntop(&Socket6::AF_INET6(),
+                        $packed);
             }
             elsif ($entryType == 7) { # Packed IPv6 address + port
                 next unless $has_Socket6;
-                $$addrEnt{'family'} = AF_INET6;
+                $$addrEnt{'family'} = &Socket6::AF_INET6();
                 my($addr, $port) = unpack('a16n', $packed);
-                $$addrEnt{'address'} = inet_ntop(AF_INET6, $addr);
+                $$addrEnt{'address'} = Socket6::inet_ntop(&Socket6::AF_INET6(),
+                        $addr);
                 $$addrEnt{'port'} = $port;
             }
             else {
