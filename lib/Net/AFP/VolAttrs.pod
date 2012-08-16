@@ -1,0 +1,109 @@
+=head1 NAME
+
+Net::AFP::VolAttrs - Volume attribute flags
+
+=head1 DESCRIPTION
+
+Attribute flags which the server can provide. These values are only
+relevant for data structures returned from the L<Net::AFP/FPOpenVol>
+and L<Net::AFP/FPGetVolParms> operations. See
+L<Net::AFP::VolParms/kFPVolAttributeBit> for more.
+
+=over
+
+=item kReadOnly
+
+If set, the volume is available for reading only.
+
+=item kHasVolumePassword
+
+If set, the volume has a volume password. Volume passwords were supported
+in prior versions of AFP; now the volume attributes reflect this
+information. This bit is the same as the C<HasPassword> bit returned for
+each volume by L<Net::AFP/FPGetSrvrParms>.
+
+=item kSupportsFileIDs
+
+If set, the volume supports file IDs. In general, if file IDs are
+supported on one volume, they are supported on all volumes, but this
+bit allows the server to be more selective, if necessary.
+
+=item kSupportsCatSearch
+
+If set, the volume supports the L<Net::AFP/FPCatSearch> and
+L<Net::AFP/FPCatSearchExt> commands. Support for L<Net::AFP/FPCatSearch> and
+L<Net::AFP/FPCatSearchExt> is optional. This bit allows the
+server to make this capability available on a per-volume basis.
+
+=item kFPSupportsBlankAccessPrivs
+
+If set, the volume has a Supports Blank Access Privileges bit that, when
+set for a directory, causes the directory to inherit its access
+privileges from its parent directory.
+
+=item kSupportsUnixPrivs
+
+If set, the volume supports UNIX privileges.
+
+=item kSupportsUTF8Names
+
+If set, the volume supports UTF-8-encoded user names, group names, and
+pathnames.
+
+=item kNoNetworkUserIDs
+
+If set, always map UNIX user IDs, group IDs and permissions to
+traditional User IDs, Group IDs and permissions. If not set, after
+logging into the server, an AFP client running on a UNIX-based machine
+should call C<getuid()> to get the user's local user ID and send an
+L<Net::AFP/FPGetUserInfo> command to get the user's user ID
+from the server. If the user IDs match, the AFP client should call
+C<getpwuid()> to get the user's local user name, which is returned in
+the C<pw_name> field, and send an L<Net::AFP/FPMapID>
+command to get the user's user name from the server. If the user names
+match, the AFP client assumes both machines are operating from a common
+user directory, and displays UNIX permissions without mapping them.
+Showing UNIX user IDs, group IDs, and permissions is useful for home
+directory servers and other servers participating in a network user
+database. If the user IDs or user names do not match, or if the AFP
+client is not running on a UNIX-based machine, the AFP client should
+map UNIX user IDs, group IDs and permissions to traditional User IDs,
+Group IDs and permissions. This default behavior can be changed by
+settings on the server. The server can be forced to always set or to
+never set the L</kNoNetworkUserIDs> bit.
+
+=item kDefaultPrivsFromParent
+
+If set, directories inherit default privileges from the parent directory.
+
+=item kNoExchangeFiles
+
+If set, exchange files is not supported.
+
+=item kSupportsExtAttrs
+
+If set, the volume supports extended attributes.
+
+=item kSupportsACLs
+
+If set, the volume supports access control lists (ACLs).
+
+=item kCaseSensitive
+
+If set, the volume contains case-sensitive filenames.
+
+=item kSupportsTMLockSteal
+
+If set, volume supports Time Machine lock stealing.
+
+=back
+
+=head1 AUTHOR
+
+Derrik Pates <demon@now.ai>
+
+=head1 SEE ALSO
+
+C<Net::AFP>
+
+=cut

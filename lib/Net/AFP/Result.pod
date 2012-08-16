@@ -1,0 +1,284 @@
+=head1 NAME
+
+Net::AFP::Result - Perl module containing AFP error symbol information
+
+=head1 SYNOPSIS
+
+This package contains symbol defintions for all known AFP error condition
+codes, as well as a helper function to transform an error code into its
+plain English equivalent.
+
+=head1 ERROR SYMBOLS
+
+=over
+
+=item kFPNoErr
+
+No error occurred (success).
+
+=item kASPBadVersNum
+
+=item kASPBufTooSmall
+
+=item kFPNoMoreSessions
+
+Server cannot handle additional sessions.
+
+This error usually indicates that the server limits the maximum number of
+concurrent clients, and that this maximum number would be exceeded by
+honoring this login request.
+
+=item kASPNoServers
+
+=item kASPParamErr
+
+=item kASPServerBusy
+
+=item kASPSessClosed
+
+ASP session closed.
+
+=item kASPSizeErr
+
+=item kASPTooManyClients
+
+=item kASPNoAck
+
+=item kFPAccessDenied
+
+User does not have the access privileges required to use the command.
+
+=item kFPAuthContinue
+
+Authentication is not yet complete.
+
+=item kFPBadUAM
+
+Specified UAM is unknown.
+
+=item kFPBadVersNum
+
+Server does not support the specified AFP version.
+
+=item kFPBitmapErr
+
+Attempt was made to get or set a parameter that cannot be obtained or set
+with this command, or a required bitmap is null.
+
+=item kFPCantMove
+
+Attempt was made to move a directory into one of its descendent directories.
+
+=item kFPDenyConflict
+
+Specified fork cannot be opened because of a deny modes conflict.
+
+=item kFPDirNotEmpty
+
+Directory is not empty.
+
+=item kFPDiskFull
+
+No more space exists on the volume.
+
+=item kFPEOFErr
+
+No more matches or end of fork reached.
+
+=item kFPFileBusy
+
+When attempting a hard create, the file already exists and is open.
+
+=item kFPFlatVol
+
+Volume is flat and does not support directories.
+
+=item kFPItemNotFound
+
+Specified APPL mapping, comment, or icon was not found in the Desktop
+database; specified ID is unknown.
+
+=item kFPLockErr
+
+Some or all of the requested range is locked by another user; a lock range
+conflict exists.
+
+=item kFPMiscErr
+
+Non-AFP error occurred.
+
+=item kFPNoMoreLocks
+
+Server's maximum lock count has been reached.
+
+=item kFPNoServer
+
+Server is not responding.
+
+=item kFPObjectExists
+
+File or directory already exists.
+
+=item kFPObjectNotFound
+
+Input parameters do not point to an existing directory, file, or volume.
+
+=item kFPParamErr
+
+Session reference number, Desktop database reference number, open fork
+reference number, Volume ID, Directory ID, File ID, Group ID, or
+subfunction is unknown; byte range starts before byte zero; pathname is
+invalid; pathname type is unknown; user name is null, exceeds the UAM's
+user name length limit, or does not exist, MaxReplySize is too small to
+hold a single offspring structure, ThisUser bit is not set, authentication
+failed for an undisclosed reason, specified user is unknown or the
+account has been disabled due to too many login attempts; ReqCount or
+Offset is negative; NewLineMask is invalid.
+
+=item kFPRangeNotLocked
+
+Attempt to unlock a range that is locked by another user or that is not
+locked at all.
+
+=item kFPRangeOverlap
+
+User tried to lock some or all of a range that the user has already
+locked.
+
+=item kFPSessClosed
+
+Session is closed.
+
+=item kFPUserNotAuth
+
+UAM failed (the specified old password doesn't match); no user is logged
+in yet for the specified session; authentication failed; password is
+incorrect.
+
+=item kFPCallNotSupported
+
+Server does not support this command.
+
+=item kFPObjectTypeErr
+
+Input parameters point to the wrong type of object.
+
+=item kFPTooManyFilesOpen
+
+Server cannot open another fork.
+
+=item kFPServerGoingDown
+
+Server is shutting down.
+
+=item kFPCantRename
+
+Attempt was made to rename a volume or root directory.
+
+=item kFPDirNotFound
+
+Input parameters do not point to an existing directory.
+
+=item kFPIconTypeError
+
+New icon's size is different from the size of the existing icon.
+
+=item kFPVolLocked
+
+Volume is Read Only.
+
+=item kFPObjectLocked
+
+File or directory is marked DeleteInhibit; directory being moved, renamed,
+or moved and renamed is marked RenameInhibit; file being moved and renamed
+is marked RenameInhibit; attempt was made to open a file for writing that
+is marked WriteInhibit; attempt was made to rename a file or directory that
+is marked RenameInhibit.
+
+=item kFPContainsSharedErr
+
+Directory contains a share point.
+
+=item kFPIDNotFound
+
+File ID was not found. (No file thread exists.)
+
+=item kFPIDExists
+
+File already has a File ID.
+
+=item kFPDiffVolErr
+
+Wrong volume.
+
+=item kFPCatalogChanged
+
+Catalog has changed.
+
+=item kFPSameObjectErr
+
+Two objects that should be different are the same object.
+
+=item kFPBadIDErr
+
+File ID is not valid.
+
+=item kFPPwdSameErr
+
+User attempted to change his or her password to the same password that
+is currently set.
+
+=item kFPPwdTooShortErr
+
+User password is shorter than the server's minimum password length, or
+user attempted to change password to a password that is shorter than
+the server's minimum password length.
+
+=item kFPPwdExpiredErr
+
+User's password has expired.
+
+=item kFPInsideSharedErr
+
+Directory being moved contains a share point and is being moved into a
+directory that is shared or is the descendent of a directory that is
+shared.
+
+=item kFPInsideTrashErr
+
+Shared directory is being moved into the Trash; a directory is being
+moved to the trash and it contains a shared folder.
+
+=item kFPPwdNeedsChangeErr
+
+User's password needs to be changed.
+
+=item kFPPwdPolicyErr
+
+New password does not conform to the server's password policy.
+
+=item kFPDiskQuotaExceeded
+
+Disk quota exceeded.
+
+=back
+
+=head1 FUNCTIONS
+
+=over
+
+=item afp_strerror (ERRNO)
+
+Return a string containing the description of the error code ERRNO.
+
+=back
+
+=head1 AUTHOR
+
+Derrik Pates <demon@now.ai>
+
+=head1 SEE ALSO
+
+C<Net::AFP>
+
+=cut

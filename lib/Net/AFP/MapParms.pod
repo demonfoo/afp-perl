@@ -1,0 +1,109 @@
+=head1 NAME
+
+Net::AFP::MapParms - mode parameters for FPMapID/FPMapName operations
+
+=head1 DESCRIPTION
+
+The following are constants to be passed as the C<$SubFunction> parameter
+to the L<Net::AFP/FPMapID> call.
+
+=over
+
+=item kUserIDToName
+
+Used to map a numeric User ID to the corresponding user name. The returned
+string will be encoded as MacRoman.
+
+=item kGroupIDToName
+
+Used to map a numeric Group ID to the corresponding group name. The returned
+string will be encoded as MacRoman.
+
+=item kUserIDToUTF8Name
+
+Used to map a numeric User ID to the corresponding user name. The returned
+string will be encoded as decomposed UTF-8.
+
+=item kGroupIDToUTF8Name
+
+Used to map a numeric Group ID to the corresponding group name. The returned
+string will be encoded as decomposed UTF-8.
+
+=item kUserUUIDToUTF8Name
+
+Used to map a UUID to the corresponding user name. Contrary to the naming,
+this works for both user and group UUIDs, as both exist within a common
+namespace. The returned structure will containg a string which will be
+encoded as decomposed UTF-8.
+
+The structure is as follows:
+
+   {
+     'Bitmap'     => [ 1 for UID, 2 for GID ],
+     'NumericID'  => [ numeric UID or GID ],
+     'UTF8Name'   => [ user/group name ],
+   }
+
+=item kGroupUUIDToUTF8Name
+
+Used to map a UUID to the corresponding group name. Contrary to the naming,
+this works for both user and group UUIDs, as both exist within a common
+namespace. The returned structure will containg a string which will be
+encoded as decomposed UTF-8.
+
+The structure is as follows:
+
+   {
+     'Bitmap'     => [ 1 for UID, 2 for GID ],
+     'NumericID'  => [ numeric UID or GID ],
+     'UTF8Name'   => [ user/group name ],
+   }
+
+=back
+
+The following are constants to be passed as the C<$SubFunction> parameter
+to the L<Net::AFP/FPMapName> call.
+
+=over
+
+=item kNameToUserID
+
+Used to map a user name to the corresponding numeric User ID. The user name
+passed will be encoded as MacRoman.
+
+=item kNameToGroupID
+
+Used to map a group name to the corresponding numeric Group ID. The group
+name passed will be encoded as MacRoman.
+
+=item kUTF8NameToUserID
+
+Used to map a user name to the corresponding numeric User ID. The user name
+passed will be encoded as UTF-8.
+
+=item kUTF8NameToGroupID
+
+Used to map a group name to the corresponding numeric Group ID. The group
+name passed will be encoded as UTF-8.
+
+=item kUTF8NameToUserUUID
+
+Used to map a user name to the corresponding numeric User UUID. The user
+name passed will be encoded as UTF-8.
+
+=item kUTF8NameToGroupUUID
+
+Used to map a group name to the corresponding numeric Group UUID. The group
+name passed will be encoded as UTF-8.
+
+=back
+
+=head1 AUTHOR
+
+Derrik Pates <demon@now.ai>
+
+=head1 SEE ALSO
+
+C<Net::AFP>
+
+=cut

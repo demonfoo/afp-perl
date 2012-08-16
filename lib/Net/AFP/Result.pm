@@ -20,386 +20,64 @@ our @EXPORT = qw(kFPNoErr kASPBadVersNum kASPBufTooSmall kFPNoMoreSessions
                  kFPInsideSharedErr kFPInsideTrashErr kFPPwdNeedsChangeErr
                  kFPPwdPolicyErr kFPDiskQuotaExceeded afp_strerror);
 
-=head1 NAME
-
-Net::AFP::Result - Perl module containing AFP error symbol information
-
-=head1 SYNOPSIS
-
-This package contains symbol defintions for all known AFP error condition
-codes, as well as a helper function to transform an error code into its
-plain English equivalent.
-
-=head1 ERROR SYMBOLS
-
-=over
-
-=item kFPNoErr
-
-No error occurred (success).
-
-=cut
 use constant kFPNoErr               => 0;
-=item kASPBadVersNum
-
-=cut
 use constant kASPBadVersNum         => -1066;
-=item kASPBufTooSmall
-
-=cut
 use constant kASPBufTooSmall        => -1067;
-=item kFPNoMoreSessions
-
-Server cannot handle additional sessions.
-
-This error usually indicates that the server limits the maximum number of
-concurrent clients, and that this maximum number would be exceeded by
-honoring this login request.
-
-=cut
 use constant kFPNoMoreSessions      => -1068;
-=item kASPNoServers
-
-=cut
 use constant kASPNoServers          => -1069;
-=item kASPParamErr
-
-=cut
 use constant kASPParamErr           => -1070;
-=item kASPServerBusy
-
-=cut
 use constant kASPServerBusy         => -1071;
-=item kASPSessClosed
-
-ASP session closed.
-
-=cut
 use constant kASPSessClosed         => -1072;
-=item kASPSizeErr
-
-=cut
 use constant kASPSizeErr            => -1073;
-=item kASPTooManyClients
-
-=cut
 use constant kASPTooManyClients     => -1074;
-=item kASPNoAck
-
-=cut
 use constant kASPNoAck              => -1075;
-=item kFPAccessDenied
-
-User does not have the access privileges required to use the command.
-
-=cut
 use constant kFPAccessDenied        => -5000;
-=item kFPAuthContinue
-
-Authentication is not yet complete.
-
-=cut
 use constant kFPAuthContinue        => -5001;
-=item kFPBadUAM
-
-Specified UAM is unknown.
-
-=cut
 use constant kFPBadUAM              => -5002;
-=item kFPBadVersNum
-
-Server does not support the specified AFP version.
-
-=cut
 use constant kFPBadVersNum          => -5003;
-=item kFPBitmapErr
-
-Attempt was made to get or set a parameter that cannot be obtained or set
-with this command, or a required bitmap is null.
-
-=cut
 use constant kFPBitmapErr           => -5004;
-=item kFPCantMove
-
-Attempt was made to move a directory into one of its descendent directories.
-
-=cut
 use constant kFPCantMove            => -5005;
-=item kFPDenyConflict
-
-Specified fork cannot be opened because of a deny modes conflict.
-
-=cut
 use constant kFPDenyConflict        => -5006;
-=item kFPDirNotEmpty
-
-Directory is not empty.
-
-=cut
 use constant kFPDirNotEmpty         => -5007;
-=item kFPDiskFull
-
-No more space exists on the volume.
-
-=cut
 use constant kFPDiskFull            => -5008;
-=item kFPEOFErr
-
-No more matches or end of fork reached.
-
-=cut
 use constant kFPEOFErr              => -5009;
-=item kFPFileBusy
-
-When attempting a hard create, the file already exists and is open.
-
-=cut
 use constant kFPFileBusy            => -5010;
-=item kFPFlatVol
-
-Volume is flat and does not support directories.
-
-=cut
 use constant kFPFlatVol             => -5011;
-=item kFPItemNotFound
-
-Specified APPL mapping, comment, or icon was not found in the Desktop
-database; specified ID is unknown.
-
-=cut
 use constant kFPItemNotFound        => -5012;
-=item kFPLockErr
-
-Some or all of the requested range is locked by another user; a lock range
-conflict exists.
-
-=cut
 use constant kFPLockErr             => -5013;
-=item kFPMiscErr
-
-Non-AFP error occurred.
-
-=cut
 use constant kFPMiscErr             => -5014;
-=item kFPNoMoreLocks
-
-Server's maximum lock count has been reached.
-
-=cut
 use constant kFPNoMoreLocks         => -5015;
-=item kFPNoServer
-
-Server is not responding.
-
-=cut
 use constant kFPNoServer            => -5016;
-=item kFPObjectExists
-
-File or directory already exists.
-
-=cut
 use constant kFPObjectExists        => -5017;
-=item kFPObjectNotFound
-
-Input parameters do not point to an existing directory, file, or volume.
-
-=cut
 use constant kFPObjectNotFound      => -5018;
-=item kFPParamErr
-
-Session reference number, Desktop database reference number, open fork
-reference number, Volume ID, Directory ID, File ID, Group ID, or
-subfunction is unknown; byte range starts before byte zero; pathname is
-invalid; pathname type is unknown; user name is null, exceeds the UAM's
-user name length limit, or does not exist, MaxReplySize is too small to
-hold a single offspring structure, ThisUser bit is not set, authentication
-failed for an undisclosed reason, specified user is unknown or the
-account has been disabled due to too many login attempts; ReqCount or
-Offset is negative; NewLineMask is invalid.
-
-=cut
 use constant kFPParamErr            => -5019;
-=item kFPRangeNotLocked
-
-Attempt to unlock a range that is locked by another user or that is not
-locked at all.
-
-=cut
 use constant kFPRangeNotLocked      => -5020;
-=item kFPRangeOverlap
-
-User tried to lock some or all of a range that the user has already
-locked.
-
-=cut
 use constant kFPRangeOverlap        => -5021;
-=item kFPSessClosed
-
-Session is closed.
-
-=cut
 use constant kFPSessClosed          => -5022;
-=item kFPUserNotAuth
-
-UAM failed (the specified old password doesn't match); no user is logged
-in yet for the specified session; authentication failed; password is
-incorrect.
-
-=cut
 use constant kFPUserNotAuth         => -5023;
-=item kFPCallNotSupported
-
-Server does not support this command.
-
-=cut
 use constant kFPCallNotSupported    => -5024;
-=item kFPObjectTypeErr
-
-Input parameters point to the wrong type of object.
-
-=cut
 use constant kFPObjectTypeErr       => -5025;
-=item kFPTooManyFilesOpen
-
-Server cannot open another fork.
-
-=cut
 use constant kFPTooManyFilesOpen    => -5026;
-=item kFPServerGoingDown
-
-Server is shutting down.
-
-=cut
 use constant kFPServerGoingDown     => -5027;
-=item kFPCantRename
-
-Attempt was made to rename a volume or root directory.
-
-=cut
 use constant kFPCantRename          => -5028;
-=item kFPDirNotFound
-
-Input parameters do not point to an existing directory.
-
-=cut
 use constant kFPDirNotFound         => -5029;
-=item kFPIconTypeError
-
-New icon's size is different from the size of the existing icon.
-
-=cut
 use constant kFPIconTypeError       => -5030;
-=item kFPVolLocked
-
-Volume is Read Only.
-
-=cut
 use constant kFPVolLocked           => -5031;
-=item kFPObjectLocked
-
-File or directory is marked DeleteInhibit; directory being moved, renamed,
-or moved and renamed is marked RenameInhibit; file being moved and renamed
-is marked RenameInhibit; attempt was made to open a file for writing that
-is marked WriteInhibit; attempt was made to rename a file or directory that
-is marked RenameInhibit.
-
-=cut
 use constant kFPObjectLocked        => -5032;
-=item kFPContainsSharedErr
-
-Directory contains a share point.
-
-=cut
 use constant kFPContainsSharedErr   => -5033;
-=item kFPIDNotFound
-
-File ID was not found. (No file thread exists.)
-
-=cut
 use constant kFPIDNotFound          => -5034;   # AFP 2.1
-=item kFPIDExists
-
-File already has a File ID.
-
-=cut
 use constant kFPIDExists            => -5035;   # AFP 2.1
-=item kFPDiffVolErr
-
-Wrong volume.
-
-=cut
 use constant kFPDiffVolErr          => -5036;   # AFP 2.1
-=item kFPCatalogChanged
-
-Catalog has changed.
-
-=cut
 use constant kFPCatalogChanged      => -5037;   # AFP 2.1
-=item kFPSameObjectErr
-
-Two objects that should be different are the same object.
-
-=cut
 use constant kFPSameObjectErr       => -5038;   # AFP 2.1
-=item kFPBadIDErr
-
-File ID is not valid.
-
-=cut
 use constant kFPBadIDErr            => -5039;   # AFP 2.1
-=item kFPPwdSameErr
-
-User attempted to change his or her password to the same password that
-is currently set.
-
-=cut
 use constant kFPPwdSameErr          => -5040;   # AFP 2.1
-=item kFPPwdTooShortErr
-
-User password is shorter than the server's minimum password length, or
-user attempted to change password to a password that is shorter than
-the server's minimum password length.
-
-=cut
 use constant kFPPwdTooShortErr      => -5041;   # AFP 2.1
-=item kFPPwdExpiredErr
-
-User's password has expired.
-
-=cut
 use constant kFPPwdExpiredErr       => -5042;   # AFP 2.1
-=item kFPInsideSharedErr
-
-Directory being moved contains a share point and is being moved into a
-directory that is shared or is the descendent of a directory that is
-shared.
-
-=cut
 use constant kFPInsideSharedErr     => -5043;   # AFP 2.1
-=item kFPInsideTrashErr
-
-Shared directory is being moved into the Trash; a directory is being
-moved to the trash and it contains a shared folder.
-
-=cut
 use constant kFPInsideTrashErr      => -5044;   # AFP 2.1
-=item kFPPwdNeedsChangeErr
-
-User's password needs to be changed.
-
-=cut
 use constant kFPPwdNeedsChangeErr   => -5045;   # AFP 2.2
-=item kFPPwdPolicyErr
-
-New password does not conform to the server's password policy.
-
-=cut
 use constant kFPPwdPolicyErr        => -5046;   # AFP 3.0
-=item kFPDiskQuotaExceeded
-
-Disk quota exceeded.
-
-=cut
 use constant kFPDiskQuotaExceeded   => -5047;   # AFP 3.1
 
 our %errorcodes = (
@@ -464,33 +142,10 @@ our %errorcodes = (
     -5047   => 'Disk quota exceeded',
 );
 
-=back
-
-=head1 FUNCTIONS
-
-=over
-
-=item afp_strerror (ERRNO)
-
-Return a string containing the description of the error code ERRNO.
-
-=cut
 sub afp_strerror {
     my ($rc) = @_;
     return $errorcodes{$rc};
 }
-
-=back
-
-=head1 AUTHOR
-
-Derrik Pates <demon@now.ai>
-
-=head1 SEE ALSO
-
-C<Net::AFP>
-
-=cut
 
 1;
 # vim: ts=4
