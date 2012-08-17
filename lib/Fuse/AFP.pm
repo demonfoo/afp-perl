@@ -1307,7 +1307,7 @@ sub read { # {{{1
 sub write { # {{{1
     my ($self, $file, $offset, $fh) = @_[0,1,3,4];
     my $data_r = \$_[2];
-    print 'called ', (caller(0))[3], "('", $file, "', [data], ", $offset, ")\n"
+    print 'called ', (caller(0))[3], "('", $file, "', [data], ", $offset, ", ", $fh, ")\n"
             if defined $::_DEBUG;
 
     $$self{'callcount'}{(caller(0))[3]}++;
