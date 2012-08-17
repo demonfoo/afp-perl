@@ -69,59 +69,6 @@ use constant COMMENT_XATTR      => 'system.comment';
 
 # }}}1
 
-=head1 NAME
-
-Fuse::AFP - An AFP filesystem implementation in Perl
-
-=head1 SYNOPSIS
-
-This package is a FUSE filesystem implementation. It derives from the
-Fuse::Class package, implementing the major FUSE operations as methods.
-
-The following is a trivial use case:
-
-    use Fuse::AFP;
-
-    my $fuse = new Fuse::AFP($afp_url, $pw_cb);
-    $fuse->main('mountpoint' => $mountpoint, 'mountopts' => '...');
-
-=head1 DESCRIPTION
-
-This package makes use of Net::AFP::TCP (and optionally, Net::AFP::Atalk)
-to connect to an AFP server, and implement all the major filesystem operations
-required of a FUSE filesystem.
-
-It derives from Fuse::Class, as mentioned. This is a thin object-oriented
-wrapper over the Fuse package, a set of Perl bindings for libfuse.
-
-This module (and the modules which it depends on) implement a fairly
-complete, working implementation of Apple Filing Protocol. It compares
-favorably with Apple's implementation in MacOS X. It implements several
-advanced features:
-
-   * Access control lists
-   * Extended attributes
-   * Large files
-   * Encrypted login (via Diffie-Hellman exchange)
-   * UNIX ownership/permissions
-   * UTF-8 filenames
-   * IPv6 support, with IO::Socket::INET6
-
-It also remains compatible with classic Mac OS; I've mounted filesystems
-from MacOS 9.x, but it should work with versions even older than that, at
-least in principle.
-
-=head1 SUBROUTINES/METHODS
-
-The main method is not overridden in this class. Most other methods are for
-internal use only, or for invocation by Fuse::Class.
-
-=over
-
-=item new( URL, PW_CB, OPTIONS )
-
-=cut
-
 sub new { # {{{1
     my ($class, $url, $pw_cb, %opts) = @_;
 
@@ -2610,7 +2557,6 @@ sub bmap { # {{{1
     return -&ENOSYS;
 } # }}}1
 
-
 # misc. helper functions below:
 
 sub generate_metrics_data { # {{{1
@@ -2830,33 +2776,6 @@ sub acl_to_xattr { # {{{1
     # the client.
     return pack('LS/(a*)', $$acldata{'acl_flags'}, @acl_parts);
 } # }}}1
-
-=back
-
-=head1 DEPENDENCIES
-
-This package derives from, and thus depends on, the Fuse::Class package.
-By proxy, it also depends on the Fuse package, specifically version
-0.10_1 or later, as it includes certain necessary fixes. The Net::AFP::TCP
-and Net::AFP::Atalk packages are included in this code release.
-
-=head1 BUGS AND LIMITATIONS
-
-None currently known.
-
-=head1 INCOMPATIBILITIES
-
-None currently known.
-
-=head1 AUTHOR
-
-Derrik Pates <demon@now.ai>
-
-=head1 SEE ALSO
-
-C<Fuse::Class>, C<Fuse>, C<Net::AFP>
-
-=cut
 
 1;
 # vim: ts=4 fdm=marker sw=4 et
