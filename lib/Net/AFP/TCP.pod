@@ -127,7 +127,7 @@ the remote server upon success.
 
 =back
 
-=item AUTHOR
+=head1 AUTHOR
 
 Derrik Pates <demon@now.ai>
 
