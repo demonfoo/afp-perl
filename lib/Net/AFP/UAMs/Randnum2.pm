@@ -8,6 +8,8 @@ package Net::AFP::UAMs::Randnum2;
 
 use strict;
 use warnings;
+use diagnostics;
+use integer;
 
 use constant UAMNAME => '2-Way Randnum exchange';
 

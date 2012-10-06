@@ -13,6 +13,8 @@
 package Net::AFP::UAMs::DHX;
 use strict;
 use warnings;
+use diagnostics;
+use integer;
 
 use constant UAMNAME => 'DHCAST128';
 

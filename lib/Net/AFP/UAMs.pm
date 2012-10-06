@@ -1,5 +1,12 @@
 package Net::AFP::UAMs;
 
+use strict;
+use warnings;
+use diagnostics;
+use integer;
+
+no strict qw(refs);
+
 use Net::AFP::TokenTypes;
 use Net::AFP::Result;
 use Log::Log4perl qw(:easy);
@@ -36,6 +43,7 @@ $incname .= '.pm';
 # %INC contains the include paths for all currently-imported packages.
 my $incpath = $INC{$incname};
 $incpath =~ s{\.pm$}{};
+my @uampaths;
 if (-d $incpath) {
     opendir(UAMDIR, $incpath);
     push(@uampaths, map { $incpath . '/' . $_ } grep(/\.pm$/, readdir(UAMDIR)));

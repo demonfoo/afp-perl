@@ -3,6 +3,7 @@ package Net::AFP::Parsers;
 use strict;
 use warnings;
 use diagnostics;
+use integer;
 
 # Enables a nice call trace on warning events.
 use Carp ();

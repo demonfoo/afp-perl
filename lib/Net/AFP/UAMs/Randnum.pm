@@ -9,6 +9,8 @@ package Net::AFP::UAMs::Randnum;
 
 use strict;
 use warnings;
+use diagnostics;
+use integer;
 
 use constant UAMNAME => 'Randnum exchange';
 

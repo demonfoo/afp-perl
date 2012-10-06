@@ -13,6 +13,8 @@ package Net::AFP::UAMs::DHX2;
 
 use strict;
 use warnings;
+use diagnostics;
+use integer;
 
 use constant UAMNAME => 'DHX2';
 

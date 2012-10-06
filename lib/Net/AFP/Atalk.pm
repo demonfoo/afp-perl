@@ -1,15 +1,18 @@
 # Implementation of a subclass that implements the necessary virtual methods
 # for handling an AFP session over AppleTalk protocol.
 package Net::AFP::Atalk;
+
+use strict;
+use warnings;
+use diagnostics;
+use integer;
+
 use Net::AFP;
 use Net::AFP::Parsers;
 use Net::AFP::Result;
 use Net::Atalk::ASP;
 use Exporter qw(import);
 use Log::Log4perl qw(:easy);
-
-use strict;
-use warnings;
 
 our @ISA = qw(Net::AFP);
 our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name kFPSoftCreate

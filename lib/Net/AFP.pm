@@ -6,6 +6,8 @@
 package Net::AFP;
 use strict;
 use warnings;
+use diagnostics;
+use integer;
 use Net::AFP::Result;
 use Net::AFP::VolParms;
 use Net::AFP::Parsers;

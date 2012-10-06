@@ -1,5 +1,10 @@
 package Net::AFP::ACL;
 
+use strict;
+use warnings;
+use diagnostics;
+use integer;
+
 use Exporter qw(import);
 
 our @EXPORT = qw(KAUTH_ACL_MAX_ENTRIES KAUTH_ACL_FLAGS_PRIVATE
