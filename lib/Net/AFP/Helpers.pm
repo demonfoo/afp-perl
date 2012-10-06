@@ -91,7 +91,7 @@ sub do_afp_connect {
 
     my %values;
     unless (@values{@args} = $url =~ $url_rx) {
-        print STDERR "URL ", $url, " was not valid, sorry\n";
+        print STDERR "URL '", $url, "' was not valid, sorry\n";
         exit(&EINVAL);
     }
 
