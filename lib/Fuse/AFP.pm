@@ -807,7 +807,10 @@ sub unlink { # {{{1
     # since the same backend call does both.
     $rc = $$self{'afpconn'}->FPDelete($$self{'volID'}, $$resp{'NodeID'},
             $$self{'pathType'}, node_name($fileName));
-    return 0            if $rc == kFPNoErr;
+    if ($rc == kFPNoErr) {
+        delete $self->{'_getattr_cache'}->{$fileName};
+        return 0;
+    }
     return -&EACCES     if $rc == kFPAccessDenied;
     return -&EBUSY      if $rc == kFPFileBusy;
     return -&EBUSY      if $rc == kFPObjectLocked;
