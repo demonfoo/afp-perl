@@ -3460,19 +3460,19 @@ Error replies:
 
 =item kFPAccessDenied
 
-User does not have the access privileges required
-to open the specified fork.
+User does not have the access privileges required to open the specified
+fork. (With AFP 1.1, can mean file is marked WriteInhibit and the user
+attempted to open it for write, or the volume is ReadOnly and the user
+attempted to open a file for write.)
 
 =item kFPBitmapErr
 
-Attempt was made to retrieve a parameter that
-cannot be obtained with this command (the fork is
-not opened).
+Attempt was made to retrieve a parameter that cannot be obtained with
+this command (the fork is not opened).
 
 =item kFPDenyConflict
 
-File or fork cannot be opened because of a deny
-modes conflict.
+File or fork cannot be opened because of a deny modes conflict.
 
 =item kFPMiscErr
 
@@ -3484,8 +3484,8 @@ Input parameters do not point to an existing file.
 
 =item kFPObjectLocked
 
-Attempt was made to open a file for writing that
-is marked WriteInhibit.
+Attempt was made to open a file for writing that is marked WriteInhibit.
+(AFP 2.0 or later.)
 
 =item kFPObjectTypeErr
 
@@ -3493,8 +3493,8 @@ Input parameters point to a directory.
 
 =item kFPParamErr
 
-Session reference number, Volume ID, or pathname
-type is unknown; a pathname is invalid.
+Session reference number, Volume ID, or pathname type is unknown; a
+pathname is invalid.
 
 =item kFPTooManyFilesOpen
 
@@ -3502,8 +3502,8 @@ Server cannot open another fork.
 
 =item kFPVolLocked
 
-Attempt was made to open for writing a file on a
-volume that is marked ReadOnly.
+Attempt was made to open for writing a file on a volume that is marked
+ReadOnly. (AFP 2.0 or later.)
 
 =back
 
@@ -3595,7 +3595,8 @@ Number of bytes to read.
 
 =item NewLineMask
 
-Mask for determining where the read should terminate.
+Mask for determining where the read should terminate. Prior to AFP 2.0,
+only 0x00 and 0xFF are legitimate values for this argument.
 
 =item NewLineChar
 
@@ -3946,6 +3947,8 @@ Error replies:
 =item kFPAccessDenied
 
 User does not have the access privileges required to use this command.
+(With AFP 1.1, can mean volume is ReadOnly, or directory is marked
+RenameInhibit.)
 
 =item kFPCantRename
 
@@ -3961,7 +3964,7 @@ File or directory having the name specified by C<$NewName> already exists.
 
 =item kFPObjectLocked
 
-File or directory is marked RenameInhibit.
+File or directory is marked RenameInhibit. (AFP 2.0 or later.)
 
 =item kFPObjectNotFound
 
@@ -3973,7 +3976,7 @@ Session reference number, Volume ID, or pathname type is unknown; pathname or C<
 
 =item kFPVolLocked
 
-Volume is ReadOnly.
+Volume is ReadOnly. (AFP 2.0 or later.)
 
 =back
 
@@ -4386,7 +4389,7 @@ C<$Pathname> is invalid.
 
 =item kFPVolLocked
 
-Volume is ReadOnly.
+Volume is ReadOnly. (AFP 2.0 or later.)
 
 =back
 
@@ -4473,7 +4476,7 @@ C<$Pathname> is invalid.
 
 =item kFPVolLocked
 
-Volume is ReadOnly.
+Volume is ReadOnly. (AFP 2.0 or later.)
 
 =back
 
@@ -4541,7 +4544,7 @@ is invalid.
 
 =item kFPVolLocked
 
-Volume is ReadOnly.
+Volume is ReadOnly. (AFP 2.0 or later.)
 
 =back
 
@@ -4580,13 +4583,13 @@ Error replies:
 
 =item kFPAccessDenied
 
-User does not have the access privileges required
-to use this command.
+User does not have the access privileges required to use this command.
+(With AFP 1.1, the volume is ReadOnly.)
 
 =item kFPBitmapErr
 
-Attempt was made to set a parameter that cannot be
-set by this command; bitmap is null.
+Attempt was made to set a parameter that cannot be set by this command;
+bitmap is null.
 
 =item kFPMiscErr
 
@@ -4598,7 +4601,7 @@ Session reference number or Volume ID is unknown.
 
 =item kFPVolLocked
 
-Volume is ReadOnly.
+Volume is ReadOnly. (AFP 2.0 or later.)
 
 =back
 
