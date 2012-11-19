@@ -1013,6 +1013,7 @@ sub rename { # {{{1
     return -&EINVAL if $rc == kFPParamErr;
     return -&EROFS  if $rc == kFPVolLocked;
     return -&EBADF  if $rc != kFPNoErr;
+    delete $self->{'_getattr_cache'}->{$oldXlated};
     return 0;
 } # }}}1
 
