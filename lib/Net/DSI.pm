@@ -69,16 +69,15 @@ sub session_thread { # {{{1
     if (!defined($conn) || !$conn->connected()) {
         $conn = new IO::Socket::INET(%connect_args);
     }
-    my $handler;
     if (!defined($conn) || !$conn->connected()) {
         $shared->{'running'} = -1;
         # gotta do this so new() completes, one way or another...
         $shared->{'conn_sem'}->up();
 
+        keys %{$shared->{'handlers'}};
         # return kFPNoServer for all waiting callers, and up() all the waiting
         # semaphores for them.
-        foreach my $id (keys %{$shared->{'handlers'}}) {
-            $handler = $shared->{'handlers'}{$id};
+        while (my($id, $handler) = each %{$shared->{'handlers'}}) {
             ${$handler->[2]} = kFPNoServer;
             ${$handler->[0]}->up();
         }
@@ -106,7 +105,7 @@ sub session_thread { # {{{1
     $poll->mask($conn, POLLIN | POLLHUP);
     my ($data, $real_length, $resp, $type, $cmd, $id, $errcode, $length,
             $reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref, $msg,
-            $wsz);
+            $wsz, $handler);
     my $last_tickle = gettimeofday();
     my $last_pkt_rcvd = $last_tickle;
 MAINLOOP:
