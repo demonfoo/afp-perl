@@ -22,6 +22,7 @@ use Encode;
 use Unicode::Normalize qw(compose decompose);
 use Exporter qw(import);
 use Log::Log4perl qw(:easy);
+use Params::Validate qw(:all);
 use Carp;
 use Readonly;
 # }}}1
@@ -247,22 +248,38 @@ sub PackSetParams { # {{{1
 } # }}}1
 
 sub FPAccess { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'Bitmap'} ||= 0;
-    croak('UUID must be provided')
-            if not exists $options{'UUID'};
-    croak('ReqAccess must be provided')
-            if not exists $options{'ReqAccess'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'Bitmap'        => { type => SCALAR, default => 0 },
+        'UUID'          => {
+            type    => SCALAR,
+            regex   => qr{^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$}i,
+        },
+        'ReqAccess'     => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid access flags' => sub {
+                    my $mask = (KAUTH_VNODE_GENERIC_ALL_BITS |
+                            KAUTH_VNODE_WRITE_RIGHTS);
+                    !($_[0] & ~$mask);
+                },
+            }
+        },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                },
+            },
+        },
+        'Pathname'      => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNna[16]Na*', $kFPAccess,
             @options{'VolumeID', 'DirectoryID', 'Bitmap',},
@@ -272,21 +289,25 @@ sub FPAccess { # {{{1
 } # }}}1
 
 sub FPAddAPPL { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
     
     DEBUG('called ', (caller(0))[3]);
-    croak('DTRefNum must be provided')
-            if not exists $options{'DTRefNum'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('FileCreator must be provided')
-            if not exists $options{'FileCreator'};
-    croak('ApplTag must be provided')
-            if not exists $options{'ApplTag'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'DTRefNum'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'FileCreator'   => { type => SCALAR },
+        'ApplTag'       => { type => SCALAR },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'      => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNNNa*', $kFPAddAPPL,
             @options{'DTRefNum', 'DirectoryID', 'FileCreator', 'ApplTag'},
@@ -295,19 +316,24 @@ sub FPAddAPPL { # {{{1
 } # }}}1
 
 sub FPAddComment { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('DTRefNum must be provided')
-            if not exists $options{'DTRefNum'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
-    croak('Comment must be provided')
-            if not exists $options{'Comment'};
+    my %options = validate(@options, {
+        'DTRefNum'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'      => { type => SCALAR },
+        'Comment'       => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNa*x![s]C/a', $kFPAddComment,
             @options{'DTRefNum', 'DirectoryID'},
@@ -317,23 +343,18 @@ sub FPAddComment { # {{{1
 } # }}}1
 
 sub FPAddIcon { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('DTRefNum must be provided')
-            if not exists $options{'DTRefNum'};
-    croak('FileCreator must be provided')
-            if not exists $options{'FileCreator'};
-    croak('FileType must be provided')
-            if not exists $options{'FileType'};
-    croak('IconType must be provided')
-            if not exists $options{'IconType'};
-    croak('IconTag must be provided')
-            if not exists $options{'IconTag'};
-    croak('BitmapSize must be provided')
-            if not exists $options{'BitmapSize'};
-    croak('IconBitmap must be provided')
-            if not exists $options{'IconBitmap'};
+    my %options = validate(@options, {
+        'DTRefNum'      => { type => SCALAR },
+        'FileCreator'   => { type => SCALAR },
+        'FileType'      => { type => SCALAR },
+        'IconType'      => { type => SCALAR },
+        'IconTag'       => { type => SCALAR },
+        'BitmapSize'    => { type => SCALAR },
+        'IconBitmap'    => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNNCxNn', $kFPAddIcon,
             @options{'DTRefNum', 'FileCreator', 'FileType', 'IconType',
@@ -342,16 +363,21 @@ sub FPAddIcon { # {{{1
 } # }}}1
 
 sub FPByteRangeLock { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    $options{'Flags'} ||= 0;
-    croak('OForkRefNum must be provided')
-            if not exists $options{'OForkRefNum'};
-    croak('Offset must be provided')
-            if not exists $options{'Offset'};
-    croak('Length must be provided')
-            if not exists $options{'Length'};
+    my %options = validate(@options, {
+        'Flags'         => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flags' => sub { !(~0x81 & $_[0]) },
+            }
+        },
+        'OForkRefNum'   => { type => SCALAR },
+        'Offset'        => { type => SCALAR },
+        'Length'        => { type => SCALAR },
+    } );
 
     my $msg = pack('CCnNN', $kFPByteRangeLock,
             @options{'Flags', 'OForkRefNum'},
@@ -367,16 +393,21 @@ sub FPByteRangeLock { # {{{1
 } # }}}1
 
 sub FPByteRangeLockExt { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    $options{'Flags'} ||= 0;
-    croak('OForkRefNum must be provided')
-            if not exists $options{'OForkRefNum'};
-    croak('Offset must be provided')
-            if not exists $options{'Offset'};
-    croak('Length must be provided')
-            if not exists $options{'Length'};
+    my %options = validate(@options, {
+        'Flags'         => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flags' => sub { !(~0x81 & $_[0]) },
+            }
+        },
+        'OForkRefNum'   => { type => SCALAR },
+        'Offset'        => { type => SCALAR },
+        'Length'        => { type => SCALAR },
+    } );
 
     my $msg = pack('CCnNNNN', $kFPByteRangeLockExt,
             @options{'Flags', 'OForkRefNum'},
@@ -468,29 +499,45 @@ sub FPCloseVol { # {{{1
 } # }}}1
 
 sub FPCopyFile { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('SourceVolumeID must be provided')
-            if not exists $options{'SourceVolumeID'};
-    croak('SourceDirectoryID must be provided')
-            if not exists $options{'SourceDirectoryID'};
-    croak('DestVolumeID must be provided')
-            if not exists $options{'DestVolumeID'};
-    croak('DestDirectoryID must be provided')
-            if not exists $options{'DestDirectoryID'};
-    croak('SourcePathType must be provided')
-            if not exists $options{'SourcePathType'};
-    croak('SourcePathname must be provided')
-            if not exists $options{'SourcePathname'};
-    croak('DestPathType must be provided')
-            if not exists $options{'DestPathType'};
-    croak('DestPathname must be provided')
-            if not exists $options{'DestPathname'};
-    croak('NewType must be provided')
-            if not exists $options{'NewType'};
-    croak('NewName must be provided')
-            if not exists $options{'NewName'};
+    my %options = validate(@options, {
+        'SourceVolumeID'    => { type => SCALAR },
+        'SourceDirectoryID' => { type => SCALAR },
+        'DestVolumeID'      => { type => SCALAR },
+        'DestDirectoryID'   => { type => SCALAR },
+        'SourcePathType'    => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'SourcePathname'    => { type => SCALAR },
+        'DestPathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'DestPathname'      => { type => SCALAR },
+        'NewType'           => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'NewName'           => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNnNa*a*a*', $kFPCopyFile,
             @options{'SourceVolumeID', 'SourceDirectoryID',
@@ -502,17 +549,23 @@ sub FPCopyFile { # {{{1
 } # }}}1
 
 sub FPCreateDir { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
     
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'      => { type => SCALAR },
+    } );
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack('CxnNa*', $kFPCreateDir,
@@ -524,18 +577,24 @@ sub FPCreateDir { # {{{1
 } # }}}1
 
 sub FPCreateFile { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    $options{'Flag'} ||= 0;
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+             'VolumeID'     => { type => SCALAR },
+             'DirectoryID'  => { type => SCALAR },
+             'PathType'     => {
+                 type       => SCALAR,
+                 callbacks  => {
+                     'valid path type' => sub {
+                         $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                         $_[0] == kFPUTF8Name
+                     }
+                 }
+             },
+             'Pathname'     => { type => SCALAR },
+             'Flag'         => { type => SCALAR, default => 0 },
+    } );
 
     return $self->SendAFPMessage(pack('CCnNa*', $kFPCreateFile,
             @options{'Flag', 'VolumeID', 'DirectoryID'},
@@ -543,17 +602,23 @@ sub FPCreateFile { # {{{1
 } # }}}1
 
 sub FPCreateID { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            }
+        },
+        'Pathname'      => { type => SCALAR },
+    } );
 
     my $resp;
     my $msg = pack('CxnNa*', $kFPCreateID,
@@ -592,25 +657,40 @@ sub FPDisconnectOldSession { # {{{1
 } # }}}1
 
 sub FPEnumerate { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'FileBitmap'} ||= 0;
-    $options{'DirectoryBitmap'} ||= 0;
-    croak('ReqCount must be provided')
-            if not exists $options{'ReqCount'};
-    croak('StartIndex must be provided')
-            if not exists $options{'StartIndex'};
-    croak('MaxReplySize must be provided')
-            if not exists $options{'MaxReplySize'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'          => { type => SCALAR },
+        'DirectoryID'       => { type => SCALAR },
+        'FileBitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+            },
+        },
+        'DirectoryBitmap'   => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+            },
+        },
+        'ReqCount'          => { type => SCALAR },
+        'StartIndex'        => { type => SCALAR },
+        'MaxReplySize'      => { type => SCALAR },
+        'PathType'          => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'          => { type => SCALAR },
+    } );
     croak('Must accept array return') if not wantarray();
 
     my $msg = pack('CxnNnnnnna*', $kFPEnumerate,
@@ -644,25 +724,40 @@ sub FPEnumerate { # {{{1
 } # }}}1
 
 sub FPEnumerateExt { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'FileBitmap'} ||= 0;
-    $options{'DirectoryBitmap'} ||= 0;
-    croak('ReqCount must be provided')
-            if not exists $options{'ReqCount'};
-    croak('StartIndex must be provided')
-            if not exists $options{'StartIndex'};
-    croak('MaxReplySize must be provided')
-            if not exists $options{'MaxReplySize'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'          => { type => SCALAR },
+        'DirectoryID'       => { type => SCALAR },
+        'FileBitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+            },
+        },
+        'DirectoryBitmap'   => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+            },
+        },
+        'ReqCount'          => { type => SCALAR },
+        'StartIndex'        => { type => SCALAR },
+        'MaxReplySize'      => { type => SCALAR },
+        'PathType'          => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'          => { type => SCALAR },
+    } );
     croak('Must accept array return') if not wantarray();
 
     my $msg = pack("CxnNnnnnna*", $kFPEnumerateExt,
@@ -694,25 +789,40 @@ sub FPEnumerateExt { # {{{1
 } # }}}1
 
 sub FPEnumerateExt2 { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'FileBitmap'} ||= 0;
-    $options{'DirectoryBitmap'} ||= 0;
-    croak('ReqCount must be provided')
-            if not exists $options{'ReqCount'};
-    croak('StartIndex must be provided')
-            if not exists $options{'StartIndex'};
-    croak('MaxReplySize must be provided')
-            if not exists $options{'MaxReplySize'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'          => { type => SCALAR },
+        'DirectoryID'       => { type => SCALAR },
+        'FileBitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+            },
+        },
+        'DirectoryBitmap'   => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+            },
+        },
+        'ReqCount'          => { type => SCALAR },
+        'StartIndex'        => { type => SCALAR },
+        'MaxReplySize'      => { type => SCALAR },
+        'PathType'          => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'          => { type => SCALAR },
+    } );
     croak('Must accept array return') if not wantarray();
 
     my $msg = pack('CxnNnnnNNa*', $kFPEnumerateExt2,
@@ -744,23 +854,34 @@ sub FPEnumerateExt2 { # {{{1
 } # }}}1
 
 sub FPExchangeFiles { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('SourceDirectoryID must be provided')
-            if not exists $options{'SourceDirectoryID'};
-    croak('DestDirectoryID must be provided')
-            if not exists $options{'DestDirectoryID'};
-    croak('SourcePathType must be provided')
-            if not exists $options{'SourcePathType'};
-    croak('SourcePathname must be provided')
-            if not exists $options{'SourcePathname'};
-    croak('DestPathType must be provided')
-            if not exists $options{'DestPathType'};
-    croak('DestPathname must be provided')
-            if not exists $options{'DestPathname'};
+    my %options = validate(@options, {
+        'VolumeID'          => { type => SCALAR },
+        'SourceDirectoryID' => { type => SCALAR },
+        'DestDirectoryID'   => { type => SCALAR },
+        'SourcePathType'    => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'SourcePathname'    => { type => SCALAR },
+        'DestPathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'DestPathname'      => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNNa*a*', $kFPExchangeFiles,
             @options{'VolumeID', 'SourceDirectoryID', 'DestDirectoryID'},
@@ -787,19 +908,35 @@ sub FPFlushFork { # {{{1
 } # }}}1
 
 sub FPGetACL { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'Bitmap'} ||= kFileSec_ACL;
-    $options{'MaxReplySize'} ||= 0;
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'Bitmap'        => {
+            type        => SCALAR,
+            default     => kFileSec_ACL,
+            callbacks   => {
+                'valid flags' => sub {
+                    my $mask = kFileSec_UUID | kFileSec_GRPUUID |
+                            kFileSec_ACL;
+                    !($_[0] & ~$mask);
+                },
+            }
+        },
+        'MaxReplySize'  => { type => SCALAR, default => 0 },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                     $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                     $_[0] == kFPUTF8Name
+                }
+            }
+        },
+        'Pathname'      => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNnNa*', $kFPGetACL,
             @options{'VolumeID', 'DirectoryID', 'Bitmap', 'MaxReplySize'},
@@ -839,16 +976,21 @@ sub FPGetACL { # {{{1
 } # }}}1
 
 sub FPGetAPPL { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('DTRefNum must be provided')
-            if not exists $options{'DTRefNum'};
-    croak('FileCreator must be provided')
-            if not exists $options{'FileCreator'};
-    croak('APPLIndex must be provided')
-            if not exists $options{'APPLIndex'};
-    $options{'Bitmap'} ||= 0;
+    my %options = validate(@options, {
+        'DTRefNum'      => { type => SCALAR },
+        'FileCreator'   => { type => SCALAR },
+        'APPLIndex'     => { type => SCALAR },
+        'Bitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flags' => sub { !(~0xFFFF & $_[0]) },
+            },
+        },
+    } );
 
     my $msg = pack('CxnNnn', $kFPGetAPPL,
             @options{'DTRefNum', 'FileCreator', 'APPLIndex', 'Bitmap'});
@@ -884,17 +1026,24 @@ sub FPGetAuthMethods { # {{{1
 } # }}}1
 
 sub FPGetComment { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('DTRefNum must be provided')
-            if not exists $options{'DTRefNum'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'DTRefNum'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                     $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                     $_[0] == kFPUTF8Name
+                },
+            }
+        },
+        'Pathname'      => { type => SCALAR },
+    } );
+    croak('Need to accept returned list') unless wantarray();
 
     my $msg = pack('CxnNa*', $kFPGetComment,
             @options{'DTRefNum', 'DirectoryID'},
@@ -907,23 +1056,46 @@ sub FPGetComment { # {{{1
 } # }}}1
 
 sub FPGetExtAttr { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'VolumeID'};
-    $options{'Bitmap'} ||= 0;
-    $options{'Offset'} ||= 0;
-    $options{'ReqCount'} ||= -1;
-    $options{'MaxReplySize'} ||= 0;
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
-    croak('Name must be provided')
-            if not exists $options{'Name'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'Bitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flags' => sub { $_[0] == kXAttrNoFollow || $_[0] == 0 },
+            }
+        },
+        'Offset'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid offset' => sub { $_[0] == 0 },
+            }
+        },
+        'ReqCount'      => {
+            type        => SCALAR,
+            default     => -1,
+            callbacks   => {
+                'valid count' => sub { $_[0] == -1 },
+            },
+        },
+        'MaxReplySize'  => { type => SCALAR, default => 0 },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                },
+            }
+        },
+        'Pathname'      => { type => SCALAR },
+        'Name'          => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNnNNNNNa*x![s]n/a*', $kFPGetExtAttr,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
@@ -947,19 +1119,37 @@ sub FPGetExtAttr { # {{{1
 } # }}}1
 
 sub FPGetFileDirParms { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'FileBitmap'} ||= 0;
-    $options{'DirectoryBitmap'} ||= 0;
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'          => { type => SCALAR },
+        'DirectoryID'       => { type => SCALAR },
+        'FileBitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+            },
+        },
+        'DirectoryBitmap'   => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+            },
+        },
+        'PathType'          => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'          => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNnna*', $kFPGetFileDirParms,
             @options{'VolumeID','DirectoryID','FileBitmap','DirectoryBitmap'},
@@ -987,19 +1177,16 @@ sub FPGetForkParms { # {{{1
 } # }}}1
 
 sub FPGetIcon { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('DTRefNum must be provided')
-            if not exists $options{'DTRefNum'};
-    croak('FileCreator must be provided')
-            if not exists $options{'FileCreator'};
-    croak('FileType must be provided')
-            if not exists $options{'FileType'};
-    croak('IconType must be provided')
-            if not exists $options{'IconType'};
-    croak('Length must be provided')
-            if not exists $options{'Length'};
+    my %options = validate(@options, {
+        'DTRefNum'      => { type => SCALAR },
+        'FileCreator'   => { type => SCALAR },
+        'FileType'      => { type => SCALAR },
+        'IconType'      => { type => SCALAR },
+        'Length'        => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNNCxn', $kFPGetIcon,
             @options{'DTRefNum', 'FileCreator', 'FileType', 'IconType',
@@ -1191,21 +1378,39 @@ sub FPGetVolParms { # {{{1
 } # }}}1
 
 sub FPListExtAttrs { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'Bitmap'} ||= 0;
-    $options{'ReqCount'} ||= 0;
-    $options{'StartIndex'} ||= 0;
-    $options{'MaxReplySize'} ||= 0;
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'Bitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flags' => sub { $_[0] == kXAttrNoFollow },
+            }
+        },
+        'ReqCount'      => { type => SCALAR, default => 0 },
+        'StartIndex'    => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid index' => sub { $_[0] == 0 },
+            }
+        },
+        'MaxReplySize'  => { type => SCALAR, default => 0 },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                },
+            }
+        },
+        'Pathname'      => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNnnNNa*', $kFPListExtAttrs,
             @options{'VolumeID', 'DirectoryID', 'Bitmap', 'ReqCount',
@@ -1283,23 +1488,49 @@ sub FPLoginCont { # {{{1
 } # }}}1
 
 sub FPLoginExt { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    $options{'Flags'} ||= 0;
-    croak('AFPVersion must br provided')
-            if not exists $options{'AFPVersion'};
-    croak('UAM must br provided')
-            if not exists $options{'UAM'};
-    # The documentation says this should always be UTF8
-    $options{'UserNameType'} ||= kFPUTF8Name;
-    croak('UserName must br provided')
-            if not exists $options{'UserName'};
-    # Documentation doesn't say this has to always be UTF8, but it's a safe
-    # choice, and generally we don't give a damn
-    $options{'PathType'} ||= kFPUTF8Name;
-    $options{'Pathname'} ||= q//;
-    $options{'UserAuthInfo'} ||= q//;
+    my %options = validate(@options, {
+        'Flags'         => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flags' => sub { $_[0] == 0 },
+            },
+        },
+        'AFPVersion'    => { type => SCALAR },
+        'UAM'           => { type => SCALAR },
+        'UserNameType'  => {
+            type        => SCALAR,
+            # The documentation says this should always be UTF8
+            default     => kFPUTF8Name,
+            callbacks   => {
+                'valid type flag' => sub { $_[0] == kFPUTF8Name },
+            }
+        },
+        'UserName'      => { type => SCALAR },
+        # Documentation doesn't say this has to always be UTF8, but it's a
+        # safe choice, and generally we don't give a damn
+        'PathType'      => {
+            type        => SCALAR,
+            default     => kFPUTF8Name,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                },
+            },
+        },
+        'Pathname'      => {
+            type        => SCALAR,
+            default     => q{},
+        },
+        'UserAuthInfo'  => {
+            type        => SCALAR,
+            default     => q{},
+        }
+    } );
 
     my $msg = pack('CxnC/a*C/a*a*a*x![s]a*', $kFPLoginExt,
             @options{'Flags', 'AFPVersion', 'UAM'},
@@ -1412,27 +1643,44 @@ sub FPMapName { # {{{1
 # doesn't seem to be anything returned other than the status code, so
 # I'm going to assume from here on out that that's the case.
 sub FPMoveAndRename { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('SourceDirectoryID must be provided')
-            if not exists $options{'SourceDirectoryID'};
-    croak('DestDirectoryID must be provided')
-            if not exists $options{'DestDirectoryID'};
-    croak('SourcePathType must be provided')
-            if not exists $options{'SourcePathType'};
-    croak('SourcePathname must be provided')
-            if not exists $options{'SourcePathname'};
-    croak('DestPathType must be provided')
-            if not exists $options{'DestPathType'};
-    croak('DestPathname must be provided')
-            if not exists $options{'DestPathname'};
-    croak('NewType must be provided')
-            if not exists $options{'NewType'};
-    croak('NewName must be provided')
-            if not exists $options{'NewName'};
+    my %options = validate(@options, {
+        'VolumeID'          => { type => SCALAR },
+        'SourceDirectoryID' => { type => SCALAR },
+        'DestDirectoryID'   => { type => SCALAR },
+        'SourcePathType'    => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'SourcePathname'    => { type => SCALAR },
+        'DestPathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'DestPathname'      => { type => SCALAR },
+        'NewType'           => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'NewName'           => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNNa*a*a*', $kFPMoveAndRename,
             @options{'VolumeID', 'SourceDirectoryID', 'DestDirectoryID'},
@@ -1445,17 +1693,23 @@ sub FPMoveAndRename { # {{{1
 } # }}}1
 
 sub FPOpenDir { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            }
+        },
+        'Pathname'      => { type => SCALAR },
+    } );
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack('CxnNa*', $kFPOpenDir,
@@ -1481,21 +1735,43 @@ sub FPOpenDT { # {{{1
 } # }}}1
 
 sub FPOpenFork { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    $options{'Flag'} ||= 0;
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'Bitmap'} ||= 0;
-    croak('AccessMode must be provided')
-            if not exists $options{'AccessMode'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'Flag'          => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flag bits' => sub { !(~0x80 & $_[0]) },
+            },
+        },
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'Bitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+            },
+        },
+        'AccessMode'    => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid access mode' => sub { !(~0x33 & $_[0]) },
+            },
+        },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            }
+        },
+        'Pathname'      => { type => SCALAR },
+    } );
 
     my $msg = pack('CCnNnna*', $kFPOpenFork,
             @options{'Flag', 'VolumeID', 'DirectoryID', 'Bitmap', 'AccessMode'},
@@ -1544,17 +1820,28 @@ sub FPOpenVol { # {{{1
 } # }}}1
 
 sub FPRead { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
     
     DEBUG('called ', (caller(0))[3]);
-    croak('OForkRefNum must be provided')
-            if not exists $options{'OForkRefNum'};
-    croak('Offset must be provided')
-            if not exists $options{'Offset'};
-    croak('ReqCount must be provided')
-            if not exists $options{'ReqCount'};
-    $options{'NewLineMask'} ||= 0;
-    $options{'NewLineChar'} ||= 0;
+    my %options = validate(@options, {
+        'OForkRefNum'   => { type => SCALAR },
+        'Offset'        => { type => SCALAR },
+        'ReqCount'      => { type => SCALAR },
+        'NewLineMask'   => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid mask values' => sub { $_[0] >= 0 && $_[0] <= 0xFF },
+            },
+        },
+        'NewLineChar'   => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid char values' => sub { $_[0] >= 0 && $_[0] <= 0xFF },
+            },
+        },
+    } );
 
     my $msg = pack('CxnNNCC', $kFPRead,
             @options{'OForkRefNum', 'Offset', 'ReqCount', 'NewLineMask',
@@ -1567,15 +1854,14 @@ sub FPRead { # {{{1
 } # }}}1
 
 sub FPReadExt { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('OForkRefNum must be provided')
-            if not exists $options{'OForkRefNum'};
-    croak('Offset must be provided')
-            if not exists $options{'Offset'};
-    croak('ReqCount must be provided')
-            if not exists $options{'ReqCount'};
+    my %options = validate(@options, {
+        'OForkRefNum'   => { type => SCALAR },
+        'Offset'        => { type => SCALAR },
+        'ReqCount'      => { type => SCALAR },
+    } );
     
     my $msg = pack('CxnNNNN', $kFPReadExt, $options{'OForkRefNum'},
             ll_convert($options{'Offset'}), ll_convert($options{'ReqCount'}));
@@ -1587,19 +1873,24 @@ sub FPReadExt { # {{{1
 } # }}}1
 
 sub FPRemoveAPPL { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('DTRefNum must be provided')
-            if not exists $options{'DTRefNum'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('FileCreator must be provided')
-            if not exists $options{'FileCreator'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'DTRefNum'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'FileCreator'   => { type => SCALAR },
+        'PathType'          => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'          => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNNa*', $kFPRemoveAPPL,
             @options{'DTRefNum', 'DirectoryID', 'FileCreator'},
@@ -1617,22 +1908,31 @@ sub FPRemoveComment { # {{{1
 } # }}}1
 
 sub FPRemoveExtAttr { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'Bitmap'} ||= 0;
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
-    croak('Name must be provided')
-            if not exists $options{'Name'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'Bitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flags' => sub { $_[0] == kXAttrNoFollow || $_[0] == 0 },
+            }
+        },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                },
+            }
+        },
+        'Pathname'      => { type => SCALAR },
+        'Name'          => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNna*x![s]n/a*', $kFPRemoveExtAttr,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
@@ -1642,21 +1942,33 @@ sub FPRemoveExtAttr { # {{{1
 } # }}}1
 
 sub FPRename { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
-    croak('NewType must be provided')
-            if not exists $options{'NewType'};
-    croak('NewName must be provided')
-            if not exists $options{'NewName'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'      => { type => SCALAR },
+        'NewType'       => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'NewName'       => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNa*a*', $kFPRename,
             @options{'VolumeID', 'DirectoryID'},
@@ -1686,18 +1998,39 @@ sub FPResolveID { # {{{1
 } # }}}1
 
 sub FPSetACL { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'Bitmap'} ||= 0;
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+            'VolumeID'      => { type => SCALAR },
+            'DirectoryID'   => { type => SCALAR },
+            'Bitmap'        => {
+                type        => SCALAR,
+                default     => kFileSec_ACL,
+                callbacks   => {
+                    'valid flags' => sub {
+                        my $mask = kFileSec_UUID | kFileSec_GRPUUID |
+                                kFileSec_ACL | kFileSec_REMOVEACL |
+                                kFileSec_Inherit;
+                        !($_[0] & ~$mask);
+                    },
+                }
+            },
+            'PathType'      => {
+                type        => SCALAR,
+                callbacks   => {
+                    'valid path type' => sub {
+                         $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                         $_[0] == kFPUTF8Name
+                    }
+                }
+            },
+            'Pathname'      => { type => SCALAR },
+            'UUID'          => { type => SCALAR, optional => 1 },
+            'GRPUUID'       => { type => SCALAR, optional => 1 },
+            'acl_ace'       => { type => ARRAYREF, optional => 1 },
+            'acl_flags'     => { type => SCALAR, optional => 1 },
+    } );
 
     my $msg = pack('CxnNna*x![s]', $kFPSetACL,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
@@ -1731,28 +2064,50 @@ sub FPSetACL { # {{{1
 } # }}}1
 
 sub FPSetDirParms { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
     
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('Bitmap must be provided')
-            if not exists $options{'Bitmap'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'          => { type => SCALAR },
+        'DirectoryID'       => { type => SCALAR },
+        'Bitmap'            => {
+            type            => SCALAR,
+            default         => 0,
+            callbacks       => {
+                'valid bitmap' => sub {
+                    my $mask = kFPAttributeBit | kFPCreateDateBit |
+                            kFPModDateBit | kFPBackupDateBit |
+                            kFPFinderInfoBit | kFPOwnerIDBit |
+                            kFPGroupIDBit | kFPAccessRightsBit |
+                            kFPUnixPrivsBit;
+                    !(~$mask & $_[0])
+                },
+            },
+        },
+        'PathType'          => {
+            type            => SCALAR,
+            callbacks       => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'          => { type => SCALAR },
+        'Attribute'         => { type => SCALAR, optional => 1 },
+        'CreateDate'        => { type => SCALAR, optional => 1 },
+        'ModDate'           => { type => SCALAR, optional => 1 },
+        'BackupDate'        => { type => SCALAR, optional => 1 },
+        'FinderInfo'        => { type => SCALAR, optional => 1 },
+        'OwnerID'           => { type => SCALAR, optional => 1 },
+        'GroupID'           => { type => SCALAR, optional => 1 },
+        'AccessRights'      => { type => SCALAR, optional => 1 },
+        'UnixUID'           => { type => SCALAR, optional => 1 },
+        'UnixGID'           => { type => SCALAR, optional => 1 },
+        'UnixPerms'         => { type => SCALAR, optional => 1 },
+        'UnixAccessRights'  => { type => SCALAR, optional => 1 },
+    } );
 
-    my $Mask = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
-               kFPBackupDateBit | kFPFinderInfoBit | kFPOwnerIDBit |
-               kFPGroupIDBit | kFPAccessRightsBit | kFPUnixPrivsBit;
-    if ($options{'Bitmap'} & (~$Mask & 0xFFFFFFFF)) {
-        # attempting to set something which doesn't make sense for
-        # FPSetDirParms...
-        return kFPParamErr;
-    }
     my $ParamsBlock = PackSetParams($options{'Bitmap'}, %options);
     return kFPParamErr if !defined $ParamsBlock;
 
@@ -1764,23 +2119,42 @@ sub FPSetDirParms { # {{{1
 } # }}}1
 
 sub FPSetExtAttr { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    $options{'Bitmap'} ||= 0;
-    $options{'Offset'} ||= 0;
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
-    croak('Name must be provided')
-            if not exists $options{'Name'};
-    croak('AttributeData must be provided')
-            if not exists $options{'AttributeData'};
+    my %options = validate(@options, {
+        'VolumeID'      => { type => SCALAR },
+        'DirectoryID'   => { type => SCALAR },
+        'Bitmap'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flags' => sub {
+                    my $mask = kXAttrNoFollow | kXAttrCreate | kXAttrReplace;
+                    !(~$mask & $_[0]);
+                },
+            },
+        },
+        'Offset'        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid offset' => sub { $_[0] == 0 },
+            }
+        },
+        'PathType'      => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                },
+            }
+        },
+        'Pathname'      => { type => SCALAR },
+        'Name'          => { type => SCALAR },
+        'AttributeData' => { type => SCALAR },
+    } );
 
     my $msg = pack('CxnNnNNa*x![s]n/a*N/a*', $kFPSetExtAttr,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
@@ -1792,27 +2166,45 @@ sub FPSetExtAttr { # {{{1
 } # }}}1
 
 sub FPSetFileDirParms { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('Bitmap must be provided')
-            if not exists $options{'Bitmap'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'          => { type => SCALAR },
+        'DirectoryID'       => { type => SCALAR },
+        'Bitmap'            => {
+            type            => SCALAR,
+            default         => 0,
+            callbacks       => {
+                'valid bitmap' => sub {
+                    my $mask = kFPAttributeBit | kFPCreateDateBit |
+                            kFPModDateBit | kFPBackupDateBit |
+                            kFPFinderInfoBit | kFPUnixPrivsBit;
+                    !(~$mask & $_[0])
+                },
+            },
+        },
+        'PathType'          => {
+            type            => SCALAR,
+            callbacks       => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'          => { type => SCALAR },
+        'Attribute'         => { type => SCALAR, optional => 1 },
+        'CreateDate'        => { type => SCALAR, optional => 1 },
+        'ModDate'           => { type => SCALAR, optional => 1 },
+        'BackupDate'        => { type => SCALAR, optional => 1 },
+        'FinderInfo'        => { type => SCALAR, optional => 1 },
+        'UnixUID'           => { type => SCALAR, optional => 1 },
+        'UnixGID'           => { type => SCALAR, optional => 1 },
+        'UnixPerms'         => { type => SCALAR, optional => 1 },
+        'UnixAccessRights'  => { type => SCALAR, optional => 1 },
+    } );
 
-    my $Mask = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
-               kFPBackupDateBit | kFPFinderInfoBit | kFPUnixPrivsBit;
-    if ($options{'Bitmap'} & (~$Mask & 0xFFFFFFFF)) {
-        # attempting to set something which doesn't make sense for
-        # FPSetFileDirParms...
-        return kFPParamErr;
-    }
     my $ParamsBlock = PackSetParams($options{'Bitmap'}, %options);
     return kFPParamErr if !defined $ParamsBlock;
 
@@ -1824,28 +2216,46 @@ sub FPSetFileDirParms { # {{{1
 } # }}}1
 
 sub FPSetFileParms { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('VolumeID must be provided')
-            if not exists $options{'VolumeID'};
-    croak('DirectoryID must be provided')
-            if not exists $options{'DirectoryID'};
-    croak('Bitmap must be provided')
-            if not exists $options{'Bitmap'};
-    croak('PathType must be provided')
-            if not exists $options{'PathType'};
-    croak('Pathname must be provided')
-            if not exists $options{'Pathname'};
+    my %options = validate(@options, {
+        'VolumeID'          => { type => SCALAR },
+        'DirectoryID'       => { type => SCALAR },
+        'Bitmap'            => {
+            type            => SCALAR,
+            default         => 0,
+            callbacks       => {
+                'valid bitmap' => sub {
+                    my $mask = kFPAttributeBit | kFPCreateDateBit |
+                            kFPModDateBit | kFPBackupDateBit |
+                            kFPFinderInfoBit | kFPLaunchLimitBit |
+                            kFPUnixPrivsBit;
+                    !(~$mask & $_[0])
+                },
+            },
+        },
+        'PathType'          => {
+            type            => SCALAR,
+            callbacks       => {
+                'valid path type' => sub {
+                    $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                    $_[0] == kFPUTF8Name
+                }
+            },
+        },
+        'Pathname'          => { type => SCALAR },
+        'Attribute'         => { type => SCALAR, optional => 1 },
+        'CreateDate'        => { type => SCALAR, optional => 1 },
+        'ModDate'           => { type => SCALAR, optional => 1 },
+        'BackupDate'        => { type => SCALAR, optional => 1 },
+        'FinderInfo'        => { type => SCALAR, optional => 1 },
+        'UnixUID'           => { type => SCALAR, optional => 1 },
+        'UnixGID'           => { type => SCALAR, optional => 1 },
+        'UnixPerms'         => { type => SCALAR, optional => 1 },
+        'UnixAccessRights'  => { type => SCALAR, optional => 1 },
+    } );
 
-    my $Mask = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
-               kFPBackupDateBit | kFPFinderInfoBit | kFPLaunchLimitBit |
-               kFPUnixPrivsBit;
-    if ($options{'Bitmap'} & (~$Mask & 0xFFFFFFFF)) {
-        # attempting to set something which doesn't make sense for
-        # FPSetFileParms...
-        return kFPParamErr;
-    }
     my $ParamsBlock = PackSetParams($options{'Bitmap'}, %options);
     return kFPParamErr if !defined $ParamsBlock;
 
@@ -1899,16 +2309,22 @@ sub FPSyncFork { # {{{1
 } # }}}1
 
 sub FPWrite { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    $options{'Flag'} ||= 0;
-    croak('OForkRefNum must be provided')
-            if not exists $options{'OForkRefNum'};
-    croak('Offset must be provided')
-            if not exists $options{'Offset'};
-    croak('ForkData must be provided')
-            if not exists $options{'ForkData'};
+    my %options = validate(@options, {
+        'Flag'          => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flag bits' => sub { !(~0x80 & $_[0]) },
+            },
+        },
+        'OForkRefNum'   => { type => SCALAR },
+        'Offset'        => { type => SCALAR },
+        'ForkData'      => { type => SCALARREF },
+        'ReqCount'      => { type => SCALAR, optional => 1 },
+    } );
     $options{'ReqCount'} ||= length(${$options{'ForkData'}});
 
     my $msg = pack('CCnNN', $kFPWrite,
@@ -1924,16 +2340,22 @@ sub FPWrite { # {{{1
 } # }}}1
 
 sub FPWriteExt { # {{{1
-    my($self, %options) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    $options{'Flag'} ||= 0;
-    croak('OForkRefNum must be provided')
-            if not exists $options{'OForkRefNum'};
-    croak('Offset must be provided')
-            if not exists $options{'Offset'};
-    croak('ForkData must be provided')
-            if not exists $options{'ForkData'};
+    my %options = validate(@options, {
+        'Flag'          => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flag bits' => sub { !(~0x80 & $_[0]) },
+            },
+        },
+        'OForkRefNum'   => { type => SCALAR },
+        'Offset'        => { type => SCALAR },
+        'ForkData'      => { type => SCALARREF },
+        'ReqCount'      => { type => SCALAR, optional => 1 },
+    } );
     $options{'ReqCount'} ||= length(${$options{'ForkData'}});
 
     my $msg = pack('CCnNNNN', $kFPWriteExt, @options{'Flag', 'OForkRefNum'},
