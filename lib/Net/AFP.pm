@@ -23,6 +23,7 @@ use Unicode::Normalize qw(compose decompose);
 use Exporter qw(import);
 use Log::Log4perl qw(:easy);
 use Carp;
+use Readonly;
 # }}}1
 
 our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name kFPSoftCreate
@@ -30,79 +31,79 @@ our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name kFPSoftCreate
 
 # define constants {{{1
 our $VERSION = '0.69.0';
-use constant kFPByteRangeLock           => 1;   # AFP 2.0
-use constant kFPCloseVol                => 2;   # AFP 2.0
-use constant kFPCloseDir                => 3;   # AFP 2.0
-use constant kFPCloseFork               => 4;   # AFP 2.0
-use constant kFPCopyFile                => 5;   # AFP 2.0
-use constant kFPCreateDir               => 6;   # AFP 2.0
-use constant kFPCreateFile              => 7;   # AFP 2.0
-use constant kFPDelete                  => 8;   # AFP 2.0
-use constant kFPEnumerate               => 9;   # AFP 2.0
-use constant kFPFlush                   => 10;  # AFP 2.0
-use constant kFPFlushFork               => 11;  # AFP 2.0
-use constant kFPGetForkParms            => 14;  # AFP 2.0
-use constant kFPGetSrvrInfo             => 15;  # AFP 2.0
-use constant kFPGetSrvrParms            => 16;  # AFP 2.0
-use constant kFPGetVolParms             => 17;  # AFP 2.0
-use constant kFPLogin                   => 18;  # AFP 2.0
-use constant kFPLoginCont               => 19;  # AFP 2.0
-use constant kFPLogout                  => 20;  # AFP 2.0
-use constant kFPMapID                   => 21;  # AFP 2.0
-use constant kFPMapName                 => 22;  # AFP 2.0
-use constant kFPMoveAndRename           => 23;  # AFP 2.0
-use constant kFPOpenVol                 => 24;  # AFP 2.0
-use constant kFPOpenDir                 => 25;  # AFP 2.0
-use constant kFPOpenFork                => 26;  # AFP 2.0
-use constant kFPRead                    => 27;  # AFP 2.0
-use constant kFPRename                  => 28;  # AFP 2.0
-use constant kFPSetDirParms             => 29;  # AFP 2.0
-use constant kFPSetFileParms            => 30;  # AFP 2.0
-use constant kFPSetForkParms            => 31;  # AFP 2.0
-use constant kFPSetVolParms             => 32;  # AFP 2.0
-use constant kFPWrite                   => 33;  # AFP 2.0
-use constant kFPGetFileDirParms         => 34;  # AFP 2.0
-use constant kFPSetFileDirParms         => 35;  # AFP 2.0
-use constant kFPChangePassword          => 36;  # AFP 2.0
-use constant kFPGetUserInfo             => 37;  # AFP 2.0
-use constant kFPGetSrvrMsg              => 38;  # AFP 2.1
-use constant kFPCreateID                => 39;  # AFP 2.1
-use constant kFPDeleteID                => 40;  # AFP 2.1
-use constant kFPResolveID               => 41;  # AFP 2.1
-use constant kFPExchangeFiles           => 42;  # AFP 2.1
-use constant kFPCatSearch               => 43;  # AFP 2.1
-use constant kFPOpenDT                  => 48;  # AFP 2.0
-use constant kFPCloseDT                 => 49;  # AFP 2.0
-use constant kFPGetIcon                 => 51;  # AFP 2.0
-use constant kFPGetIconInfo             => 52;  # AFP 2.0
-use constant kFPAddAPPL                 => 53;  # AFP 2.0
-use constant kFPRemoveAPPL              => 54;  # AFP 2.0
-use constant kFPGetAPPL                 => 55;  # AFP 2.0
-use constant kFPAddComment              => 56;  # AFP 2.0
-use constant kFPRemoveComment           => 57;  # AFP 2.0
-use constant kFPGetComment              => 58;  # AFP 2.0
-use constant kFPByteRangeLockExt        => 59;  # AFP 3.0
-use constant kFPReadExt                 => 60;  # AFP 3.0
-use constant kFPWriteExt                => 61;  # AFP 3.0
-use constant kFPGetAuthMethods          => 62;  # AFP 3.0
-use constant kFPLoginExt                => 63;  # AFP 3.0
-use constant kFPGetSessionToken         => 64;  # AFP 3.0
-use constant kFPDisconnectOldSession    => 65;  # AFP 3.0
-use constant kFPEnumerateExt            => 66;  # AFP 3.0
-use constant kFPCatSearchExt            => 67;  # AFP 3.0
-use constant kFPEnumerateExt2           => 68;  # AFP 3.1
-use constant kFPGetExtAttr              => 69;  # AFP 3.2
-use constant kFPSetExtAttr              => 70;  # AFP 3.2
-use constant kFPRemoveExtAttr           => 71;  # AFP 3.2
-use constant kFPListExtAttrs            => 72;  # AFP 3.2
-use constant kFPGetACL                  => 73;  # AFP 3.2
-use constant kFPSetACL                  => 74;  # AFP 3.2
-use constant kFPAccess                  => 75;  # AFP 3.2
-use constant kFPSpotlightRPC            => 76;  # AFP 3.2+ (10.5)
-use constant kFPSyncDir                 => 78;  # AFP 3.2+ (10.5)
-use constant kFPSyncFork                => 79;  # AFP 3.2+ (10.5)
-use constant kFPZzzzz                   => 122; # AFP 2.3
-use constant kFPAddIcon                 => 192; # AFP 2.0
+Readonly my $kFPByteRangeLock           => 1;   # AFP 2.0
+Readonly my $kFPCloseVol                => 2;   # AFP 2.0
+Readonly my $kFPCloseDir                => 3;   # AFP 2.0
+Readonly my $kFPCloseFork               => 4;   # AFP 2.0
+Readonly my $kFPCopyFile                => 5;   # AFP 2.0
+Readonly my $kFPCreateDir               => 6;   # AFP 2.0
+Readonly my $kFPCreateFile              => 7;   # AFP 2.0
+Readonly my $kFPDelete                  => 8;   # AFP 2.0
+Readonly my $kFPEnumerate               => 9;   # AFP 2.0
+Readonly my $kFPFlush                   => 10;  # AFP 2.0
+Readonly my $kFPFlushFork               => 11;  # AFP 2.0
+Readonly my $kFPGetForkParms            => 14;  # AFP 2.0
+Readonly my $kFPGetSrvrInfo             => 15;  # AFP 2.0
+Readonly my $kFPGetSrvrParms            => 16;  # AFP 2.0
+Readonly my $kFPGetVolParms             => 17;  # AFP 2.0
+Readonly my $kFPLogin                   => 18;  # AFP 2.0
+Readonly my $kFPLoginCont               => 19;  # AFP 2.0
+Readonly my $kFPLogout                  => 20;  # AFP 2.0
+Readonly my $kFPMapID                   => 21;  # AFP 2.0
+Readonly my $kFPMapName                 => 22;  # AFP 2.0
+Readonly my $kFPMoveAndRename           => 23;  # AFP 2.0
+Readonly my $kFPOpenVol                 => 24;  # AFP 2.0
+Readonly my $kFPOpenDir                 => 25;  # AFP 2.0
+Readonly my $kFPOpenFork                => 26;  # AFP 2.0
+Readonly my $kFPRead                    => 27;  # AFP 2.0
+Readonly my $kFPRename                  => 28;  # AFP 2.0
+Readonly my $kFPSetDirParms             => 29;  # AFP 2.0
+Readonly my $kFPSetFileParms            => 30;  # AFP 2.0
+Readonly my $kFPSetForkParms            => 31;  # AFP 2.0
+Readonly my $kFPSetVolParms             => 32;  # AFP 2.0
+Readonly my $kFPWrite                   => 33;  # AFP 2.0
+Readonly my $kFPGetFileDirParms         => 34;  # AFP 2.0
+Readonly my $kFPSetFileDirParms         => 35;  # AFP 2.0
+Readonly my $kFPChangePassword          => 36;  # AFP 2.0
+Readonly my $kFPGetUserInfo             => 37;  # AFP 2.0
+Readonly my $kFPGetSrvrMsg              => 38;  # AFP 2.1
+Readonly my $kFPCreateID                => 39;  # AFP 2.1
+Readonly my $kFPDeleteID                => 40;  # AFP 2.1
+Readonly my $kFPResolveID               => 41;  # AFP 2.1
+Readonly my $kFPExchangeFiles           => 42;  # AFP 2.1
+Readonly my $kFPCatSearch               => 43;  # AFP 2.1
+Readonly my $kFPOpenDT                  => 48;  # AFP 2.0
+Readonly my $kFPCloseDT                 => 49;  # AFP 2.0
+Readonly my $kFPGetIcon                 => 51;  # AFP 2.0
+Readonly my $kFPGetIconInfo             => 52;  # AFP 2.0
+Readonly my $kFPAddAPPL                 => 53;  # AFP 2.0
+Readonly my $kFPRemoveAPPL              => 54;  # AFP 2.0
+Readonly my $kFPGetAPPL                 => 55;  # AFP 2.0
+Readonly my $kFPAddComment              => 56;  # AFP 2.0
+Readonly my $kFPRemoveComment           => 57;  # AFP 2.0
+Readonly my $kFPGetComment              => 58;  # AFP 2.0
+Readonly my $kFPByteRangeLockExt        => 59;  # AFP 3.0
+Readonly my $kFPReadExt                 => 60;  # AFP 3.0
+Readonly my $kFPWriteExt                => 61;  # AFP 3.0
+Readonly my $kFPGetAuthMethods          => 62;  # AFP 3.0
+Readonly my $kFPLoginExt                => 63;  # AFP 3.0
+Readonly my $kFPGetSessionToken         => 64;  # AFP 3.0
+Readonly my $kFPDisconnectOldSession    => 65;  # AFP 3.0
+Readonly my $kFPEnumerateExt            => 66;  # AFP 3.0
+Readonly my $kFPCatSearchExt            => 67;  # AFP 3.0
+Readonly my $kFPEnumerateExt2           => 68;  # AFP 3.1
+Readonly my $kFPGetExtAttr              => 69;  # AFP 3.2
+Readonly my $kFPSetExtAttr              => 70;  # AFP 3.2
+Readonly my $kFPRemoveExtAttr           => 71;  # AFP 3.2
+Readonly my $kFPListExtAttrs            => 72;  # AFP 3.2
+Readonly my $kFPGetACL                  => 73;  # AFP 3.2
+Readonly my $kFPSetACL                  => 74;  # AFP 3.2
+Readonly my $kFPAccess                  => 75;  # AFP 3.2
+Readonly my $kFPSpotlightRPC            => 76;  # AFP 3.2+ (10.5)
+Readonly my $kFPSyncDir                 => 78;  # AFP 3.2+ (10.5)
+Readonly my $kFPSyncFork                => 79;  # AFP 3.2+ (10.5)
+Readonly my $kFPZzzzz                   => 122; # AFP 2.3
+Readonly my $kFPAddIcon                 => 192; # AFP 2.0
 # }}}1
 
 use constant kFPShortName       => 1;
@@ -188,55 +189,55 @@ sub PackSetParams { # {{{1
     my $ParamsBlock = q//;
 
     if ($Bitmap & kFPAttributeBit) {
-        return unless exists $options{'Attribute'};
+        return if not exists $options{'Attribute'};
         $ParamsBlock .= pack('n', $options{'Attribute'});
     }
 
     if ($Bitmap & kFPCreateDateBit) {
-        return unless exists $options{'CreateDate'};
+        return if not exists $options{'CreateDate'};
         my $time = $options{'CreateDate'} - globalTimeOffset;
         $ParamsBlock .= pack('N', long_convert($time));
     }
 
     if ($Bitmap & kFPModDateBit) {
-        return unless exists $options{'ModDate'};
+        return if not exists $options{'ModDate'};
         my $time = $options{'ModDate'} - globalTimeOffset;
         $ParamsBlock .= pack('N', long_convert($time));
     }
 
     if ($Bitmap & kFPBackupDateBit) {
-        return unless exists $options{'BackupDate'};
+        return if not exists $options{'BackupDate'};
         my $time = $options{'BackupDate'} - globalTimeOffset;
         $ParamsBlock .= pack('N', long_convert($time));
     }
 
     if ($Bitmap & kFPFinderInfoBit) {
-        return unless exists $options{'FinderInfo'};
+        return if not exists $options{'FinderInfo'};
         $ParamsBlock .= pack('a[32]', $options{'FinderInfo'});
     }
 
     if ($Bitmap & kFPOwnerIDBit) {
-        return unless exists $options{'OwnerID'};
+        return if not exists $options{'OwnerID'};
         $ParamsBlock .= pack('N', $options{'OwnerID'});
     }
 
     if ($Bitmap & kFPGroupIDBit) {
-        return unless exists $options{'GroupID'};
+        return if not exists $options{'GroupID'};
         $ParamsBlock .= pack('N', $options{'GroupID'});
     }
 
     if ($Bitmap & kFPAccessRightsBit) {
-        return unless exists $options{'AccessRights'};
+        return if not exists $options{'AccessRights'};
         $ParamsBlock .= pack('N', $options{'AccessRights'});
     }
 
     # kFPLaunchLimitBit? what it do? can has knows?
 
     if ($Bitmap & kFPUnixPrivsBit) {
-        return unless exists $options{'UnixUID'};
-        return unless exists $options{'UnixGID'};
-        return unless exists $options{'UnixPerms'};
-        return unless exists $options{'UnixAccessRights'};
+        return if not exists $options{'UnixUID'};
+        return if not exists $options{'UnixGID'};
+        return if not exists $options{'UnixPerms'};
+        return if not exists $options{'UnixAccessRights'};
 
         $ParamsBlock .= pack('NNNN', @options{'UnixUID', 'UnixGID', 'UnixPerms',
                                               'UnixAccessRights'});
@@ -250,20 +251,20 @@ sub FPAccess { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'Bitmap'} ||= 0;
     croak('UUID must be provided')
-            unless exists $options{'UUID'};
+            if not exists $options{'UUID'};
     croak('ReqAccess must be provided')
-            unless exists $options{'ReqAccess'};
+            if not exists $options{'ReqAccess'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    my $msg = pack('CxnNna[16]Na*', kFPAccess,
+    my $msg = pack('CxnNna[16]Na*', $kFPAccess,
             @options{'VolumeID', 'DirectoryID', 'Bitmap',},
             uuid_pack($options{'UUID'}), $options{'ReqAccess'},
             PackagePath(@options{'PathType', 'Pathname'}));
@@ -275,19 +276,19 @@ sub FPAddAPPL { # {{{1
     
     DEBUG('called ', (caller(0))[3]);
     croak('DTRefNum must be provided')
-            unless exists $options{'DTRefNum'};
+            if not exists $options{'DTRefNum'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('FileCreator must be provided')
-            unless exists $options{'FileCreator'};
+            if not exists $options{'FileCreator'};
     croak('ApplTag must be provided')
-            unless exists $options{'ApplTag'};
+            if not exists $options{'ApplTag'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    my $msg = pack('CxnNNNa*', kFPAddAPPL,
+    my $msg = pack('CxnNNNa*', $kFPAddAPPL,
             @options{'DTRefNum', 'DirectoryID', 'FileCreator', 'ApplTag'},
             PackagePath(@options{'PathType', 'Pathname'}));
     return $self->SendAFPMessage($msg);
@@ -298,17 +299,17 @@ sub FPAddComment { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('DTRefNum must be provided')
-            unless exists $options{'DTRefNum'};
+            if not exists $options{'DTRefNum'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
     croak('Comment must be provided')
-            unless exists $options{'Comment'};
+            if not exists $options{'Comment'};
 
-    my $msg = pack('CxnNa*x![s]C/a', kFPAddComment,
+    my $msg = pack('CxnNa*x![s]C/a', $kFPAddComment,
             @options{'DTRefNum', 'DirectoryID'},
             PackagePath(@options{'PathType', 'Pathname'}),
             $options{'Comment'});
@@ -320,21 +321,21 @@ sub FPAddIcon { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('DTRefNum must be provided')
-            unless exists $options{'DTRefNum'};
+            if not exists $options{'DTRefNum'};
     croak('FileCreator must be provided')
-            unless exists $options{'FileCreator'};
+            if not exists $options{'FileCreator'};
     croak('FileType must be provided')
-            unless exists $options{'FileType'};
+            if not exists $options{'FileType'};
     croak('IconType must be provided')
-            unless exists $options{'IconType'};
+            if not exists $options{'IconType'};
     croak('IconTag must be provided')
-            unless exists $options{'IconTag'};
+            if not exists $options{'IconTag'};
     croak('BitmapSize must be provided')
-            unless exists $options{'BitmapSize'};
+            if not exists $options{'BitmapSize'};
     croak('IconBitmap must be provided')
-            unless exists $options{'IconBitmap'};
+            if not exists $options{'IconBitmap'};
 
-    my $msg = pack('CxnNNCxNn', kFPAddIcon,
+    my $msg = pack('CxnNNCxNn', $kFPAddIcon,
             @options{'DTRefNum', 'FileCreator', 'FileType', 'IconType',
                      'IconTag', 'BitmapSize'});
     return $self->SendAFPWrite($msg, \$options{'IconBitmap'});
@@ -346,20 +347,20 @@ sub FPByteRangeLock { # {{{1
     DEBUG('called ', (caller(0))[3]);
     $options{'Flags'} ||= 0;
     croak('OForkRefNum must be provided')
-            unless exists $options{'OForkRefNum'};
+            if not exists $options{'OForkRefNum'};
     croak('Offset must be provided')
-            unless exists $options{'Offset'};
+            if not exists $options{'Offset'};
     croak('Length must be provided')
-            unless exists $options{'Length'};
+            if not exists $options{'Length'};
 
-    my $msg = pack('CCnNN', kFPByteRangeLock,
+    my $msg = pack('CCnNN', $kFPByteRangeLock,
             @options{'Flags', 'OForkRefNum'},
             long_convert($options{'Offset'}),
             long_convert($options{'Length'}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     if ($rc == kFPNoErr) {
-        croak('Need to accept returned list') unless wantarray();
+        croak('Need to accept returned list') if not wantarray();
         return($rc, unpack('N', $resp));
     }
     return $rc;
@@ -371,20 +372,20 @@ sub FPByteRangeLockExt { # {{{1
     DEBUG('called ', (caller(0))[3]);
     $options{'Flags'} ||= 0;
     croak('OForkRefNum must be provided')
-            unless exists $options{'OForkRefNum'};
+            if not exists $options{'OForkRefNum'};
     croak('Offset must be provided')
-            unless exists $options{'Offset'};
+            if not exists $options{'Offset'};
     croak('Length must be provided')
-            unless exists $options{'Length'};
+            if not exists $options{'Length'};
 
-    my $msg = pack('CCnNNNN', kFPByteRangeLockExt,
+    my $msg = pack('CCnNNNN', $kFPByteRangeLockExt,
             @options{'Flags', 'OForkRefNum'},
             ll_convert($options{'Offset'}),
             ll_convert($options{'Length'}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     if ($rc == kFPNoErr) {
-        croak('Need to accept returned list') unless wantarray();
+        croak('Need to accept returned list') if not wantarray();
         return($rc, ll_unconvert(unpack('NN', $resp)));
     }
     return $rc;
@@ -397,15 +398,15 @@ sub FPCatSearch {
     ERROR('called function ', (caller(0))[3], ' not implemented');
     croak('Not yet implemented');
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('ReqMatches must be provided')
-            unless exists $options{'ReqMatches'};
-    $options{'CatalogPosition'} ||= '';
+            if not exists $options{'ReqMatches'};
+    $options{'CatalogPosition'} ||= q{};
     $options{'FileRsltBitmap'} ||= 0;
     $options{'DirectoryRsltBitmap'} ||= 0;
     $options{'ReqBitmap'} ||=
 
-    my $msg = pack('CxnNx[4]a[16]nnN', kFPCatSearch,
+    my $msg = pack('CxnNx[4]a[16]nnN', $kFPCatSearch,
             @options{'VolumeID', 'ReqMatches', 'CatalogPosition',
                      'FileRsltBitmap', 'DirectoryRsltBitmap',
                      'ReqBitmap'});
@@ -427,7 +428,7 @@ sub FPChangePassword { # {{{1
 
     $UserAuthInfo ||= q//;
 
-    my $msg = pack('CxC/a*x![s]C/a*x![s]a*', kFPChangePassword, $UAM,
+    my $msg = pack('CxC/a*x![s]C/a*x![s]a*', $kFPChangePassword, $UAM,
             $UserName, $UserAuthInfo);
     return $self->SendAFPMessage($msg, $resp_r, 1);
 } # }}}1
@@ -437,7 +438,7 @@ sub FPCloseDir { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('CxnN', kFPCloseDir, $VolumeID,
+    return $self->SendAFPMessage(pack('CxnN', $kFPCloseDir, $VolumeID,
             $DirectoryID));
 } # }}}1
 
@@ -446,7 +447,7 @@ sub FPCloseDT { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPCloseDT, $DTRefNum));
+    return $self->SendAFPMessage(pack('Cxn', $kFPCloseDT, $DTRefNum));
 } # }}}1
 
 sub FPCloseFork { # {{{1
@@ -454,7 +455,7 @@ sub FPCloseFork { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPCloseFork, $OForkRefNum),
+    return $self->SendAFPMessage(pack('Cxn', $kFPCloseFork, $OForkRefNum),
             undef, 1);
 } # }}}1
 
@@ -463,7 +464,7 @@ sub FPCloseVol { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPCloseVol, $VolumeID), undef, 1);
+    return $self->SendAFPMessage(pack('Cxn', $kFPCloseVol, $VolumeID), undef, 1);
 } # }}}1
 
 sub FPCopyFile { # {{{1
@@ -471,27 +472,27 @@ sub FPCopyFile { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('SourceVolumeID must be provided')
-            unless exists $options{'SourceVolumeID'};
+            if not exists $options{'SourceVolumeID'};
     croak('SourceDirectoryID must be provided')
-            unless exists $options{'SourceDirectoryID'};
+            if not exists $options{'SourceDirectoryID'};
     croak('DestVolumeID must be provided')
-            unless exists $options{'DestVolumeID'};
+            if not exists $options{'DestVolumeID'};
     croak('DestDirectoryID must be provided')
-            unless exists $options{'DestDirectoryID'};
+            if not exists $options{'DestDirectoryID'};
     croak('SourcePathType must be provided')
-            unless exists $options{'SourcePathType'};
+            if not exists $options{'SourcePathType'};
     croak('SourcePathname must be provided')
-            unless exists $options{'SourcePathname'};
+            if not exists $options{'SourcePathname'};
     croak('DestPathType must be provided')
-            unless exists $options{'DestPathType'};
+            if not exists $options{'DestPathType'};
     croak('DestPathname must be provided')
-            unless exists $options{'DestPathname'};
+            if not exists $options{'DestPathname'};
     croak('NewType must be provided')
-            unless exists $options{'NewType'};
+            if not exists $options{'NewType'};
     croak('NewName must be provided')
-            unless exists $options{'NewName'};
+            if not exists $options{'NewName'};
 
-    my $msg = pack('CxnNnNa*a*a*', kFPCopyFile,
+    my $msg = pack('CxnNnNa*a*a*', $kFPCopyFile,
             @options{'SourceVolumeID', 'SourceDirectoryID',
                      'DestVolumeID', 'DestDirectoryID'},
             PackagePath(@options{'SourcePathType', 'SourcePathname'}),
@@ -505,16 +506,16 @@ sub FPCreateDir { # {{{1
     
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('CxnNa*', kFPCreateDir,
+    my $rc = $self->SendAFPMessage(pack('CxnNa*', $kFPCreateDir,
             @options{'VolumeID', 'DirectoryID'},
             PackagePath(@options{'PathType', 'Pathname'})), \$resp, 1);
     return($rc, unpack('N', $resp))
@@ -528,15 +529,15 @@ sub FPCreateFile { # {{{1
     DEBUG('called ', (caller(0))[3]);
     $options{'Flag'} ||= 0;
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    return $self->SendAFPMessage(pack('CCnNa*', kFPCreateFile,
+    return $self->SendAFPMessage(pack('CCnNa*', $kFPCreateFile,
             @options{'Flag', 'VolumeID', 'DirectoryID'},
             PackagePath(@options{'PathType', 'Pathname'})), undef, 1);
 } # }}}1
@@ -546,21 +547,21 @@ sub FPCreateID { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
     my $resp;
-    my $msg = pack('CxnNa*', kFPCreateID,
+    my $msg = pack('CxnNa*', $kFPCreateID,
             @options{'VolumeID', 'DirectoryID'},
             PackagePath(@options{'PathType', 'Pathname'}));
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return($rc) unless $rc == kFPNoErr;
-    croak('Need to accept returned list') unless wantarray();
+    return($rc) if $rc != kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
     return($rc, unpack('N', $resp));
 } # }}}1
 
@@ -569,7 +570,7 @@ sub FPDelete { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('CxnNa*', kFPDelete, $VolumeID,
+    return $self->SendAFPMessage(pack('CxnNa*', $kFPDelete, $VolumeID,
             $DirectoryID, PackagePath($PathType, $Pathname)), undef, 1);
 } # }}}1
 
@@ -577,7 +578,8 @@ sub FPDeleteID { # {{{1
     my($self, $VolumeID, $FileID) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    return $self->SendAFPMessage(pack('CxnN', kFPDeleteID, $VolumeID, $FileID));
+    return $self->SendAFPMessage(pack('CxnN', $kFPDeleteID, $VolumeID,
+            $FileID));
 } # }}}1
 
 sub FPDisconnectOldSession { # {{{1
@@ -585,8 +587,8 @@ sub FPDisconnectOldSession { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('CxnN/a', kFPDisconnectOldSession, $Type,
-            $Token));
+    return $self->SendAFPMessage(pack('CxnN/a', $kFPDisconnectOldSession,
+            $Type, $Token));
 } # }}}1
 
 sub FPEnumerate { # {{{1
@@ -594,30 +596,30 @@ sub FPEnumerate { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'FileBitmap'} ||= 0;
     $options{'DirectoryBitmap'} ||= 0;
     croak('ReqCount must be provided')
-            unless exists $options{'ReqCount'};
+            if not exists $options{'ReqCount'};
     croak('StartIndex must be provided')
-            unless exists $options{'StartIndex'};
+            if not exists $options{'StartIndex'};
     croak('MaxReplySize must be provided')
-            unless exists $options{'MaxReplySize'};
+            if not exists $options{'MaxReplySize'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
-    croak('Must accept array return') unless wantarray();
+            if not exists $options{'Pathname'};
+    croak('Must accept array return') if not wantarray();
 
-    my $msg = pack('CxnNnnnnna*', kFPEnumerate,
+    my $msg = pack('CxnNnnnnna*', $kFPEnumerate,
             @options{'VolumeID', 'DirectoryID', 'FileBitmap', 'DirectoryBitmap',
                      'ReqCount', 'StartIndex', 'MaxReplySize'},
             PackagePath(@options{'PathType', 'Pathname'}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
     my($FileBitmap, $DirectoryBitmap, $ActualCount, $ReplyBody)
             = unpack('nnna*', $resp);
     my $Entry;
@@ -646,30 +648,30 @@ sub FPEnumerateExt { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'FileBitmap'} ||= 0;
     $options{'DirectoryBitmap'} ||= 0;
     croak('ReqCount must be provided')
-            unless exists $options{'ReqCount'};
+            if not exists $options{'ReqCount'};
     croak('StartIndex must be provided')
-            unless exists $options{'StartIndex'};
+            if not exists $options{'StartIndex'};
     croak('MaxReplySize must be provided')
-            unless exists $options{'MaxReplySize'};
+            if not exists $options{'MaxReplySize'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
-    croak('Must accept array return') unless wantarray();
+            if not exists $options{'Pathname'};
+    croak('Must accept array return') if not wantarray();
 
-    my $msg = pack("CxnNnnnnna*", kFPEnumerateExt,
+    my $msg = pack("CxnNnnnnna*", $kFPEnumerateExt,
             @options{'VolumeID', 'DirectoryID', 'FileBitmap', 'DirectoryBitmap',
                      'ReqCount', 'StartIndex', 'MaxReplySize'},
             PackagePath(@options{'PathType', 'Pathname'}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
     my($FileBitmap, $DirectoryBitmap, $ActualCount, $ReplyBody)
             = unpack('nnna*', $resp);
     my $Entry;
@@ -696,30 +698,30 @@ sub FPEnumerateExt2 { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'FileBitmap'} ||= 0;
     $options{'DirectoryBitmap'} ||= 0;
     croak('ReqCount must be provided')
-            unless exists $options{'ReqCount'};
+            if not exists $options{'ReqCount'};
     croak('StartIndex must be provided')
-            unless exists $options{'StartIndex'};
+            if not exists $options{'StartIndex'};
     croak('MaxReplySize must be provided')
-            unless exists $options{'MaxReplySize'};
+            if not exists $options{'MaxReplySize'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
-    croak('Must accept array return') unless wantarray();
+            if not exists $options{'Pathname'};
+    croak('Must accept array return') if not wantarray();
 
-    my $msg = pack('CxnNnnnNNa*', kFPEnumerateExt2,
+    my $msg = pack('CxnNnnnNNa*', $kFPEnumerateExt2,
             @options{'VolumeID', 'DirectoryID', 'FileBitmap', 'DirectoryBitmap',
                      'ReqCount', 'StartIndex', 'MaxReplySize'},
             PackagePath(@options{'PathType', 'Pathname'}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
     my($FileBitmap, $DirectoryBitmap, $ActualCount, $ReplyBody)
             = unpack('nnna*', $resp);
     my $Entry;
@@ -746,21 +748,21 @@ sub FPExchangeFiles { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('SourceDirectoryID must be provided')
-            unless exists $options{'SourceDirectoryID'};
+            if not exists $options{'SourceDirectoryID'};
     croak('DestDirectoryID must be provided')
-            unless exists $options{'DestDirectoryID'};
+            if not exists $options{'DestDirectoryID'};
     croak('SourcePathType must be provided')
-            unless exists $options{'SourcePathType'};
+            if not exists $options{'SourcePathType'};
     croak('SourcePathname must be provided')
-            unless exists $options{'SourcePathname'};
+            if not exists $options{'SourcePathname'};
     croak('DestPathType must be provided')
-            unless exists $options{'DestPathType'};
+            if not exists $options{'DestPathType'};
     croak('DestPathname must be provided')
-            unless exists $options{'DestPathname'};
+            if not exists $options{'DestPathname'};
 
-    my $msg = pack('CxnNNa*a*', kFPExchangeFiles,
+    my $msg = pack('CxnNNa*a*', $kFPExchangeFiles,
             @options{'VolumeID', 'SourceDirectoryID', 'DestDirectoryID'},
             PackagePath(@options{'SourcePathType', 'SourcePathname'}),
             PackagePath(@options{'DestPathType', 'DestPathname'}));
@@ -772,7 +774,7 @@ sub FPFlush { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPFlush, $VolumeID), undef, 1);
+    return $self->SendAFPMessage(pack('Cxn', $kFPFlush, $VolumeID), undef, 1);
 } # }}}1
 
 sub FPFlushFork { # {{{1
@@ -780,7 +782,7 @@ sub FPFlushFork { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPFlushFork, $OForkRefNum),
+    return $self->SendAFPMessage(pack('Cxn', $kFPFlushFork, $OForkRefNum),
             undef, 1);
 } # }}}1
 
@@ -789,23 +791,23 @@ sub FPGetACL { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'Bitmap'} ||= kFileSec_ACL;
     $options{'MaxReplySize'} ||= 0;
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    my $msg = pack('CxnNnNa*', kFPGetACL,
+    my $msg = pack('CxnNnNa*', $kFPGetACL,
             @options{'VolumeID', 'DirectoryID', 'Bitmap', 'MaxReplySize'},
             PackagePath(@options{'PathType', 'Pathname'}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
-    croak('Need to accept returned list') unless wantarray();
+    return $rc if $rc != kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
     my %rvals;
     ($rvals{'Bitmap'}, $resp) = unpack('na*', $resp);
 
@@ -841,20 +843,20 @@ sub FPGetAPPL { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('DTRefNum must be provided')
-            unless exists $options{'DTRefNum'};
+            if not exists $options{'DTRefNum'};
     croak('FileCreator must be provided')
-            unless exists $options{'FileCreator'};
+            if not exists $options{'FileCreator'};
     croak('APPLIndex must be provided')
-            unless exists $options{'APPLIndex'};
+            if not exists $options{'APPLIndex'};
     $options{'Bitmap'} ||= 0;
 
-    my $msg = pack('CxnNnn', kFPGetAPPL,
+    my $msg = pack('CxnNnn', $kFPGetAPPL,
             @options{'DTRefNum', 'FileCreator', 'APPLIndex', 'Bitmap'});
 
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return($rc) unless $rc == kFPNoErr;
-    croak('Need to accept returned list') unless wantarray();
+    return($rc) if $rc != kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
     my($Bitmap_n, $APPLTag, $data) = unpack('nNa*', $resp);
     my $info = _ParseFileParms($Bitmap_n, $data);
     my %rvals = (
@@ -870,8 +872,8 @@ sub FPGetAuthMethods { # {{{1
     DEBUG('called ', (caller(0))[3]);
 
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
-    my $msg = pack('CxCa*', kFPGetAuthMethods, $Flags,
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+    my $msg = pack('CxCa*', $kFPGetAuthMethods, $Flags,
             PackagePath($PathType, $Pathname));
     my($resp, @UAMStrings);
     my $rc = $self->SendAFPMessage($msg, \$resp);
@@ -886,21 +888,21 @@ sub FPGetComment { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('DTRefNum must be provided')
-            unless exists $options{'DTRefNum'};
+            if not exists $options{'DTRefNum'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    my $msg = pack('CxnNa*', kFPGetComment,
+    my $msg = pack('CxnNa*', $kFPGetComment,
             @options{'DTRefNum', 'DirectoryID'},
             PackagePath(@options{'PathType', 'Pathname'}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
-    croak('Need to accept returned list') unless wantarray();
+    return $rc if $rc != kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
     return($rc, unpack('C/a', $resp));
 } # }}}1
 
@@ -909,21 +911,21 @@ sub FPGetExtAttr { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     $options{'Bitmap'} ||= 0;
     $options{'Offset'} ||= 0;
     $options{'ReqCount'} ||= -1;
     $options{'MaxReplySize'} ||= 0;
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
     croak('Name must be provided')
-            unless exists $options{'Name'};
+            if not exists $options{'Name'};
 
-    my $msg = pack('CxnNnNNNNNa*x![s]n/a*', kFPGetExtAttr,
+    my $msg = pack('CxnNnNNNNNa*x![s]n/a*', $kFPGetExtAttr,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             ll_convert($options{'Offset'}),
             ll_convert($options{'ReqCount'}),
@@ -932,8 +934,8 @@ sub FPGetExtAttr { # {{{1
             encode_utf8(decompose($options{'Name'})));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
-    croak('Need to accept returned list') unless wantarray();
+    return $rc if $rc != kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
     my %rvals;
     if ($options{'MaxReplySize'} > 0) {
         @rvals{'Bitmap', 'AttributeData'} = unpack('nN/a*', $resp);
@@ -949,23 +951,23 @@ sub FPGetFileDirParms { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'FileBitmap'} ||= 0;
     $options{'DirectoryBitmap'} ||= 0;
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    my $msg = pack('CxnNnna*', kFPGetFileDirParms,
+    my $msg = pack('CxnNnna*', $kFPGetFileDirParms,
             @options{'VolumeID','DirectoryID','FileBitmap','DirectoryBitmap'},
             PackagePath(@options{'PathType', 'Pathname'}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
-    croak('Need to accept returned list') unless wantarray();
+    return $rc if $rc != kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
     return($rc, _ParseFileDirParms($resp));
 } # }}}1
 
@@ -974,12 +976,12 @@ sub FPGetForkParms { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cxnn', kFPGetForkParms, $OForkRefNum,
+    my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetForkParms, $OForkRefNum,
             $Bitmap), \$resp);
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
     ${$resp_r} = _ParseFileParms(unpack('na*', $resp));
     return $rc;
 } # }}}1
@@ -989,20 +991,20 @@ sub FPGetIcon { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('DTRefNum must be provided')
-            unless exists $options{'DTRefNum'};
+            if not exists $options{'DTRefNum'};
     croak('FileCreator must be provided')
-            unless exists $options{'FileCreator'};
+            if not exists $options{'FileCreator'};
     croak('FileType must be provided')
-            unless exists $options{'FileType'};
+            if not exists $options{'FileType'};
     croak('IconType must be provided')
-            unless exists $options{'IconType'};
+            if not exists $options{'IconType'};
     croak('Length must be provided')
-            unless exists $options{'Length'};
+            if not exists $options{'Length'};
 
-    my $msg = pack('CxnNNCxn', kFPGetIcon,
+    my $msg = pack('CxnNNCxn', $kFPGetIcon,
             @options{'DTRefNum', 'FileCreator', 'FileType', 'IconType',
                      'Length'});
-    croak('Need to accept returned list') unless wantarray();
+    croak('Need to accept returned list') if not wantarray();
     my $rdata;
     my $rc = $self->SendAFPMessage($msg, \$rdata);
     return($rc, $rdata);
@@ -1013,13 +1015,13 @@ sub FPGetIconInfo { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
     
     my $resp;
-    my $msg = pack('CxnNn', kFPGetIconInfo, $DTRefNum, $FileCreator,
+    my $msg = pack('CxnNn', $kFPGetIconInfo, $DTRefNum, $FileCreator,
             $IconIndex);
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return($rc) unless $rc == kFPNoErr;
+    return($rc) if $rc != kFPNoErr;
     ${$resp_r} = {};
     @{${$resp_r}}{'IconTag', 'FileType', 'IconType', 'Size'} =
             unpack('NNCxn', $resp);
@@ -1031,12 +1033,12 @@ sub FPGetSessionToken { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
     $ID ||= q//;
     my $pack_mask = 'CxnN';
-    my @params = (kFPGetSessionToken, $Type, length($ID));
+    my @params = ($kFPGetSessionToken, $Type, length($ID));
     if ($Type == kLoginWithTimeAndID || $Type == kReconnWithTimeAndID) {
         $pack_mask .= 'N';
         push(@params, $timeStamp);
@@ -1057,12 +1059,12 @@ sub FPGetSrvrInfo { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cx', kFPGetSrvrInfo), \$resp);
+    my $rc = $self->SendAFPMessage(pack('Cx', $kFPGetSrvrInfo), \$resp);
     # If the response was not kFPNoErr, the info block will not be present.
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
 
     ${$resp_r} = _ParseSrvrInfo($resp);
     return $rc;
@@ -1073,12 +1075,12 @@ sub FPGetSrvrMsg { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cxnn', kFPGetSrvrMsg, $MessageType,
+    my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetSrvrMsg, $MessageType,
             $MessageBitmap), \$resp);
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
     my ($Length, $ServerMessage);
     if ($MessageBitmap & 0x2) { # bit 1; means send message as UTF8
         ($Length, $MessageType, $MessageBitmap, $ServerMessage) =
@@ -1104,12 +1106,12 @@ sub FPGetSrvrParms { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cx', kFPGetSrvrParms), \$resp);
+    my $rc = $self->SendAFPMessage(pack('Cx', $kFPGetSrvrParms), \$resp);
     # If the response was not kFPNoErr, the info block will not be present.
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
 
     my $data = {};
     my ($time, @volinfo) = unpack('NC/(CC/a)', $resp);
@@ -1137,13 +1139,13 @@ sub FPGetUserInfo { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('CCNn', kFPGetUserInfo, $Flags, $UserID,
+    my $rc = $self->SendAFPMessage(pack('CCNn', $kFPGetUserInfo, $Flags, $UserID,
             $Bitmap), \$resp);
 
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
     
     my $rbmp = unpack('n', $resp);
     my $offset = 2;
@@ -1178,12 +1180,12 @@ sub FPGetVolParms { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cxnn', kFPGetVolParms, $VolumeID,
+    my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetVolParms, $VolumeID,
             $Bitmap), \$resp);
-    return($rc) unless $rc == kFPNoErr;
+    return($rc) if $rc != kFPNoErr;
     ${$resp_r} = _ParseVolParms($resp);
     return $rc;
 } # }}}1
@@ -1193,26 +1195,26 @@ sub FPListExtAttrs { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'Bitmap'} ||= 0;
     $options{'ReqCount'} ||= 0;
     $options{'StartIndex'} ||= 0;
     $options{'MaxReplySize'} ||= 0;
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    my $msg = pack('CxnNnnNNa*', kFPListExtAttrs,
+    my $msg = pack('CxnNnnNNa*', $kFPListExtAttrs,
             @options{'VolumeID', 'DirectoryID', 'Bitmap', 'ReqCount',
                      'StartIndex', 'MaxReplySize'},
             PackagePath(@options{'PathType', 'Pathname'}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
-    croak('Need to accept returned list') unless wantarray();
+    return $rc if $rc != kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
     my %rvals;
     if ($options{'MaxReplySize'} > 0) {
         my $names;
@@ -1232,12 +1234,12 @@ sub FPLogin { # {{{1
     DEBUG('called ', (caller(0))[3]);
     $UserAuthInfo ||= q//;
 
-    my $msg = pack('CC/a*C/a*a*', kFPLogin, $AFPVersion, $UAM, $UserAuthInfo);
+    my $msg = pack('CC/a*C/a*a*', $kFPLogin, $AFPVersion, $UAM, $UserAuthInfo);
     my $resp;
     my %rvals;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     
-    croak('Need to accept returned list') unless wantarray();
+    croak('Need to accept returned list') if not wantarray();
     if ($rc == kFPAuthContinue and length($resp) >= 2) {
         $rvals{'ID'} = unpack('n', $resp);
         if (length($resp) > 2) {
@@ -1262,7 +1264,7 @@ sub FPLoginCont { # {{{1
 
     my $resp;
     # Unlike FPLogin, the pad byte actually does need to be there.
-    my $rc = $self->SendAFPMessage(pack('Cxna*', kFPLoginCont, $ID,
+    my $rc = $self->SendAFPMessage(pack('Cxna*', $kFPLoginCont, $ID,
             $UserAuthInfo), \$resp);
     
     if (($rc == kFPAuthContinue || $rc == kFPNoErr)
@@ -1286,20 +1288,20 @@ sub FPLoginExt { # {{{1
     DEBUG('called ', (caller(0))[3]);
     $options{'Flags'} ||= 0;
     croak('AFPVersion must br provided')
-            unless exists $options{'AFPVersion'};
+            if not exists $options{'AFPVersion'};
     croak('UAM must br provided')
-            unless exists $options{'UAM'};
+            if not exists $options{'UAM'};
     # The documentation says this should always be UTF8
     $options{'UserNameType'} ||= kFPUTF8Name;
     croak('UserName must br provided')
-            unless exists $options{'UserName'};
+            if not exists $options{'UserName'};
     # Documentation doesn't say this has to always be UTF8, but it's a safe
     # choice, and generally we don't give a damn
     $options{'PathType'} ||= kFPUTF8Name;
     $options{'Pathname'} ||= q//;
     $options{'UserAuthInfo'} ||= q//;
 
-    my $msg = pack('CxnC/a*C/a*a*a*x![s]a*', kFPLoginExt,
+    my $msg = pack('CxnC/a*C/a*a*a*x![s]a*', $kFPLoginExt,
             @options{'Flags', 'AFPVersion', 'UAM'},
             PackagePath(@options{'UserNameType', 'UserName'}, 1),
             PackagePath(@options{'PathType', 'Pathname'}, 1),
@@ -1308,7 +1310,7 @@ sub FPLoginExt { # {{{1
     my %rvals;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     
-    croak('Need to accept returned list') unless wantarray();
+    croak('Need to accept returned list') if not wantarray();
     if ($rc == kFPAuthContinue and length($resp) >= 2) {
         $rvals{'ID'} = unpack('n', $resp);
         if (length($resp) > 2) {
@@ -1323,7 +1325,7 @@ sub FPLogout { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cx', kFPLogout));
+    return $self->SendAFPMessage(pack('Cx', $kFPLogout));
 } # }}}1
 
 sub FPMapID { # {{{1
@@ -1331,11 +1333,11 @@ sub FPMapID { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
     my $pack_mask = 'CC';
-    my @pack_args = (kFPMapID, $Subfunction);
+    my @pack_args = ($kFPMapID, $Subfunction);
     if ($Subfunction == kUserUUIDToUTF8Name ||
             $Subfunction == kGroupUUIDToUTF8Name) {
         $pack_mask .= 'a[16]';
@@ -1347,7 +1349,7 @@ sub FPMapID { # {{{1
     push(@pack_args, $ID);
     my $msg = pack($pack_mask, @pack_args);
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
     if ($Subfunction == kUserUUIDToUTF8Name ||
             $Subfunction == kGroupUUIDToUTF8Name) {
         ${$resp_r} = {};
@@ -1371,7 +1373,7 @@ sub FPMapName { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
     my $pack_mask = 'CC';
@@ -1390,9 +1392,9 @@ sub FPMapName { # {{{1
             $Name = encode('MacRoman', $Name);
         }
     }
-    my $msg = pack($pack_mask, kFPMapName, $Subfunction, $Name);
+    my $msg = pack($pack_mask, $kFPMapName, $Subfunction, $Name);
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
     if ($Subfunction == kUTF8NameToUserUUID ||
             $Subfunction == kUTF8NameToGroupUUID) {
         ${$resp_r} = uuid_unpack($resp);
@@ -1414,25 +1416,25 @@ sub FPMoveAndRename { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('SourceDirectoryID must be provided')
-            unless exists $options{'SourceDirectoryID'};
+            if not exists $options{'SourceDirectoryID'};
     croak('DestDirectoryID must be provided')
-            unless exists $options{'DestDirectoryID'};
+            if not exists $options{'DestDirectoryID'};
     croak('SourcePathType must be provided')
-            unless exists $options{'SourcePathType'};
+            if not exists $options{'SourcePathType'};
     croak('SourcePathname must be provided')
-            unless exists $options{'SourcePathname'};
+            if not exists $options{'SourcePathname'};
     croak('DestPathType must be provided')
-            unless exists $options{'DestPathType'};
+            if not exists $options{'DestPathType'};
     croak('DestPathname must be provided')
-            unless exists $options{'DestPathname'};
+            if not exists $options{'DestPathname'};
     croak('NewType must be provided')
-            unless exists $options{'NewType'};
+            if not exists $options{'NewType'};
     croak('NewName must be provided')
-            unless exists $options{'NewName'};
+            if not exists $options{'NewName'};
 
-    my $msg = pack('CxnNNa*a*a*', kFPMoveAndRename,
+    my $msg = pack('CxnNNa*a*a*', $kFPMoveAndRename,
             @options{'VolumeID', 'SourceDirectoryID', 'DestDirectoryID'},
             PackagePath(@options{'SourcePathType', 'SourcePathname'}),
             PackagePath(@options{'DestPathType', 'DestPathname'}),
@@ -1447,20 +1449,20 @@ sub FPOpenDir { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('CxnNa*', kFPOpenDir,
+    my $rc = $self->SendAFPMessage(pack('CxnNa*', $kFPOpenDir,
             @options{'VolumeID', 'DirectoryID'},
             PackagePath(@options{'PathType', 'Pathname'})), \$resp);
-    return $rc unless $rc == kFPNoErr;
-    croak('Need to accept returned list') unless wantarray();
+    return $rc if $rc != kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
     return($rc, unpack('N', $resp));
 } # }}}1
 
@@ -1469,11 +1471,11 @@ sub FPOpenDT { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cxn', kFPOpenDT, $VolumeID), \$resp);
-    return $rc unless $rc == kFPNoErr;
+    my $rc = $self->SendAFPMessage(pack('Cxn', $kFPOpenDT, $VolumeID), \$resp);
+    return $rc if $rc != kFPNoErr;
     (${$resp_r}) = unpack('n', $resp);
     return $rc;
 } # }}}1
@@ -1484,25 +1486,25 @@ sub FPOpenFork { # {{{1
     DEBUG('called ', (caller(0))[3]);
     $options{'Flag'} ||= 0;
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'Bitmap'} ||= 0;
     croak('AccessMode must be provided')
-            unless exists $options{'AccessMode'};
+            if not exists $options{'AccessMode'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    my $msg = pack('CCnNnna*', kFPOpenFork,
+    my $msg = pack('CCnNnna*', $kFPOpenFork,
             @options{'Flag', 'VolumeID', 'DirectoryID', 'Bitmap', 'AccessMode'},
             PackagePath(@options{'PathType', 'Pathname'}));
 
     my $resp;
     my %rvals;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
-    croak('Need to accept returned list') unless wantarray();
+    croak('Need to accept returned list') if not wantarray();
     if ($rc == kFPNoErr) {
         my ($rBitmap, $OForkRefNum, $FileParameters) = unpack('nna*', $resp);
         %rvals = %{ _ParseFileParms($rBitmap, $FileParameters) };
@@ -1516,7 +1518,7 @@ sub FPOpenVol { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
     
     # If the caller passed undef, just set an empty bitmap.
     $Bitmap ||= 0;
@@ -1525,7 +1527,7 @@ sub FPOpenVol { # {{{1
     $Bitmap |= kFPVolIDBit;
 
     my $PackPattern = 'CxnCa*';
-    my @PackArgs = (kFPOpenVol, $Bitmap, length($VolumeName), $VolumeName);
+    my @PackArgs = ($kFPOpenVol, $Bitmap, length($VolumeName), $VolumeName);
     # Only append a password if one was provided. If not, we don't provide
     # it.
     if (defined $Password) {
@@ -1536,7 +1538,7 @@ sub FPOpenVol { # {{{1
 
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
-    return $rc unless $rc == kFPNoErr;
+    return $rc if $rc != kFPNoErr;
     ${$resp_r} = _ParseVolParms($resp);
     return $rc;
 } # }}}1
@@ -1546,19 +1548,19 @@ sub FPRead { # {{{1
     
     DEBUG('called ', (caller(0))[3]);
     croak('OForkRefNum must be provided')
-            unless exists $options{'OForkRefNum'};
+            if not exists $options{'OForkRefNum'};
     croak('Offset must be provided')
-            unless exists $options{'Offset'};
+            if not exists $options{'Offset'};
     croak('ReqCount must be provided')
-            unless exists $options{'ReqCount'};
+            if not exists $options{'ReqCount'};
     $options{'NewLineMask'} ||= 0;
     $options{'NewLineChar'} ||= 0;
 
-    my $msg = pack('CxnNNCC', kFPRead,
+    my $msg = pack('CxnNNCC', $kFPRead,
             @options{'OForkRefNum', 'Offset', 'ReqCount', 'NewLineMask',
                      'NewLineChar'});
 
-    croak('Need to accept returned list') unless wantarray();
+    croak('Need to accept returned list') if not wantarray();
     my $rdata;
     my $rc = $self->SendAFPMessage($msg, \$rdata);
     return($rc, $rdata);
@@ -1569,16 +1571,16 @@ sub FPReadExt { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('OForkRefNum must be provided')
-            unless exists $options{'OForkRefNum'};
+            if not exists $options{'OForkRefNum'};
     croak('Offset must be provided')
-            unless exists $options{'Offset'};
+            if not exists $options{'Offset'};
     croak('ReqCount must be provided')
-            unless exists $options{'ReqCount'};
+            if not exists $options{'ReqCount'};
     
-    my $msg = pack('CxnNNNN', kFPReadExt, $options{'OForkRefNum'},
+    my $msg = pack('CxnNNNN', $kFPReadExt, $options{'OForkRefNum'},
             ll_convert($options{'Offset'}), ll_convert($options{'ReqCount'}));
 
-    croak('Need to accept returned list') unless wantarray();
+    croak('Need to accept returned list') if not wantarray();
     my $rdata;
     my $rc = $self->SendAFPMessage($msg, \$rdata);
     return($rc, $rdata);
@@ -1589,17 +1591,17 @@ sub FPRemoveAPPL { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('DTRefNum must be provided')
-            unless exists $options{'DTRefNum'};
+            if not exists $options{'DTRefNum'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('FileCreator must be provided')
-            unless exists $options{'FileCreator'};
+            if not exists $options{'FileCreator'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    my $msg = pack('CxnNNa*', kFPRemoveAPPL,
+    my $msg = pack('CxnNNa*', $kFPRemoveAPPL,
             @options{'DTRefNum', 'DirectoryID', 'FileCreator'},
             PackagePath(@options{'PathType', 'Pathname'}));
     return $self->SendAFPMessage($msg);
@@ -1609,7 +1611,7 @@ sub FPRemoveComment { # {{{1
     my($self, $DTRefNum, $DirectoryID, $PathType, $Pathname) = @_;
     DEBUG('called ', (caller(0))[3]);
 
-    my $msg = pack('CxnNa*', kFPRemoveComment, $DTRefNum, $DirectoryID,
+    my $msg = pack('CxnNa*', $kFPRemoveComment, $DTRefNum, $DirectoryID,
             PackagePath($PathType, $Pathname));
     return $self->SendAFPMessage($msg);
 } # }}}1
@@ -1619,20 +1621,20 @@ sub FPRemoveExtAttr { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'Bitmap'} ||= 0;
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
     croak('Name must be provided')
-            unless exists $options{'Name'};
+            if not exists $options{'Name'};
 
-    my $msg = pack('CxnNna*x![s]n/a*', kFPRemoveExtAttr,
+    my $msg = pack('CxnNna*x![s]n/a*', $kFPRemoveExtAttr,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             PackagePath(@options{'PathType', 'Pathname'}),
             encode_utf8(decompose($options{'Name'})));
@@ -1644,19 +1646,19 @@ sub FPRename { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
     croak('NewType must be provided')
-            unless exists $options{'NewType'};
+            if not exists $options{'NewType'};
     croak('NewName must be provided')
-            unless exists $options{'NewName'};
+            if not exists $options{'NewName'};
 
-    my $msg = pack('CxnNa*a*', kFPRename,
+    my $msg = pack('CxnNa*a*', $kFPRename,
             @options{'VolumeID', 'DirectoryID'},
             PackagePath(@options{'PathType', 'Pathname'}),
             PackagePath(@options{'NewType', 'NewName'}));
@@ -1668,12 +1670,12 @@ sub FPResolveID { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
 
     my $resp;
-    my $msg = pack('CxnNn', kFPResolveID, $VolumeID, $FileID, $Bitmap);
+    my $msg = pack('CxnNn', $kFPResolveID, $VolumeID, $FileID, $Bitmap);
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    return($rc) unless $rc == kFPNoErr;
+    return($rc) if $rc != kFPNoErr;
     my($Bitmap_n, $data) = unpack('na*', $resp);
     my $info = _ParseFileParms($Bitmap_n, $data);
     ${$resp_r} = {
@@ -1688,33 +1690,33 @@ sub FPSetACL { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'Bitmap'} ||= 0;
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
-    my $msg = pack('CxnNna*x![s]', kFPSetACL,
+    my $msg = pack('CxnNna*x![s]', $kFPSetACL,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             PackagePath(@options{'PathType', 'Pathname'}));
     if ($options{'Bitmap'} & kFileSec_UUID) {
         croak('UUID must be provided')
-                unless exists $options{'UUID'};
+                if not exists $options{'UUID'};
         $msg .= uuid_pack($options{'UUID'});
     }
     if ($options{'Bitmap'} & kFileSec_GRPUUID) {
         croak('GRPUUID must be provided')
-                unless exists $options{'GRPUUID'};
+                if not exists $options{'GRPUUID'};
         $msg .= uuid_pack($options{'GRPUUID'});
     }
     if ($options{'Bitmap'} & kFileSec_ACL) {
         croak('acl_ace must be provided')
-                unless exists $options{'acl_ace'};
+                if not exists $options{'acl_ace'};
         croak('acl_flags must be provided')
-                unless exists $options{'acl_flags'};
+                if not exists $options{'acl_flags'};
         my @ace_list;
         foreach my $ace (@{$options{'acl_ace'}}) {
             push(@ace_list, pack('a[16]NN',
@@ -1733,15 +1735,15 @@ sub FPSetDirParms { # {{{1
     
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('Bitmap must be provided')
-            unless exists $options{'Bitmap'};
+            if not exists $options{'Bitmap'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
     my $Mask = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
                kFPBackupDateBit | kFPFinderInfoBit | kFPOwnerIDBit |
@@ -1754,7 +1756,7 @@ sub FPSetDirParms { # {{{1
     my $ParamsBlock = PackSetParams($options{'Bitmap'}, %options);
     return kFPParamErr if !defined $ParamsBlock;
 
-    my $msg = pack('CxnNna*x![s]a*', kFPSetDirParms,
+    my $msg = pack('CxnNna*x![s]a*', $kFPSetDirParms,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             PackagePath(@options{'PathType', 'Pathname'}),
             $ParamsBlock);
@@ -1766,21 +1768,21 @@ sub FPSetExtAttr { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     $options{'Bitmap'} ||= 0;
     $options{'Offset'} ||= 0;
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
     croak('Name must be provided')
-            unless exists $options{'Name'};
+            if not exists $options{'Name'};
     croak('AttributeData must be provided')
-            unless exists $options{'AttributeData'};
+            if not exists $options{'AttributeData'};
 
-    my $msg = pack('CxnNnNNa*x![s]n/a*N/a*', kFPSetExtAttr,
+    my $msg = pack('CxnNnNNa*x![s]n/a*N/a*', $kFPSetExtAttr,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             ll_convert($options{'Offset'}),
             PackagePath(@options{'PathType', 'Pathname'}),
@@ -1794,15 +1796,15 @@ sub FPSetFileDirParms { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('Bitmap must be provided')
-            unless exists $options{'Bitmap'};
+            if not exists $options{'Bitmap'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
     my $Mask = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
                kFPBackupDateBit | kFPFinderInfoBit | kFPUnixPrivsBit;
@@ -1814,7 +1816,7 @@ sub FPSetFileDirParms { # {{{1
     my $ParamsBlock = PackSetParams($options{'Bitmap'}, %options);
     return kFPParamErr if !defined $ParamsBlock;
 
-    my $msg = pack('CxnNna*x![s]a*', kFPSetFileDirParms,
+    my $msg = pack('CxnNna*x![s]a*', $kFPSetFileDirParms,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             PackagePath(@options{'PathType', 'Pathname'}),
             $ParamsBlock);
@@ -1826,15 +1828,15 @@ sub FPSetFileParms { # {{{1
 
     DEBUG('called ', (caller(0))[3]);
     croak('VolumeID must be provided')
-            unless exists $options{'VolumeID'};
+            if not exists $options{'VolumeID'};
     croak('DirectoryID must be provided')
-            unless exists $options{'DirectoryID'};
+            if not exists $options{'DirectoryID'};
     croak('Bitmap must be provided')
-            unless exists $options{'Bitmap'};
+            if not exists $options{'Bitmap'};
     croak('PathType must be provided')
-            unless exists $options{'PathType'};
+            if not exists $options{'PathType'};
     croak('Pathname must be provided')
-            unless exists $options{'Pathname'};
+            if not exists $options{'Pathname'};
 
     my $Mask = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
                kFPBackupDateBit | kFPFinderInfoBit | kFPLaunchLimitBit |
@@ -1847,7 +1849,7 @@ sub FPSetFileParms { # {{{1
     my $ParamsBlock = PackSetParams($options{'Bitmap'}, %options);
     return kFPParamErr if !defined $ParamsBlock;
 
-    my $msg = pack('CxnNna*x![s]a*', kFPSetFileParms,
+    my $msg = pack('CxnNna*x![s]a*', $kFPSetFileParms,
             @options{'VolumeID', 'DirectoryID', 'Bitmap'},
             PackagePath(@options{'PathType', 'Pathname'}),
             $ParamsBlock);
@@ -1868,7 +1870,7 @@ sub FPSetForkParms { # {{{1
         $packed = pack('NN', ll_convert($ForkLen));
     }
 
-    return $self->SendAFPMessage(pack('Cxnna*', kFPSetForkParms, $OForkRefNum,
+    return $self->SendAFPMessage(pack('Cxnna*', $kFPSetForkParms, $OForkRefNum,
             $Bitmap, $packed), undef, 1);
 } # }}}1
 
@@ -1876,7 +1878,7 @@ sub FPSetVolParms { # {{{1
     my ($self, $VolumeID, $Bitmap, $BackupDate) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    return $self->SendAFPMessage(pack('CxnnN', kFPSetVolParms, $VolumeID,
+    return $self->SendAFPMessage(pack('CxnnN', $kFPSetVolParms, $VolumeID,
             $Bitmap, $BackupDate), undef, 1);
 } # }}}1
 
@@ -1884,7 +1886,7 @@ sub FPSyncDir { # {{{1
     my($self, $VolumeID, $DirectoryID) = @_;
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('CxnN', kFPSyncDir, $VolumeID,
+    return $self->SendAFPMessage(pack('CxnN', $kFPSyncDir, $VolumeID,
             $DirectoryID), undef, 1);
 } # }}}1
 
@@ -1892,7 +1894,7 @@ sub FPSyncFork { # {{{1
     my($self, $OForkRefNum) = @_;
     DEBUG('called ', (caller(0))[3]);
 
-    return $self->SendAFPMessage(pack('Cxn', kFPSyncFork, $OForkRefNum),
+    return $self->SendAFPMessage(pack('Cxn', $kFPSyncFork, $OForkRefNum),
             undef, 1);
 } # }}}1
 
@@ -1902,14 +1904,14 @@ sub FPWrite { # {{{1
     DEBUG('called ', (caller(0))[3]);
     $options{'Flag'} ||= 0;
     croak('OForkRefNum must be provided')
-            unless exists $options{'OForkRefNum'};
+            if not exists $options{'OForkRefNum'};
     croak('Offset must be provided')
-            unless exists $options{'Offset'};
+            if not exists $options{'Offset'};
     croak('ForkData must be provided')
-            unless exists $options{'ForkData'};
+            if not exists $options{'ForkData'};
     $options{'ReqCount'} ||= length(${$options{'ForkData'}});
 
-    my $msg = pack('CCnNN', kFPWrite,
+    my $msg = pack('CCnNN', $kFPWrite,
             @options{'Flag', 'OForkRefNum', 'Offset', 'ReqCount'});
 
     my $resp;
@@ -1927,14 +1929,14 @@ sub FPWriteExt { # {{{1
     DEBUG('called ', (caller(0))[3]);
     $options{'Flag'} ||= 0;
     croak('OForkRefNum must be provided')
-            unless exists $options{'OForkRefNum'};
+            if not exists $options{'OForkRefNum'};
     croak('Offset must be provided')
-            unless exists $options{'Offset'};
+            if not exists $options{'Offset'};
     croak('ForkData must be provided')
-            unless exists $options{'ForkData'};
+            if not exists $options{'ForkData'};
     $options{'ReqCount'} ||= length(${$options{'ForkData'}});
 
-    my $msg = pack('CCnNNNN', kFPWriteExt, @options{'Flag', 'OForkRefNum'},
+    my $msg = pack('CCnNNNN', $kFPWriteExt, @options{'Flag', 'OForkRefNum'},
             ll_convert($options{'Offset'}), ll_convert($options{'ReqCount'}));
 
     my $resp;
@@ -1950,7 +1952,7 @@ sub FPZzzzz { # {{{1
     my ($self, $Flags) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    return $self->SendAFPMessage(pack('CxN', kFPZzzzz, $Flags));
+    return $self->SendAFPMessage(pack('CxN', $kFPZzzzz, $Flags));
 } # }}}1
 
 1;
