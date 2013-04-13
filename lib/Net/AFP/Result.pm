@@ -2,13 +2,11 @@ package Net::AFP::Result;
 
 use Exporter qw(import);
 
-our @EXPORT = qw(kFPNoErr kASPBadVersNum kASPBufTooSmall kFPNoMoreSessions
-                 kASPNoServers kASPParamErr kASPServerBusy kASPSessClosed
-                 kFPAccessDenied kASPSizeErr kASPTooManyClients kASPNoAck
-                 kFPAuthContinue kFPBadUAM kFPBadVersNum kFPBitmapErr
-                 kFPCantMove kFPDenyConflict kFPDirNotEmpty kFPDiskFull
-                 kFPEOFErr kFPFileBusy kFPFlatVol kFPItemNotFound kFPLockErr
-                 kFPMiscErr kFPNoMoreLocks kFPNoServer kFPObjectExists
+our @EXPORT = qw(kFPNoErr kFPAccessDenied kFPAuthContinue kFPBadUAM
+                 kFPBadVersNum kFPBitmapErr kFPCantMove kFPDenyConflict
+                 kFPDirNotEmpty kFPDiskFull kFPEOFErr kFPFileBusy
+                 kFPFlatVol kFPItemNotFound kFPLockErr kFPMiscErr
+                 kFPNoMoreLocks kFPNoServer kFPObjectExists
                  kFPObjectNotFound kFPParamErr kFPRangeNotLocked
                  kFPRangeOverlap kFPSessClosed kFPUserNotAuth
                  kFPCallNotSupported kFPObjectTypeErr kFPTooManyFilesOpen
@@ -21,16 +19,6 @@ our @EXPORT = qw(kFPNoErr kASPBadVersNum kASPBufTooSmall kFPNoMoreSessions
                  kFPPwdPolicyErr kFPDiskQuotaExceeded afp_strerror);
 
 use constant kFPNoErr               => 0;
-use constant kASPBadVersNum         => -1066;
-use constant kASPBufTooSmall        => -1067;
-use constant kFPNoMoreSessions      => -1068;
-use constant kASPNoServers          => -1069;
-use constant kASPParamErr           => -1070;
-use constant kASPServerBusy         => -1071;
-use constant kASPSessClosed         => -1072;
-use constant kASPSizeErr            => -1073;
-use constant kASPTooManyClients     => -1074;
-use constant kASPNoAck              => -1075;
 use constant kFPAccessDenied        => -5000;
 use constant kFPAuthContinue        => -5001;
 use constant kFPBadUAM              => -5002;
