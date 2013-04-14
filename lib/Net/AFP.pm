@@ -450,14 +450,15 @@ sub FPCatSearchExt {
 }
 
 sub FPChangePassword { # {{{1
-    my ($self, $UAM, $UserName, $UserAuthInfo, $resp_r) = @_;
+    my ($self, @options) = @_;
     DEBUG('called ', (caller(0))[3]);
 
-    if (ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF') {
-        $resp_r = \q//;
-    }
-
-    $UserAuthInfo ||= q//;
+    my($UAM, $UserName, $UserAuthInfo, $resp_r) =
+            validate_pos(@options,
+                { type => SCALAR },
+                { type => SCALAR },
+                { type => SCALAR, optional => 1, default => q{} },
+                { type => SCALARREF, optional => 1, default => \q{} });
 
     my $msg = pack('CxC/a*x![s]C/a*x![s]a*', $kFPChangePassword, $UAM,
             $UserName, $UserAuthInfo);
@@ -465,35 +466,44 @@ sub FPChangePassword { # {{{1
 } # }}}1
 
 sub FPCloseDir { # {{{1
-    my ($self, $VolumeID, $DirectoryID) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($VolumeID, $DirectoryID) = 
+            validate_pos(@options, { type => SCALAR }, { type => SCALAR });
 
     return $self->SendAFPMessage(pack('CxnN', $kFPCloseDir, $VolumeID,
             $DirectoryID));
 } # }}}1
 
 sub FPCloseDT { # {{{1
-    my($self, $DTRefNum) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($DTRefNum) = validate_pos(@options, { type => SCALAR });
 
     return $self->SendAFPMessage(pack('Cxn', $kFPCloseDT, $DTRefNum));
 } # }}}1
 
 sub FPCloseFork { # {{{1
-    my($self, $OForkRefNum) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
 
     return $self->SendAFPMessage(pack('Cxn', $kFPCloseFork, $OForkRefNum),
             undef, 1);
 } # }}}1
 
 sub FPCloseVol { # {{{1
-    my ($self, $VolumeID) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($VolumeID) = validate_pos(@options, { type => SCALAR });
 
     return $self->SendAFPMessage(pack('Cxn', $kFPCloseVol, $VolumeID), undef, 1);
 } # }}}1
@@ -631,26 +641,48 @@ sub FPCreateID { # {{{1
 } # }}}1
 
 sub FPDelete { # {{{1
-    my($self, $VolumeID, $DirectoryID, $PathType, $Pathname) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($VolumeID, $DirectoryID, $PathType, $Pathname) =
+            validate_pos(@options,
+                { type => SCALAR },
+                { type => SCALAR },
+                {
+                    type => SCALAR,
+                    callbacks  => {
+                        'valid path type' => sub {
+                            $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                            $_[0] == kFPUTF8Name
+                        }
+                    }
+                },
+                { type => SCALAR });
 
     return $self->SendAFPMessage(pack('CxnNa*', $kFPDelete, $VolumeID,
             $DirectoryID, PackagePath($PathType, $Pathname)), undef, 1);
 } # }}}1
 
 sub FPDeleteID { # {{{1
-    my($self, $VolumeID, $FileID) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($VolumeID, $FileID) = validate_pos(@options,
+            { type => SCALAR }, { type => SCALAR });
+
     return $self->SendAFPMessage(pack('CxnN', $kFPDeleteID, $VolumeID,
             $FileID));
 } # }}}1
 
 sub FPDisconnectOldSession { # {{{1
-    my($self, $Type, $Token) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($Type, $Token) = validate_pos(@options,
+            { type => SCALAR }, { type => SCALAR });
 
     return $self->SendAFPMessage(pack('CxnN/a', $kFPDisconnectOldSession,
             $Type, $Token));
@@ -891,17 +923,21 @@ sub FPExchangeFiles { # {{{1
 } # }}}1
 
 sub FPFlush { # {{{1
-    my ($self, $VolumeID) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($VolumeID) = validate_pos(@options, { type => SCALAR });
 
     return $self->SendAFPMessage(pack('Cxn', $kFPFlush, $VolumeID), undef, 1);
 } # }}}1
 
 sub FPFlushFork { # {{{1
-    my ($self, $OForkRefNum) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
 
     return $self->SendAFPMessage(pack('Cxn', $kFPFlushFork, $OForkRefNum),
             undef, 1);
@@ -1010,11 +1046,28 @@ sub FPGetAPPL { # {{{1
 } # }}}1
 
 sub FPGetAuthMethods { # {{{1
-    my($self, $Flags, $PathType, $Pathname, $resp_r) = @_;
+    my($self, @options) = @_;
     DEBUG('called ', (caller(0))[3]);
 
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+    my($Flags, $PathType, $Pathname, $resp_r) = validate_pos(@options,
+            {
+                type        => SCALAR,
+                callbacks   => {
+                    'valid flags' => sub { $_[0] == 0 }
+                }
+            },
+            {
+                type        => SCALAR,
+                callbacks   => {
+                    'valid path type' => sub {
+                        $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                        $_[0] == kFPUTF8Name
+                    }
+                }
+            },
+            { type => SCALAR },
+            { type => SCALARREF });
+
     my $msg = pack('CxCa*', $kFPGetAuthMethods, $Flags,
             PackagePath($PathType, $Pathname));
     my($resp, @UAMStrings);
@@ -1162,11 +1215,19 @@ sub FPGetFileDirParms { # {{{1
 } # }}}1
 
 sub FPGetForkParms { # {{{1
-    my ($self, $OForkRefNum, $Bitmap, $resp_r) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($OForkRefNum, $Bitmap, $resp_r) = validate_pos(@options,
+            { type => SCALAR },
+            {
+                type        => SCALAR,
+                callbacks   => {
+                    'valid bitmap' => sub { !(~0xFFFF & $_[0]) }
+                }
+            },
+            { type => SCALARREF });
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetForkParms, $OForkRefNum,
@@ -1198,11 +1259,16 @@ sub FPGetIcon { # {{{1
 } # }}}1
 
 sub FPGetIconInfo { # {{{1
-    my($self, $DTRefNum, $FileCreator, $IconIndex, $resp_r) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($DTRefNum, $FileCreator, $IconIndex, $resp_r) =
+            validate_pos(@options,
+                { type => SCALAR },
+                { type => SCALAR },
+                { type => SCALAR },
+                { type => SCALARREF });
     
     my $resp;
     my $msg = pack('CxnNn', $kFPGetIconInfo, $DTRefNum, $FileCreator,
@@ -1216,14 +1282,25 @@ sub FPGetIconInfo { # {{{1
 } # }}}1
 
 sub FPGetSessionToken { # {{{1
-    my ($self, $Type, $timeStamp, $ID, $resp_r) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($Type, $timeStamp, $ID, $resp_r) = validate_pos(@options,
+            {
+                type        => SCALAR,
+                callbacks   => {
+                    'valid type' => {
+                        $_[0] >= kLoginWithoutID &&
+                            $_[0] <= kGetKerberosSessionKey
+                    }
+                }
+            },
+            { type => SCALAR },
+            { type => SCALAR, optional => 1, default => q{} },
+            { type => SCALARREF });
 
     my $resp;
-    $ID ||= q//;
     my $pack_mask = 'CxnN';
     my @params = ($kFPGetSessionToken, $Type, length($ID));
     if ($Type == kLoginWithTimeAndID || $Type == kReconnWithTimeAndID) {
@@ -1242,11 +1319,11 @@ sub FPGetSessionToken { # {{{1
 } # }}}1
 
 sub FPGetSrvrInfo { # {{{1
-    my ($self, $resp_r) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($resp_r) = validate_pos(@options, { type => SCALARREF });
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack('Cx', $kFPGetSrvrInfo), \$resp);
@@ -1258,11 +1335,25 @@ sub FPGetSrvrInfo { # {{{1
 } # }}}1
 
 sub FPGetSrvrMsg { # {{{1
-    my($self, $MessageType, $MessageBitmap, $resp_r) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($MessageType, $MessageBitmap, $resp_r) =
+            validate_pos(@options,
+                {
+                    type        => SCALAR,
+                    callbacks   => {
+                        'valid type' => sub { $_[0] == 0 || $_[0] == 1 }
+                    }
+                },
+                {
+                    type        => SCALAR,
+                    callbacks   => {
+                        'valid bitmap' => sub { !(~0x3 & $_[0]) }
+                    }
+                },
+                { type => SCALARREF });
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetSrvrMsg, $MessageType,
@@ -1289,11 +1380,11 @@ sub FPGetSrvrMsg { # {{{1
 } # }}}1
 
 sub FPGetSrvrParms { # {{{1
-    my ($self, $resp_r) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($resp_r) = validate_pos(@options, { type => SCALARREF });
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack('Cx', $kFPGetSrvrParms), \$resp);
@@ -1322,15 +1413,30 @@ sub FPGetSrvrParms { # {{{1
 } # }}}1
 
 sub FPGetUserInfo { # {{{1
-    my ($self, $Flags, $UserID, $Bitmap, $resp_r) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($Flags, $UserID, $Bitmap, $resp_r) =
+            validate_pos(@options,
+                {
+                    type        => SCALAR,
+                    callbacks   => {
+                        'valid type' => sub { !(~0x1 & $_[0]) }
+                    }
+                },
+                { type => SCALAR },
+                {
+                    type        => SCALAR,
+                    callbacks   => {
+                        'valid bitmap' => sub { !(~0x7 & $_[0]) }
+                    }
+                },
+                { type => SCALARREF });
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('CCNn', $kFPGetUserInfo, $Flags, $UserID,
-            $Bitmap), \$resp);
+    my $rc = $self->SendAFPMessage(pack('CCNn', $kFPGetUserInfo, $Flags,
+            $UserID, $Bitmap), \$resp);
 
     return $rc if $rc != kFPNoErr;
     
@@ -1363,11 +1469,19 @@ sub FPGetUserInfo { # {{{1
 } # }}}1
 
 sub FPGetVolParms { # {{{1
-    my($self, $VolumeID, $Bitmap, $resp_r) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($VolumeID, $Bitmap, $resp_r) = validate_pos(@options,
+            { type => SCALAR },
+            {
+                type        => SCALAR,
+                callbacks   => {
+                    'valid bitmap' => sub { !(~0xFFF & $_[0]) }
+                }
+            },
+            { type => SCALARREF });
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetVolParms, $VolumeID,
@@ -1434,10 +1548,15 @@ sub FPListExtAttrs { # {{{1
 } # }}}1
 
 sub FPLogin { # {{{1
-    my ($self, $AFPVersion, $UAM, $UserAuthInfo) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    $UserAuthInfo ||= q//;
+
+    my($AFPVersion, $UAM, $UserAuthInfo) =
+            validate_pos(@options,
+                { type => SCALAR },
+                { type => SCALAR },
+                { type => SCALAR, optional => 1, default => q{} });
 
     my $msg = pack('CC/a*C/a*a*', $kFPLogin, $AFPVersion, $UAM, $UserAuthInfo);
     my $resp;
@@ -1455,17 +1574,15 @@ sub FPLogin { # {{{1
 } # }}}1
 
 sub FPLoginCont { # {{{1
-    my ($self, $ID, $UserAuthInfo, $resp_r) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    if (ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF') {
-        # Hm, was getting "Modification of a read-only value attempted" later
-        # in this call apparently because of using \'' to generate a bogus
-        # anon scalar. Never got that before.
-        $resp_r = *foo{SCALAR};
-    }
 
-    $UserAuthInfo ||= q//;
+    my($ID, $UserAuthInfo, $resp_r) =
+            validate_pos(@options,
+                { type => SCALAR },
+                { type => SCALAR, optional => 1, default => q{} },
+                { type => SCALARREF, optional => 1, default => *foo{SCALAR} });
 
     my $resp;
     # Unlike FPLogin, the pad byte actually does need to be there.
@@ -1560,11 +1677,23 @@ sub FPLogout { # {{{1
 } # }}}1
 
 sub FPMapID { # {{{1
-    my($self, $Subfunction, $ID, $resp_r) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($Subfunction, $ID, $resp_r) =
+            validate_pos(@options,
+                {
+                    type        => SCALAR,
+                    callbacks   => {
+                        'valid subfunction' => sub {
+                            $_[0] >= kUserIDToName &&
+                                    $_[0] <= kGroupUUIDToUTF8Name
+                        }
+                    }
+                },
+                { type => SCALAR },
+                { type => SCALARREF });
 
     my $resp;
     my $pack_mask = 'CC';
@@ -1600,11 +1729,22 @@ sub FPMapID { # {{{1
 } # }}}1
 
 sub FPMapName { # {{{1
-    my($self, $Subfunction, $Name, $resp_r) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+    my($Subfunction, $Name, $resp_r) =
+            validate_pos(@options,
+                {
+                    type        => SCALAR,
+                    callbacks   => {
+                        'valid subfunction' => sub {
+                            $_[0] >= kNameToUserID &&
+                                    $_[0] <= kUTF8NameToGroupUUID
+                        }
+                    }
+                },
+                { type => SCALAR },
+                { type => SCALARREF });
 
     my $resp;
     my $pack_mask = 'CC';
@@ -1721,11 +1861,13 @@ sub FPOpenDir { # {{{1
 } # }}}1
 
 sub FPOpenDT { # {{{1
-    my($self, $VolumeID, $resp_r) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($VolumeID, $resp_r) = validate_pos(@options,
+            { type => SCALAR },
+            { type => SCALARREF });
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack('Cxn', $kFPOpenDT, $VolumeID), \$resp);
@@ -1790,15 +1932,22 @@ sub FPOpenFork { # {{{1
 } # }}}1
 
 sub FPOpenVol { # {{{1
-    my ($self, $Bitmap, $VolumeName, $Password, $resp_r) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
-    
-    # If the caller passed undef, just set an empty bitmap.
-    $Bitmap ||= 0;
 
+    my($Bitmap, $VolumeName, $Password, $resp_r) =
+            validate_pos(@options,
+            {
+                type        => SCALAR,
+                callbacks   => {
+                    'valid bitmap' => sub { !(~0xFFF & $_[0]) }
+                }
+            },
+            { type => SCALAR },
+            { type => SCALAR | UNDEF, optional => 1, default => q{} },
+            { type => SCALARREF });
+    
     # Make sure the VolID bit is set, because it's kind of necessary.
     $Bitmap |= kFPVolIDBit;
 
@@ -1899,8 +2048,23 @@ sub FPRemoveAPPL { # {{{1
 } # }}}1
 
 sub FPRemoveComment { # {{{1
-    my($self, $DTRefNum, $DirectoryID, $PathType, $Pathname) = @_;
+    my($self, @options) = @_;
     DEBUG('called ', (caller(0))[3]);
+
+    my($DTRefNum, $DirectoryID, $PathType, $Pathname) =
+            validate_pos(@options,
+                { type => SCALAR },
+                { type => SCALAR },
+                {
+                    type        => SCALAR,
+                    callbacks   => {
+                        'valid path type' => sub {
+                            $_[0] == kFPShortName || $_[0] == kFPLongName ||
+                            $_[0] == kFPUTF8Name
+                        }
+                    }
+                },
+                { type => SCALAR });
 
     my $msg = pack('CxnNa*', $kFPRemoveComment, $DTRefNum, $DirectoryID,
             PackagePath($PathType, $Pathname));
@@ -1978,11 +2142,21 @@ sub FPRename { # {{{1
 } # }}}1
 
 sub FPResolveID { # {{{1
-    my($self, $VolumeID, $FileID, $Bitmap, $resp_r) = @_;
+    my($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
-    croak('$resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+
+    my($VolumeID, $FileID, $Bitmap, $resp_r) =
+            validate_pos(@options,
+                { type => SCALAR },
+                { type => SCALAR },
+                {
+                    type        => SCALAR,
+                    callbacks   => {
+                        'valid bitmap' => sub { !(~0xFFFF & $_[0]) }
+                    }
+                },
+                { type => SCALARREF });
 
     my $resp;
     my $msg = pack('CxnNn', $kFPResolveID, $VolumeID, $FileID, $Bitmap);
@@ -2267,8 +2441,19 @@ sub FPSetFileParms { # {{{1
 } # }}}1
 
 sub FPSetForkParms { # {{{1
-    my ($self, $OForkRefNum, $Bitmap, $ForkLen) = @_;
+    my ($self, @options) = @_;
+
     DEBUG('called ', (caller(0))[3]);
+
+    my($OForkRefNum, $Bitmap, $ForkLen) = validate_pos(@options,
+            { type => SCALAR },
+            {
+                type        => SCALAR,
+                callbacks   => {
+                    'valid bitmap' => sub { !(~0x4E00 & $_[0]) }
+                }
+            },
+            { type => SCALAR });
 
     my $packed = undef;
     if (($Bitmap & kFPDataForkLenBit) or
@@ -2285,24 +2470,43 @@ sub FPSetForkParms { # {{{1
 } # }}}1
 
 sub FPSetVolParms { # {{{1
-    my ($self, $VolumeID, $Bitmap, $BackupDate) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($VolumeID, $Bitmap, $BackupDate) =
+            validate_pos(@options,
+                { type => SCALAR },
+                {
+                    type        => SCALAR,
+                    callbacks   => {
+                        'valid bitmap' => sub { !(~0x0010 & $_[0]) }
+                    }
+                },
+                { type => SCALAR });
     return $self->SendAFPMessage(pack('CxnnN', $kFPSetVolParms, $VolumeID,
             $Bitmap, $BackupDate), undef, 1);
 } # }}}1
 
 sub FPSyncDir { # {{{1
-    my($self, $VolumeID, $DirectoryID) = @_;
+    my($self, @options) = @_;
+
     DEBUG('called ', (caller(0))[3]);
+
+    my($VolumeID, $DirectoryID) = validate_pos(@options,
+            { type => SCALAR },
+            { type => SCALAR });
 
     return $self->SendAFPMessage(pack('CxnN', $kFPSyncDir, $VolumeID,
             $DirectoryID), undef, 1);
 } # }}}1
 
 sub FPSyncFork { # {{{1
-    my($self, $OForkRefNum) = @_;
+    my($self, @options) = @_;
+
     DEBUG('called ', (caller(0))[3]);
+
+    my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
 
     return $self->SendAFPMessage(pack('Cxn', $kFPSyncFork, $OForkRefNum),
             undef, 1);
@@ -2371,9 +2575,20 @@ sub FPWriteExt { # {{{1
 } # }}}1
 
 sub FPZzzzz { # {{{1
-    my ($self, $Flags) = @_;
+    my ($self, @options) = @_;
 
     DEBUG('called ', (caller(0))[3]);
+
+    my($Flags) = validate_pos(@options,
+            {
+                type        => SCALAR,
+                callbacks   => {
+                    'valid flags' => sub { !(~0x3 & $_[0]) }
+                },
+                optional    => 1,
+                default     => 0
+            });
+
     return $self->SendAFPMessage(pack('CxN', $kFPZzzzz, $Flags));
 } # }}}1
 
