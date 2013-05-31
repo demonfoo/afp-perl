@@ -297,7 +297,7 @@ sub new { # {{{1
     if ($$obj{'volAttrs'} & kSupportsACLs) {
         if ($has_Data__UUID) {
             my $uo = new Data::UUID;
-            $$obj{'client_uuid'} = $uo->create();
+            $$obj{'client_uuid'} = $uo->create_str();
         }
         else {
             print "Need Data::UUID class for full ACL functionality, ACL checking disabled\n";
@@ -406,7 +406,7 @@ sub getattr { # {{{1
     $file = $self->{'local_encode'}->decode($file);
     if ($file eq '/._metrics') {
         my $timest = time();
-        my @stat = (
+        my @stat = ( # {{{2
             # device number (just make it 0, since it's not a real device)
             0,
             # inode number (node ID works fine)
