@@ -1013,6 +1013,7 @@ sub rename { # {{{1
     return -&EINVAL if $rc == kFPParamErr;
     return -&EROFS  if $rc == kFPVolLocked;
     return -&EBADF  if $rc != kFPNoErr;
+
     delete $self->{'_getattr_cache'}->{$oldXlated};
     return 0;
 } # }}}1
@@ -1068,6 +1069,7 @@ sub chmod { # {{{1
     return -&EROFS  if $rc == kFPVolLocked;
     return -&EBADF  if $rc != kFPNoErr;
 
+    delete $self->{'_getattr_cache'}->{$fileName};
     return 0;
 } # }}}1
 
@@ -1121,6 +1123,7 @@ sub chown { # {{{1
     return -&EROFS  if $rc == kFPVolLocked;
     return -&EBADF  if $rc != kFPNoErr;
 
+    delete $self->{'_getattr_cache'}->{$fileName};
     return 0;
 } # }}}1
 
@@ -1174,6 +1177,8 @@ sub truncate { # {{{1
     return -&EINVAL if $rc == kFPParamErr;
     return -&EROFS  if $rc == kFPVolLocked;
     return -&EBADF  if $rc != kFPNoErr;
+
+    delete $self->{'_getattr_cache'}->{$fileName};
     return 0;
 } # }}}1
 
@@ -1196,7 +1201,10 @@ sub utime { # {{{1
             'Pathname'      => $fileName,
             #'CreateDate'    => $actime - $$self{'timedelta'},
             'ModDate'       => $modtime - $$self{'timedelta'});
-    return 0        if $rc == kFPNoErr;
+    if ($rc == kFPNoErr) {
+        delete $self->{'_getattr_cache'}->{$fileName};
+        return 0;
+    }
     return -&EPERM  if $rc == kFPAccessDenied;
     return -&ENOENT if $rc == kFPObjectNotFound;
     return -&EINVAL if $rc == kFPParamErr;
@@ -2140,7 +2148,7 @@ sub readdir { # {{{1
     # Set the result set size limit; if there are more entries in the
     # directory, extra requests will have to be sent. Larger set sizes
     # mean less time spent waiting around for responses.
-    my $entrycount = 50;
+    my $entrycount = 100;
 
     # Add '.' and '..' entries {{{2
     if (!$offset) {
@@ -2450,7 +2458,7 @@ sub fgetattr { # {{{1
 
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
-    print 'called ', (caller(0))[3], "('", join(', ', @_), ")\n"
+    print 'called ', (caller(0))[3], "(", join(', ', @_), ")\n"
             if defined $::_DEBUG;
 
     $$self{'callcount'}{(caller(0))[3]}++;
@@ -2466,12 +2474,6 @@ sub lock { # {{{1
         return -&EBADF;
     }
 
-    # AFP gets cranky if the lock range length is 0 (it considers that a
-    # bullshit parameter, and returns kFPParamErr).
-    if (!$lkparms->{'l_len'}) {
-        $lkparms->{'l_len'} = 1;
-    }
-
     if ($cmd == F_SETLK || $cmd == F_SETLKW) {
         my $flags = 0;
         if ($lkparms->{'l_type'} == F_UNLCK) {
@@ -2485,7 +2487,7 @@ sub lock { # {{{1
                                 'Flags'         => $flags,
                                 'OForkRefNum'   => $fh,
                                 'Offset'        => $lkparms->{'l_start'},
-                                'Length'        => $lkparms->{'l_len'},
+                                'Length'        => $lkparms->{'l_len'} || -1,
                               );
         return -&ENOLCK if $rc == kFPNoMoreLocks;
         return -&EACCES if $rc == kFPLockErr;
