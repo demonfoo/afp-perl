@@ -12,7 +12,7 @@ use integer;
 
 # Enables a nice call trace on warning events.
 use Carp;
-local $SIG{'__WARN__'} = \&Carp::cluck;
+local $SIG{__WARN__} = \&Carp::cluck;
 
 my $has_IO__Socket__INET6 = 0;
 eval {
@@ -52,17 +52,21 @@ use constant kServerReplayCacheSize => 0x02;
 # Thread::Semaphore objects. It also contains a 'running' flag, to
 # allow potential callers to know if the thread is in play or not.
 sub session_thread { # {{{1
-    my($shared, $host, $port) = @_;
+    my($shared, $host, $port, %params) = @_;
 
     # Set up the connection to the server. Then we need to check that we've
     # connected successfully.
     my $conn;
-    my %connect_args = ( 'PeerAddr'     => $host,
-                         'PeerPort'     => $port,
-                         'HostPort'     => 0,
-                         'Proto'        => 'tcp',
-                         'Type'         => SOCK_STREAM,
-                         'Timeout'      => 5 );
+    my %connect_args = ( PeerAddr   => $host,
+                         PeerPort   => $port,
+                         HostPort   => 0,
+                         Proto      => 'tcp',
+                         Type       => SOCK_STREAM,
+                         Timeout    => 5 );
+    my $handlers     = $shared->{handlers};
+    my $active_timer = $params{ActiveTimer} || 60;
+    my $idle_timer   = $params{IdleTimer} || 120;
+
     if ($has_IO__Socket__INET6 == 1) {
         $conn = new IO::Socket::INET6(%connect_args);
     }
@@ -70,14 +74,14 @@ sub session_thread { # {{{1
         $conn = new IO::Socket::INET(%connect_args);
     }
     if (!defined($conn) || !$conn->connected()) {
-        $shared->{'running'} = -1;
+        $shared->{running} = -1;
         # gotta do this so new() completes, one way or another...
-        $shared->{'conn_sem'}->up();
+        $shared->{conn_sem}->up();
 
-        keys %{$shared->{'handlers'}};
+        keys %{$handlers};
         # return kFPNoServer for all waiting callers, and up() all the waiting
         # semaphores for them.
-        while (my($id, $handler) = each %{$shared->{'handlers'}}) {
+        while (my($id, $handler) = each %{$handlers}) {
             ${$handler->[2]} = kFPNoServer;
             ${$handler->[0]}->up();
         }
@@ -87,17 +91,17 @@ sub session_thread { # {{{1
     # Tell the TCP stack that we don't want Nagle's algorithm; for our
     # purposes, all it's going to do is screw us up.
     setsockopt($conn, IPPROTO_TCP, TCP_NODELAY, 1);
-    $shared->{'conn_fd'} = fileno($conn);
-    $shared->{'running'} = 1;
-    $shared->{'sockaddr'} = $conn->sockaddr();
-    $shared->{'sockport'} = $conn->sockport();
-    $shared->{'peeraddr'} = $conn->peeraddr();
-    $shared->{'peerport'} = $conn->peerport();
-    $shared->{'sockdomain'} = AF_INET;
+    $shared->{conn_fd}      = fileno($conn);
+    $shared->{running}      = 1;
+    $shared->{sockaddr}     = $conn->sockaddr();
+    $shared->{sockport}     = $conn->sockport();
+    $shared->{peeraddr}     = $conn->peeraddr();
+    $shared->{peerport}     = $conn->peerport();
+    $shared->{sockdomain}   = AF_INET;
     if (ref($conn) eq 'IO::Socket::INET6') {
-        $shared->{'sockdomain'} = $conn->sockdomain();
+        $shared->{sockdomain} = $conn->sockdomain();
     }
-    $shared->{'conn_sem'}->up();
+    $shared->{conn_sem}->up();
 
     # Set up a poll object for checking out our socket. Also preallocate
     # several variables which will be used in the main loop.
@@ -106,46 +110,64 @@ sub session_thread { # {{{1
     my ($data, $real_length, $resp, $type, $cmd, $id, $errcode, $length,
             $reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref, $msg,
             $wsz, $handler);
-    my $last_tickle = gettimeofday();
-    my $last_pkt_rcvd = $last_tickle;
+    my $last_tickle     = gettimeofday();
+    my $last_pkt_rcvd   = $last_tickle;
 MAINLOOP:
-    while ($shared->{'exit'} == 0) {
+    while ($shared->{exit} == 0) {
         $now = gettimeofday();
+        # Scan the handlers list to see if there are any callouts that
+        # haven't been responded to.
+        keys %{$handlers};
+        while (($id, $handler) = each %{$handlers}) {
+            # If we find that a transaction hasn't been responded to in at
+            # least $active_timer seconds (default is 60), take our ball and
+            # go home.
+            if (($now - $handler->[3]) > $active_timer) {
+                $shared->{exit} = 1;
+                last MAINLOOP;
+            }
+        }
+
         # Check to see how long it's been since we've heard a tickle packet
         # from the server...
-        if ($now - $last_pkt_rcvd > 120) {
+        #if ($now - $last_pkt_rcvd > $idle_timer) {
             # Apple's docs say if we are 2 minutes out from receiving a
             # tickle from the peer, we should assume the connection is
             # dead.
-            $shared->{'exit'} = 1;
-            last;
-        }
+        #    $shared->{exit} = 1;
+        #    last;
+        #}
         if ($poll->poll(0.5)) {
             $ev = $poll->events($conn);
             if ($ev & POLLHUP) {
                 # If this happens, the socket is (almost certainly) no
                 # longer connected to the peer, so we should bail.
-                last MAINLOOP;
+                #last MAINLOOP;
+                print {\*STDERR} "Net::DSI::session_thread(): poll returned POLLHUP, but this is indeterminate\n";
             }
             # Try to get a message from the server.
-            $shared->{'conn_sem'}->down();
+            $shared->{conn_sem}->down();
             $rsz = 0;
             while ($rsz < 16) {
                 $length = sysread($conn, $resp, 16 - $rsz, $rsz);
+                # Some kind of error occurred...
                 if (!defined $length) {
-                    $shared->{'conn_sem'}->up();
+                    print {\*STDERR} "Net::DSI::session_thread(): socket read received error $!\n";
+                    $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
+                # This means the socket read returned EOF; we should go away.
                 if ($length == 0) {
-                    $shared->{'conn_sem'}->up();
-                    next MAINLOOP;
+                    print {\*STDERR} "Net::DSI::session_thread(): socket read returned EOF\n";
+                    $shared->{conn_sem}->up();
+                    last MAINLOOP;
                 }
                 $rsz += $length;
             }
-            $shared->{'conn_sem'}->up();
+            $shared->{conn_sem}->up();
             next MAINLOOP unless $rsz == 16;
             ($type, $cmd, $id, $errcode, $length, $reserved) =
-                    unpack('CCnNNN', $resp);
+                    unpack('CCS>l>L>L>', $resp);
 
             $rb_ref = *bar{SCALAR};
             $sem_ref = undef;
@@ -156,31 +178,27 @@ MAINLOOP:
                 # DSICloseSession from server; this means the server is
                 # going away (i.e., it's shutting down).
                 if ($cmd == OP_DSI_CLOSESESSION) {
-                    $shared->{'exit'} = 1;
+                    $shared->{exit} = 1;
                 }
 
                 elsif ($cmd == OP_DSI_ATTENTION) {
-                    $shared->{'conn_sem'}->down();
+                    $shared->{conn_sem}->down();
                     $rsz = 0;
                     while ($rsz < $length) {
                         $rsz += sysread($conn, $data, $length - $rsz, $rsz);
+                        $last_pkt_rcvd = gettimeofday();
                     }
-                    $shared->{'conn_sem'}->up();
+                    $shared->{conn_sem}->up();
                     ($userBytes) = unpack('n', $data);
                     # Queue the notification for later processing
-                    push(@{$shared->{'attnq'}}, $userBytes);
+                    push(@{$shared->{attnq}}, $userBytes);
                     next MAINLOOP;
                 }
             } else {
-                # Handle negative return codes in the canonical way.
-                if ($errcode & 0x80000000) {
-                    $errcode = -((~$errcode & 0xFFFFFFFF) + 1);
-                }
-
                 # Check for a completion handler block for the given message ID.
-                if (exists $shared->{'handlers'}{$id}) {
-                    $handler = $shared->{'handlers'}{$id};
-                    delete $shared->{'handlers'}{$id};
+                if (exists $handlers->{$id}) {
+                    $handler = $handlers->{$id};
+                    delete $handlers->{$id};
                     # push the data back to the caller
                     #${$handler->[1]} = ($length ? $data : '');
                     $rb_ref = $handler->[1];
@@ -196,14 +214,18 @@ MAINLOOP:
             }
 
             $real_length = 0;
+            # Perl 5.18 gets bitchy if sysread() is passed a variable
+            # containing undef.
+            ${$rb_ref} = q{};
             # Get any additional data from the server, if the message
             # indicated that there was a payload.
-            $shared->{'conn_sem'}->down();
+            $shared->{conn_sem}->down();
             while ($real_length < $length) {
                 $real_length += sysread($conn, ${$rb_ref},
                         $length - $real_length, $real_length);
+                $last_pkt_rcvd = gettimeofday();
             }
-            $shared->{'conn_sem'}->up();
+            $shared->{conn_sem}->up();
 
             ${$sem_ref}->up() if defined $sem_ref;
         }
@@ -213,73 +235,75 @@ MAINLOOP:
             # send a DSITickle to the server
             # Field 2: Command: DSITickle(5)
             # Manually queue the DSITickle message.
-            $msg = pack('CCnNNN', 0, OP_DSI_TICKLE,
-                    $shared->{'requestid'}++ % 2**16, 0, 0, 0);
-            $shared->{'conn_sem'}->down();
+            $msg = pack('CCS>l>L>L>', 0, OP_DSI_TICKLE,
+                    $shared->{requestid}++ % 2**16, 0, 0, 0);
+            $shared->{conn_sem}->down();
             $wsz = 0;
             while ($wsz < length($msg)) {
                 $wsz += syswrite($conn, $msg, length($msg) - $wsz, $wsz);
             }
-            $shared->{'conn_sem'}->up();
+            $shared->{conn_sem}->up();
             $last_tickle = $now;
         }
     }
-    $shared->{'running'} = -1;
-    undef $shared->{'conn_fd'};
+    $shared->{running} = -1;
+    undef $shared->{conn_fd};
     close($conn);
 
     # Return kFPNoServer to any still-waiting callers. (Sort of a hack to
     # deal with netatalk shutting down the connection right away when FPLogout
     # is received, instead of waiting for the client to send DSICloseSession.
     # Thanks again, netatalk. :| )
-    foreach my $id (keys %{$shared->{'handlers'}}) {
-        $handler = $shared->{'handlers'}{$id};
-            ${$handler->[2]} = kFPNoServer;
-            ${$handler->[0]}->up();
+    keys %{$handlers};
+    while (($id, $handler) = each %{$handlers}) {
+        $handler = $handlers->{$id};
+        ${$handler->[2]} = kFPNoServer;
+        ${$handler->[0]}->up();
     }
     return;
 } # }}}1
 
 sub new { # {{{1
-    my ($class, $host, $port) = @_;
+    my ($class, $host, $port, %params) = @_;
     $port ||= 548;
     my $obj = bless {}, $class;
 
     my $shared = &share({});
     %{$shared} = (
         # 0 means starting, 1 means running, -1 means stopped
-        'running'   => 0,
+        running     => 0,
         # set to 1 to stop the main loop
-        'exit'      => 0,
+        exit        => 0,
         # a counter for a (mostly) unique sequence ID for messages
         # sent to the server.
-        'requestid' => 0,
-        'conn_fd'   => undef,
-        'conn_sem'  => new Thread::Semaphore(0),
+        requestid   => 0,
+        conn_fd     => undef,
+        conn_sem    => new Thread::Semaphore(0),
         # completion handlers are registered here.
-        'handlers'  => &share({}),
+        handlers    => &share({}),
         # server attention messages queued here, should have
         # Net::AFP::TCP check these
-        'attnq'     => &share([]),
+        attnq       => &share([]),
     );
 
-    $obj->{'Shared'} = $shared;
-    my $thread = threads->create(\&session_thread, $shared, $host, $port);
-    $obj->{'Dispatcher'} = $thread;
-    $shared->{'conn_sem'}->down();
-    $obj->{'Conn'} = new IO::Handle;
-    if ($shared->{'running'} == 1) {
-        $obj->{'Conn'}->fdopen($shared->{'conn_fd'}, 'w');
-        $obj->{'Conn'}->autoflush(1);
+    $obj->{Shared}      = $shared;
+    my $thread          = threads->create(\&session_thread, $shared, $host,
+                                            $port);
+    $obj->{Dispatcher}  = $thread;
+    $shared->{conn_sem}->down();
+    $obj->{Conn}        = new IO::Handle;
+    if ($shared->{running} == 1) {
+        $obj->{Conn}->fdopen($shared->{conn_fd}, 'w');
+        $obj->{Conn}->autoflush(1);
     }
-    $shared->{'conn_sem'}->up();
+    $shared->{conn_sem}->up();
 
     return $obj;
 } # }}}1
 sub close { # {{{1
     my ($self) = @_;
-    $self->{'Shared'}{'exit'} = 1;
-    $self->{'Dispatcher'}->join();
+    $self->{Shared}{exit} = 1;
+    $self->{Dispatcher}->join();
     return;
 } # }}}1
 
@@ -311,22 +335,22 @@ sub SendMessage { # {{{1
         ${$sem_r} = new Thread::Semaphore(0);
     }
 
-    $resp_r ||= *foo{SCALAR};
-    $resp_r = &share($resp_r);
+    $resp_r  ||= *foo{SCALAR};
+    $resp_r    = &share($resp_r);
 
-    $rc_r ||= *bar{SCALAR};
-    $rc_r = &share($rc_r);
+    $rc_r    ||= *bar{SCALAR};
+    $rc_r      = &share($rc_r);
 
     $message ||= q{};
 
-    $data_r ||= \q{};
-    $d_len ||= length(${$data_r});
+    $data_r  ||= \q{};
+    $d_len   ||= length(${$data_r});
 
     # Cycle the request ID that DSI uses to identify the request/reply
     # pairing. I'd like to handle that part asynchronously eventually.
-    my $reqId = $self->{'Shared'}{'requestid'}++ % 2**16;
+    my $reqId  = $self->{Shared}{requestid}++ % 2**16;
 
-    if ($self->{'Shared'}{'running'} == -1) {
+    if ($self->{Shared}{running} == -1) {
         ${$sem_r}->up() if defined $sem_r;
         return kFPNoServer;
     }
@@ -338,30 +362,30 @@ sub SendMessage { # {{{1
     #        data offset for DSIWrite messages
     # Arg 5: long  MsgLength
     # Arg 6: long  Reserved: 0
-    my $msg = pack('CCnNNNa*', 0, $cmd, $reqId,
+    my $msg = pack('CCS>l>L>L>a*', 0, $cmd, $reqId,
             $d_len > 0 ? length($message) : 0,
             length($message) + $d_len, 0, $message);
 
     if (defined $sem_r) {
         my $handler = &share([]);
-        @{$handler} = ( $sem_r, $resp_r, $rc_r );
-        $self->{'Shared'}{'handlers'}{$reqId} = $handler;
+        @{$handler} = ( $sem_r, $resp_r, $rc_r, scalar(gettimeofday()) );
+        $self->{Shared}{handlers}{$reqId} = $handler;
     }
 
     # Send the request packet to the server.
-    $self->{'Shared'}{'conn_sem'}->down();
+    $self->{Shared}{conn_sem}->down();
     my $wlen = 0;
     while ($wlen < length($msg)) {
-        $wlen += syswrite($self->{'Conn'}, $msg, length($msg) - $wlen, $wlen);
+        $wlen += syswrite($self->{Conn}, $msg, length($msg) - $wlen, $wlen);
     }
     if ($d_len) {
         $wlen = 0;
         while ($wlen < $d_len) {
-            $wlen += syswrite($self->{'Conn'}, ${$data_r}, $d_len - $wlen,
+            $wlen += syswrite($self->{Conn}, ${$data_r}, $d_len - $wlen,
                     $wlen);
         }
     }
-    $self->{'Shared'}{'conn_sem'}->up();
+    $self->{Shared}{conn_sem}->up();
 
     return $reqId;
 } # }}}1
@@ -442,11 +466,11 @@ sub DSIOpenSession { # {{{1
     while (length($resp) > 0) {
         my ($opttype, $optdata) = unpack('CC/a', $resp);
         if ($opttype == kRequestQuanta) {
-            $rcvd_opts{'RequestQuanta'} = unpack('N', $optdata);
+            $rcvd_opts{RequestQuanta}           = unpack('N', $optdata);
         } elsif ($opttype == kAttentionQuanta) {
-            $rcvd_opts{'AttentionQuanta'} = unpack('N', $optdata);
+            $rcvd_opts{AttentionQuanta}         = unpack('N', $optdata);
         } elsif ($opttype == kServerReplayCacheSize) {
-            $rcvd_opts{'ServerReplayCacheSize'} = unpack('N', $optdata);
+            $rcvd_opts{ServerReplayCacheSize}   = unpack('N', $optdata);
         }
         $resp = substr($resp, 2 + length($optdata));
     }
