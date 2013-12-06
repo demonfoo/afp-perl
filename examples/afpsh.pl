@@ -6,7 +6,7 @@ use diagnostics;
 
 # Enables a nice call trace on warning events.
 use Carp ();
-local $SIG{'__WARN__'} = \&Carp::cluck;
+local $SIG{__WARN__} = \&Carp::cluck;
 
 # Pull in all the AFP packages that we need, for the connection object
 # itself and return code symbols, helper functions for version handling
@@ -67,16 +67,16 @@ GetOptions( 'debug-afp' => sub { $__AFP_DEBUG = 1; },
             'atalk-first' => \$atalk_first,
             'prefer-v4' => \$prefer_v4);
 
-$afpopts{'aforder'} = [AF_INET];
+$afpopts{aforder} = [AF_INET];
 if ($prefer_v4) {
-    push(@{$afpopts{'aforder'}}, AF_INET6);
+    push(@{$afpopts{aforder}}, AF_INET6);
 } else {
-    unshift(@{$afpopts{'aforder'}}, AF_INET6);
+    unshift(@{$afpopts{aforder}}, AF_INET6);
 }
 if ($atalk_first) {
-    unshift(@{$afpopts{'aforder'}}, AF_APPLETALK);
+    unshift(@{$afpopts{aforder}}, AF_APPLETALK);
 } else {
-    push(@{$afpopts{'aforder'}}, AF_APPLETALK);
+    push(@{$afpopts{aforder}}, AF_APPLETALK);
 }
 
 my($path) = @ARGV;
@@ -84,17 +84,17 @@ my($path) = @ARGV;
 my $pw_cb = sub {
     my(%values) = @_;
     my $prompt = 'Password: ';
-    return $values{'password'} if defined $values{'password'};
+    return $values{password} if defined $values{password};
     return read_password($prompt);
 };
-my($session, %values) = do_afp_connect($pw_cb, $path, undef, %afpopts);
+my($session, %values) = do_afp_connect($pw_cb, $path || q{}, undef, %afpopts);
 unless (ref($session) && $session->isa('Net::AFP')) {
     exit($session);
 }
 
 # If no volume was named, contact the server and find out the volumes
 # it knows, and spit those out in a friendly format.
-unless ($values{'volume'}) {
+unless ($values{volume}) {
     my $srvrParms;
     $session->FPGetSrvrParms(\$srvrParms);
     print <<'_EOT_';
@@ -102,8 +102,10 @@ unless ($values{'volume'}) {
 Volume Name                                 | UNIX privs? | Volume pass?
 -------------------------------------------------------------------------
 _EOT_
-    foreach my $volume (@{$$srvrParms{'Volumes'}}) {
-        printf("\%-43s |     \%-3s     |     \%s\n", $$volume{'VolName'}, $$volume{'HasUNIXPrivs'} ? 'Yes' : 'No', $$volume{'HasPassword'} ? 'Yes' : 'No');
+    foreach my $volume (@{$$srvrParms{Volumes}}) {
+        printf("\%-43s |     \%-3s     |     \%s\n", $volume->{VolName},
+                $volume->{HasUNIXPrivs} ? 'Yes' : 'No',
+                $volume->{HasPassword} ? 'Yes' : 'No');
     }
 
     $session->FPLogout();
@@ -112,7 +114,7 @@ _EOT_
 }
 
 my $volInfo;
-my $rc = $session->FPOpenVol(kFPVolAttributeBit, $values{'volume'}, undef,
+my $rc = $session->FPOpenVol(kFPVolAttributeBit, $values{volume}, undef,
         \$volInfo);
 unless ($rc == kFPNoErr) {
     print "Volume was unknown?\n";
@@ -121,7 +123,7 @@ unless ($rc == kFPNoErr) {
     exit(1);
 }
 
-my $volID = $$volInfo{'ID'};
+my $volID = $$volInfo{ID};
 my $DT_ID;
 $rc = $session->FPOpenDT($volID, \$DT_ID);
 unless ($rc == kFPNoErr) {
@@ -132,7 +134,7 @@ unless ($rc == kFPNoErr) {
 #   $session->close();
 }
 
-my $volAttrs = $$volInfo{'VolAttribute'};
+my $volAttrs = $volInfo->{VolAttribute};
 
 my $client_uuid;
 if ($volAttrs & kSupportsACLs) {
@@ -184,11 +186,11 @@ if (Net::AFP::Versions::CompareByVersionNum($session, 3, 1,
     $EnumFn         = \&Net::AFP::FPEnumerateExt2;
 }
 
-if (defined $values{'subpath'}) {
+if (defined $values{subpath}) {
     my ($newDirId, $fileName) = resolve_path($session, $volID, $curdirnode,
-            $values{'subpath'});
+            $values{subpath});
     if (defined $fileName || !defined $newDirId) {
-        print "path ", $values{'subpath'}, " is not accessible, defaulting ",
+        print 'path ', $values{subpath}, ' is not accessible, defaulting ',
                 "to volume root\n";
     }
     else {
@@ -202,14 +204,14 @@ my %commands = (
         my $fileBmp = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
                 kFPNodeIDBit | $DForkLenFlag | $RForkLenFlag |
                 kFPParentDirIDBit | $pathFlag;
-        if ($$volInfo{'VolAttribute'} & kSupportsUnixPrivs) {
+        if ($volInfo->{VolAttribute} & kSupportsUnixPrivs) {
             $fileBmp |= kFPUnixPrivsBit;
         }
         my $dirBmp = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
                 kFPNodeIDBit | kFPOffspringCountBit | kFPOwnerIDBit |
                 kFPGroupIDBit | kFPAccessRightsBit | kFPParentDirIDBit |
                 $pathFlag;
-        if ($$volInfo{'VolAttribute'} & kSupportsUnixPrivs) {
+        if ($volInfo->{VolAttribute} & kSupportsUnixPrivs) {
             $dirBmp |= kFPUnixPrivsBit;
         }
         my $printDirNames = 0;
@@ -223,13 +225,6 @@ my %commands = (
             my $results;
             my $rc;
             my $expansion_list = expand_globbed_path($session, $volID, $curdirnode, $item);
-            #print Dumper($expansion_list);
-            #my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
-            #        $item);
-            #unless (defined $dirId) {
-            #    print "Sorry, couldn't find named entry \"", $item, "\"\n";
-            #    next;
-            #}
             if (!ref($expansion_list) || scalar(@{$expansion_list}) < 1) {
                 print "Sorry, couldn't find any matches for entry \"", $item, "\"\n";
                 next;
@@ -238,50 +233,50 @@ my %commands = (
                 $printDirNames = 1;
             }
             foreach my $elem (@{$expansion_list}) {
-
-            my @records;
-            my ($dirId, $fileName, $dirName) = @{$elem};
-            if (defined $fileName && $fileName ne '') {
-                my $resp;
-                ($rc, $resp) = $session->FPGetFileDirParms(
-                        VolumeID        => $volID,
-                        DirectoryID     => $dirId,
-                        FileBitmap      => $fileBmp,
-                        DirectoryBitmap => $dirBmp,
-                        PathType        => $pathType,
-                        Pathname        => $fileName);
-                push(@records, $resp) if $rc == kFPNoErr;
-            }
-            else {
-                my $offset = 1;
-                do {
-                    $results = undef;
-                    ($rc, $results) = &$EnumFn($session,
-                                   'VolumeID'       => $volID,
-                                   'DirectoryID'    => $dirId,
-                                   'FileBitmap'     => $fileBmp,
-                                   'DirectoryBitmap' => $dirBmp,
-                                   'ReqCount'       => 1024,
-                                   'StartIndex'     => $offset,
-                                   'MaxReplySize'   => 32767,
-                                   'PathType'       => $pathType,
-                                   'Pathname'       => '');
-                    if (ref($results) eq 'ARRAY') {
-                        push(@records, @$results);
-                        $offset += scalar(@$results);
+                my @records;
+                my ($dirId, $fileName, $dirName) = @{$elem};
+                if (defined $fileName && $fileName ne q{}) {
+                    my $resp;
+                    ($rc, $resp) = $session->FPGetFileDirParms(
+                            VolumeID        => $volID,
+                            DirectoryID     => $dirId,
+                            FileBitmap      => $fileBmp,
+                            DirectoryBitmap => $dirBmp,
+                            PathType        => $pathType,
+                            Pathname        => $fileName);
+                    push(@records, $resp) if $rc == kFPNoErr;
+                }
+                else {
+                    my $offset = 1;
+                    do {
+                        $results = undef;
+                        ($rc, $results) = &$EnumFn($session,
+                                VolumeID        => $volID,
+                                DirectoryID     => $dirId,
+                                FileBitmap      => $fileBmp,
+                                DirectoryBitmap => $dirBmp,
+                                ReqCount        => 1024,
+                                StartIndex      => $offset,
+                                MaxReplySize    => 32767,
+                                PathType        => $pathType,
+                                Pathname        => q{});
+                        if (ref($results) eq 'ARRAY') {
+                            push(@records, @$results);
+                            $offset += scalar(@$results);
+                        }
+                    } while ($rc == kFPNoErr);
+                }
+                if ($rc == kFPNoErr || $rc == kFPObjectNotFound) {
+                    if ($printDirNames == 1 &&
+                            (!defined($fileName) || $fileName eq q{})) {
+                        print $dirName, ":\n";
                     }
-                } while ($rc == kFPNoErr);
-            }
-            if ($rc == kFPNoErr || $rc == kFPObjectNotFound) {
-                if ($printDirNames == 1 && (!defined($fileName) || $fileName eq '')) {
-                    print $dirName, ":\n";
+                    do_listentries(\@records, $volID);
+                    if ($printDirNames == 1 &&
+                            (!defined($fileName) || $fileName eq q{})) {
+                        print "\n";
+                    }
                 }
-                do_listentries(\@records, $volID);
-                if ($printDirNames == 1 && (!defined($fileName) || $fileName eq '')) {
-                    print "\n";
-                }
-            }
-
             }
         }
         return 1;
@@ -292,11 +287,11 @@ my %commands = (
             my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
                     $fname);
             my($rc, %resp) = $session->FPOpenFork(
-                    'VolumeID'      => $volID,
-                    'DirectoryID'   => $dirId,
-                    'AccessMode'    => 0x1,
-                    'PathType'      => $pathType,
-                    'Pathname'      => $fileName);
+                    VolumeID    => $volID,
+                    DirectoryID => $dirId,
+                    AccessMode  => 0x1,
+                    PathType    => $pathType,
+                    Pathname    => $fileName);
             if ($rc != kFPNoErr) {
                 print 'open attempt failed with code ', $rc, ' (',
                         afp_strerror($rc), ")\n";
@@ -306,14 +301,14 @@ my %commands = (
             while (1) {
                 my $data;
                 ($rc, $data) = &$ReadFn($session,
-                        'OForkRefNum'   => $resp{'OForkRefNum'},
-                        'Offset'        => $pos,
-                        'ReqCount'      => 1024);
+                        OForkRefNum => $resp{OForkRefNum},
+                        Offset      => $pos,
+                        ReqCount    => 1024);
                 print $data;
-                last if $rc != kFPNoErr || $data eq '';
+                last if $rc != kFPNoErr || $data eq q{};
                 $pos += length($data);
             }
-            $rc = $session->FPCloseFork($resp{'OForkRefNum'});
+            $rc = $session->FPCloseFork($resp{OForkRefNum});
             if ($rc != kFPNoErr) {
                 print 'close attempt failed with code ', $rc, ' (',
                         afp_strerror($rc), ")\n";
@@ -344,8 +339,17 @@ my %commands = (
         return 1;
     },
     get => sub {
-        my @words = @_;
-        if (scalar(@words) < 2 or scalar(@words) > 3) {
+        my @words = @_[1..$#_];
+        my($continue, $del_src_after_get, $del_target_before_get, $basedir,
+            $outputpath);
+        GetOptionsFromArray(\@words,
+            'c'     => \$continue,
+            'E'     => \$del_src_after_get,
+            'e'     => \$del_target_before_get,
+            'O=s'   => \$basedir,
+            'o=s'   => \$outputpath,
+        );
+        if (scalar(@words) < 1 or scalar(@words) > 2) {
             print <<'_EOT_';
 Error: Specify the name of the file to retrieve, and optionally the name of
 the file to store the local copy to. Quote the name if needed (to account
@@ -354,7 +358,7 @@ _EOT_
             return 1;
         }
         my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
-                $words[1]);
+                $words[0]);
         unless (defined $dirId) {
             print <<'_EOT_';
 Error: Couldn't resolve path; possibly no such file?
@@ -367,13 +371,13 @@ Error: Not a file; you must specify the name of a file to retrieve.
 _EOT_
             return 1;
         }
-        my $targetFile = (scalar(@words) == 2 ? $fileName : $words[2]);
+        my $targetFile = (scalar(@words) == 1 ? $fileName : $words[1]);
         my($rc, %resp) = $session->FPOpenFork(
-                'VolumeID'      => $volID,
-                'DirectoryID'   => $dirId,
-                'AccessMode'    => 0x1,
-                'PathType'      => $pathType,
-                'Pathname'      => $fileName);
+                VolumeID    => $volID,
+                DirectoryID => $dirId,
+                AccessMode  => 0x1,
+                PathType    => $pathType,
+                Pathname    => $fileName);
         if ($rc != kFPNoErr) {
             print 'open attempt failed with code ', $rc, ' (',
                     afp_strerror($rc), ")\n";
@@ -383,18 +387,18 @@ _EOT_
         my $local_fh = new IO::File($targetFile, 'w');
         unless (defined $local_fh) {
             print "Couldn't open local file for writing!\n";
-            $session->FPCloseFork($resp{'OForkRefNum'});
+            $session->FPCloseFork($resp{OForkRefNum});
             return 1;
         }
 
-        my $sresp = '';
+        my $sresp = q{};
         my $bitmap = $DForkLenFlag | $RForkLenFlag;
         ($rc, $sresp) = $session->FPGetFileDirParms(
-                'VolumeID'      => $volID,
-                'DirectoryID'   => $dirId,
-                'PathType'      => $pathType,
-                'Pathname'      => $fileName,
-                'FileBitmap'    => $bitmap);
+                VolumeID    => $volID,
+                DirectoryID => $dirId,
+                PathType    => $pathType,
+                Pathname    => $fileName,
+                FileBitmap  => $bitmap);
 
         if ($sresp->{$RForkLenKey} > 0) {
             print "note that the resource fork isn't handled yet!\n";
@@ -407,22 +411,22 @@ _EOT_
         while (1) {
             my $data;
             ($rc, $data) = &$ReadFn($session,
-                    'OForkRefNum'   => $resp{'OForkRefNum'},
-                    'Offset'        => $pos,
-                    'ReqCount'      => 131072);
+                    OForkRefNum => $resp{OForkRefNum},
+                    Offset      => $pos,
+                    ReqCount    => 131_072);
             print $local_fh $data;
             my $rate = 0;
-            my $delta = (($time{'sec'} - $starttime{'sec'}) +
-                    (($time{'usec'} - $starttime{'usec'}) / 1000000.0));
+            my $delta = (($time{sec} - $starttime{sec}) +
+                    (($time{usec} - $starttime{usec}) / 1_000_000.0));
             my $mult = ' ';
             if ($delta > 0) {
                 $rate = $pos / $delta;
-                if ($rate > 1000) {
-                    $rate /= 1000.0;
+                if ($rate > 1_000) {
+                    $rate /= 1_000.0;
                     $mult = 'K';
                 }
-                if ($rate > 1000) {
-                    $rate /= 1000.0;
+                if ($rate > 1_000) {
+                    $rate /= 1_000.0;
                     $mult = 'M';
                 }
             }
@@ -437,14 +441,14 @@ _EOT_
         }
         print "\n";
         close($local_fh);
-        $rc = $session->FPCloseFork($resp{'OForkRefNum'});
+        $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != kFPNoErr) {
             print 'close attempt failed with code ', $rc, ' (',
                     afp_strerror($rc), ")\n";
         }
         return 1;
     },
-    'put' => sub {
+    put => sub {
         my @words = @_;
         if (scalar(@words) < 2 or scalar(@words) > 3) {
             print <<'_EOT_';
@@ -475,11 +479,11 @@ _EOT_
             return 1;
         }
         my $rc = $session->FPCreateFile(
-                'Flag'          => 0x80,
-                'VolumeID'      => $volID,
-                'DirectoryID'   => $dirID,
-                'PathType'      => $pathType,
-                'Pathname'      => $fileName);
+                Flag        => 0x80,
+                VolumeID    => $volID,
+                DirectoryID => $dirID,
+                PathType    => $pathType,
+                Pathname    => $fileName);
         if ($rc != kFPNoErr) {
             print 'Couldn\'t create file on remote server; server returned code ',
                     $rc, ' (', afp_strerror($rc), ")\n";
@@ -487,11 +491,11 @@ _EOT_
         }
         my %resp;
         ($rc, %resp) = $session->FPOpenFork(
-                'VolumeID'      => $volID,
-                'DirectoryID'   => $dirID,
-                'AccessMode'    => 0x3,
-                'PathType'      => $pathType,
-                'Pathname'      => $fileName);
+                VolumeID    => $volID,
+                DirectoryID => $dirID,
+                AccessMode  => 0x3,
+                PathType    => $pathType,
+                Pathname    => $fileName);
         if ($rc != kFPNoErr) {
             print 'open attempt failed with code ', $rc, ' (',
                     afp_strerror($rc), ")\n";
@@ -508,13 +512,13 @@ _EOT_
         my $wcount = 0;
         while (1) {
             my $data;
-            my $rcnt = read($srcFile, $data, 131072);
+            my $rcnt = read($srcFile, $data, 131_072);
             last if $rcnt == 0;
             # try a direct write, and see how far we get; zero-copy is
             # preferred if possible.
             ($rc, $wcount) = &$WriteFn($session,
                     Flag        => kFPStartEndFlag,
-                    OForkRefNum => $resp{'OForkRefNum'},
+                    OForkRefNum => $resp{OForkRefNum},
                     Offset      => 0,
                     ForkData    => \$data);
 
@@ -533,17 +537,17 @@ _EOT_
 #            printf(' %3d%%  |%-25s|  %-.42s' . "\r",
 #                    $pcnt, '*' x ($pcnt * 25 / 100), $srcFileName);
             my $rate = 0;
-            my $delta = (($time{'sec'} - $starttime{'sec'}) +
-                        (($time{'usec'} - $starttime{'usec'}) / 1000000.0));
+            my $delta = (($time{sec} - $starttime{sec}) +
+                    (($time{usec} - $starttime{usec}) / 1_000_000.0));
             my $mult = ' ';
             if ($delta > 0) {
                 $rate = $pos / $delta;
-                if ($rate > 1000) {
-                    $rate /= 1000.0;
+                if ($rate > 1_000) {
+                    $rate /= 1_000.0;
                     $mult = 'K';
                 }
-                if ($rate > 1000) {
-                    $rate /= 1000.0;
+                if ($rate > 1_000) {
+                    $rate /= 1_000.0;
                     $mult = 'M';
                 }
             }
@@ -565,7 +569,7 @@ _EOT_
         print "\n";
         #}
         close($srcFile);
-        $rc = $session->FPCloseFork($resp{'OForkRefNum'});
+        $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != kFPNoErr) {
             print 'close attempt failed with code ', $rc, ' (',
                     afp_strerror($rc), "\n";
@@ -599,14 +603,6 @@ Please specify the name of one or more files or directories to remove.
 _EOT_
             return 1;
         }
-        #my ($dirID, $fileName) = resolve_path($session, $volID, $curdirnode,
-        #        $words[1], 1, 0);
-        #unless (defined $dirID) {
-        #    print <<'_EOT_';
-#Error: Couldn't resolve path; possibly no such file?
-#_EOT_
-        #    return 1;
-        #}
 NEXT_ARG:
         foreach my $item (@words[1 .. $#words]) {
             my $expansion_list = expand_globbed_path($session, $volID, $curdirnode, $words[1]);
@@ -618,7 +614,7 @@ NEXT_EXPANDED:
             foreach my $elem (@{$expansion_list}) {
                 my ($dirId, $fileName, $dirName) = @{$elem};
                 my $rc = $session->FPDelete($volID, $dirId, $pathType,
-                        $fileName || '');
+                        $fileName || q{});
                 if ($rc != kFPNoErr) {
                     print 'sorry, couldn\'t remove item "',
                             $fileName || $dirName, '"; response was ', $rc,
@@ -635,13 +631,13 @@ NEXT_EXPANDED:
         while ($searchID != $topDirID) {
             my $dirbits = kFPParentDirIDBit | $pathFlag;
             my($rc, $entry) = $session->FPGetFileDirParms(
-                    'VolumeID'          => $volID,
-                    'DirectoryID'       => $searchID,
-                    'DirectoryBitmap'   => $dirbits,
-                    'PathType'          => $pathType,
-                    'Pathname'          => '');
+                    VolumeID        => $volID,
+                    DirectoryID     => $searchID,
+                    DirectoryBitmap => $dirbits,
+                    PathType        => $pathType,
+                    Pathname        => q{});
             push(@nameParts, $$entry{$pathkey});
-            $searchID = $$entry{'ParentDirID'};
+            $searchID = $entry->{ParentDirID};
         }
         print "current directory is /", join('/', reverse(@nameParts)), "\n";
         return 1;
@@ -657,7 +653,8 @@ NEXT_EXPANDED:
             my($rc, %resp) = $session->FPGetACL(
                     VolumeID    => $volID,
                     DirectoryID => $dirId,
-                    Bitmap      => kFileSec_UUID | kFileSec_GRPUUID | kFileSec_ACL,
+                    Bitmap      => kFileSec_UUID | kFileSec_GRPUUID |
+                                    kFileSec_ACL,
                     PathType    => $pathType,
                     Pathname    => $fileName);
             if ($rc != kFPNoErr) {
@@ -688,16 +685,17 @@ NEXT_EXPANDED:
     },
     globtest    => sub {
         my @words = @_;
-        print Dumper(expand_globbed_path($session, $volID, $curdirnode, $words[1]));
+        print Dumper(expand_globbed_path($session, $volID, $curdirnode,
+                $words[1]));
 
         return 1;
     },
-    'lcd'       => sub {
+    lcd => sub {
         my @words = @_;
         chdir($words[1] || $ENV{HOME}) || print "Couldn't change local directory: $!\n";
         return 1;
     },
-    'lpwd'      => sub {
+    lpwd    => sub {
         print Cwd::getcwd(), "\n";
         return 1;
     },
@@ -711,18 +709,55 @@ _EOT_
             return 1;
         }
         my $mode = oct($words[1]);
-    }
+    },
+    allinfo => sub {
+        my @words = @_;
+        my $fileBmp = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
+                kFPNodeIDBit | $DForkLenFlag | $RForkLenFlag |
+                kFPParentDirIDBit | $pathFlag;
+        if ($volInfo->{VolAttribute} & kSupportsUnixPrivs) {
+            $fileBmp |= kFPUnixPrivsBit;
+        }
+        my $dirBmp = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
+                kFPNodeIDBit | kFPOffspringCountBit | kFPOwnerIDBit |
+                kFPGroupIDBit | kFPAccessRightsBit | kFPParentDirIDBit |
+                $pathFlag;
+        if ($volInfo->{VolAttribute} & kSupportsUnixPrivs) {
+            $dirBmp |= kFPUnixPrivsBit;
+        }
+        my($rc, $resp);
+        foreach my $fname (@words[1..$#words]) {
+            my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
+                    $fname);
+
+            ($rc, $resp) = $session->FPGetFileDirParms(
+                    VolumeID        => $volID,
+                    DirectoryID     => $dirId,
+                    FileBitmap      => $fileBmp,
+                    DirectoryBitmap => $dirBmp,
+                    PathType        => $pathType,
+                    Pathname        => $fileName || q{});
+            if ($rc == kFPNoErr) {
+                print Dumper($resp);
+            }
+            else {
+                print "ERROR: Could not look up entry \"$fname\", error $rc (",
+                        afp_strerror($rc), ")\n";
+            }
+        }
+        return 1;
+    },
 );
-$commands{'dir'}    = $commands{'ls'};
-$commands{'delete'} = $commands{'rm'};
-$commands{'quit'}   = $commands{'exit'};
-$commands{'cdup'}   = [ $commands{'cd'}, '..' ];
-$commands{'rmdir'}  = $commands{'rm'};
+$commands{dir}    = $commands{ls};
+$commands{delete} = $commands{rm};
+$commands{quit}   = $commands{exit};
+$commands{cdup}   = [ $commands{cd}, '..' ];
+$commands{rmdir}  = $commands{rm};
 
 binmode STDOUT, ':utf8';
 binmode STDIN, ':utf8';
 
-local $SIG{'INT'} = sub {
+local $SIG{INT} = sub {
     print "\nCtrl-C received, exiting\n";
     $session->FPCloseDT($DT_ID) if defined $DT_ID;
     $session->FPCloseVol($volID);
@@ -739,7 +774,7 @@ while (1) {
     }
     $line = decode($term_enc, $line);
     my @words = shellwords($line);
-    next if (!defined($words[0]) || ($words[0] eq ''));
+    next if (!defined($words[0]) || ($words[0] eq q{}));
     if (exists $commands{$words[0]}) {
         my $docall = $commands{$words[0]};
         if (ref($docall) eq 'ARRAY') {
@@ -761,19 +796,19 @@ sub do_listentries {
     my ($results, $volID) = @_;
     @$results = sort { $$a{$pathkey} cmp $$b{$pathkey} } @$results;
     foreach my $ent (@$results) {
-        my $fmodtime = $$ent{'ModDate'};
+        my $fmodtime = $$ent{ModDate};
         my $tfmt = '%b %e  %Y';
         if (time() - $fmodtime < 6 * 30 * 24 * 60 * 60) {
             $tfmt = '%b %e %H:%M';
         }
         my $up;
-        if (exists $$ent{'UnixPerms'}) {
-            $up = $$ent{'UnixPerms'};
+        if (exists $$ent{UnixPerms}) {
+            $up = $$ent{UnixPerms};
         }
         else {
-            $up = $$ent{'FileIsDir'} ? 0755 : 0644;
+            $up = $$ent{FileIsDir} ? 0755 : 0644;
         }
-        my $uid = $$ent{'UnixUID'} || 0;
+        my $uid = $$ent{UnixUID} || 0;
         my $user;
         if (exists $uidmap{$uid}) {
             $user = $uidmap{$uid};
@@ -783,7 +818,7 @@ sub do_listentries {
             $uidmap{$uid} = $user;
         }
 
-        my $gid = $$ent{'UnixGID'} || 0;
+        my $gid = $$ent{UnixGID} || 0;
         my $group;
         if (exists $gidmap{$gid}) {
             $group = $gidmap{$gid};
@@ -795,7 +830,7 @@ sub do_listentries {
 
         $$ent{$pathkey} =~ tr/\//:/;
         printf('%s%s%s%s%s%s%s%s%s%s %3d %-8s %-8s %8s %-11s %s' . "\n",
-            ($$ent{'FileIsDir'} == 1 ? 'd' : '-'),
+            ($ent->{FileIsDir} == 1 ? 'd' : '-'),
             ($up & 0400 ? 'r' : '-'),
             ($up & 0200 ? 'w' : '-'),
             ($up & 04000 ? ($up & 0100 ? 's' : 'S') : ($up & 0100 ? 'x' : '-')),
@@ -805,33 +840,33 @@ sub do_listentries {
             ($up & 0004 ? 'r' : '-'),
             ($up & 0002 ? 'w' : '-'),
             ($up & 01000 ? ($up & 0001 ? 't' : 'T') : ($up & 0001 ? 'x' : '-')),
-            ($$ent{'FileIsDir'} == 1 ? $$ent{'OffspringCount'} + 2 : 1),
+            ($ent->{FileIsDir} == 1 ? $ent->{OffspringCount} + 2 : 1),
             $user || $uid, $group || $gid,
-            ($$ent{'FileIsDir'} == 1 ? 0 : $$ent{$DForkLenKey}),
+            ($ent->{FileIsDir} == 1 ? 0 : $ent->{$DForkLenKey}),
             strftime($tfmt, localtime($fmodtime)),
-            $$ent{$pathkey});
+            $ent->{$pathkey});
         if ($client_uuid) {
             my($rc, %acl_info) = $session->FPGetACL(
-                    'VolumeID'      => $volID,
-                    'DirectoryID'   => $$ent{'ParentDirID'},
-                    'PathType'      => $pathType,
-                    'Pathname'      => $$ent{$pathkey});
-            if ($rc == kFPNoErr && ($acl_info{'Bitmap'} & kFileSec_ACL)) {
-                for (my $i = 0; $i <= $#{$acl_info{'acl_ace'}}; $i++) {
-                    my $entry = ${$acl_info{'acl_ace'}}[$i];
+                    VolumeID    => $volID,
+                    DirectoryID => $ent->{ParentDirID},
+                    PathType    => $pathType,
+                    Pathname    => $ent->{$pathkey});
+            if ($rc == kFPNoErr && ($acl_info{Bitmap} & kFileSec_ACL)) {
+                for (my $i = 0; $i <= $#{$acl_info{acl_ace}}; $i++) {
+                    my $entry = $acl_info{acl_ace}[$i];
                     my $name;
                     my @args = ();
                     my $rc = $session->FPMapID(kUserUUIDToUTF8Name,
-                            $$entry{'ace_applicable'}, \$name);
+                            $entry->{ace_applicable}, \$name);
                     my $idtype;
-                    if ($$name{'Bitmap'} == kFileSec_UUID) {
+                    if ($name->{Bitmap} == kFileSec_UUID) {
                         $idtype = 'user';
                     }
-                    elsif ($$name{'Bitmap'} == kFileSec_GRPUUID) {
+                    elsif ($name->{Bitmap} == kFileSec_GRPUUID) {
                         $idtype = 'group';
                     }
 
-                    my $acl_kind = $$entry{'ace_flags'} & KAUTH_ACE_KINDMASK;
+                    my $acl_kind = $entry->{ace_flags} & KAUTH_ACE_KINDMASK;
                     my $kind = 'unknown';
                     if ($acl_kind == KAUTH_ACE_PERMIT) {
                         $kind = 'allow';
@@ -841,21 +876,24 @@ sub do_listentries {
                     }
 
                     my @actions = ();
-                    my $rights = $$entry{'ace_rights'};
+                    my $rights = $entry->{ace_rights};
                     if ($rights & KAUTH_VNODE_READ_DATA) {
-                        push(@actions, $$ent{'FileIsDir'} ? 'list' : 'read');
+                        push(@actions, $ent->{FileIsDir} ? 'list' : 'read');
                     }
                     if ($rights & KAUTH_VNODE_WRITE_DATA) {
-                        push(@actions, $$ent{'FileIsDir'} ? 'add_file' : 'write');
+                        push(@actions, $ent->{FileIsDir} ? 'add_file' :
+                                'write');
                     }
                     if ($rights & KAUTH_VNODE_EXECUTE) {
-                        push(@actions, $$ent{'FileIsDir'} ? 'search' : 'execute');
+                        push(@actions, $ent->{FileIsDir} ? 'search' :
+                                'execute');
                     }
                     if ($rights & KAUTH_VNODE_DELETE) {
                         push(@actions, 'delete');
                     }
                     if ($rights & KAUTH_VNODE_APPEND_DATA) {
-                        push(@actions, $$ent{'FileIsDir'} ? 'add_subdirectory' : 'append');
+                        push(@actions, $ent->{FileIsDir} ?
+                                'add_subdirectory' : 'append');
                     }
                     if ($rights & KAUTH_VNODE_DELETE_CHILD) {
                         push(@actions, 'delete_child');
@@ -883,7 +921,7 @@ sub do_listentries {
                     }
 
                     printf(" \%d: \%s:\%s \%s \%s\n", $i, $idtype,
-                            $$name{'UTF8Name'}, $kind, @actions);
+                            $name->{UTF8Name}, $kind, @actions);
                 }
             }
         }
@@ -902,7 +940,7 @@ sub expand_globbed_path {
 
     my @nameParts;
 
-    if (!defined($pathElements[0]) || ($pathElements[0] eq '')) {
+    if (!defined($pathElements[0]) || ($pathElements[0] eq q{})) {
         $curNode = 2;
         shift(@pathElements);
     }
@@ -911,41 +949,41 @@ sub expand_globbed_path {
         while ($searchID != $topDirID) {
             my $dirbits = kFPParentDirIDBit | $pathFlag;
             my($rc, $entry) = $session->FPGetFileDirParms(
-                    'VolumeID'          => $volID,
-                    'DirectoryID'       => $searchID,
-                    'DirectoryBitmap'   => $dirbits,
-                    'PathType'          => $pathType,
-                    'Pathname'          => '');
+                    VolumeID        => $volID,
+                    DirectoryID     => $searchID,
+                    DirectoryBitmap => $dirbits,
+                    PathType        => $pathType,
+                    Pathname        => q{});
             unshift(@nameParts, $entry->{$pathkey});
-            $searchID = $$entry{'ParentDirID'};
+            $searchID = $entry->{ParentDirID};
         }
     }
-    my @expanded_paths = ( [ $curNode, '', @nameParts ] );
+    my @expanded_paths = ( [ $curNode, q{}, @nameParts ] );
     my $pathElem = shift(@pathElements);
     while (defined $pathElem) {
         my (@newpaths);
-        if ($pathElem eq '' or $pathElem eq '.') {
+        if ($pathElem eq q{} or $pathElem eq q{.}) {
             $pathElem = shift(@pathElements);
             next;
         }
-        if ($pathElem eq '..') {
+        if ($pathElem eq q{..}) {
             # use unique keyspace temporarily for duplicate checking, since
             # I think this is really the only point where it's a serious
             # concern (so far).
             my %dupchk;
             foreach my $expath (@expanded_paths) {
-                next if $$expath[1] ne '';
+                next if $$expath[1] ne q{};
                 my($rc, $resp) = $session->FPGetFileDirParms(
-                        'VolumeID'          => $volid,
-                        'DirectoryID'       => $$expath[0],
-                        'DirectoryBitmap'   => kFPParentDirIDBit,
-                        'PathType'          => $pathType,
-                        'Pathname'          => '');
+                        VolumeID        => $volid,
+                        DirectoryID     => $$expath[0],
+                        DirectoryBitmap => kFPParentDirIDBit,
+                        PathType        => $pathType,
+                        Pathname        => q{});
                 next if $rc != kFPNoErr;
-                next if exists $dupchk{$$resp{'ParentDirID'}};
-                push(@newpaths, [ $$resp{'ParentDirID'}, '',
-                     @$expath[3 .. $#$expath] ]);
-                $dupchk{$$resp{'ParentDirID'}} = 1;
+                next if exists $dupchk{$resp->{ParentDirID}};
+                push(@newpaths, [ $resp->{ParentDirID}, q{},
+                        @{$expath}[3 .. $#{$expath}] ]);
+                $dupchk{$resp->{ParentDirID}} = 1;
             }
             @expanded_paths = @newpaths;
             $pathElem = shift(@pathElements);
@@ -959,15 +997,15 @@ sub expand_globbed_path {
 COLLECT_PATHS:
             while ($rc == kFPNoErr){
                 ($rc, $resp) = &$EnumFn($session,
-                               'VolumeID'       => $volid,
-                               'DirectoryID'    => $$expath[0],
-                               'FileBitmap'     => $fileBmp,
-                               'DirectoryBitmap' => $dirBmp,
-                               'ReqCount'       => 256,
-                               'StartIndex'     => scalar(keys %entries) + 1,
-                               'MaxReplySize'   => 32767,
-                               'PathType'       => $pathType,
-                               'Pathname'       => $$expath[1]);
+                               VolumeID         => $volid,
+                               DirectoryID      => $$expath[0],
+                               FileBitmap       => $fileBmp,
+                               DirectoryBitmap  => $dirBmp,
+                               ReqCount         => 256,
+                               StartIndex       => scalar(keys %entries) + 1,
+                               MaxReplySize     => 32767,
+                               PathType         => $pathType,
+                               Pathname         => $$expath[1]);
                 if ($rc == kFPNoErr || $rc == kFPObjectNotFound) {
                     if ($#{$resp} == 0 && $lastelem &&
                             $resp->[0]->{$pathkey} eq $lastelem) {
@@ -986,9 +1024,9 @@ COLLECT_PATHS:
             foreach my $match (@matches) {
                 $match =~ tr/\//:/;
                 my $nelem = [];
-                if ($entries{$match}{'FileIsDir'}) {
-                @$nelem = ($entries{$match}{'NodeID'}, '', $match,
-                           @$expath[2 .. $#$expath]);
+                if ($entries{$match}{FileIsDir}) {
+                    @$nelem = ($entries{$match}{NodeID}, q{}, $match,
+                            @$expath[2 .. $#$expath]);
                 } else {
                     @$nelem = ($$expath[0], $match, @$expath[2 .. $#$expath]);
                 }
@@ -1023,29 +1061,29 @@ sub resolve_path {
 
     my @pathElements = split('/', $path);
     my $curNode = $dirid;
-    if (!defined($pathElements[0]) || ($pathElements[0] eq '')) {
+    if (!defined($pathElements[0]) || ($pathElements[0] eq q{})) {
         $curNode = 2;
         shift(@pathElements);
     }
     for (my $i = 0; $i < scalar(@pathElements); $i++) {
         my $elem = $pathElements[$i];
         my $getParentID = 0;
-        next if $elem eq '.' or $elem eq '';
-        if ($elem eq '..') {
+        next if $elem eq q{.} or $elem eq q{};
+        if ($elem eq q{..}) {
             next if $curNode == 2;
-            $elem = '';
+            $elem = q{};
             $getParentID = 1;
         }
         $elem =~ tr/:/\//;
         my($rc, $resp) = $session->FPGetFileDirParms(
-                'VolumeID'          => $volid,
-                'DirectoryID'       => $curNode,
-                'FileBitmap'        => $fileBmp,
-                'DirectoryBitmap'   => $dirBmp,
-                'PathType'          => $pathType,
-                'Pathname'          => $elem);
+                VolumeID        => $volid,
+                DirectoryID     => $curNode,
+                FileBitmap      => $fileBmp,
+                DirectoryBitmap => $dirBmp,
+                PathType        => $pathType,
+                Pathname        => $elem);
         if (($lastNoExist == 1 and $rc == kFPObjectNotFound) or
-                ($rc == kFPNoErr and $$resp{'FileIsDir'} != 1)) {
+                ($rc == kFPNoErr and $resp->{FileIsDir} != 1)) {
             if ($i == $#pathElements) {
                 $fileName = $elem;
                 last;
@@ -1055,8 +1093,8 @@ sub resolve_path {
             }
         }
         return(undef) if $rc != kFPNoErr;
-        $curNode = ($getParentID == 1 ? $$resp{'ParentDirID'} :
-                $$resp{'NodeID'});
+        $curNode = ($getParentID == 1 ? $resp->{ParentDirID} :
+                $resp->{NodeID});
     }
     return($curNode, $fileName);
 }
@@ -1068,4 +1106,4 @@ $session->close();
 exit(0);
 
 
-# vim: ts=4 ai
+# vim: ts=4 et ai
