@@ -195,13 +195,11 @@ sub _ParseSrvrInfo { # {{{1
     my ($machtype_off, $afpvers_off, $uams_off, $icon_off, $flags, $srvname) =
             unpack('nnnnnC/a*', $data);
 
+    my($sig_off, $addrs_off, $dirserv_off, $utf8name_off);
+
     # ERRATA: On some pre-AFP-2.2 (maybe all?) implementations, there would
     # be a bunch of space characters between the end of the ServerName
     # field, and the start of the MachineType field.
-
-    my($sig_off, $addrs_off, $dirserv_off, $utf8name_off);
-    # The machine type field comes right after the server name; if the offset
-    # is large enough to leave room, it's at least AFP 2.2.
     my $extra_off = 11 + length($srvname);
     if ($extra_off % 2) { $extra_off++; }
     my $extra = substr($data, $extra_off, $machtype_off - $extra_off);
