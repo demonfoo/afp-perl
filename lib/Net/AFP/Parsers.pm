@@ -195,15 +195,25 @@ sub _ParseSrvrInfo { # {{{1
     my ($machtype_off, $afpvers_off, $uams_off, $icon_off, $flags, $srvname) =
             unpack('nnnnnC/a*', $data);
 
+    # ERRATA: On some pre-AFP-2.2 (maybe all?) implementations, there would
+    # be a bunch of space characters between the end of the ServerName
+    # field, and the start of the MachineType field.
+
     my($sig_off, $addrs_off, $dirserv_off, $utf8name_off);
     # The machine type field comes right after the server name; if the offset
     # is large enough to leave room, it's at least AFP 2.2.
-    if ($machtype_off > (12 + length($srvname))) {
-        ($sig_off, $addrs_off) = unpack('x[10]C/xx![s]nn', $data);
-    }
-    # Enough room for the AFP 3.0-specific fields.
-    if ($machtype_off > (16 + length($srvname))) {
-        ($dirserv_off, $utf8name_off) = unpack('x[10]C/xx![s]x[4]nn', $data);
+    my $extra_off = 11 + length($srvname);
+    if ($extra_off % 2) { $extra_off++; }
+    my $extra = substr($data, $extra_off, $machtype_off - $extra_off);
+    # If the slack space after the basic items is just spaces, ignore it.
+    if ($extra ne q{ } x length($extra)) {
+        if ($machtype_off > (12 + length($srvname))) {
+            ($sig_off, $addrs_off) = unpack('x[10]C/xx![s]nn', $data);
+        }
+        # Enough room for the AFP 3.0-specific fields.
+        if ($machtype_off > (16 + length($srvname))) {
+            ($dirserv_off, $utf8name_off) = unpack('x[10]C/xx![s]x[4]nn', $data);
+        }
     }
 
     $$resp{'ServerName'} = $srvname;
@@ -257,7 +267,7 @@ _EOT_
                 compose(decode_utf8(unpack('x[' . $utf8name_off . ']n/a', $data)));
     }
 
-    if ($addrs_off) {
+    if (($flags & kSupportsTCP) && $addrs_off) {
         $$resp{'NetworkAddresses'} = [];
         my @addrlist = map { unpack('xCa*', $_) }
                 unpack('x[' . $addrs_off . ']C/(CX/a)', $data);
