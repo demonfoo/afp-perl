@@ -111,7 +111,8 @@ sub do_afp_connect {
 
         my @records = NBPLookup($values{'host'}, 'AFPServer', $values{'port'},
                 undef, 1);
-        croak("Could not resolve NBP name " . $values{'host'})
+        croak("Could not resolve NBP name " . $values{'host'} .
+		':AFPServer@' . ($values{'port'} ? $values{'port'} : '='))
                 unless scalar(@records);
         ($host, $port) = @{$records[0]}[0,1];
 
