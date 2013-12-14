@@ -34,17 +34,19 @@ my $pw_cb =  sub {
 my $srvInfo;
 my($session, %values) = do_afp_connect($pw_cb, $url, \$srvInfo);
 if (not ref($session) or not $session->isa('Net::AFP')) {
-    exit($session);
+    exit(2);
 }
 
 if (not($srvInfo->{Flags} & kSupportsChgPwd)) {
     print "ERROR: Server does not support password changing\n";
     $session->close();
-    exit(1)
+    exit(2);
 }
 
 my $new_pass = read_password('Enter your new password: ');
 my $check_pass = read_password('Reenter your password: ');
+
+my $rv = 0;
 
 if ($new_pass eq $check_pass) {
     my $uamlist = $srvInfo->{UAMs};
@@ -55,6 +57,7 @@ if ($new_pass eq $check_pass) {
             $values{username}, $old_pass, $new_pass);
     if ($rc != kFPNoErr) {
         print 'ERROR: Server responded: ', afp_strerror($rc), ' (', $rc, ")\n";
+        $rv = 2;
     }
     else {
         print "No error, password changed successfully\n";
@@ -62,9 +65,12 @@ if ($new_pass eq $check_pass) {
 }
 else {
     print "ERROR: Passwords did not match!\n";
+    $rv = 3;
 }
 
 $session->close();
+
+exit($rv);
 
 sub usage {
     print <<'_EOT_';
@@ -73,6 +79,10 @@ afp_chpass.pl - AFP password changing tool
 
 Usage: afp_chpass.pl [AFP URL]
 
+Change password on an AFP server.
+
+Returns 0 on successful password change, 1 if arguments could not be
+parsed, 2 on server error, 3 on password mismatch.
 
 _EOT_
 
