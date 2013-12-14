@@ -122,6 +122,7 @@ sub SendAFPMessage { # {{{1
 sub SendAFPWrite { # {{{1
     my ($self, $payload, $data_r, $d_len, $resp_r) = @_;
 
+    my $logger = get_logger('status');
     $logger->debug('called ', (caller(0))[3]);
     $self->CheckAttnQueue();
     return $self->{'Session'}->Write($payload, $data_r, $d_len, $resp_r);
