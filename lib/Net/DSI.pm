@@ -390,7 +390,8 @@ sub SendMessage { # {{{1
     return $reqId;
 } # }}}1
 
-sub DSICloseSession { # {{{1
+sub DSICloseSession { return CloseSession(@_); }
+sub CloseSession { # {{{1
     my ($self) = @_;
 
     # Issue the DSICloseSession command to the server. Apparently the
@@ -399,7 +400,8 @@ sub DSICloseSession { # {{{1
     return;
 } # }}}1
 
-sub DSICommand { # {{{1
+sub DSICommand { return Command(@_); }
+sub Command { # {{{1
     my ($self, $message, $resp_r) = @_;
 
     # Require that the caller includes a reference to stuff a reply block
@@ -414,7 +416,8 @@ sub DSICommand { # {{{1
     return $rc;
 } # }}}1
 
-sub DSIGetStatus { # {{{1
+sub DSIGetStatus { return GetStatus(@_); }
+sub GetStatus { # {{{1
     my ($self, $resp_r) = @_;
 
     # Require that the caller provide a ref to stuff the reply block into.
@@ -432,7 +435,8 @@ sub DSIGetStatus { # {{{1
     return $rc;
 } # }}}1
 
-sub DSIOpenSession { # {{{1
+sub DSIOpenSession { return OpenSession(@_); }
+sub OpenSession { # {{{1
     my ($self, %options) = @_;
 
     my $options_packed = q{};
@@ -487,7 +491,8 @@ sub DSITickle { # {{{1
     return;
 } # }}}1
 
-sub DSIWrite { # {{{1
+sub DSIWrite { return Write(@_); }
+sub Write { # {{{1
     # This should only be used for FPWrite and FPAddIcon
     my ($self, $message, $data_r, $d_len, $resp_r) = @_;
 
