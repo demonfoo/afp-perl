@@ -15,7 +15,7 @@ use Term::ReadPassword;
 
 my($url) = @ARGV;
 
-unless ($url) {
+if (not $url) {
     usage();
 }
 
@@ -24,7 +24,7 @@ my $pw_cb =  sub {
     my(%values) = @_;
     my $prompt = 'Password for ' . $values{username} .
             ' at ' . $values{host} . ': ';
-    unless ($values{password}) {
+    if (not $values{password}) {
         $values{password} = read_password($prompt);
     }
     $old_pass = $values{password};
@@ -33,11 +33,11 @@ my $pw_cb =  sub {
 
 my $srvInfo;
 my($session, %values) = do_afp_connect($pw_cb, $url, \$srvInfo);
-unless (ref($session) && $session->isa('Net::AFP')) {
+if (not ref($session) or not $session->isa('Net::AFP')) {
     exit($session);
 }
 
-if (!($srvInfo->{Flags} & kSupportsChgPwd)) {
+if (not($srvInfo->{Flags} & kSupportsChgPwd)) {
     print "ERROR: Server does not support password changing\n";
     $session->close();
     exit(1)
@@ -54,7 +54,7 @@ if ($new_pass eq $check_pass) {
     my $rc = Net::AFP::UAMs::ChangePassword($session, $srvInfo->{UAMs},
             $values{username}, $old_pass, $new_pass);
     if ($rc != kFPNoErr) {
-        print 'Server responded: ', afp_strerror($rc), ' (', $rc, ")\n";
+        print 'ERROR: Server responded: ', afp_strerror($rc), ' (', $rc, ")\n";
     }
     else {
         print "No error, password changed successfully\n";
