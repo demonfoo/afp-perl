@@ -808,7 +808,7 @@ sub do_listentries {
         else {
             $up = $$ent{FileIsDir} ? 0755 : 0644;
         }
-        my $uid = $$ent{UnixUID} || 0;
+        my $uid = $ent->{UnixUID} || $ent->{OwnerID} || 0;
         my $user;
         if (exists $uidmap{$uid}) {
             $user = $uidmap{$uid};
@@ -818,7 +818,7 @@ sub do_listentries {
             $uidmap{$uid} = $user;
         }
 
-        my $gid = $$ent{UnixGID} || 0;
+        my $gid = $ent->{UnixGID} || $ent->{GroupID} || 0;
         my $group;
         if (exists $gidmap{$gid}) {
             $group = $gidmap{$gid};
