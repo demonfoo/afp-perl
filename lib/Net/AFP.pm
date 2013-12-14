@@ -458,7 +458,7 @@ sub FPChangePassword { # {{{1
                 { type => SCALAR },
                 { type => SCALAR },
                 { type => SCALAR, optional => 1, default => q{} },
-                { type => SCALARREF, optional => 1, default => \q{} });
+                { type => SCALARREF, optional => 1, default => *bar{SCALAR} });
 
     my $msg = pack('CxC/a*x![s]C/a*x![s]a*', $kFPChangePassword, $UAM,
             $UserName, $UserAuthInfo);
