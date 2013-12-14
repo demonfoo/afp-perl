@@ -106,6 +106,7 @@ sub ChangePassword {
     my %ReqUAMs = map { lc($_), 1 } @$SupportedUAMs;
     foreach my $uaminfo (@UAMReg) {
         next unless exists $ReqUAMs{lc($$uaminfo{'name'})};
+        next unless $$uaminfo{'class'}->can('ChangePassword');
         last if $$uaminfo{'pref'} < 0 and scalar(keys %ReqUAMs) > 1;
         my $function = $$uaminfo{'class'} . '::ChangePassword';
         DEBUG('password changing function is ', $function);
