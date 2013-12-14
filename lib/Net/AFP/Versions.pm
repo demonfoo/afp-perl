@@ -65,14 +65,14 @@ our @versions = (
         'VersionString' => 'AFPVersion 2.0',
         'MajorNumber'   => 2,
         'MinorNumber'   => 0,
-        'Supported'     => 0,
+        'Supported'     => 1,
         'CanDoAtalk'    => 1,
     },
     {
         'VersionString' => 'AFPVersion 1.1',
         'MajorNumber'   => 1,
         'MinorNumber'   => 1,
-        'Supported'     => 0,
+        'Supported'     => 1,
         'CanDoAtalk'    => 1,
     },
 );
