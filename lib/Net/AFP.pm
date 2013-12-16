@@ -197,19 +197,19 @@ sub PackSetParams { # {{{1
     if ($Bitmap & kFPCreateDateBit) {
         return if not exists $options{CreateDate};
         my $time = $options{CreateDate} - globalTimeOffset;
-        $ParamsBlock .= pack('N', long_convert($time));
+        $ParamsBlock .= pack('l>', $time);
     }
 
     if ($Bitmap & kFPModDateBit) {
         return if not exists $options{ModDate};
         my $time = $options{ModDate} - globalTimeOffset;
-        $ParamsBlock .= pack('N', long_convert($time));
+        $ParamsBlock .= pack('l>', $time);
     }
 
     if ($Bitmap & kFPBackupDateBit) {
         return if not exists $options{BackupDate};
         my $time = $options{BackupDate} - globalTimeOffset;
-        $ParamsBlock .= pack('N', long_convert($time));
+        $ParamsBlock .= pack('l>', $time);
     }
 
     if ($Bitmap & kFPFinderInfoBit) {
@@ -379,10 +379,8 @@ sub FPByteRangeLock { # {{{1
         Length      => { type => SCALAR },
     } );
 
-    my $msg = pack('CCnNN', $kFPByteRangeLock,
-            @options{'Flags', 'OForkRefNum'},
-            long_convert($options{Offset}),
-            long_convert($options{Length}));
+    my $msg = pack('CCnl>l>', $kFPByteRangeLock,
+            @options{'Flags', 'OForkRefNum', 'Offset', 'Length'});
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     if ($rc == kFPNoErr) {
@@ -1392,14 +1390,21 @@ sub FPGetSrvrParms { # {{{1
     return $rc if $rc != kFPNoErr;
 
     my $data = {};
-    my ($time, @volinfo) = unpack('NC/(CC/a)', $resp);
+    my ($time, @volinfo) = unpack('l>C/(CC/a)', $resp);
     # AFP does not express times since 1 Jan 1970 00:00 GMT, but since 
     # 1 Jan 2000 00:00 GMT (I think GMT, anyway). Good call, Apple...
-    ${$data}{ServerTime}    = long_unconvert($time) + globalTimeOffset;
+    ${$data}{ServerTime}    = $time + globalTimeOffset;
     ${$data}{Volumes}       = [];
     while (scalar(@volinfo) > 0) {
         my $flags = shift @volinfo;
         my $volname = shift @volinfo;
+        if (Net::AFP::Versions::CompareByVersionNum($self, 3, 0,
+                kFPVerAtLeast)) {
+            $volname = decode_utf8($volname);
+        }
+        else {
+            $volname = decode('MacRoman', $volname);
+        }
         # The documentation from Apple says "HasUNIXPrivs" is the high
         # bit; ethereal seems to think it's the second bit, not the high
         # bit. I'll have to see how to turn that on somewhere to find out.
@@ -1487,7 +1492,7 @@ sub FPGetVolParms { # {{{1
     my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetVolParms, $VolumeID,
             $Bitmap), \$resp);
     return($rc) if $rc != kFPNoErr;
-    ${$resp_r} = _ParseVolParms($resp);
+    ${$resp_r} = _ParseVolParms($resp, $self);
     return $rc;
 } # }}}1
 
@@ -1951,6 +1956,14 @@ sub FPOpenVol { # {{{1
     # Make sure the VolID bit is set, because it's kind of necessary.
     $Bitmap |= kFPVolIDBit;
 
+    if (Net::AFP::Versions::CompareByVersionNum($self, 3, 0,
+            kFPVerAtLeast)) {
+        $VolumeName = encode_utf8($VolumeName);
+    }
+    else {
+        $VolumeName = encode('MacRoman', $VolumeName);
+    }
+
     my $PackPattern = 'CxnCa*';
     my @PackArgs = ($kFPOpenVol, $Bitmap, length($VolumeName), $VolumeName);
     # Only append a password if one was provided. If not, we don't provide
@@ -1964,7 +1977,7 @@ sub FPOpenVol { # {{{1
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     return $rc if $rc != kFPNoErr;
-    ${$resp_r} = _ParseVolParms($resp);
+    ${$resp_r} = _ParseVolParms($resp, $self);
     return $rc;
 } # }}}1
 

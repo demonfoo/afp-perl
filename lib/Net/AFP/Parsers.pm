@@ -13,6 +13,7 @@ use Net::AFP::DirParms qw(:DEFAULT !:common);
 use Net::AFP::FileParms;
 use Net::AFP::VolParms;
 use Net::AFP::SrvParms;
+use Net::AFP::Versions;
 use Encode;
 use Unicode::Normalize qw(compose decompose);
 use Socket;
@@ -36,18 +37,6 @@ eval {
 
 # This is zero time for AFP - 1 Jan 2000 00:00 GMT.
 sub globalTimeOffset { return 946684800; }
-
-sub long_convert { # {{{1
-    my($number) = @_;
-
-    return unpack('l', pack('L', $number));
-} # }}}1
-
-sub long_unconvert { # {{{1
-    my($number) = @_;
-
-    return unpack('L', pack('l', $number));
-} # }}}1
 
 sub ll_convert { # {{{1
     my($number) = @_;
@@ -105,79 +94,85 @@ sub uuid_pack { # {{{1
 # FPGetVolParms and FPOpenVol will both need this to parse volume
 # parameter info from the server.
 sub _ParseVolParms { # {{{1
-    my ($data) = @_;
+    my ($data, $obj) = @_;
     DEBUG('called ', (caller(0))[3]);
 
     my $offset = 2;
-    my $Bitmap = unpack('n', $data);
+    my $Bitmap = unpack('S>', $data);
     my $resp = {};
 
     if ($Bitmap & kFPVolAttributeBit) {
-        $$resp{'VolAttribute'} = unpack('x' . $offset . 'n', $data);
+        $resp->{Attribute} = unpack('x' . $offset . 'S>', $data);
         $offset += 2;
     }
 
     if ($Bitmap & kFPVolSignatureBit) {
-        $$resp{'Signature'} = unpack('x' . $offset . 'n', $data);
+        $resp->{Signature} = unpack('x' . $offset . 'S>', $data);
         $offset += 2;
     }
 
     if ($Bitmap & kFPVolCreateDateBit) {
-        $$resp{'CreateDate'} =
-                long_unconvert(unpack('x' . $offset . 'N', $data)) +
+        $resp->{CreateDate} = unpack('x' . $offset . 'l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
 
     if ($Bitmap & kFPVolModDateBit) {
-        $$resp{'ModDate'} =
-                long_unconvert(unpack('x' . $offset . 'N', $data)) +
+        $resp->{ModDate} = unpack('x' . $offset . 'l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
 
     if ($Bitmap & kFPVolBackupDateBit) {
-        $$resp{'BackupDate'} =
-                long_unconvert(unpack('x' . $offset . 'N', $data)) +
+        $resp->{BackupDate} = unpack('x' . $offset . 'l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
 
     if ($Bitmap & kFPVolIDBit) {
-        $$resp{'ID'} = unpack('x' . $offset . 'n', $data);
+        $resp->{ID} = unpack('x' . $offset . 'S>', $data);
         $offset += 2;
     }
 
     if ($Bitmap & kFPVolBytesFreeBit) {
-        $$resp{'BytesFree'} = unpack('x' . $offset . 'N', $data);
+        $resp->{BytesFree} = unpack('x' . $offset . 'L>', $data);
         $offset += 4;
     }
 
     if ($Bitmap & kFPVolBytesTotalBit) {
-        $$resp{'BytesTotal'} = unpack('x' . $offset . 'N', $data);
+        $resp->{BytesTotal} = unpack('x' . $offset . 'L>', $data);
         $offset += 4;
     }
 
     if ($Bitmap & kFPVolNameBit) {
-        my $name_off = unpack('x' . $offset . 'n', $data);
+        my $name_off = unpack('x' . $offset . 'S>', $data);
         $offset += 2;
 
-        $$resp{'Name'} = decode('MacRoman', unpack('x' . ($name_off + 2) . 'C/a', $data));
+        $resp->{Name} = unpack('x' . ($name_off + 2) . 'C/a', $data);
+        if (Net::AFP::Versions::CompareByVersionNum($obj, 3, 0,
+                kFPVerAtLeast)) {
+            $resp->{Name} = decode_utf8($resp->{Name});
+        }
+        else {
+            $resp->{Name} = decode('MacRoman', $resp->{Name});
+        }
+
     }
 
     if ($Bitmap & kFPVolExtBytesFreeBit) {
-        $$resp{'ExtBytesFree'} =
+        $resp->{ExtBytesFree} =
                 ll_unconvert(unpack('x[' . $offset . ']NN', $data));
         $offset += 8;
     }
 
     if ($Bitmap & kFPVolExtBytesTotalBit) {
-        $$resp{'ExtBytesTotal'} = ll_unconvert(unpack('x[' . $offset . ']NN', $data));
+        $resp->{ExtBytesTotal} =
+                ll_unconvert(unpack('x[' . $offset . ']NN', $data));
         $offset += 8;
     }
 
     if ($Bitmap & kFPVolBlockSizeBit) {
-        $$resp{'BlockSize'} = unpack('x' . $offset . 'N', $data);
+        $resp->{BlockSize} = unpack('x' . $offset . 'L>', $data);
         $offset += 4;
     }
 
@@ -206,21 +201,22 @@ sub _ParseSrvrInfo { # {{{1
     # If the slack space after the basic items is just spaces, ignore it.
     if ($extra ne q{ } x length($extra)) {
         if ($machtype_off > (12 + length($srvname))) {
-            ($sig_off, $addrs_off) = unpack('x[10]C/xx![s]nn', $data);
+            ($sig_off, $addrs_off) = unpack('x[10]C/xx![s]S>S>', $data);
         }
         # Enough room for the AFP 3.0-specific fields.
         if ($machtype_off > (16 + length($srvname))) {
-            ($dirserv_off, $utf8name_off) = unpack('x[10]C/xx![s]x[4]nn', $data);
+            ($dirserv_off, $utf8name_off) = unpack('x[10]C/xx![s]x[4]S>S>',
+                    $data);
         }
     }
 
-    $$resp{'ServerName'} = $srvname;
-    $$resp{'Flags'} = $flags;
+    $resp->{ServerName}  = $srvname;
+    $resp->{Flags}       = $flags;
 
-    $$resp{'MachineType'} = unpack('x[' . $machtype_off . ']C/a', $data);
-    $$resp{'AFPVersions'} =
+    $resp->{MachineType} = unpack('x[' . $machtype_off . ']C/a', $data);
+    $resp->{AFPVersions} =
             [unpack('x[' . $afpvers_off . ']C/(C/a)', $data)];
-    $$resp{'UAMs'} = [unpack('x[' . $uams_off . ']C/(C/a)', $data)];
+    $resp->{UAMs}        = [ unpack('x[' . $uams_off . ']C/(C/a)', $data) ];
 
     # The server icon is deprecated as of AFP 3.0.
     if ($icon_off) {
@@ -253,42 +249,43 @@ _EOT_
             push(@xpm_rows, $line);
         }
         $icon_text .= join(",\n", @xpm_rows) . "};\n";
-        $$resp{'VolumeIcon'} = $icon_text;
+        $resp->{VolumeIcon} = $icon_text;
     }
 
     if ($flags & kSrvrSig) {
-        $$resp{'ServerSignature'} = substr($data, $sig_off, 16);
+        $resp->{ServerSignature} = substr($data, $sig_off, 16);
     }
 
     if ($flags & kSupportsUTF8SrvrName) {
-        $$resp{'UTF8ServerName'} =
-                compose(decode_utf8(unpack('x[' . $utf8name_off . ']n/a', $data)));
+        $resp->{UTF8ServerName} =
+                compose(decode_utf8(unpack('x[' . $utf8name_off . ']S>/a',
+                    $data)));
     }
 
     if (($flags & kSupportsTCP) && $addrs_off) {
-        $$resp{'NetworkAddresses'} = [];
+        $resp->{NetworkAddresses} = [];
         my @addrlist = map { unpack('xCa*', $_) }
                 unpack('x[' . $addrs_off . ']C/(CX/a)', $data);
         while (@addrlist) {
             my $addrEnt = {};
             my($entryType, $packed) = (shift(@addrlist), shift(@addrlist));
             if ($entryType == 1) { # Packed IP address
-                $$addrEnt{'family'} = AF_INET;
-                $$addrEnt{'address'} = inet_ntoa($packed);
+                $addrEnt->{family}  = AF_INET;
+                $addrEnt->{address} = inet_ntoa($packed);
             }
             elsif ($entryType == 2) { # Packed IP address + port
-                $$addrEnt{'family'} = AF_INET;
-                my($addr, $port) = unpack('a4n', $packed);
-                $$addrEnt{'address'} = inet_ntoa($addr);
-                $$addrEnt{'port'} = $port;
+                my($addr, $port) = unpack('a4S>', $packed);
+                $addrEnt->{family}  = AF_INET;
+                $addrEnt->{address} = inet_ntoa($addr);
+                $addrEnt->{port}    = $port;
             }
             elsif ($entryType == 3) { # Packed DDP (AppleTalk) address
-                $$addrEnt{'family'} = AF_APPLETALK;
-                $$addrEnt{'address'} = sprintf('%u.%u', unpack('nCx', $packed));
-                $$addrEnt{'port'} = sprintf('%u', unpack('x[3]C', $packed));
+                $addrEnt->{family}  = AF_APPLETALK;
+                $addrEnt->{address} = sprintf('%u.%u', unpack('S>Cx', $packed));
+                $addrEnt->{port}    = sprintf('%u', unpack('x[3]C', $packed));
             }
             elsif ($entryType == 4) { # Just the DNS name
-                $$addrEnt{'hostname'} = $packed;
+                $addrEnt->{hostname} = $packed;
             }
             elsif ($entryType == 5) { # IPv4 using SSH tunnel
                 # Apple's docs say this is a packed IP and port; the netatalk
@@ -296,34 +293,34 @@ _EOT_
                 # hostname. Wouldn't be the first time Apple's docs lied.
                 # This type is deprecated.
                 #print "SSH tunnel type - not sure what needs to be added to handle this right\n";
-                $$addrEnt{'hostname'} = $packed;
-                $$addrEnt{'ssh_tunnel'} = 1;
+                $addrEnt->{hostname}   = $packed;
+                $addrEnt->{ssh_tunnel} = 1;
             }
             elsif ($entryType == 6) { # Packed IPv6 address
                 next unless $has_Socket6;
-                $$addrEnt{'family'} = &Socket6::AF_INET6();
-                $$addrEnt{'address'} = Socket6::inet_ntop(&Socket6::AF_INET6(),
+                $addrEnt->{family}  = &Socket6::AF_INET6();
+                $addrEnt->{address} = Socket6::inet_ntop(&Socket6::AF_INET6(),
                         $packed);
             }
             elsif ($entryType == 7) { # Packed IPv6 address + port
                 next unless $has_Socket6;
-                $$addrEnt{'family'} = &Socket6::AF_INET6();
-                my($addr, $port) = unpack('a16n', $packed);
-                $$addrEnt{'address'} = Socket6::inet_ntop(&Socket6::AF_INET6(),
+                my($addr, $port) = unpack('a16S>', $packed);
+                $addrEnt->{family}  = &Socket6::AF_INET6();
+                $addrEnt->{address} = Socket6::inet_ntop(&Socket6::AF_INET6(),
                         $addr);
-                $$addrEnt{'port'} = $port;
+                $addrEnt->{port}    = $port;
             }
             else {
-                INFO('unknown address type ', $entryType, ", skipping");
+                INFO('unknown address type ', $entryType, ', skipping');
                 next;
             }
-            push(@{$$resp{'NetworkAddresses'}}, $addrEnt);
+            push(@{$resp->{NetworkAddresses}}, $addrEnt);
         }
     }
 
     if ($flags & kSupportsDirServices) {
-        $$resp{'DirectoryNames'} =
-                [unpack('x' . $dirserv_off . 'C/(C/a)', $data)];
+        $resp->{DirectoryNames} =
+                [unpack('x[' . $dirserv_off . ']C/(C/a)', $data)];
     }
 
     return $resp;
@@ -334,7 +331,7 @@ sub _ParseFileDirParms { # {{{1
     DEBUG('called ', (caller(0))[3]);
 
     my ($FileBitmap, $DirectoryBitmap, $IsFileDir, $ReqParams) =
-            unpack('nnCxa*', $data);
+            unpack('S>S>Cxa*', $data);
 
     if ($IsFileDir & 0x80) { # This is a directory
         return _ParseDirParms($DirectoryBitmap, $ReqParams);
@@ -351,84 +348,82 @@ sub _ParseFileParms { # {{{1
     my $offset = 0;
 
     if ($Bitmap & kFPAttributeBit) {
-        $$resp{'Attributes'} = unpack('x' . $offset . 'n', $data);
+        $resp->{Attributes} = unpack('x[' . $offset . ']S>', $data);
         $offset += 2;
     }
     if ($Bitmap & kFPParentDirIDBit) {
-        $$resp{'ParentDirID'} = unpack('x' . $offset . 'N', $data);
+        $resp->{ParentDirID} = unpack('x[' . $offset . ']L>', $data);
         $offset += 4;
     }
     if ($Bitmap & kFPCreateDateBit) {
-        $$resp{'CreateDate'} =
-                long_unconvert(unpack('x' . $offset . 'N', $data)) +
+        $resp->{CreateDate} = unpack('x[' . $offset . ']l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
     if ($Bitmap & kFPModDateBit) {
-        $$resp{'ModDate'} =
-                long_unconvert(unpack('x' . $offset . 'N', $data)) +
+        $resp->{ModDate} = unpack('x[' . $offset . ']l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
     if ($Bitmap & kFPBackupDateBit) {
-        $$resp{'BackupDate'} =
-                long_unconvert(unpack('x' . $offset . 'N', $data)) +
+        $resp->{BackupDate} = unpack('x[' . $offset . ']l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
     if ($Bitmap & kFPFinderInfoBit) {
-        $$resp{'FinderInfo'} = unpack('x' . $offset . 'a32', $data);
+        $resp->{FinderInfo} = unpack('x[' . $offset . ']a32', $data);
         $offset += 32;
     }
     if ($Bitmap & kFPLongNameBit) {
-        my $position = unpack('x' . $offset . 'n', $data);
-        $$resp{'LongName'} = decode('MacRoman', unpack('x' . $position . 'C/a', $data));
+        my $position = unpack('x[' . $offset . ']S>', $data);
+        $resp->{LongName} =
+                decode('MacRoman', unpack('x[' . $position . ']C/a', $data));
         $offset += 2;
     }
     if ($Bitmap & kFPShortNameBit) {
-        my $position = unpack('x' . $offset . 'n', $data);
-        $$resp{'ShortName'} = unpack('x' . $position . 'C/a', $data);
+        my $position = unpack('x[' . $offset . ']S>', $data);
+        $resp->{ShortName} = unpack('x[' . $position . ']C/a', $data);
         $offset += 2;
     }
     if ($Bitmap & kFPNodeIDBit) {
-        $$resp{'NodeID'} = unpack('x' . $offset . 'N', $data);
+        $resp->{NodeID} = unpack('x[' . $offset . ']L>', $data);
         $offset += 4;
     }
     if ($Bitmap & kFPDataForkLenBit) {
-        $$resp{'DataForkLen'} = unpack('x' . $offset . 'N', $data);
+        $resp->{DataForkLen} = unpack('x[' . $offset . ']L>', $data);
         $offset += 4;
     }
     if ($Bitmap & kFPRsrcForkLenBit) {
-        $$resp{'RsrcForkLen'} = unpack('x' . $offset . 'N', $data);
+        $resp->{RsrcForkLen} = unpack('x[' . $offset . ']L>', $data);
         $offset += 4;
     }
     if ($Bitmap & kFPExtDataForkLenBit) {
-        $$resp{'ExtDataForkLen'} =
+        $resp->{ExtDataForkLen} =
                 ll_unconvert(unpack('x[' . $offset . ']NN', $data));
         $offset += 8;
     }
     if ($Bitmap & kFPLaunchLimitBit) {
-        $$resp{'LaunchLimit'} = unpack('x' . $offset . 'n', $data);
+        $resp->{LaunchLimit} = unpack('x[' . $offset . ']S>', $data);
         $offset += 2;
     }
     if ($Bitmap & kFPUTF8NameBit) {
-        my $position = unpack('x[' . $offset . ']n', $data);
-        @$resp{'UTF8Hint', 'UTF8Name'} =
-                unpack('x' . $position . 'Nn/a', $data);
-        $$resp{'UTF8Name'} = compose(decode_utf8($$resp{'UTF8Name'}));
+        my $position = unpack('x[' . $offset . ']S>', $data);
+        @{$resp}{'UTF8Hint', 'UTF8Name'} =
+                unpack('x' . $position . 'L>S>/a', $data);
+        $resp->{UTF8Name} = compose(decode_utf8($resp->{UTF8Name}));
         $offset += 6;
     }
     if ($Bitmap & kFPExtRsrcForkLenBit) {
-        $$resp{'ExtRsrcForkLen'} =
+        $resp->{ExtRsrcForkLen} =
                 ll_unconvert(unpack('x[' . $offset . ']NN', $data));
         $offset += 8;
     }
     if ($Bitmap & kFPUnixPrivsBit) {
-        @$resp{'UnixUID', 'UnixGID', 'UnixPerms', 'UnixAccessRights'} =
-            unpack('x' . $offset . 'NNNN', $data);
+        @{$resp}{'UnixUID', 'UnixGID', 'UnixPerms', 'UnixAccessRights'} =
+            unpack('x' . $offset . 'L>L>L>L>', $data);
         $offset += 16;
     }
-    $$resp{'FileIsDir'} = 0;
+    $resp->{FileIsDir} = 0;
     return $resp;
 } # }}}1
 
@@ -439,78 +434,76 @@ sub _ParseDirParms { # {{{1
     my $offset = 0;
 
     if ($Bitmap & kFPAttributeBit) {
-        $$resp{'Attributes'} = unpack('x' . $offset . 'n', $data);
+        $resp->{Attributes} = unpack('x' . $offset . 'S>', $data);
         $offset += 2;
     }
     if ($Bitmap & kFPParentDirIDBit) {
-        $$resp{'ParentDirID'} = unpack('x' . $offset . 'N', $data);
+        $resp->{ParentDirID} = unpack('x' . $offset . 'L>', $data);
         $offset += 4;
     }
     if ($Bitmap & kFPCreateDateBit) {
-        $$resp{'CreateDate'} =
-                long_unconvert(unpack('x' . $offset . 'N', $data)) +
+        $resp->{CreateDate} = unpack('x' . $offset . 'l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
     if ($Bitmap & kFPModDateBit) {
-        $$resp{'ModDate'} =
-                long_unconvert(unpack('x' . $offset . 'N', $data)) +
+        $resp->{ModDate} = unpack('x' . $offset . 'l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
     if ($Bitmap & kFPBackupDateBit) {
-        $$resp{'BackupDate'} =
-                long_unconvert(unpack('x' . $offset . 'N', $data)) +
+        $resp->{BackupDate} = unpack('x' . $offset . 'l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
     if ($Bitmap & kFPFinderInfoBit) {
-        $$resp{'FinderInfo'} = unpack('x' . $offset . 'a32', $data);
+        $resp->{FinderInfo} = unpack('x' . $offset . 'a32', $data);
         $offset += 32;
     }
     if ($Bitmap & kFPLongNameBit) {
         my $position = unpack('x' . $offset . 'n', $data);
-        $$resp{'LongName'} = decode('MacRoman', unpack('x' . $position . 'C/a', $data));
+        $resp->{LongName} = decode('MacRoman',
+                unpack('x' . $position . 'C/a', $data));
         $offset += 2;
     }
     if ($Bitmap & kFPShortNameBit) {
-        my $position = unpack('x' . $offset . 'n', $data);
-        $$resp{'ShortName'} = unpack('x' . $position . 'C/a', $data);
+        my $position = unpack('x' . $offset . 'S>', $data);
+        $resp->{ShortName} = unpack('x' . $position . 'C/a', $data);
         $offset += 2;
     }
     if ($Bitmap & kFPNodeIDBit) {
-        $$resp{'NodeID'} = unpack('x' . $offset . 'N', $data);
+        $resp->{NodeID} = unpack('x' . $offset . 'L>', $data);
         $offset += 4;
     }
     if ($Bitmap & kFPOffspringCountBit) {
-        $$resp{'OffspringCount'} = unpack('x' . $offset . 'n', $data);
+        $resp->{OffspringCount} = unpack('x' . $offset . 'S>', $data);
         $offset += 2;
     }
     if ($Bitmap & kFPOwnerIDBit) {
-        $$resp{'OwnerID'} = unpack('x' . $offset . 'N', $data);
+        $resp->{OwnerID} = unpack('x' . $offset . 'L>', $data);
         $offset += 4;
     }
     if ($Bitmap & kFPGroupIDBit) {
-        $$resp{'GroupID'} = unpack('x' . $offset . 'N', $data);
+        $resp->{GroupID} = unpack('x' . $offset . 'L>', $data);
         $offset += 4;
     }
     if ($Bitmap & kFPAccessRightsBit) {
-        $$resp{'AccessRights'} = unpack('x' . $offset . 'N', $data);
+        $resp->{AccessRights} = unpack('x' . $offset . 'L>', $data);
         $offset += 4;
     }
     if ($Bitmap & kFPUTF8NameBit) {
-        my $position = unpack('x' . $offset . 'n', $data);
-        @$resp{'UTF8Hint', 'UTF8Name'} =
-                unpack('x' . $position . 'Nn/a', $data);
-        $$resp{'UTF8Name'} = compose(decode_utf8($$resp{'UTF8Name'}));
+        my $position = unpack('x' . $offset . 'S>', $data);
+        @{$resp}{'UTF8Hint', 'UTF8Name'} =
+                unpack('x' . $position . 'L>S>/a', $data);
+        $resp->{UTF8Name} = compose(decode_utf8($resp->{UTF8Name}));
         $offset += 6;
     }
     if ($Bitmap & kFPUnixPrivsBit) {
-        @$resp{'UnixUID', 'UnixGID', 'UnixPerms', 'UnixAccessRights'} =
-            unpack('x' . $offset . 'NNNN', $data);
+        @{$resp}{'UnixUID', 'UnixGID', 'UnixPerms', 'UnixAccessRights'} =
+            unpack('x' . $offset . 'L>L>L>L>', $data);
         $offset += 16;
     }
-    $$resp{'FileIsDir'} = 1;
+    $resp->{FileIsDir} = 1;
     return $resp;
 } # }}}1
 
