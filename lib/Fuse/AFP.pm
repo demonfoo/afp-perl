@@ -240,11 +240,11 @@ sub new { # {{{1
     # Copy out the attribute value, since there are some flags we should really
     # be checking in there (you know, for UTF8 support, extended attributes,
     # ACLs, things like that)...
-    $$obj{'volAttrs'} = $$volInfo{'VolAttribute'};
+    $obj->{volAttrs}   = $volInfo->{Attribute};
 
-    $$obj{'pathType'}   = kFPLongName; # AFP long names by default
-    $$obj{'pathFlag'}   = kFPLongNameBit;
-    $$obj{'pathkey'}    = 'LongName';
+    $obj->{pathType}   = kFPLongName; # AFP long names by default
+    $obj->{pathFlag}   = kFPLongNameBit;
+    $obj->{pathkey}    = 'LongName';
 
     if ($$obj{'volAttrs'} & kSupportsUTF8Names) {
         # If the remote volume does UTF8 names, then we'll go with that..
