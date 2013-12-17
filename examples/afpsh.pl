@@ -40,6 +40,7 @@ use Text::Glob qw(match_glob);
 use Encode;
 use I18N::Langinfo qw(langinfo CODESET);
 use Cwd();
+use Fcntl qw(:mode);
 
 # Find out the character encoding for the current terminal.
 my $term_enc = langinfo(CODESET);
@@ -293,7 +294,7 @@ my %commands = (
                                 DirectoryBitmap => $dirBmp,
                                 ReqCount        => 1024,
                                 StartIndex      => $offset,
-                                MaxReplySize    => 32_767,
+                                MaxReplySize    => 2**15 - 1,
                                 PathType        => $pathType,
                                 Pathname        => q{});
                         if (ref($results) eq 'ARRAY') {
@@ -320,6 +321,7 @@ my %commands = (
     cat => sub {
         my @words = @_;
         foreach my $fname (@words[1..$#words]) {
+            local $OUTPUT_AUTOFLUSH = 1;
             my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
                     $fname);
             my ($rc, %resp) = $session->FPOpenFork(
@@ -856,7 +858,7 @@ sub do_listentries {
             $up = $ent->{UnixPerms};
         }
         else {
-            $up = $ent->{FileIsDir} ? 0755 : 0644;
+            $up = $ent->{FileIsDir} ?  (S_IFDIR | 0755) : (S_IFREG | 0644);
         }
         my $uid = $ent->{UnixUID} || $ent->{OwnerID} || 0;
         my $user;
@@ -879,8 +881,8 @@ sub do_listentries {
         }
 
         $ent->{$pathkey} =~ tr/\//:/;
-        printf(q{%s%s%s%s%s%s%s%s%s%s %3d %-8s %-8s %8s %-11s %s} . "\n",
-            ($ent->{FileIsDir} == 1 ? q{d} : q{-}),
+        printf(q{%s%s%s%s%s%s%s%s%s%s %3d %-8s %-8s %8s %-11s %s},
+            ($ent->{FileIsDir} == 1 ? q{d} : S_ISLNK($up) ? q{l} : q{-}),
             ($up & 0400 ? q{r} : q{-}),
             ($up & 0200 ? q{w} : q{-}),
             ($up & 04000 ? ($up & 0100 ? q{s} : q{S}) :
@@ -898,6 +900,25 @@ sub do_listentries {
             ($ent->{FileIsDir} == 1 ? 0 : $ent->{$DForkLenKey}),
             strftime($tfmt, localtime($fmodtime)),
             $ent->{$pathkey});
+        if (S_ISLNK($up)) {
+            # Read link path and print that out too...
+            my ($rc, %resp) = $session->FPOpenFork(
+                    VolumeID    => $vol,
+                    DirectoryID => $ent->{ParentDirID},
+                    AccessMode  => 0x1,
+                    PathType    => $pathType,
+                    Pathname    => $ent->{$pathkey});
+            if ($rc == kFPNoErr) {
+                my $data;
+                ($rc, $data) = &{$ReadFn}($session,
+                        OForkRefNum => $resp{OForkRefNum},
+                        Offset      => 0,
+                        ReqCount    => 1024);
+                $rc = $session->FPCloseFork($resp{OForkRefNum});
+                print q{ -> }, $data;
+            }
+        }
+        print "\n";
         if ($client_uuid) {
             my($rc, %acl_info) = $session->FPGetACL(
                     VolumeID    => $vol,
@@ -1056,7 +1077,7 @@ COLLECT_PATHS:
                                DirectoryBitmap  => $dirBmp,
                                ReqCount         => 256,
                                StartIndex       => scalar(keys %entries) + 1,
-                               MaxReplySize     => 32_767,
+                               MaxReplySize     => 2**15 - 1,
                                PathType         => $pathType,
                                Pathname         => $expath->[1]);
                 if ($rc == kFPNoErr || $rc == kFPObjectNotFound) {
