@@ -9,6 +9,7 @@ use strict;
 use warnings;
 use diagnostics;
 use integer;
+use Data::Dumper;
 
 # Enables a nice call trace on warning events.
 use Carp;
@@ -124,6 +125,7 @@ MAINLOOP:
             # go home.
             if (($now - $handler->[3]) > $active_timer) {
                 $shared->{exit} = 1;
+                print {\*STDERR} "Net::DSI::session_thread(): Waiting request timed out, aborting\n";
                 last MAINLOOP;
             }
         }
@@ -134,6 +136,7 @@ MAINLOOP:
             # Apple's docs say if we are 2 minutes out from receiving a
             # tickle from the peer, we should assume the connection is
             # dead.
+        #    print {\*STDERR} "Net::DSI::session_thread(): No packets in 120 seconds, setting exit flag to 1\n";
         #    $shared->{exit} = 1;
         #    last;
         #}
@@ -142,6 +145,7 @@ MAINLOOP:
             if ($ev & POLLHUP) {
                 # If this happens, the socket is (almost certainly) no
                 # longer connected to the peer, so we should bail.
+                #print {\*STDERR} "Net::DSI::session_thread(): Received HUP on AFP server connection, terminating loop\n";
                 #last MAINLOOP;
                 print {\*STDERR} "Net::DSI::session_thread(): poll returned POLLHUP, but this is indeterminate\n";
             }
@@ -174,10 +178,12 @@ MAINLOOP:
 
             $last_pkt_rcvd = gettimeofday();
 
+            # These are requests *from* the server...
             if ($type == 0) {
                 # DSICloseSession from server; this means the server is
                 # going away (i.e., it's shutting down).
                 if ($cmd == OP_DSI_CLOSESESSION) {
+                    print {\*STDERR} "Net::DSI::session_thread(): Received CloseSession from server, setting exit flag to 1\n";
                     $shared->{exit} = 1;
                 }
 
@@ -193,6 +199,14 @@ MAINLOOP:
                     # Queue the notification for later processing
                     push(@{$shared->{attnq}}, $userBytes);
                     next MAINLOOP;
+                }
+
+                elsif ($cmd == OP_DSI_TICKLE) {
+                    print {\*STDERR} "Net::DSI::session_thread(): Received tickle packet at $last_pkt_rcvd\n";
+                }
+
+                else {
+                    print {\*STDERR} "Net::DSI::session_thread(): Unexpected packet received:\n", Dumper( { type => $type, cmd => $cmd, id => $id, errcode => $errcode, length => $length, reserved =>$reserved } );
                 }
             } else {
                 # Check for a completion handler block for the given message ID.
@@ -210,6 +224,9 @@ MAINLOOP:
                     # on down())
                     #${$$handler[0]}->up();
                     $sem_ref = $handler->[0];
+                }
+                else {
+                    print {\*STDERR} "Net::DSI::session_thread(): Message packet received with id $id, but no handler block present\n";
                 }
             }
 
