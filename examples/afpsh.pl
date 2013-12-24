@@ -148,8 +148,8 @@ _EOT_
 }
 
 my $volInfo;
-my $ret = $session->FPOpenVol(kFPVolAttributeBit, $values{volume}, undef,
-        \$volInfo);
+my $ret = $session->FPOpenVol(kFPVolAttributeBit,
+        decode($term_enc, $values{volume}), undef, \$volInfo);
 if ($ret != kFPNoErr) {
     print "Volume was unknown?\n";
     $session->FPLogout();
@@ -223,7 +223,7 @@ if (Net::AFP::Versions::CompareByVersionNum($session, 3, 1,
 
 if (defined $values{subpath}) {
     my ($newDirId, $fileName) = resolve_path($session, $volID, $curdirnode,
-            $values{subpath});
+            decode($term_enc, $values{subpath}));
     if (defined $fileName || !defined $newDirId) {
         print 'path ', $values{subpath}, ' is not accessible, defaulting ',
                 "to volume root\n";
