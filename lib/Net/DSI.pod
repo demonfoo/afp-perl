@@ -32,33 +32,33 @@ IPv6 (if L<IO::Socket::INET6> is present) address, or a DNS name.
 
 =item close
 
-=item DSICloseSession ()
+=item CloseSession ()
 
-The C<DSICloseSession> call can be issued at any time by the DSI client to
-close a session previously opened through an C<DSIOpenSession> call. As a
+The C<CloseSession> call can be issued at any time by the DSI client to
+close a session previously opened through an C<OpenSession> call. As a
 result of the call, all pending activity on the session is immediately
 canceled.
 
-=item DSICommand (MESSAGE, RESP_R)
+=item Command (MESSAGE, RESP_R)
 
 Once a session has been opened, the workstation end client can send a
-command to the server end by issuing an C<DSICommand> call.
+command to the server end by issuing an C<Command> call.
 
 MESSAGE contains the binary data for the outgoing request. RESP_R must
 be a scalar ref that will contain the reassembled response data, if any,
 received from the server in response to the request sent.
 
-=item DSIGetStatus (RESP_R)
+=item GetStatus (RESP_R)
 
-The C<DSIGetStatus> call is used by a DSI client to obtain status
+The C<GetStatus> call is used by a DSI client to obtain status
 information for a particular server.
 
 RESP_R must be a scalar ref which will contain the raw binary data returned
-from the DSIGetStatus call.
+from the C<GetStatus> call.
 
-=item DSIOpenSession ( [OPTIONS] )
+=item OpenSession ( [OPTIONS] )
 
-The C<DSIOpenSession> call is issued by a client to begin a DSI session with
+The C<OpenSession> call is issued by a client to begin a DSI session with
 the connected server.
 
 OPTIONS are passed as a hash of values. These are optional. If the return
@@ -87,12 +87,12 @@ server supports it.
 
 =back
 
-=item DSITickle
+=item Tickle
 
 This call is used to keep an existing DSI connection alive. It should not
 be called directly in your code; this operation is handled internally.
 
-=item DSIWrite (MESSAGE, DATA_R, D_LEN, RESP_R)
+=item Write (MESSAGE, DATA_R, D_LEN, RESP_R)
 
 Used for sending write requests to the server. This is only applicable for
 the L<Net::AFP/"FPWrite">, L<Net::AFP/"FPWriteExt">, and
