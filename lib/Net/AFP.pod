@@ -4967,10 +4967,10 @@ Unimplemented functions:
 
 Server implementations tested and known to work with:
 
- - Mac OS 9.x (should work with older versions, as long as they
-   implement at least AFP 2.0)
+ - System 7.x (7.0.1 and 7.5.5, tested via BasiliskII)
+ - Mac OS 9.x (9.1 and 9.2.2, tested via SheepShaver and Mac-On-Linux)
  - Mac OS X (tested with 10.4 and later, should work with any version)
- - Netatalk 2.x
+ - Netatalk 2.x/3.x
  - Apple AirDisk devices
 
 Server implementations known not to work with:
@@ -4988,7 +4988,7 @@ Operating systems known to work on:
 Operating systems known not to work on:
 
  - Solaris (broken ithreads)
- - Windows (socket interactions with ithreads)
+ - Windows (socket interactions with ithreads, may work slowly)
 
 =head1 AUTHOR
 
