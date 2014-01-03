@@ -1323,6 +1323,7 @@ sub write { # {{{1
             if defined $::_DEBUG;
 
     $$self{'callcount'}{(caller(0))[3]}++;
+    my $fileName = translate_path($file, $self);
 
     if (ref($fh)) {
         return -&EBADF;
@@ -1360,6 +1361,7 @@ sub write { # {{{1
         $self->{'metrics'}->{'wr_minsize'} = $wr_size;
     }
 
+    delete $self->{'_getattr_cache'}->{$fileName};
     return $wr_size;
 } # }}}1
 
