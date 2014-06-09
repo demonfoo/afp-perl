@@ -760,8 +760,8 @@ sub mkdir { # {{{1
             Pathname    => node_name($fileName));
     if ($rc == kFPNoErr) {
         # Set the mode on the directory to $mode.
-        my $resp;
-        ($rc, $resp) = $self->{afpconn}->FPGetFileDirParms(
+        my $sresp;
+        ($rc, $sresp) = $self->{afpconn}->FPGetFileDirParms(
                 VolumeID        => $self->{volID},
                 DirectoryID     => $resp->{NodeID},
                 PathType        => $self->{pathType},
@@ -776,9 +776,9 @@ sub mkdir { # {{{1
                 Pathname        => node_name($fileName),
                 Bitmap          => kFPUnixPrivsBit,
                 UnixPerms       => S_IFDIR | $mode,
-                UnixUID         => $resp->{UnixUID},
-                UnixGID         => $resp->{UnixGID},
-                UnixAccessRights => $resp->{UnixAccessRights});
+                UnixUID         => $sresp->{UnixUID},
+                UnixGID         => $sresp->{UnixGID},
+                UnixAccessRights => $sresp->{UnixAccessRights});
         return &EBADF if $rc != kFPNoErr;
 
         return 0;
@@ -2186,6 +2186,12 @@ sub readdir { # {{{1
             push(@filesList, [++$offset, '._metrics']);
         }
     } # }}}2
+    #else {
+    #    $offset -= 2;
+    #    if ($dirname eq '/') {
+    #        $offset--;
+    #    }
+    #}
 
     my $bitmap = $self->{pathFlag};
 
