@@ -31,16 +31,16 @@ my $pw_cb =  sub {
     return $values{password};
 };
 
-my $srvInfo;
-my($session, %values) = do_afp_connect($pw_cb, $url, \$srvInfo);
-if (not ref($session) or not $session->isa('Net::AFP')) {
-    exit(2);
+my $si;
+my($session, %values) = do_afp_connect($pw_cb, $url, \$si);
+if (not ref $session or not $session->isa('Net::AFP')) {
+    exit 2;
 }
 
-if (not($srvInfo->{Flags} & kSupportsChgPwd)) {
+if (not($si->{Flags} & kSupportsChgPwd)) {
     print "ERROR: Server does not support password changing\n";
     $session->close();
-    exit(2);
+    exit 2;
 }
 
 my $new_pass = read_password('Enter your new password: ');
@@ -49,11 +49,11 @@ my $check_pass = read_password('Reenter your password: ');
 my $rv = 0;
 
 if ($new_pass eq $check_pass) {
-    my $uamlist = $srvInfo->{UAMs};
+    my $uamlist = $si->{UAMs};
     if (exists $values{UAM}) {
         $uamlist = [ $values{UAM} ];
     }
-    my $rc = Net::AFP::UAMs::ChangePassword($session, $srvInfo->{UAMs},
+    my $rc = Net::AFP::UAMs::ChangePassword($session, $si->{UAMs},
             $values{username}, $old_pass, $new_pass);
     if ($rc != kFPNoErr) {
         print 'ERROR: Server responded: ', afp_strerror($rc), ' (', $rc, ")\n";
@@ -70,14 +70,14 @@ else {
 
 $session->close();
 
-exit($rv);
+exit $rv;
 
 sub usage {
-    print <<'_EOT_';
+    print <<"_EOT_";
 
-afp_chpass.pl - AFP password changing tool
+${PROGRAM_NAME} - AFP password changing tool
 
-Usage: afp_chpass.pl [AFP URL]
+Usage: ${PROGRAM_NAME} [AFP URL]
 
 Change password on an AFP server.
 
@@ -86,6 +86,6 @@ parsed, 2 on server error, 3 on password mismatch.
 
 _EOT_
 
-    exit(1);
+    exit 1;
 }
 # vim: ts=4 fdm=marker sw=4 et

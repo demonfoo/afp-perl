@@ -35,7 +35,7 @@ if (not $has_atalk) {
 my @results;
 eval {
 	@results = NBPLookup(undef, 'AFPServer');
-};
+} or carp('AppleTalk stack probably out of order');
 
 foreach my $entry (@results) {
 	print 'For host ', $entry->[3], ":\n";

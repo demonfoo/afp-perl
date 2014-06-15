@@ -82,9 +82,12 @@ if ($atalk_first) {
 }
 
 if (not scalar(@ARGV)) {
-    print "\nafpclient version ", $Net::AFP::VERSION, " - Apple Filing Protocol CLI client\n";
-    print "\nUsage: ", $0, " [options] [AFP URL]\n\n";
-    print <<'_EOT_';
+    print <<"_EOT_";
+
+afpclient version ${Net::AFP::VERSION} - Apple Filing Protocol CLI client
+
+Usage: ${PROGRAM_NAME} [options] [AFP URL]
+
 Options:
     --prefer-v4
         Use IPv4 connectivity before IPv6, if available.
@@ -320,8 +323,8 @@ my %commands = (
     },
     cat => sub {
         my @words = @_;
+        STDOUT->autoflush(1);
         foreach my $fname (@words[1..$#words]) {
-            local $OUTPUT_AUTOFLUSH = 1;
             my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
                     $fname);
             my ($rc, %resp) = $session->FPOpenFork(
@@ -441,7 +444,7 @@ _EOT_
         if ($sresp->{$RForkLenKey} > 0) {
             print "note that the resource fork isn't handled yet!\n";
         }
-        local $OUTPUT_AUTOFLUSH = 1;
+        STDOUT->autoflush(1);
         my $pos = 0;
         my(%time, %lasttime, %starttime);
         @time{'sec', 'usec'} = gettimeofday();
@@ -478,7 +481,7 @@ _EOT_
             @time{'sec', 'usec'} = gettimeofday();
         }
         print "\n";
-        close($local_fh);
+        close($local_fh) || carp("Couldn't close local file");
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != kFPNoErr) {
             print 'close attempt failed with code ', $rc, ' (',
@@ -541,7 +544,7 @@ _EOT_
         }
 
         my $fileLen = (stat($srcFile))[7];
-        local $OUTPUT_AUTOFLUSH = 1;
+        STDOUT->autoflush(1);
         my $pos = 0;
         my(%time, %lasttime, %starttime);
         @time{'sec', 'usec'} = gettimeofday();
@@ -606,7 +609,7 @@ _EOT_
         #if ($hashmarks_enabled == 1) {
         print "\n";
         #}
-        close($srcFile);
+        close($srcFile) || carp("Couldn't close local file");
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != kFPNoErr) {
             print 'close attempt failed with code ', $rc, ' (',
@@ -794,8 +797,8 @@ $commands{quit}   = $commands{exit};
 $commands{cdup}   = [ $commands{cd}, q{..} ];
 $commands{rmdir}  = $commands{rm};
 
-binmode STDOUT, ':utf8';
-binmode STDIN, ':utf8';
+binmode STDOUT, ':encoding(UTF-8)';
+binmode STDIN, ':encoding(UTF-8)';
 
 local $SIG{INT} = sub {
     print "\nCtrl-C received, exiting\n";
@@ -1009,7 +1012,7 @@ sub expand_globbed_path {
     my $dirBmp = kFPNodeIDBit | kFPParentDirIDBit | $pathFlag;
     my $fileBmp = $dirBmp;
     my $fileName = undef;
-    my @pathElements = split(qr{/}, $path);
+    my @pathElements = split(m{/}s, $path);
     my $curNode = $dirid;
 
     my @nameParts;
@@ -1134,7 +1137,7 @@ sub resolve_path {
     my $fileBmp = 0;
     my $fileName = undef;
 
-    my @pathElements = split(qr{/}, $path);
+    my @pathElements = split(m{/}s, $path);
     my $curNode = $dirid;
     if (!defined($pathElements[0]) || ($pathElements[0] eq q{})) {
         $curNode = 2;
