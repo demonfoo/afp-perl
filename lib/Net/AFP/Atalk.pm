@@ -16,8 +16,8 @@ use Exporter qw(import);
 use Log::Log4perl qw(:easy);
 
 use base qw(Net::AFP);
-our @EXPORT = qw(kFPShortName kFPLongName kFPUTF8Name kFPSoftCreate
-                 kFPHardCreate kFPStartEndFlag kFPLockUnlockFlag);
+our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
+                 $kFPHardCreate $kFPStartEndFlag $kFPLockUnlockFlag);
 
 # Arguments:
 #   $class: The class (Net::AFP::Atalk) to create an instance of. This
@@ -34,7 +34,7 @@ sub new { # {{{1
 
     $obj->{'Session'} = new Net::Atalk::ASP($host, $port);
     my $rc = $obj->{'Session'}->OpenSession();
-    if ($rc != kFPNoErr) {
+    if ($rc != $kFPNoErr) {
         $obj->{'Session'}->close();
         return $rc;
     }
@@ -127,7 +127,7 @@ sub GetStatus { # {{{1
     my $resp;
     my $rc = $obj->GetStatus(\$resp);
     $obj->close();
-    return $rc unless $rc == kFPNoErr;
+    return $rc unless $rc == $kFPNoErr;
 
     ${$resp_r} = _ParseSrvrInfo($resp);
     return $rc;

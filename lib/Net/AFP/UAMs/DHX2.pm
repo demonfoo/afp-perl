@@ -16,10 +16,11 @@ use warnings;
 use diagnostics;
 use integer;
 
-use constant UAMNAME => 'DHX2';
+use Readonly;
+Readonly my $UAMNAME => 'DHX2';
 
-use constant C2SIV => 'LWallace';
-use constant S2CIV => 'CJalbert';
+Readonly my $C2SIV => 'LWallace';
+Readonly my $S2CIV => 'CJalbert';
 
 # Provides the encryption algorithm.
 my $has_Crypt__CAST5_PP = 0;
@@ -53,7 +54,7 @@ use Math::BigInt lib => 'GMP';
 use Net::AFP::Versions;
 use Log::Log4perl qw(:easy);
 
-Net::AFP::UAMs::RegisterUAM(UAMNAME, __PACKAGE__, 200);
+Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 200);
 
 sub zeropad { return('0' x ($_[1] - length($_[0])) . $_[0]); }
 
@@ -138,7 +139,7 @@ sub zeropad { return('0' x ($_[1] - length($_[0])) . $_[0]); }
 # | 5       | Client->Server  | FPLoginCont (2 bytes)/ID + 1/                |
 # |         |                 |       (serverNonce + 1, password, S2CIV)K    |
 # +---------+-----------------+----------------------------------------------+
-# | 6       | Server->Client  | A result code of kFPNoErr if authentication  |
+# | 6       | Server->Client  | A result code of $kFPNoErr if authentication |
 # |         |                 |       was successful                         |
 # +---------+-----------------+----------------------------------------------+
 sub Authenticate {
@@ -162,19 +163,19 @@ sub Authenticate {
     my $rc;
     
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
-            kFPVerAtLeast)) {
+            $kFPVerAtLeast)) {
         ($rc, %resp) = $session->FPLoginExt(
                 'AFPVersion'    => $AFPVersion,
-                'UAM'           => UAMNAME,
+                'UAM'           => $UAMNAME,
                 'UserName'      => $username);
         DEBUG('FPLoginExt() completed with result code ', $rc);
     }
     else {
-        ($rc, %resp) = $session->FPLogin($AFPVersion, UAMNAME,
+        ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME,
                 pack('C/a*x![s]', $username));
         DEBUG('FPLogin() completed with result code ', $rc);
     }
-    return $rc unless $rc == kFPAuthContinue;
+    return $rc unless $rc == $kFPAuthContinue;
 
     # Received message 2, parsing below.
     # Get the value for g, and the length value for assorted things (p, Ma,
@@ -236,18 +237,18 @@ sub Authenticate {
     
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
-    my $ctx = new Crypt::CBC( { 'key'               => $K_binary,
-                                'cipher'            => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
-                                'padding'           => 'null',
-                                'literal_key'       => 0,
-                                'prepend_iv'        => 0,
-                                'iv'                => C2SIV } );
+    my $ctx = new Crypt::CBC( { key         => $K_binary,
+                                cipher      => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
+                                padding     => 'null',
+                                literal_key => 0,
+                                prepend_iv  => 0,
+                                iv          => $C2SIV } );
     #undef $K_hash;
     $$session{'cryptctx'} = $ctx;
 
     # Encrypt the random nonce value we fetched above, then assemble the
     # message to send to the server.
-    #$ctx->set_initialization_vector(C2SIV);
+    #$ctx->set_initialization_vector($C2SIV);
     my $ciphertext = $ctx->encrypt($clientNonce_binary);
     undef $clientNonce_binary;
     my $message = $Ma_binary . $ciphertext;
@@ -262,12 +263,12 @@ sub Authenticate {
     $rc = $session->FPLoginCont($resp{'ID'}, $message, \$sresp);
     undef $message;
     DEBUG('FPLoginCont() completed with result code ', $rc);
-    return $rc unless $rc == kFPAuthContinue;
+    return $rc unless $rc == $kFPAuthContinue;
 
     # Decrypting message 4.
     # Decrypt the message from the server, and separate the (hopefully)
     # incremented nonce value from us, and the server's nonce value.
-    $ctx->set_initialization_vector(S2CIV);
+    $ctx->set_initialization_vector($S2CIV);
     my $decrypted = $ctx->decrypt($sresp->{'UserAuthInfo'});
     # HACK ALERT: seems decrypt() likes to drop the trailing null on me :|
     # this line should pad out to the appropriate length, which should
@@ -304,7 +305,7 @@ sub Authenticate {
     # message.
     my $authdata = pack('H32a256', $newServerNonce_text, &$pw_cb());
     undef $newServerNonce_text;
-    $ctx->set_initialization_vector(C2SIV);
+    $ctx->set_initialization_vector($C2SIV);
     $ciphertext = $ctx->encrypt($authdata);
     DEBUG('$ciphertext is ', unpack('H*', $ciphertext));
 
@@ -328,12 +329,12 @@ sub ChangePassword {
     my $resp = undef;
 
     if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
-            kFPVerAtLeast)) {
+            $kFPVerAtLeast)) {
         $username = '';
     }
-    my $rc = $session->FPChangePassword(UAMNAME, $username, undef, \$resp);
+    my $rc = $session->FPChangePassword($UAMNAME, $username, undef, \$resp);
     DEBUG('FPChangePassword() completed with result code ', $rc);
-    return $rc unless $rc == kFPAuthContinue;
+    return $rc unless $rc == $kFPAuthContinue;
 
     # Get the value for g, and the length value for assorted things (p, Ma,
     # Mb, Ra, Rb).
@@ -394,17 +395,17 @@ sub ChangePassword {
     # and decrypting stuff to talk to the server. Note the setting of
     # literal_key to a false value, because in this method, we
     # actually want the MD5 hash of the key, not the key itself.
-    my $ctx = new Crypt::CBC( { 'key'               => $K_binary,
-                                'cipher'            => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
-                                'padding'           => 'null',
-                                'literal_key'       => 0,
-                                'prepend_iv'        => 0,
-                                'iv'                => C2SIV } );
+    my $ctx = new Crypt::CBC( { key         => $K_binary,
+                                cipher      => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
+                                padding     => 'null',
+                                literal_key => 0,
+                                prepend_iv  => 0,
+                                iv          => $C2SIV } );
     undef $K_binary;
 
     # Encrypt the random nonce value we fetched above, then assemble the
     # message to send to the server.
-    #$ctx->set_initialization_vector(C2SIV);
+    #$ctx->set_initialization_vector($C2SIV);
     my $ciphertext = $ctx->encrypt($clientNonce_binary);
     undef $clientNonce_binary;
     my $message = pack('na[' . $len . ']a*', $ID, $Ma_binary, $ciphertext);
@@ -415,9 +416,9 @@ sub ChangePassword {
     # Send the message to the server containing Ma (our "public key"), and
     # the encrypted nonce value.
     my $sresp = '';
-    $rc = $session->FPChangePassword(UAMNAME, $username, $message, \$sresp);
+    $rc = $session->FPChangePassword($UAMNAME, $username, $message, \$sresp);
     DEBUG('FPChangePassword() completed with result code ', $rc);
-    return $rc unless $rc == kFPAuthContinue;
+    return $rc unless $rc == $kFPAuthContinue;
     undef $message;
 
     # Unpack the server response for our perusal.
@@ -425,7 +426,7 @@ sub ChangePassword {
 
     # Decrypt the message from the server, and separate the (hopefully)
     # incremented nonce value from us, and the server's nonce value.
-    $ctx->set_initialization_vector(S2CIV);
+    $ctx->set_initialization_vector($S2CIV);
     my $decrypted = $ctx->decrypt($message);
     # HACK ALERT: seems decrypt() likes to drop the trailing null on me :|
     # this line should pad out to the appropriate length, which should
@@ -464,7 +465,7 @@ sub ChangePassword {
     my $authdata = pack('H32a256a256', $newServerNonce_text, $newPassword,
             $oldPassword);
     undef $newServerNonce_text;
-    $ctx->set_initialization_vector(C2SIV);
+    $ctx->set_initialization_vector($C2SIV);
     $ciphertext = $ctx->encrypt($authdata);
     DEBUG('$ciphertext is ', unpack('H*', $ciphertext));
 
@@ -472,7 +473,7 @@ sub ChangePassword {
     undef $ciphertext;
 
     # Send the response back to the server, and hope we did this right.
-    $rc = $session->FPChangePassword(UAMNAME, $username, $message);
+    $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;
     DEBUG('FPChangePassword() completed with result code ', $rc);
     return $rc;

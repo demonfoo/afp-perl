@@ -2,7 +2,8 @@
 
 package Net::AFP::UAMs::Kerberos;
 
-use constant UAMNAME => 'Client Krb v2';
+use Readonly;
+Readonly my $UAMNAME => 'Client Krb v2';
 
 use GSSAPI;
 use Net::AFP::Result;
@@ -11,7 +12,7 @@ use Net::AFP;
 
 use strict;
 
-#Net::AFP::UAMs::RegisterUAM(UAMNAME, __PACKAGE__, 300);
+#Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 300);
 
 sub Authenticate {
     my ($session, $AFPVersion, $username, $pw_cb, $realm) = @_;
@@ -35,19 +36,19 @@ sub Authenticate {
 
     # Assuming that succeeded, now we do the first stage of the login process.
     my $resp = '';
-    my $rc = $session->FPLoginExt(0, $AFPVersion, UAMNAME, kFPUTF8Name,
-            $username, kFPUTF8Name, $realm, undef, \$resp);
+    my $rc = $session->FPLoginExt(0, $AFPVersion, $UAMNAME, $kFPUTF8Name,
+            $username, $kFPUTF8Name, $realm, undef, \$resp);
     print 'FPLoginExt() completed with result code ', $rc, "\n"
             if defined $::__AFP_DEBUG;
 
-    return $rc unless $rc == kFPAuthContinue;
+    return $rc unless $rc == $kFPAuthContinue;
 
     # Now send the Kerberos ticket to the AFP server to be authorized...?
     my $message = pack('C/a*x![s]S>/a*', $username, $gss_output_token);
     my $sresp;
     $rc = $session->FPLoginCont($resp->{ID}, $message, \$sresp);
 
-    return $rc unless $rc == kFPNoErr;
+    return $rc unless $rc == $kFPNoErr;
 
     # Get an encrypted Kerberos session key from the AFP server.
     my $enc_session_key;

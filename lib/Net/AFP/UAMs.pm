@@ -65,7 +65,7 @@ foreach my $uampath (@uampaths) {
 sub GuestAuth($$) {
     my($session, $AFPVersion) = @_;
     my $rc = Net::AFP::UAMs::Anonymous::Authenticate($session, $AFPVersion);
-    if ($rc == kFPNoErr) {
+    if ($rc == $kFPNoErr) {
         $session->{'AFPVersion'} = $AFPVersion;
     }
     return $rc;
@@ -88,7 +88,7 @@ sub PasswordAuth($$$$$) {
         DEBUG('auth function is ', $function);
         $session->{'username'} = $UserName;
         my $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
-        if ($rc == kFPNoErr) {
+        if ($rc == $kFPNoErr) {
             $session->{'AFPVersion'} = $AFPVersion;
         }
         return $rc;
@@ -97,7 +97,7 @@ sub PasswordAuth($$$$$) {
     # If we reach this point, none of the UAMs the server knew were available.
     DEBUG((caller(0))[3], 
             " Could not find an agreeable UAM for authenticating to server\n");
-    return kFPBadUAM;
+    return $kFPBadUAM;
 }
 
 sub ChangePassword {
@@ -118,7 +118,7 @@ sub ChangePassword {
     # If we reach this point, none of the UAMs the server knew were available.
     DEBUG((caller(0))[3], 
             " Could not find valid password changing UAM\n");
-    return kFPBadUAM;
+    return $kFPBadUAM;
 }
 
 1;

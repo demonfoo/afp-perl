@@ -18,6 +18,7 @@ use Socket;
 use Errno qw(:POSIX);
 use URI::Escape;
 use English qw(-no_match_vars);
+use Readonly;
 
 # Do conditional includes of several modules, and denote to ourselves
 # if they got imported or not.
@@ -54,12 +55,12 @@ eval {
 # }}}1
 
 # define constants {{{1
-use constant MSG_NEEDPASSWORD   => 1;
-use constant MSG_PASSWORDIS     => 2;
-use constant MSG_RUNNING        => 3;
-use constant MSG_STARTERR       => 4;
-use constant MSGFORMAT          => 'CS';
-use constant MSGLEN             => 3;
+Readonly our $MSG_NEEDPASSWORD  => 1;
+Readonly our $MSG_PASSWORDIS    => 2;
+Readonly our $MSG_RUNNING       => 3;
+Readonly our $MSG_STARTERR      => 4;
+Readonly our $MSGFORMAT         => 'CS';
+Readonly our $MSGLEN            => 3;
 my @msgfields = qw(msg payloadlen);
 # }}}1
 
@@ -245,27 +246,27 @@ if ($pid > 0) {
         if ($poll->events(\*CHILD) & POLLIN) {
             # process received message {{{2
             my $data = q{};
-            my $len = sysread CHILD, $data, MSGLEN;
+            my $len = sysread CHILD, $data, $MSGLEN;
             last unless $len;
             my %msg;
-            @msg{@msgfields} = unpack MSGFORMAT, $data;
+            @msg{@msgfields} = unpack $MSGFORMAT, $data;
             my $payload;
             if ($msg{payloadlen}) {
                 sysread CHILD, $payload, $msg{payloadlen};
             }
 
-            if ($msg{msg} == MSG_RUNNING) {
+            if ($msg{msg} == $MSG_RUNNING) {
                 # the child process has said everything's happy, so we can
                 # now go away; it could still implode, but it's now to a
                 # point where we can't do anything about it.
                 exit 0;
             }
-            elsif ($msg{msg} == MSG_STARTERR) {
+            elsif ($msg{msg} == $MSG_STARTERR) {
                 # some sort of failure condition occurred.
                 my $failcode = unpack 's', $payload;
                 exit $failcode;
             }
-            elsif ($msg{msg} == MSG_NEEDPASSWORD) {
+            elsif ($msg{msg} == $MSG_NEEDPASSWORD) {
                 # child process needs a password, so we'll do the prompting
                 # for it.
                 my ($username, $hostname) = unpack 'S/a*S/a*', $payload;
@@ -279,7 +280,7 @@ if ($pid > 0) {
                     print 'Term::ReadPassword was not available, can\'t ',
                             "get password\n";
                 }
-                syswrite CHILD, pack(MSGFORMAT, MSG_PASSWORDIS,
+                syswrite CHILD, pack($MSGFORMAT, $MSG_PASSWORDIS,
                         length $pw) . $pw;
             }
             else {
@@ -315,14 +316,14 @@ eval {
             my ($username, $hostname, $password) = @_;
             if (!defined $password && defined $interactive) {
                 my $sp = pack 'S/a*S/a*', $username, $hostname;
-                syswrite PARENT, pack(MSGFORMAT, MSG_NEEDPASSWORD,
+                syswrite PARENT, pack($MSGFORMAT, $MSG_NEEDPASSWORD,
                             length $sp) . $sp;
                 my ($data, $payload, %msg) = (q{}, q{});
                 my $poll = new IO::Poll;
                 $poll->mask(\*PARENT, POLLIN);
                 $poll->poll(1);
-                sysread PARENT, $data, MSGLEN;
-                @msg{@msgfields} = unpack MSGFORMAT, $data;
+                sysread PARENT, $data, $MSGLEN;
+                @msg{@msgfields} = unpack $MSGFORMAT, $data;
                 if ($msg{payloadlen} > 0) {
                     sysread PARENT, $payload, $msg{payloadlen};
                 }
@@ -336,20 +337,20 @@ eval {
 } or do {
     # If an exception does happen, it's probably due to an invalid URL...
     print {\*STDERR} "Error while invoking Fuse::AFP:\n", $EVAL_ERROR;
-    syswrite PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, EINVAL);
+    syswrite PARENT, pack($MSGFORMAT . 's', $MSG_STARTERR, 2, EINVAL);
     exit 1;
 };
 
 if (!ref $fuse) {
     # if this happens, an error code was returned, so pass that back to
     # the parent process...
-    syswrite PARENT, pack(MSGFORMAT . 's', MSG_STARTERR, 2, $fuse);
+    syswrite PARENT, pack($MSGFORMAT . 's', $MSG_STARTERR, 2, $fuse);
     exit 1;
 } #}}}1
 
 # Send a love note to the folks saying "wish you were here, everything's
 # fine".
-syswrite PARENT, pack(MSGFORMAT, MSG_RUNNING, 0);
+syswrite PARENT, pack($MSGFORMAT, $MSG_RUNNING, 0);
 close(PARENT) || carp('Couldn\'t close socket to parent process');
 
 # reopen the standard FDs onto /dev/null; they have to be open, since if

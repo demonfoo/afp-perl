@@ -7,9 +7,10 @@ package Net::AFP::Versions;
 use Net::AFP::TokenTypes;
 
 use Exporter qw(import);
+use Readonly;
 
-our @EXPORT = qw(kFPVerNewerThan kFPVerAtLeast kFPVerEqual kFPVerNoNowerThan
-                 kFPVerOlderThan);
+our @EXPORT = qw($kFPVerNewerThan $kFPVerAtLeast $kFPVerEqual
+                 $kFPVerNoNowerThan $kFPVerOlderThan);
 
 our @versions = (
     {
@@ -79,11 +80,11 @@ our @versions = (
 
 our %versionmap = map { $$_{'VersionString'}, $_ } @versions;
 
-use constant kFPVerNewerThan    => 0;
-use constant kFPVerAtLeast      => 1;
-use constant kFPVerEqual        => 2;
-use constant kFPVerNoNewerThan  => 3;
-use constant kFPVerOlderThan    => 4;
+Readonly our $kFPVerNewerThan   => 0;
+Readonly our $kFPVerAtLeast     => 1;
+Readonly our $kFPVerEqual       => 2;
+Readonly our $kFPVerNoNewerThan => 3;
+Readonly our $kFPVerOlderThan   => 4;
 
 sub CompareByString {
     my($session, $verstring, $cmptype) = @_;
@@ -100,22 +101,22 @@ sub CompareByVersionNum {
     my $running_ver = $versionmap{$ver_str};
     my($r_major, $r_minor) = @$running_ver{'MajorNumber', 'MinorNumber'};
 
-    if ($cmptype == kFPVerNewerThan) {
+    if ($cmptype == $kFPVerNewerThan) {
         return(1) if $r_major > $major;
         return(1) if $r_major == $major && $r_minor > $minor;
         return 0;
-    } elsif ($cmptype == kFPVerAtLeast) {
+    } elsif ($cmptype == $kFPVerAtLeast) {
         return(1) if $r_major > $major;
         return(1) if $r_major == $major && $r_minor >= $minor;
         return 0;
-    } elsif ($cmptype == kFPVerEqual) {
+    } elsif ($cmptype == $kFPVerEqual) {
         return(1) if $r_major == $major && $r_minor == $minor;
         return 0;
-    } elsif ($cmptype == kFPVerNoNewerThan) {
+    } elsif ($cmptype == $kFPVerNoNewerThan) {
         return(0) if $r_major > $major;
         return(0) if $r_major == $major && $r_minor > $minor;
         return 1;
-    } elsif ($cmptype == kFPVerOlderThan) {
+    } elsif ($cmptype == $kFPVerOlderThan) {
         return(0) if $r_major > $major;
         return(0) if $r_major == $major && $r_minor >= $minor;
         return 1;

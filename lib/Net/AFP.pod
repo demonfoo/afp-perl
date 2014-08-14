@@ -30,15 +30,15 @@ Constants indicating the type of names in a C<$Pathname> parameter.
 
 =over
 
-=item kFPShortName
+=item $kFPShortName
 
 Indicates that a C<$Pathname> parameter contains Short Names.
 
-=item kFPLongName
+=item $kFPLongName
 
 Indicates that a C<$Pathname> parameter contains Long Names.
 
-=item kFPUTF8Name
+=item $kFPUTF8Name
 
 Indicates that a C<$Pathname> parameter contains an AFPName, which
 consists of a four-byte text encoding hint followed a two-byte length,
@@ -53,11 +53,11 @@ C<Flag> parameter for the L</FPCreateFile()> command.
 
 =over
 
-=item kFPSoftCreate
+=item $kFPSoftCreate
 
 Indicates soft file creation; i.e., create only if a file does not exist.
 
-=item kFPHardCreate
+=item $kFPHardCreate
 
 Indicates hard file creation; i.e., if the file already exists, destroy it.
 
@@ -66,9 +66,9 @@ Indicates hard file creation; i.e., if the file already exists, destroy it.
 =head2 Catalog Node Names
 
 Catalog node (CNode) names identify every directory and file in a volume
-catalog. Each directory and file has a Long Name (L</kFPLongName>),
-Short Name (L</kFPShortName>, and may also have an AFPName
-(L</kFPUTF8Name>).
+catalog. Each directory and file has a Long Name (L</$kFPLongName>),
+Short Name (L</$kFPShortName>, and may also have an AFPName
+(L</$kFPUTF8Name>).
 
 Long Names and Short Names correspond in two of the native file systems
 that AFP supports; the Mac OS refers to files and directories by Long
@@ -2994,7 +2994,7 @@ L<Net::AFP::UAMs/"UAM STRINGS">.
 
 =item UserNameType
 
-Type of name in C<UserName>; always L</kFPUTF8Name>.
+Type of name in C<UserName>; always L</$kFPUTF8Name>.
 
 =item UserName
 

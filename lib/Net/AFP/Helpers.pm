@@ -121,7 +121,7 @@ sub do_afp_connect {
     else {
         $rc = Net::AFP::TCP->GetStatus(@values{'host', 'port'}, \$srvInfo);
     }
-    if ($rc != kFPNoErr) {
+    if ($rc != $kFPNoErr) {
         print STDERR "Could not issue GetStatus on ", $values{'host'}, "\n";
         return &ENODEV;
     }
@@ -203,7 +203,7 @@ TRY_SOCKADDRS:
                 $values{'username'}, sub {
                     return &$pw_cb(%values)
                 });
-        unless ($rc == kFPNoErr) {
+        unless ($rc == $kFPNoErr) {
             print STDERR "Incorrect username/password while trying to authenticate\n";
             $session->close();
             return &EACCES;
@@ -211,7 +211,7 @@ TRY_SOCKADDRS:
     }
     else {
         my $rc = Net::AFP::UAMs::GuestAuth($session, $cv);
-        unless ($rc == kFPNoErr) {
+        unless ($rc == $kFPNoErr) {
             print STDERR "Anonymous authentication failed\n";
             $session->close();
             return &EACCES;

@@ -12,14 +12,15 @@ use warnings;
 use diagnostics;
 use integer;
 
-use constant UAMNAME => 'Randnum exchange';
+use Readonly;
+Readonly my $UAMNAME => 'Randnum exchange';
 
 use Crypt::DES;
 use Net::AFP::Result;
 use Net::AFP::Versions;
 use Log::Log4perl qw(:easy);
 
-Net::AFP::UAMs::RegisterUAM(UAMNAME, __PACKAGE__, 50);
+Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 50);
 
 sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
@@ -37,20 +38,20 @@ sub Authenticate {
     my $rc;
     
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
-            kFPVerAtLeast)) {
+            $kFPVerAtLeast)) {
         ($rc, %resp) = $session->FPLoginExt(
-                'AFPVersion'    => $AFPVersion,
-                'UAM'           => UAMNAME,
-                'UserName'      => $username);
+                AFPVersion  => $AFPVersion,
+                UAM         => $UAMNAME,
+                UserName    => $username);
         DEBUG('FPLoginExt() completed with result code ', $rc);
     }
     else {
         my $authinfo = pack('C/a*', $username);
-        ($rc, %resp) = $session->FPLogin($AFPVersion, UAMNAME, $authinfo);
+        ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
         DEBUG('FPLogin() completed with result code ', $rc);
     }
 
-    return $rc unless $rc == kFPAuthContinue;
+    return $rc unless $rc == $kFPAuthContinue;
 
     # The server will send us a random 8-byte number; take that, and encrypt
     # it with the password the user gave us.
@@ -88,10 +89,10 @@ sub ChangePassword {
     # Send the message to the server, and pass the return code directly
     # back to the caller.
     if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
-            kFPVerAtLeast)) {
+            $kFPVerAtLeast)) {
         $username = '';
     }
-    my $rc = $session->FPChangePassword(UAMNAME, $username, $message);
+    my $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;
     DEBUG('FPChangePassword() completed with result code ', $rc);
     return $rc;

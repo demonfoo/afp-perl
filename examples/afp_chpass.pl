@@ -37,7 +37,7 @@ if (not ref $session or not $session->isa('Net::AFP')) {
     exit 2;
 }
 
-if (not($si->{Flags} & kSupportsChgPwd)) {
+if (not($si->{Flags} & $kSupportsChgPwd)) {
     print "ERROR: Server does not support password changing\n";
     $session->close();
     exit 2;
@@ -55,7 +55,7 @@ if ($new_pass eq $check_pass) {
     }
     my $rc = Net::AFP::UAMs::ChangePassword($session, $si->{UAMs},
             $values{username}, $old_pass, $new_pass);
-    if ($rc != kFPNoErr) {
+    if ($rc != $kFPNoErr) {
         print 'ERROR: Server responded: ', afp_strerror($rc), ' (', $rc, ")\n";
         $rv = 2;
     }

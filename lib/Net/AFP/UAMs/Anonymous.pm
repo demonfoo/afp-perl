@@ -2,14 +2,15 @@
 # AFP protocol.
 
 package Net::AFP::UAMs::Anonymous;
-use constant UAMNAME => 'No User Authent';
+use Readonly;
+Readonly my $UAMNAME => 'No User Authent';
 use Net::AFP::Result;
 use Net::AFP::Versions;
 
 use strict;
 use warnings;
 
-Net::AFP::UAMs::RegisterUAM(UAMNAME, __PACKAGE__, -10);
+Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, -10);
 
 sub Authenticate {
     # The latter two args (username and a password callback function) can
@@ -24,16 +25,16 @@ sub Authenticate {
     my $rc;
 
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
-            kFPVerAtLeast)) {
+            $kFPVerAtLeast)) {
         ($rc) = $session->FPLoginExt(
-                'AFPVersion'    => $AFPVersion,
-                'UAM'           => UAMNAME,
-                'UserName'      => '');
+                AFPVersion  => $AFPVersion,
+                UAM         => $UAMNAME,
+                UserName    => '');
         print 'FPLoginExt() completed with result code ', $rc, "\n"
                 if defined $::__AFP_DEBUG;
     }
     else {
-        ($rc) = $session->FPLogin($AFPVersion, UAMNAME, '');
+        ($rc) = $session->FPLogin($AFPVersion, $UAMNAME, '');
         print 'FPLogin() completed with result code ', $rc, "\n"
                 if defined $::__AFP_DEBUG;
     }

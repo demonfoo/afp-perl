@@ -11,11 +11,12 @@ use Getopt::Long;
 use Encode;
 use Errno qw(:POSIX);
 use English qw(-no_match_vars);
+use Readonly;
 # }}}1
 
 # define constants {{{1
-use constant XATTR_NAME     => 'afp_acl';
-use constant XATTR_NS       => 'system';
+Readonly our $XATTR_NAME    => 'afp_acl';
+Readonly our $XATTR_NS      => 'system';
 sub ENODATA { return($OSNAME eq 'freebsd' ? Errno::ENOATTR : Errno::ENODATA); }
 # }}}1
 
@@ -58,98 +59,98 @@ sub assemble_xattr { # {{{1
 my @ace_rights_info = ( # {{{1
     {
       name      => 'read',
-      value     => KAUTH_VNODE_READ_DATA,
+      value     => $KAUTH_VNODE_READ_DATA,
       for_dir   => 0,
     },
     {
       name      => 'list',
-      value     => KAUTH_VNODE_LIST_DIRECTORY,
+      value     => $KAUTH_VNODE_LIST_DIRECTORY,
       for_dir   => 1,
     },
     {
       name      => 'write',
-      value     => KAUTH_VNODE_WRITE_DATA,
+      value     => $KAUTH_VNODE_WRITE_DATA,
       for_dir   => 0,
     },
     {
       name      => 'add_file',
-      value     => KAUTH_VNODE_ADD_FILE,
+      value     => $KAUTH_VNODE_ADD_FILE,
       for_dir   => 1,
     },
     {
       name      => 'execute',
-      value     => KAUTH_VNODE_EXECUTE,
+      value     => $KAUTH_VNODE_EXECUTE,
       for_dir   => 0,
     },
     {
       name      => 'search',
-      value     => KAUTH_VNODE_SEARCH,
+      value     => $KAUTH_VNODE_SEARCH,
       for_dir   => 1,
     },
     {
       name      => 'delete',
-      value     => KAUTH_VNODE_DELETE,
+      value     => $KAUTH_VNODE_DELETE,
     },
     {
       name      => 'append',
-      value     => KAUTH_VNODE_APPEND_DATA,
+      value     => $KAUTH_VNODE_APPEND_DATA,
       for_dir   => 0,
     },
     {
       name      => 'add_subdirectory',
-      value     => KAUTH_VNODE_ADD_SUBDIRECTORY,
+      value     => $KAUTH_VNODE_ADD_SUBDIRECTORY,
       for_dir   => 1,
     },
     {
       name      => 'delete_child',
-      value     => KAUTH_VNODE_DELETE_CHILD,
+      value     => $KAUTH_VNODE_DELETE_CHILD,
     },
     {
       name      => 'readattr',
-      value     => KAUTH_VNODE_READ_ATTRIBUTES,
+      value     => $KAUTH_VNODE_READ_ATTRIBUTES,
     },
     {
       name      => 'writeattr',
-      value     => KAUTH_VNODE_WRITE_ATTRIBUTES,
+      value     => $KAUTH_VNODE_WRITE_ATTRIBUTES,
     },
     {
       name      => 'readextattr',
-      value     => KAUTH_VNODE_READ_EXTATTRIBUTES,
+      value     => $KAUTH_VNODE_READ_EXTATTRIBUTES,
     },
     {
       name      => 'writeextattr',
-      value     => KAUTH_VNODE_WRITE_EXTATTRIBUTES,
+      value     => $KAUTH_VNODE_WRITE_EXTATTRIBUTES,
     },
     {
       name      => 'readsecurity',
-      value     => KAUTH_VNODE_READ_SECURITY,
+      value     => $KAUTH_VNODE_READ_SECURITY,
     },
     {
       name      => 'writesecurity',
-      value     => KAUTH_VNODE_WRITE_SECURITY,
+      value     => $KAUTH_VNODE_WRITE_SECURITY,
     },
     {
       name      => 'chown',
-      value     => KAUTH_VNODE_CHANGE_OWNER,
+      value     => $KAUTH_VNODE_CHANGE_OWNER,
     },
 ); # }}}1
 
 my @ace_flags_info = ( # {{{1
     {
       name      => 'file_inherit',
-      value     => KAUTH_ACE_FILE_INHERIT,
+      value     => $KAUTH_ACE_FILE_INHERIT,
     },
     {
       name      => 'directory_inherit',
-      value     => KAUTH_ACE_DIRECTORY_INHERIT,
+      value     => $KAUTH_ACE_DIRECTORY_INHERIT,
     },
     {
       name      => 'limit_inherit',
-      value     => KAUTH_ACE_LIMIT_INHERIT,
+      value     => $KAUTH_ACE_LIMIT_INHERIT,
     },
     {
       name      => 'only_inherit',
-      value     => KAUTH_ACE_ONLY_INHERIT,
+      value     => $KAUTH_ACE_ONLY_INHERIT,
     },
 ); # }}}1
 
@@ -197,9 +198,9 @@ sub make_ace { # {{{1
     my $kind = shift @parts;
     $ace->{ace_flags} = 0;
     if ($kind eq 'allow') {
-        $ace->{ace_flags} = KAUTH_ACE_PERMIT;
+        $ace->{ace_flags} = $KAUTH_ACE_PERMIT;
     } elsif ($kind eq 'deny') {
-        $ace->{ace_flags} = KAUTH_ACE_DENY;
+        $ace->{ace_flags} = $KAUTH_ACE_DENY;
     } else {
         croak('ACL kind ' . $kind . ' is not valid');
     }
@@ -217,7 +218,7 @@ sub make_ace { # {{{1
             croak('Access right ' . $right . ' is not valid');
         }
     }
-    if ($set_inherited) { $ace->{ace_flags} |= KAUTH_ACE_INHERITED }
+    if ($set_inherited) { $ace->{ace_flags} |= $KAUTH_ACE_INHERITED }
 
     return $ace;
 } # }}}1
@@ -266,7 +267,7 @@ if (defined $remove) { # {{{1
     foreach my $file (@ARGV) { # {{{2
         # Get the ACL for the file via the magic extended attribute, and if
         # one is available, go ahead and parse it.
-        my $raw_acl = getfattr($file, XATTR_NAME, { namespace => XATTR_NS });
+        my $raw_acl = getfattr($file, $XATTR_NAME, { namespace => $XATTR_NS });
         next unless defined $raw_acl;
         my($acl_flags, $acl) = parse_xattr($raw_acl);
         if (defined $offset) {
@@ -288,11 +289,11 @@ if (defined $remove) { # {{{1
                 }
                 # Make sure the ACE we're looking at modifying indicates
                 # taking the same kind of action.
-                next unless (($ace->{ace_flags} & KAUTH_ACE_KINDMASK) ==
-                        ($entry->{ace_flags} & KAUTH_ACE_KINDMASK));
+                next unless (($ace->{ace_flags} & $KAUTH_ACE_KINDMASK) ==
+                        ($entry->{ace_flags} & $KAUTH_ACE_KINDMASK));
 
-                next unless (($ace->{ace_flags} & KAUTH_ACE_INHERIT_CONTROL_FLAGS) ==
-                        ($entry->{ace_flags} & KAUTH_ACE_INHERIT_CONTROL_FLAGS));
+                next unless (($ace->{ace_flags} & $KAUTH_ACE_INHERIT_CONTROL_FLAGS) ==
+                        ($entry->{ace_flags} & $KAUTH_ACE_INHERIT_CONTROL_FLAGS));
                 # Looks good, add the additional rights we want to the mask.
                 $entry->{ace_rights} &= ~$ace->{ace_rights};
             }
@@ -305,8 +306,8 @@ if (defined $remove) { # {{{1
         }
         # Repack the ACL, and update the extended attribute.
         my $new_rawacl = assemble_xattr($acl_flags, $acl);
-        my $rv = setfattr($file, XATTR_NAME, $new_rawacl,
-                { namespace => XATTR_NS });
+        my $rv = setfattr($file, $XATTR_NAME, $new_rawacl,
+                { namespace => $XATTR_NS });
         if (!$rv) {
             print 'Error while updating ACL on "', $file, '": ',
                     $errors{int $ERRNO},"\n";
@@ -321,7 +322,7 @@ if (defined $add) { # {{{1
     foreach my $file (@ARGV) { # {{{2
         # Fetch the ACL, if there is one; if not, just make an empty array
         # ref that we can stick the new ACE into.
-        my $raw_acl = getfattr($file, XATTR_NAME, { namespace => XATTR_NS });
+        my $raw_acl = getfattr($file, $XATTR_NAME, { namespace => $XATTR_NS });
         my($acl, $acl_flags) = ([], 0);
         if (defined $raw_acl) {
             ($acl_flags, $acl) = parse_xattr($raw_acl);
@@ -338,11 +339,11 @@ if (defined $add) { # {{{1
             # and we can't do a normal 'add'.
             my $entry = $acl->[$i];
             my $flags = $entry->{ace_flags};
-            my $acl_kind = $flags & KAUTH_ACE_KINDMASK;
+            my $acl_kind = $flags & $KAUTH_ACE_KINDMASK;
 
-            if ($flags & KAUTH_ACE_INHERITED) {
+            if ($flags & $KAUTH_ACE_INHERITED) {
                 $first_inherited ||= $i;
-                if ($acl_kind == KAUTH_ACE_PERMIT) {
+                if ($acl_kind == $KAUTH_ACE_PERMIT) {
                     $first_inherited_allow ||= $i;
                 }
                 elsif (defined $first_inherited_allow) {
@@ -355,7 +356,7 @@ if (defined $add) { # {{{1
                 last;
             }
             else {
-                if ($acl_kind == KAUTH_ACE_PERMIT) {
+                if ($acl_kind == $KAUTH_ACE_PERMIT) {
                     $first_allow ||= $i;
                 }
                 elsif (defined $first_allow) {
@@ -394,10 +395,10 @@ _EOT_
             # grouping.
             my $offset = 0;
             my $flags = $ace->{ace_flags};
-            my $acl_kind = $flags & KAUTH_ACE_KINDMASK;
+            my $acl_kind = $flags & $KAUTH_ACE_KINDMASK;
 
-            my $is_inherited = $flags & KAUTH_ACE_INHERITED;
-            my $is_allow = ($acl_kind == KAUTH_ACE_PERMIT);
+            my $is_inherited = $flags & $KAUTH_ACE_INHERITED;
+            my $is_allow = ($acl_kind == $KAUTH_ACE_PERMIT);
 
             if ($is_inherited) {
                 if ($is_allow) {
@@ -424,8 +425,8 @@ _EOT_
 
         # Repack the ACL, and push it back out via the extended attribute.
         my $new_rawacl = assemble_xattr($acl_flags, $acl);
-        my $rv = setfattr($file, XATTR_NAME, $new_rawacl,
-                { namespace => XATTR_NS });
+        my $rv = setfattr($file, $XATTR_NAME, $new_rawacl,
+                { namespace => $XATTR_NS });
         if (!$rv) {
             print 'Error while updating ACL on "', $file, '": ',
                     $errors{int $ERRNO},"\n";
@@ -442,7 +443,7 @@ if (scalar @insert) { # {{{1
     foreach my $file (@ARGV) { # {{{2
         # Get the file's ACL. Parse it if there is one; if not, just set
         # an empty array ref, so that we can try to add the entry.
-        my $raw_acl = getfattr($file, XATTR_NAME, { namespace => XATTR_NS });
+        my $raw_acl = getfattr($file, $XATTR_NAME, { namespace => $XATTR_NS });
         my($acl, $acl_flags) = ([], 0);
         if (defined $raw_acl) {
             ($acl_flags, $acl) = parse_xattr($raw_acl);
@@ -458,8 +459,8 @@ if (scalar @insert) { # {{{1
 
         # Repack the ACL, and push it back out via the extended attribute.
         my $new_rawacl = assemble_xattr($acl_flags, $acl);
-        my $rv = setfattr($file, XATTR_NAME, $new_rawacl,
-                { namespace => XATTR_NS });
+        my $rv = setfattr($file, $XATTR_NAME, $new_rawacl,
+                { namespace => $XATTR_NS });
         if (!$rv) {
             print 'Error while updating ACL on "', $file, '": ',
                     $errors{int $ERRNO}, "\n";
@@ -476,7 +477,7 @@ if (scalar @replace) { # {{{1
     foreach my $file (@ARGV) { # {{{2
         # Get the ACL for the file. If it's present, parse it out; otherwise,
         # just use an empty array ref.
-        my $raw_acl = getfattr($file, XATTR_NAME, { namespace => XATTR_NS });
+        my $raw_acl = getfattr($file, $XATTR_NAME, { namespace => $XATTR_NS });
         my($acl, $acl_flags) = ([], 0);
         if (defined $raw_acl) {
             ($acl_flags, $acl) = parse_xattr($raw_acl);
@@ -493,8 +494,8 @@ if (scalar @replace) { # {{{1
 
         # Repack the ACL, and push it back out to the extended attribute.
         my $new_rawacl = assemble_xattr($acl_flags, $acl);
-        my $rv = setfattr($file, XATTR_NAME, $new_rawacl,
-                { namespace => XATTR_NS });
+        my $rv = setfattr($file, $XATTR_NAME, $new_rawacl,
+                { namespace => $XATTR_NS });
         if (!$rv) {
             print 'Error while updating ACL on "', $file, '": ',
                     $errors{int $ERRNO},"\n";
@@ -506,7 +507,7 @@ if (defined $clear) { # {{{1
     foreach my $file (@ARGV) {
         # Remove the extended attribute. The FUSE code knows that this means
         # to delete the ACL in its entirety.
-        my $rv = delfattr($file, XATTR_NAME, { namespace => XATTR_NS });
+        my $rv = delfattr($file, $XATTR_NAME, { namespace => $XATTR_NS });
         if (!$rv) {
             print 'Error while updating ACL on "', $file, '": ',
                     $errors{int $ERRNO},"\n";
@@ -517,7 +518,7 @@ if (defined $clear) { # {{{1
 
 foreach my $file (@ARGV) {
     # Get the ACL for the file, and break it out into a data structure.
-    my $raw_acl = getfattr($file, XATTR_NAME, { namespace => XATTR_NS });
+    my $raw_acl = getfattr($file, $XATTR_NAME, { namespace => $XATTR_NS });
     my($acl, $acl_flags) = ([], 0);
     if (defined $raw_acl) {
         ($acl_flags, $acl) = parse_xattr($raw_acl);
@@ -538,12 +539,12 @@ foreach my $file (@ARGV) {
         } elsif ($entry->{Bitmap} == kFileSec_GRPUUID) {
             $idtype = 'group';
         }
-        my $acl_kind = $entry->{ace_flags} & KAUTH_ACE_KINDMASK;
+        my $acl_kind = $entry->{ace_flags} & $KAUTH_ACE_KINDMASK;
         # What kind of action does it specify?
         my $kind = 'unknown';
-        if ($acl_kind == KAUTH_ACE_PERMIT) {
+        if ($acl_kind == $KAUTH_ACE_PERMIT) {
             $kind = 'allow';
-        } elsif ($acl_kind == KAUTH_ACE_DENY) {
+        } elsif ($acl_kind == $KAUTH_ACE_DENY) {
             $kind = 'deny';
         }
 
@@ -569,7 +570,7 @@ foreach my $file (@ARGV) {
             }
             push @actions, $finfo->{name};
         }
-        my $is_inherited = $flags & KAUTH_ACE_INHERITED;
+        my $is_inherited = $flags & $KAUTH_ACE_INHERITED;
         # Print out the entry.
         printf " \%d: \%s:\%s\%s \%s \%s\n", $i, $idtype,
                 $entry->{UTF8Name}, $is_inherited ? ' inherited' : q{},

@@ -151,9 +151,9 @@ _EOT_
 }
 
 my $volInfo;
-my $ret = $session->FPOpenVol(kFPVolAttributeBit,
+my $ret = $session->FPOpenVol($kFPVolAttributeBit,
         decode($term_enc, $values{volume}), undef, \$volInfo);
-if ($ret != kFPNoErr) {
+if ($ret != $kFPNoErr) {
     print "Volume was unknown?\n";
     $session->FPLogout();
     $session->close();
@@ -163,7 +163,7 @@ if ($ret != kFPNoErr) {
 my $volID = $volInfo->{ID};
 my $DT_ID;
 $ret = $session->FPOpenDT($volID, \$DT_ID);
-if ($ret != kFPNoErr) {
+if ($ret != $kFPNoErr) {
     print "Couldn't open Desktop DB\n";
     undef $DT_ID;
 #   $session->FPCloseVol($volID);
@@ -174,7 +174,7 @@ if ($ret != kFPNoErr) {
 my $volAttrs = $volInfo->{Attribute};
 
 my $client_uuid;
-if ($volAttrs & kSupportsACLs) {
+if ($volAttrs & $kSupportsACLs) {
     if ($has_Data__UUID) {
         my $uo = Data::UUID->new();
         $client_uuid = $uo->create();
@@ -184,14 +184,14 @@ if ($volAttrs & kSupportsACLs) {
     }
 }
 
-my $pathType    = kFPLongName;
-my $pathFlag    = kFPLongNameBit;
+my $pathType    = $kFPLongName;
+my $pathFlag    = $kFPLongNameBit;
 my $pathkey     = 'LongName';
 
-if ($volAttrs & kSupportsUTF8Names) {
+if ($volAttrs & $kSupportsUTF8Names) {
     # If the remote volume does UTF8 names, then we'll go with that..
-    $pathType       = kFPUTF8Name;
-    $pathFlag       = kFPUTF8NameBit;
+    $pathType       = $kFPUTF8Name;
+    $pathFlag       = $kFPUTF8NameBit;
     $pathkey        = 'UTF8Name';
 }
 
@@ -200,8 +200,8 @@ my $term = Term::ReadLine->new('afpclient');
 my $attribs = $term->Attribs();
 my $curdirnode = $topDirID;
 
-my $DForkLenFlag    = kFPDataForkLenBit;
-my $RForkLenFlag    = kFPRsrcForkLenBit;
+my $DForkLenFlag    = $kFPDataForkLenBit;
+my $RForkLenFlag    = $kFPRsrcForkLenBit;
 my $DForkLenKey     = 'DataForkLen';
 my $RForkLenKey     = 'RsrcForkLen';
 my $EnumFn          = \&Net::AFP::FPEnumerate;
@@ -209,9 +209,9 @@ my $ReadFn          = \&Net::AFP::FPRead;
 my $WriteFn         = \&Net::AFP::FPWrite;
 # I *think* large file support entered the picture as of AFP 3.0...
 if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
-        kFPVerAtLeast)) {
-    $DForkLenFlag   = kFPExtDataForkLenBit;
-    $RForkLenFlag   = kFPExtRsrcForkLenBit;
+        $kFPVerAtLeast)) {
+    $DForkLenFlag   = $kFPExtDataForkLenBit;
+    $RForkLenFlag   = $kFPExtRsrcForkLenBit;
     $DForkLenKey    = 'ExtDataForkLen';
     $RForkLenKey    = 'ExtRsrcForkLen';
     $ReadFn         = \&Net::AFP::FPReadExt;
@@ -220,7 +220,7 @@ if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
 }
 
 if (Net::AFP::Versions::CompareByVersionNum($session, 3, 1,
-        kFPVerAtLeast)) {
+        $kFPVerAtLeast)) {
     $EnumFn         = \&Net::AFP::FPEnumerateExt2;
 }
 
@@ -239,18 +239,18 @@ if (defined $values{subpath}) {
 my %commands = (
     ls  => sub {
         my @words = @_;
-        my $fileBmp = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
-                kFPNodeIDBit | $DForkLenFlag | $RForkLenFlag |
-                kFPParentDirIDBit | $pathFlag;
-        if ($volInfo->{Attribute} & kSupportsUnixPrivs) {
-            $fileBmp |= kFPUnixPrivsBit;
+        my $fileBmp = $kFPAttributeBit | $kFPCreateDateBit | $kFPModDateBit |
+                $kFPNodeIDBit | $DForkLenFlag | $RForkLenFlag |
+                $kFPParentDirIDBit | $pathFlag;
+        if ($volInfo->{Attribute} & $kSupportsUnixPrivs) {
+            $fileBmp |= $kFPUnixPrivsBit;
         }
-        my $dirBmp = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
-                kFPNodeIDBit | kFPOffspringCountBit | kFPOwnerIDBit |
-                kFPGroupIDBit | kFPAccessRightsBit | kFPParentDirIDBit |
+        my $dirBmp = $kFPAttributeBit | $kFPCreateDateBit | $kFPModDateBit |
+                $kFPNodeIDBit | $kFPOffspringCountBit | $kFPOwnerIDBit |
+                $kFPGroupIDBit | $kFPAccessRightsBit | $kFPParentDirIDBit |
                 $pathFlag;
-        if ($volInfo->{Attribute} & kSupportsUnixPrivs) {
-            $dirBmp |= kFPUnixPrivsBit;
+        if ($volInfo->{Attribute} & $kSupportsUnixPrivs) {
+            $dirBmp |= $kFPUnixPrivsBit;
         }
         my $printDirNames = 0;
         if (scalar(@words) > 2) {
@@ -282,7 +282,7 @@ my %commands = (
                             DirectoryBitmap => $dirBmp,
                             PathType        => $pathType,
                             Pathname        => $fileName);
-                    if ($rc == kFPNoErr) {
+                    if ($rc == $kFPNoErr) {
                         push(@records, $resp);
                     }
                 }
@@ -304,9 +304,9 @@ my %commands = (
                             push(@records, @{$results});
                             $offset += scalar(@{$results});
                         }
-                    } while ($rc == kFPNoErr);
+                    } while ($rc == $kFPNoErr);
                 }
-                if ($rc == kFPNoErr || $rc == kFPObjectNotFound) {
+                if ($rc == $kFPNoErr || $rc == $kFPObjectNotFound) {
                     if ($printDirNames == 1 &&
                             (!defined($fileName) || $fileName eq q{})) {
                         print $dirName, ":\n";
@@ -333,7 +333,7 @@ my %commands = (
                     AccessMode  => 0x1,
                     PathType    => $pathType,
                     Pathname    => $fileName);
-            if ($rc != kFPNoErr) {
+            if ($rc != $kFPNoErr) {
                 print 'open attempt failed with code ', $rc, ' (',
                         afp_strerror($rc), ")\n";
                 next;
@@ -346,11 +346,11 @@ my %commands = (
                         Offset      => $pos,
                         ReqCount    => 1024);
                 print $data;
-                last if $rc != kFPNoErr || $data eq q{};
+                last if $rc != $kFPNoErr || $data eq q{};
                 $pos += length($data);
             }
             $rc = $session->FPCloseFork($resp{OForkRefNum});
-            if ($rc != kFPNoErr) {
+            if ($rc != $kFPNoErr) {
                 print 'close attempt failed with code ', $rc, ' (',
                         afp_strerror($rc), ")\n";
             }
@@ -419,7 +419,7 @@ _EOT_
                 AccessMode  => 0x1,
                 PathType    => $pathType,
                 Pathname    => $fileName);
-        if ($rc != kFPNoErr) {
+        if ($rc != $kFPNoErr) {
             print 'open attempt failed with code ', $rc, ' (',
                     afp_strerror($rc), ")\n";
             return 1;
@@ -475,7 +475,7 @@ _EOT_
             printf(' %3d%%  |%-25s|  %-28s  %5.2f %sB/sec' . "\r", $pcnt,
                     q{*} x ($pcnt * 25 / 100), substr($fileName, 0, 28),
                     $rate, $mult);
-            last if $rc != kFPNoErr;
+            last if $rc != $kFPNoErr;
             $pos += length($data);
             %lasttime = %time;
             @time{'sec', 'usec'} = gettimeofday();
@@ -483,7 +483,7 @@ _EOT_
         print "\n";
         close($local_fh) || carp("Couldn't close local file");
         $rc = $session->FPCloseFork($resp{OForkRefNum});
-        if ($rc != kFPNoErr) {
+        if ($rc != $kFPNoErr) {
             print 'close attempt failed with code ', $rc, ' (',
                     afp_strerror($rc), ")\n";
         }
@@ -525,7 +525,7 @@ _EOT_
                 DirectoryID => $dirID,
                 PathType    => $pathType,
                 Pathname    => $fileName);
-        if ($rc != kFPNoErr) {
+        if ($rc != $kFPNoErr) {
             print 'Couldn\'t create file on remote server; server returned code ',
                     $rc, ' (', afp_strerror($rc), ")\n";
             return 1;
@@ -537,7 +537,7 @@ _EOT_
                 AccessMode  => 0x3,
                 PathType    => $pathType,
                 Pathname    => $fileName);
-        if ($rc != kFPNoErr) {
+        if ($rc != $kFPNoErr) {
             print 'open attempt failed with code ', $rc, ' (',
                     afp_strerror($rc), ")\n";
             return 1;
@@ -558,16 +558,16 @@ _EOT_
             # try a direct write, and see how far we get; zero-copy is
             # preferred if possible.
             ($rc, $wcount) = &{$WriteFn}($session,
-                    Flag        => kFPStartEndFlag,
+                    Flag        => $kFPStartEndFlag,
                     OForkRefNum => $resp{OForkRefNum},
                     Offset      => 0,
                     ForkData    => \$data);
 
-            while ($wcount < ($total + $rcnt) && $rc == kFPNoErr) {
+            while ($wcount < ($total + $rcnt) && $rc == $kFPNoErr) {
                 my $dchunk = substr($data, $wcount - $total,
                         $total + $rcnt - $wcount);
                 ($rc, $wcount) = &{$WriteFn}($session,
-                        Flag        => kFPStartEndFlag,
+                        Flag        => $kFPStartEndFlag,
                         OForkRefNum => $resp{OForkRefNum},
                         Offset      => 0,
                         ForkData    => \$dchunk);
@@ -595,12 +595,12 @@ _EOT_
             my $pcnt = ($pos + length($data)) * 100 / $fileLen;
             printf(' %3d%%  |%-25s|  %-28s  %5.2f %sB/sec' . "\r", $pcnt,
                     q{*} x ($pcnt * 25 / 100), $fileName, $rate, $mult);
-            last if $rc != kFPNoErr;
+            last if $rc != $kFPNoErr;
             $pos += $rcnt;
             %lasttime = %time;
             @time{'sec', 'usec'} = gettimeofday();
             #}
-            if ($rc != kFPNoErr) {
+            if ($rc != $kFPNoErr) {
                 print 'Write to file on server failed with return code ', $rc,
                         ' (', afp_strerror($rc), ")\n";
                 last;
@@ -611,7 +611,7 @@ _EOT_
         #}
         close($srcFile) || carp("Couldn't close local file");
         $rc = $session->FPCloseFork($resp{OForkRefNum});
-        if ($rc != kFPNoErr) {
+        if ($rc != $kFPNoErr) {
             print 'close attempt failed with code ', $rc, ' (',
                     afp_strerror($rc), "\n";
         }
@@ -630,7 +630,7 @@ _EOT_
                 DirectoryID => $curdirnode,
                 PathType    => $pathType,
                 Pathname    => $words[1]);
-        if ($rc != kFPNoErr) {
+        if ($rc != $kFPNoErr) {
             print 'sorry, couldn\'t create requested directory; response was ',
                     $rc, ' (', afp_strerror($rc), ")\n";
         }
@@ -656,7 +656,7 @@ NEXT_EXPANDED:
                 my ($dirId, $fileName, $dirName) = @{$elem};
                 my $rc = $session->FPDelete($volID, $dirId, $pathType,
                         $fileName || q{});
-                if ($rc != kFPNoErr) {
+                if ($rc != $kFPNoErr) {
                     print 'sorry, couldn\'t remove item "',
                             $fileName || $dirName, '"; response was ', $rc,
                             ' (', afp_strerror($rc), ")\n";
@@ -670,7 +670,7 @@ NEXT_EXPANDED:
         my $searchID = $curdirnode;
         my @nameParts;
         while ($searchID != $topDirID) {
-            my $dirbits = kFPParentDirIDBit | $pathFlag;
+            my $dirbits = $kFPParentDirIDBit | $pathFlag;
             my($rc, $entry) = $session->FPGetFileDirParms(
                     VolumeID        => $volID,
                     DirectoryID     => $searchID,
@@ -694,11 +694,11 @@ NEXT_EXPANDED:
             my($rc, %resp) = $session->FPGetACL(
                     VolumeID    => $volID,
                     DirectoryID => $dirId,
-                    Bitmap      => kFileSec_UUID | kFileSec_GRPUUID |
-                                    kFileSec_ACL,
+                    Bitmap      => $kFileSec_UUID | $kFileSec_GRPUUID |
+                                    $kFileSec_ACL,
                     PathType    => $pathType,
                     Pathname    => $fileName);
-            if ($rc != kFPNoErr) {
+            if ($rc != $kFPNoErr) {
                 print "Sorry, file/directory was not found\n";
                 return 1;
             }
@@ -718,7 +718,7 @@ NEXT_EXPANDED:
             }
             my $rc = $session->FPGetComment($DT_ID, $dirId, $pathType,
                     $fileName, \$resp);
-            if ($rc != kFPNoErr) {
+            if ($rc != $kFPNoErr) {
                 print "Sorry, file/directory was not found\n";
                 return;
             }
@@ -755,18 +755,18 @@ _EOT_
     },
     allinfo => sub {
         my @words = @_;
-        my $fileBmp = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
-                kFPNodeIDBit | $DForkLenFlag | $RForkLenFlag |
-                kFPParentDirIDBit | $pathFlag;
-        if ($volInfo->{Attribute} & kSupportsUnixPrivs) {
-            $fileBmp |= kFPUnixPrivsBit;
+        my $fileBmp = $kFPAttributeBit | $kFPCreateDateBit | $kFPModDateBit |
+                $kFPNodeIDBit | $DForkLenFlag | $RForkLenFlag |
+                $kFPParentDirIDBit | $pathFlag;
+        if ($volInfo->{Attribute} & $kSupportsUnixPrivs) {
+            $fileBmp |= $kFPUnixPrivsBit;
         }
-        my $dirBmp = kFPAttributeBit | kFPCreateDateBit | kFPModDateBit |
-                kFPNodeIDBit | kFPOffspringCountBit | kFPOwnerIDBit |
-                kFPGroupIDBit | kFPAccessRightsBit | kFPParentDirIDBit |
+        my $dirBmp = $kFPAttributeBit | $kFPCreateDateBit | $kFPModDateBit |
+                $kFPNodeIDBit | $kFPOffspringCountBit | $kFPOwnerIDBit |
+                $kFPGroupIDBit | $kFPAccessRightsBit | $kFPParentDirIDBit |
                 $pathFlag;
-        if ($volInfo->{Attribute} & kSupportsUnixPrivs) {
-            $dirBmp |= kFPUnixPrivsBit;
+        if ($volInfo->{Attribute} & $kSupportsUnixPrivs) {
+            $dirBmp |= $kFPUnixPrivsBit;
         }
         my($rc, $resp);
         foreach my $fname (@words[1..$#words]) {
@@ -780,7 +780,7 @@ _EOT_
                     DirectoryBitmap => $dirBmp,
                     PathType        => $pathType,
                     Pathname        => $fileName || q{});
-            if ($rc == kFPNoErr) {
+            if ($rc == $kFPNoErr) {
                 print Dumper($resp);
             }
             else {
@@ -869,7 +869,7 @@ sub do_listentries {
             $user = $uidmap{$uid};
         }
         else {
-            $session->FPMapID(kUserIDToName, $uid, \$user);
+            $session->FPMapID($kUserIDToName, $uid, \$user);
             $uidmap{$uid} = $user;
         }
 
@@ -879,7 +879,7 @@ sub do_listentries {
             $group = $gidmap{$gid};
         }
         else {
-            $session->FPMapID(kGroupIDToName, $gid, \$group);
+            $session->FPMapID($kGroupIDToName, $gid, \$group);
             $gidmap{$gid} = $group;
         }
 
@@ -911,7 +911,7 @@ sub do_listentries {
                     AccessMode  => 0x1,
                     PathType    => $pathType,
                     Pathname    => $ent->{$pathkey});
-            if ($rc == kFPNoErr) {
+            if ($rc == $kFPNoErr) {
                 my $data;
                 ($rc, $data) = &{$ReadFn}($session,
                         OForkRefNum => $resp{OForkRefNum},
@@ -928,72 +928,72 @@ sub do_listentries {
                     DirectoryID => $ent->{ParentDirID},
                     PathType    => $pathType,
                     Pathname    => $ent->{$pathkey});
-            if ($rc == kFPNoErr && ($acl_info{Bitmap} & kFileSec_ACL)) {
+            if ($rc == $kFPNoErr && ($acl_info{Bitmap} & $kFileSec_ACL)) {
                 foreach my $i (0 .. $#{$acl_info{acl_ace}}) {
                     my $entry = $acl_info{acl_ace}[$i];
                     my $name;
                     my @args = ();
-                    $rc = $session->FPMapID(kUserUUIDToUTF8Name,
+                    $rc = $session->FPMapID($kUserUUIDToUTF8Name,
                             $entry->{ace_applicable}, \$name);
                     my $idtype;
-                    if ($name->{Bitmap} == kFileSec_UUID) {
+                    if ($name->{Bitmap} == $kFileSec_UUID) {
                         $idtype = 'user';
                     }
-                    elsif ($name->{Bitmap} == kFileSec_GRPUUID) {
+                    elsif ($name->{Bitmap} == $kFileSec_GRPUUID) {
                         $idtype = 'group';
                     }
 
-                    my $acl_kind = $entry->{ace_flags} & KAUTH_ACE_KINDMASK;
+                    my $acl_kind = $entry->{ace_flags} & $KAUTH_ACE_KINDMASK;
                     my $kind = 'unknown';
-                    if ($acl_kind == KAUTH_ACE_PERMIT) {
+                    if ($acl_kind == $KAUTH_ACE_PERMIT) {
                         $kind = 'allow';
                     }
-                    elsif ($acl_kind == KAUTH_ACE_DENY) {
+                    elsif ($acl_kind == $KAUTH_ACE_DENY) {
                         $kind = 'deny';
                     }
 
                     my @actions = ();
                     my $rights = $entry->{ace_rights};
-                    if ($rights & KAUTH_VNODE_READ_DATA) {
+                    if ($rights & $KAUTH_VNODE_READ_DATA) {
                         push(@actions, $ent->{FileIsDir} ? 'list' : 'read');
                     }
-                    if ($rights & KAUTH_VNODE_WRITE_DATA) {
+                    if ($rights & $KAUTH_VNODE_WRITE_DATA) {
                         push(@actions, $ent->{FileIsDir} ? 'add_file' :
                                 'write');
                     }
-                    if ($rights & KAUTH_VNODE_EXECUTE) {
+                    if ($rights & $KAUTH_VNODE_EXECUTE) {
                         push(@actions, $ent->{FileIsDir} ? 'search' :
                                 'execute');
                     }
-                    if ($rights & KAUTH_VNODE_DELETE) {
+                    if ($rights & $KAUTH_VNODE_DELETE) {
                         push(@actions, 'delete');
                     }
-                    if ($rights & KAUTH_VNODE_APPEND_DATA) {
+                    if ($rights & $KAUTH_VNODE_APPEND_DATA) {
                         push(@actions, $ent->{FileIsDir} ?
                                 'add_subdirectory' : 'append');
                     }
-                    if ($rights & KAUTH_VNODE_DELETE_CHILD) {
+                    if ($rights & $KAUTH_VNODE_DELETE_CHILD) {
                         push(@actions, 'delete_child');
                     }
-                    if ($rights & KAUTH_VNODE_READ_ATTRIBUTES) {
+                    if ($rights & $KAUTH_VNODE_READ_ATTRIBUTES) {
                         push(@actions, 'readattr');
                     }
-                    if ($rights & KAUTH_VNODE_WRITE_ATTRIBUTES) {
+                    if ($rights & $KAUTH_VNODE_WRITE_ATTRIBUTES) {
                         push(@actions, 'writeattr');
                     }
-                    if ($rights & KAUTH_VNODE_READ_EXTATTRIBUTES) {
+                    if ($rights & $KAUTH_VNODE_READ_EXTATTRIBUTES) {
                         push(@actions, 'readextattr');
                     }
-                    if ($rights & KAUTH_VNODE_WRITE_EXTATTRIBUTES) {
+                    if ($rights & $KAUTH_VNODE_WRITE_EXTATTRIBUTES) {
                         push(@actions, 'writeextattr');
                     }
-                    if ($rights & KAUTH_VNODE_READ_SECURITY) {
+                    if ($rights & $KAUTH_VNODE_READ_SECURITY) {
                         push(@actions, 'readsecurity');
                     }
-                    if ($rights & KAUTH_VNODE_WRITE_SECURITY) {
+                    if ($rights & $KAUTH_VNODE_WRITE_SECURITY) {
                         push(@actions, 'writesecurity');
                     }
-                    if ($rights & KAUTH_VNODE_CHANGE_OWNER) {
+                    if ($rights & $KAUTH_VNODE_CHANGE_OWNER) {
                         push(@actions, 'chown');
                     }
 
@@ -1009,7 +1009,7 @@ sub do_listentries {
 sub expand_globbed_path {
     my ($sess, $volid, $dirid, $path) = @_;
 
-    my $dirBmp = kFPNodeIDBit | kFPParentDirIDBit | $pathFlag;
+    my $dirBmp = $kFPNodeIDBit | $kFPParentDirIDBit | $pathFlag;
     my $fileBmp = $dirBmp;
     my $fileName = undef;
     my @pathElements = split(m{/}s, $path);
@@ -1024,7 +1024,7 @@ sub expand_globbed_path {
     else {
         my $searchID = $curNode;
         while ($searchID != $topDirID) {
-            my $dirbits = kFPParentDirIDBit | $pathFlag;
+            my $dirbits = $kFPParentDirIDBit | $pathFlag;
             my($rc, $entry) = $sess->FPGetFileDirParms(
                     VolumeID        => $volID,
                     DirectoryID     => $searchID,
@@ -1053,10 +1053,10 @@ sub expand_globbed_path {
                 my($rc, $resp) = $sess->FPGetFileDirParms(
                         VolumeID        => $volid,
                         DirectoryID     => $expath->[0],
-                        DirectoryBitmap => kFPParentDirIDBit,
+                        DirectoryBitmap => $kFPParentDirIDBit,
                         PathType        => $pathType,
                         Pathname        => q{});
-                next if $rc != kFPNoErr;
+                next if $rc != $kFPNoErr;
                 next if exists $dupchk{$resp->{ParentDirID}};
                 push(@newpaths, [ $resp->{ParentDirID}, q{},
                         @{$expath}[3 .. $#{$expath}] ]);
@@ -1069,10 +1069,10 @@ sub expand_globbed_path {
         $pathElem =~ tr/:/\//;
         foreach my $expath (@expanded_paths) {
             my ($rc, $resp, %entries);
-            $rc = kFPNoErr;
+            $rc = $kFPNoErr;
             my $lastelem;
 COLLECT_PATHS:
-            while ($rc == kFPNoErr){
+            while ($rc == $kFPNoErr){
                 ($rc, $resp) = &{$EnumFn}($sess,
                                VolumeID         => $volid,
                                DirectoryID      => $expath->[0],
@@ -1083,7 +1083,7 @@ COLLECT_PATHS:
                                MaxReplySize     => 2**15 - 1,
                                PathType         => $pathType,
                                Pathname         => $expath->[1]);
-                if ($rc == kFPNoErr || $rc == kFPObjectNotFound) {
+                if ($rc == $kFPNoErr || $rc == $kFPObjectNotFound) {
                     if ($#{$resp} == 0 && $lastelem &&
                             $resp->[0]->{$pathkey} eq $lastelem) {
                         last COLLECT_PATHS;
@@ -1133,7 +1133,7 @@ sub resolve_path {
         $lastNoExist = 0;
     }
 
-    my $dirBmp = kFPNodeIDBit | kFPParentDirIDBit;
+    my $dirBmp = $kFPNodeIDBit | $kFPParentDirIDBit;
     my $fileBmp = 0;
     my $fileName = undef;
 
@@ -1160,8 +1160,8 @@ sub resolve_path {
                 DirectoryBitmap => $dirBmp,
                 PathType        => $pathType,
                 Pathname        => $elem);
-        if (($lastNoExist == 1 and $rc == kFPObjectNotFound) or
-                ($rc == kFPNoErr and $resp->{FileIsDir} != 1)) {
+        if (($lastNoExist == 1 and $rc == $kFPObjectNotFound) or
+                ($rc == $kFPNoErr and $resp->{FileIsDir} != 1)) {
             if ($i == $#pathElements) {
                 $fileName = $elem;
                 last;
@@ -1170,7 +1170,7 @@ sub resolve_path {
                 return(undef);
             }
         }
-        return(undef) if $rc != kFPNoErr;
+        return(undef) if $rc != $kFPNoErr;
         $curNode = ($getParentID == 1 ? $resp->{ParentDirID} :
                 $resp->{NodeID});
     }

@@ -8,10 +8,11 @@ use Digest::MD5 qw(md5);
 use strict;
 use warnings;
 
-use constant UAMNAME => 'Recon1';
+use Readonly;
+Readonly my $UAMNAME => 'Recon1';
 
-use constant C2SIV => 'WOMDMOAB';
-use constant S2CIV => 'WOMDMOAB';
+Readonly my $C2SIV => 'WOMDMOAB';
+Readonly my $S2CIV => 'WOMDMOAB';
 
 sub GetCred {
     my($session) = @_;
@@ -26,8 +27,8 @@ sub GetCred {
     my $ID = '';  # need to actually do something with this
     my $t1_k1 = $ctx->encrypt(pack('Na*', $stamp, $ID));
     my $resp = '';
-    my $rc = $session->FPGetSessionToken(kRecon1Login, undef, $t1_k1, \$resp);
-    if ($rc != Net::AFP::Result::kFPNoErr) {
+    my $rc = $session->FPGetSessionToken($kRecon1Login, undef, $t1_k1, \$resp);
+    if ($rc != $Net::AFP::Result::kFPNoErr) {
         print "Calling FPGetSessionToken failed\n";
         return undef;
     }
@@ -49,15 +50,15 @@ sub RefreshCred {
 
     my $stamp = time() - globalTimeOffset;
     my $ID = '';  # need to actually do something with this
-    $ctx->iv(C2SIV);
+    $ctx->iv($C2SIV);
     my $t1_k1 = $ctx->encrypt(pack('Na*', $stamp, $ID));
     my $resp ;
-    my $rc = $session->FPGetSessionToken(kRecon1RefreshToken, undef, $t1_k1, \$resp);
-    if ($rc != Net::AFP::Result::kFPNoErr) {
+    my $rc = $session->FPGetSessionToken($kRecon1RefreshToken, undef, $t1_k1, \$resp);
+    if ($rc != $Net::AFP::Result::kFPNoErr) {
         print "Calling FPGetSessionToken failed\n";
         return undef;
     }
-    #$ctx->iv(S2CIV);
+    #$ctx->iv($S2CIV);
     #my $plaintext = $ctx->decrypt($resp);
     #my($s, $m, $exp, $t3, $validator) = unpack('a[8]NNNa*', $plaintext);
     return($resp);

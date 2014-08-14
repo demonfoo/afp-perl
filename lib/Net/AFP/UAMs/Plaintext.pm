@@ -2,14 +2,15 @@
 # Cleartxt Passwrd) UAM for the AFP protocol.
 
 package Net::AFP::UAMs::Plaintext;
-use constant UAMNAME => 'Cleartxt Passwrd';
+use Readonly;
+Readonly my $UAMNAME => 'Cleartxt Passwrd';
 
 use Net::AFP::Versions;
 use Net::AFP::Result;
 use strict;
 use warnings;
 
-Net::AFP::UAMs::RegisterUAM(UAMNAME, __PACKAGE__, 0);
+Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 0);
 
 sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
@@ -25,10 +26,10 @@ sub Authenticate {
     my $rc;
     
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
-            kFPVerAtLeast)) {
+            $kFPVerAtLeast)) {
         ($rc) = $session->FPLoginExt(
                 'AFPVersion'    => $AFPVersion,
-                'UAM'           => UAMNAME,
+                'UAM'           => $UAMNAME,
                 'UserName'      => $username,
                 'UserAuthInfo'  => $pw_data);
         print 'FPLoginExt() completed with result code ', $rc, "\n"
@@ -36,7 +37,7 @@ sub Authenticate {
     }
     else {
         my $authinfo = substr(pack('xC/a*x![s]a8', $username, $pw_data), 1);
-        ($rc) = $session->FPLogin($AFPVersion, UAMNAME, $authinfo);
+        ($rc) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
         print 'FPLogin() completed with result code ', $rc, "\n"
                 if defined $::__AFP_DEBUG;
     }
@@ -52,10 +53,10 @@ sub ChangePassword {
             unless ref($session) and $session->isa('Net::AFP');
 
     if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
-            kFPVerAtLeast)) {
+            $kFPVerAtLeast)) {
         $username = '';
     }
-    return $session->FPChangePassword(UAMNAME, $username,
+    return $session->FPChangePassword($UAMNAME, $username,
             pack('a8', $newPassword));
 }
 

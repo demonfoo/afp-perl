@@ -11,7 +11,8 @@ use warnings;
 use diagnostics;
 use integer;
 
-use constant UAMNAME => '2-Way Randnum exchange';
+use Readonly;
+Readonly my $UAMNAME => '2-Way Randnum exchange';
 
 use Crypt::DES;
 use Crypt::CBC;
@@ -37,20 +38,20 @@ sub Authenticate {
     my $rc;
     
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
-            kFPVerAtLeast)) {
+            $kFPVerAtLeast)) {
         ($rc, %resp) = $session->FPLoginExt(
-                'AFPVersion'    => $AFPVersion,
-                'UAM'           => UAMNAME,
-                'UserName'      => $username);
+                AFPVersion  => $AFPVersion,
+                UAM         => $UAMNAME,
+                UserName    => $username);
         DEBUG('FPLoginExt() completed with result code ', $rc);
     }
     else {
         my $authinfo = pack('C/a*', $username);
-        ($rc, %resp) = $session->FPLogin($AFPVersion, UAMNAME, $authinfo);
+        ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
         DEBUG('FPLogin() completed with result code ', $rc);
     }
 
-    return $rc unless $rc == kFPAuthContinue;
+    return $rc unless $rc == $kFPAuthContinue;
 
     # The server will send us a random 8-byte number; take that, and encrypt
     # it with the password the user gave us.
@@ -81,7 +82,7 @@ sub Authenticate {
     $rc = $session->FPLoginCont($resp{'ID'}, $crypted . $my_randnum, \$sresp);
     undef $crypted;
     DEBUG('FPLoginCont() completed with result code ', $rc);
-    return $rc unless $rc == kFPNoErr;
+    return $rc unless $rc == $kFPNoErr;
     
     # Now, verify the server's crypted copy of the password to ensure that
     # they really have it.
@@ -91,12 +92,12 @@ sub Authenticate {
     undef $my_randnum;
     DEBUG('$recrypted is 0x', unpack('H*', $recrypted));
     # Maybe a different result code is in order? Not sure...
-    return kFPUserNotAuth unless $srv_hash eq $recrypted;
+    return $kFPUserNotAuth unless $srv_hash eq $recrypted;
     undef $srv_hash;
     undef $recrypted;
 
     # If we've reached this point, all went well, so return success.
-    return kFPNoErr;
+    return $kFPNoErr;
 }
 
 # This UAM does not implement password changing; Randnum.pm's ChangePassword()

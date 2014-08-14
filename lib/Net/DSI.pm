@@ -31,19 +31,20 @@ use threads;
 use threads::shared;
 use Thread::Semaphore;
 use Socket qw(TCP_NODELAY IPPROTO_TCP);
+use Readonly;
 
-use constant OP_DSI_CLOSESESSION    => 1;   # to and from server
-use constant OP_DSI_COMMAND         => 2;   # to server only
-use constant OP_DSI_GETSTATUS       => 3;   # to server only
-use constant OP_DSI_OPENSESSION     => 4;   # to server only
-use constant OP_DSI_TICKLE          => 5;   # to and from server
-use constant OP_DSI_WRITE           => 6;   # to server only
-use constant OP_DSI_ATTENTION       => 8;   # from server only
+Readonly my $OP_DSI_CLOSESESSION        => 1;   # to and from server
+Readonly my $OP_DSI_COMMAND             => 2;   # to server only
+Readonly my $OP_DSI_GETSTATUS           => 3;   # to server only
+Readonly my $OP_DSI_OPENSESSION         => 4;   # to server only
+Readonly my $OP_DSI_TICKLE              => 5;   # to and from server
+Readonly my $OP_DSI_WRITE               => 6;   # to server only
+Readonly my $OP_DSI_ATTENTION           => 8;   # from server only
 
-use constant kRequestQuanta         => 0x00;
+Readonly our $kRequestQuanta            => 0x00;
 # not sure if this is the canonical name for this option code...
-use constant kAttentionQuanta       => 0x01;
-use constant kServerReplayCacheSize => 0x02;
+Readonly our $kAttentionQuanta          => 0x01;
+Readonly our $kServerReplayCacheSize    => 0x02;
 
 # This function is the body of our thread. It's a hybrid dispatcher
 # arrangement, and it will also send periodic (~30 second interval)
@@ -80,10 +81,10 @@ sub session_thread { # {{{1
         $shared->{conn_sem}->up();
 
         keys %{$handlers};
-        # return kFPNoServer for all waiting callers, and up() all the waiting
+        # return $kFPNoServer for all waiting callers, and up() all the waiting
         # semaphores for them.
         while (my($id, $handler) = each %{$handlers}) {
-            ${$handler->[2]} = kFPNoServer;
+            ${$handler->[2]} = $kFPNoServer;
             ${$handler->[0]}->up();
         }
         return;
@@ -182,12 +183,12 @@ MAINLOOP:
             if ($type == 0) {
                 # DSICloseSession from server; this means the server is
                 # going away (i.e., it's shutting down).
-                if ($cmd == OP_DSI_CLOSESESSION) {
+                if ($cmd == $OP_DSI_CLOSESESSION) {
                     print {\*STDERR} "Net::DSI::session_thread(): Received CloseSession from server, setting exit flag to 1\n";
                     $shared->{exit} = 1;
                 }
 
-                elsif ($cmd == OP_DSI_ATTENTION) {
+                elsif ($cmd == $OP_DSI_ATTENTION) {
                     $shared->{conn_sem}->down();
                     $rsz = 0;
                     while ($rsz < $length) {
@@ -201,7 +202,7 @@ MAINLOOP:
                     next MAINLOOP;
                 }
 
-                elsif ($cmd == OP_DSI_TICKLE) {
+                elsif ($cmd == $OP_DSI_TICKLE) {
                     print {\*STDERR} "Net::DSI::session_thread(): Received tickle packet at $last_pkt_rcvd\n";
                 }
 
@@ -252,7 +253,7 @@ MAINLOOP:
             # send a DSITickle to the server
             # Field 2: Command: DSITickle(5)
             # Manually queue the DSITickle message.
-            $msg = pack('CCS>l>L>L>', 0, OP_DSI_TICKLE,
+            $msg = pack('CCS>l>L>L>', 0, $OP_DSI_TICKLE,
                     $shared->{requestid}++ % 2**16, 0, 0, 0);
             $shared->{conn_sem}->down();
             $wsz = 0;
@@ -267,14 +268,14 @@ MAINLOOP:
     undef $shared->{conn_fd};
     close($conn);
 
-    # Return kFPNoServer to any still-waiting callers. (Sort of a hack to
+    # Return $kFPNoServer to any still-waiting callers. (Sort of a hack to
     # deal with netatalk shutting down the connection right away when FPLogout
     # is received, instead of waiting for the client to send DSICloseSession.
     # Thanks again, netatalk. :| )
     keys %{$handlers};
     while (($id, $handler) = each %{$handlers}) {
         $handler = $handlers->{$id};
-        ${$handler->[2]} = kFPNoServer;
+        ${$handler->[2]} = $kFPNoServer;
         ${$handler->[0]}->up();
     }
     return;
@@ -369,7 +370,7 @@ sub SendMessage { # {{{1
 
     if ($self->{Shared}{running} == -1) {
         ${$sem_r}->up() if defined $sem_r;
-        return kFPNoServer;
+        return $kFPNoServer;
     }
     # Assemble the message header to be sent to the AFP over TCP server.
     # Arg 1: byte  Flags: 0 for request, 1 for reply
@@ -413,7 +414,7 @@ sub CloseSession { # {{{1
 
     # Issue the DSICloseSession command to the server. Apparently the
     # server doesn't have anything to say in response.
-    my $reqId = $self->SendMessage(OP_DSI_CLOSESESSION);
+    my $reqId = $self->SendMessage($OP_DSI_CLOSESESSION);
     return;
 } # }}}1
 
@@ -425,7 +426,7 @@ sub Command { # {{{1
     # into - issuing a DSICommand generally gets one.
     my $sem;
     my $rc;
-    my $reqId = $self->SendMessage(OP_DSI_COMMAND, $message, undef, undef,
+    my $reqId = $self->SendMessage($OP_DSI_COMMAND, $message, undef, undef,
             \$sem, $resp_r, \$rc);
     $sem->down();
     return $reqId if $reqId < 0;
@@ -444,7 +445,7 @@ sub GetStatus { # {{{1
             unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
     my $sem;
     my $rc;
-    my $reqId = $self->SendMessage(OP_DSI_GETSTATUS, undef, undef, undef,
+    my $reqId = $self->SendMessage($OP_DSI_GETSTATUS, undef, undef, undef,
             \$sem, $resp_r, \$rc);
     $sem->down();
     return $reqId if $reqId < 0;
@@ -461,13 +462,13 @@ sub OpenSession { # {{{1
         my $opttype;
         my $optdata;
         if ($key eq 'RequestQuanta') {
-            $opttype = kRequestQuanta;
+            $opttype = $kRequestQuanta;
             $optdata = pack('N', $options{$key});
         } elsif ($key eq 'AttentionQuanta') {
-            $opttype = kAttentionQuanta;
+            $opttype = $kAttentionQuanta;
             $optdata = pack('N', $options{$key});
         } elsif ($key eq 'ServerReplayCacheSize') {
-            $opttype = kServerReplayCacheSize;
+            $opttype = $kServerReplayCacheSize;
             $optdata = pack('N', $options{$key});
         } else {
             croak('Unknown option key ' . $key);
@@ -478,7 +479,7 @@ sub OpenSession { # {{{1
     my $sem;
     my $rc;
     my $resp;
-    my $reqId = $self->SendMessage(OP_DSI_OPENSESSION, $options_packed, undef,
+    my $reqId = $self->SendMessage($OP_DSI_OPENSESSION, $options_packed, undef,
             undef, \$sem, \$resp, \$rc);
     return $reqId if $reqId < 0;
     $sem->down();
@@ -486,11 +487,11 @@ sub OpenSession { # {{{1
     my %rcvd_opts;
     while (length($resp) > 0) {
         my ($opttype, $optdata) = unpack('CC/a', $resp);
-        if ($opttype == kRequestQuanta) {
+        if ($opttype == $kRequestQuanta) {
             $rcvd_opts{RequestQuanta}           = unpack('N', $optdata);
-        } elsif ($opttype == kAttentionQuanta) {
+        } elsif ($opttype == $kAttentionQuanta) {
             $rcvd_opts{AttentionQuanta}         = unpack('N', $optdata);
-        } elsif ($opttype == kServerReplayCacheSize) {
+        } elsif ($opttype == $kServerReplayCacheSize) {
             $rcvd_opts{ServerReplayCacheSize}   = unpack('N', $optdata);
         }
         $resp = substr($resp, 2 + length($optdata));
@@ -504,7 +505,7 @@ sub OpenSession { # {{{1
 sub DSITickle { # {{{1
     my ($self) = @_;
 
-    my $reqId = $self->SendMessage(OP_DSI_TICKLE);
+    my $reqId = $self->SendMessage($OP_DSI_TICKLE);
     return;
 } # }}}1
 
@@ -515,7 +516,7 @@ sub Write { # {{{1
 
     my $sem;
     my $rc;
-    my $reqId = $self->SendMessage(OP_DSI_WRITE, $message, $data_r, $d_len,
+    my $reqId = $self->SendMessage($OP_DSI_WRITE, $message, $data_r, $d_len,
             \$sem, $resp_r, \$rc);
     return $reqId if $reqId < 0;
     $sem->down();
