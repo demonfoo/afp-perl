@@ -28,7 +28,8 @@ use Readonly;
 # }}}1
 
 our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
-                 $kFPHardCreate $kFPStartEndFlag $kFPLockUnlockFlag);
+                 $kFPHardCreate $kFPStartEndFlag $kFPLockUnlockFlag
+                 $kFPAccessReadOnly $kFPAccessWriteOnly $kFPAccessReadWrite);
 
 # define constants {{{1
 our $VERSION = '0.69.0';
@@ -107,15 +108,19 @@ Readonly my $kFPZzzzz                   => 122; # AFP 2.3
 Readonly my $kFPAddIcon                 => 192; # AFP 1.1
 # }}}1
 
-Readonly our $kFPShortName      => 1;
-Readonly our $kFPLongName       => 2;
-Readonly our $kFPUTF8Name       => 3;   # AFP 3.0
+Readonly our $kFPShortName          => 1;
+Readonly our $kFPLongName           => 2;
+Readonly our $kFPUTF8Name           => 3;   # AFP 3.0
 
-Readonly our $kFPSoftCreate     => 0;
-Readonly our $kFPHardCreate     => 0x80;
+Readonly our $kFPSoftCreate         => 0;
+Readonly our $kFPHardCreate         => 0x80;
 
-Readonly our $kFPStartEndFlag   => 0x80;
-Readonly our $kFPLockUnlockFlag => 1;
+Readonly our $kFPStartEndFlag       => 0x80;
+Readonly our $kFPLockUnlockFlag     => 1;
+
+Readonly our $kFPAccessReadOnly     => 1;
+Readonly our $kFPAccessWriteOnly    => 2;
+Readonly our $kFPAccessReadWrite    => 3;
 
 # This class is only to be inherited. It uses virtual methods to talk to
 # the server by whatever protocol the inheriting class is supposed to

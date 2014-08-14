@@ -1279,19 +1279,19 @@ sub open { # {{{1
         return -EBADF()  if $rc != $kFPNoErr;
     }
 
-    my $accessbitmap = 0x1;
+    my $accessbitmap = $kFPAccessReadOnly;
     if ($accmode == O_RDWR) {
-        $accessbitmap = 0x3;
+        $accessbitmap = $kFPAccessReadWrite;
     }
     elsif ($accmode == O_WRONLY) {
         # HACK: Thanks Apple. Way to, I don't know, know how to IMPLEMENT
         # YOUR OWN PROTOCOL. Seems with Airport Disk, if you open a file
         # write-only, and then, oh, try to WRITE TO IT, the writes then
         # fail. Wow. That makes so much sense!
-        $accessbitmap = 0x3;
+        $accessbitmap = $kFPAccessReadWrite;
     }
     elsif ($accmode == O_RDONLY) {
-        $accessbitmap = 0x1;
+        $accessbitmap = $kFPAccessReadOnly;
     }
 
     my($rc, %resp) = $self->{afpconn}->FPOpenFork(
