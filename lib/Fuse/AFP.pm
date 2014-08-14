@@ -562,7 +562,7 @@ sub readlink { # {{{1
         ($rc, %sresp) = $self->{afpconn}->FPOpenFork(
                 VolumeID    => $self->{volID},
                 DirectoryID => $self->{topDirID},
-                AccessMode  => 0x1,
+                AccessMode  => $kFPAccessReadOnly,
                 PathType    => $self->{pathType},
                 Pathname    => $filename);
         return -EACCES() if $rc == $kFPAccessDenied;
@@ -915,7 +915,7 @@ sub symlink { # {{{1
     ($rc, %sresp) = $self->{afpconn}->FPOpenFork(
             VolumeID    => $self->{volID},
             DirectoryID => $self->{topDirID},
-            AccessMode  => 0x3,
+            AccessMode  => $kFPAccessReadWrite,
             PathType    => $self->{pathType},
             Pathname    => $filename);
     return -EACCES()  if $rc == $kFPAccessDenied;
@@ -1184,7 +1184,7 @@ sub truncate { # {{{1
     my ($rc, %resp) = $self->{afpconn}->FPOpenFork(
             VolumeID    => $self->{volID},
             DirectoryID => $self->{topDirID},
-            AccessMode  => 0x3,
+            AccessMode  => $kFPAccessReadWrite,
             PathType    => $self->{pathType},
             Pathname    => $filename);
     return -EPERM()  if $rc == $kFPAccessDenied;
@@ -1646,7 +1646,7 @@ sub setxattr { # {{{1
             my ($rc, %resp) = $self->{afpconn}->FPOpenFork(
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
-                    AccessMode  => 0x3,
+                    AccessMode  => $kFPAccessReadWrite,
                     Flag        => 0x80,
                     PathType    => $self->{pathType},
                     Pathname    => $filename);
@@ -1819,7 +1819,7 @@ sub getxattr { # {{{1
             ($rc, %resp) = $self->{afpconn}->FPOpenFork(
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
-                    AccessMode  => 0x1,
+                    AccessMode  => $kFPAccessReadOnly,
                     Flag        => 0x80,
                     PathType    => $self->{pathType},
                     Pathname    => $filename);
@@ -2077,7 +2077,7 @@ sub removexattr { # {{{1
             my ($rc, %resp) = $self->{afpconn}->FPOpenFork(
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
-                    AccessMode  => 0x3,
+                    AccessMode  => $kFPAccessReadWrite,
                     Flag        => 0x80,
                     PathType    => $self->{pathType},
                     Pathname    => $filename);

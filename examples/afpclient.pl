@@ -330,7 +330,7 @@ my %commands = (
             my ($rc, %resp) = $session->FPOpenFork(
                     VolumeID    => $volID,
                     DirectoryID => $dirId,
-                    AccessMode  => 0x1,
+                    AccessMode  => $kFPAccessReadOnly,
                     PathType    => $pathType,
                     Pathname    => $fileName);
             if ($rc != $kFPNoErr) {
@@ -416,7 +416,7 @@ _EOT_
         my($rc, %resp) = $session->FPOpenFork(
                 VolumeID    => $volID,
                 DirectoryID => $dirId,
-                AccessMode  => 0x1,
+                AccessMode  => $kFPAccessReadOnly,
                 PathType    => $pathType,
                 Pathname    => $fileName);
         if ($rc != $kFPNoErr) {
@@ -534,7 +534,7 @@ _EOT_
         ($rc, %resp) = $session->FPOpenFork(
                 VolumeID    => $volID,
                 DirectoryID => $dirID,
-                AccessMode  => 0x3,
+                AccessMode  => $kFPAccessReadWrite,
                 PathType    => $pathType,
                 Pathname    => $fileName);
         if ($rc != $kFPNoErr) {
@@ -908,7 +908,7 @@ sub do_listentries {
             my ($rc, %resp) = $session->FPOpenFork(
                     VolumeID    => $vol,
                     DirectoryID => $ent->{ParentDirID},
-                    AccessMode  => 0x1,
+                    AccessMode  => $kFPAccessReadOnly,
                     PathType    => $pathType,
                     Pathname    => $ent->{$pathkey});
             if ($rc == $kFPNoErr) {
