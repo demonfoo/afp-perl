@@ -54,7 +54,7 @@ eval {
 
 # FreeBSD oh-so-handily names this error code differently, so I'm going
 # to cheat just slightly...
-sub ENODATA {
+sub ENODATA() {
     return($OSNAME eq 'freebsd' ? Errno::ENOATTR() : Errno::ENODATA());
 }
 
