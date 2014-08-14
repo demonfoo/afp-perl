@@ -1647,7 +1647,7 @@ sub setxattr { # {{{1
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
                     AccessMode  => $kFPAccessReadWrite,
-                    Flag        => 0x80,
+                    Flag        => $kFPResourceDataFlag,
                     PathType    => $self->{pathType},
                     Pathname    => $filename);
             return -EISDIR() if $rc == $kFPObjectTypeErr;
@@ -1820,7 +1820,7 @@ sub getxattr { # {{{1
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
                     AccessMode  => $kFPAccessReadOnly,
-                    Flag        => 0x80,
+                    Flag        => $kFPResourceDataFlag,
                     PathType    => $self->{pathType},
                     Pathname    => $filename);
             return -EACCES() if $rc == $kFPAccessDenied;
@@ -2078,7 +2078,7 @@ sub removexattr { # {{{1
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
                     AccessMode  => $kFPAccessReadWrite,
-                    Flag        => 0x80,
+                    Flag        => $kFPResourceDataFlag,
                     PathType    => $self->{pathType},
                     Pathname    => $filename);
             return -EACCES() if $rc == $kFPAccessDenied;

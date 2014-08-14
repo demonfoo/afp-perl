@@ -520,7 +520,7 @@ _EOT_
             return 1;
         }
         my $rc = $session->FPCreateFile(
-                Flag        => 0x80,
+                Flag        => $kFPHardCreate,
                 VolumeID    => $volID,
                 DirectoryID => $dirID,
                 PathType    => $pathType,
