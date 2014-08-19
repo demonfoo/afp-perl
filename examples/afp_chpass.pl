@@ -12,6 +12,7 @@ use Net::AFP::UAMs;
 use Net::AFP::Result;
 use Net::AFP::SrvParms;
 use Term::ReadPassword;
+use English qw(-no_match_vars);
 
 my($url) = @ARGV;
 

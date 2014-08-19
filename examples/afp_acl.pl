@@ -17,7 +17,9 @@ use Readonly;
 # define constants {{{1
 Readonly our $XATTR_NAME    => 'afp_acl';
 Readonly our $XATTR_NS      => 'system';
-sub ENODATA { return($OSNAME eq 'freebsd' ? Errno::ENOATTR : Errno::ENODATA); }
+sub ENODATA() {
+    return($OSNAME eq 'freebsd' ? Errno::ENOATTR() : Errno::ENODATA());
+}
 # }}}1
 
 # Take a binary packed ACL representation and generate a structured
@@ -187,10 +189,10 @@ sub make_ace { # {{{1
     my @about_parts = split m{:}s, $about;
     $ace->{Bitmap}  = 0;
     if ($about_parts[0] eq 'user') {
-        $ace->{Bitmap} = kFileSec_UUID;
+        $ace->{Bitmap} = $kFileSec_UUID;
         shift @about_parts;
     } elsif ($about_parts[0] eq 'group') {
-        $ace->{Bitmap} = kFileSec_GRPUUID;
+        $ace->{Bitmap} = $kFileSec_GRPUUID;
         shift @about_parts;
     }
     $ace->{UTF8Name} = decode_utf8($about_parts[0]);
@@ -534,9 +536,9 @@ foreach my $file (@ARGV) {
 
         # What sort of object is this entry about?
         my $idtype;
-        if ($entry->{Bitmap} == kFileSec_UUID) {
+        if ($entry->{Bitmap} == $kFileSec_UUID) {
             $idtype = 'user';
-        } elsif ($entry->{Bitmap} == kFileSec_GRPUUID) {
+        } elsif ($entry->{Bitmap} == $kFileSec_GRPUUID) {
             $idtype = 'group';
         }
         my $acl_kind = $entry->{ace_flags} & $KAUTH_ACE_KINDMASK;
