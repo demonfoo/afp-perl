@@ -37,7 +37,7 @@ advanced features:
    * IPv6 support, with IO::Socket::INET6
 
 It also remains compatible with classic Mac OS; I've mounted filesystems
-from MacOS 9.x, but it should work with versions even older than that, at
+from Mac System 7, but it should work with versions even older than that, at
 least in principle.
 
 =head1 SUBROUTINES/METHODS
