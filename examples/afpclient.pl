@@ -637,7 +637,7 @@ _EOT_
             }
             my $pcnt = ($pos + length($data)) * 100 / $fileLen;
             if (($i % 20 == 0) || $rc != $kFPNoErr) {
-                printf(' %3d%%  |%-25s|  %-28s  %5.2f %sB/sec' . "\r", $pcnt,
+                printf(' %3d%%  |%-25s|  %-.28s  %5.2f %sB/sec' . "\r", $pcnt,
                         q{*} x ($pcnt * 25 / 100), $fileName, $rate, $mult);
             }
             last if $rc != $kFPNoErr;
