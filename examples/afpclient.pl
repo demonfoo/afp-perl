@@ -61,13 +61,55 @@ my %UUID_cache = ();
 our $__AFP_DEBUG;
 our $__DSI_DEBUG;
 
+sub usage {
+    print <<"_EOT_";
+
+afp-perl version ${Net::AFP::VERSION} - Apple Filing Protocol CLI client
+
+Usage: ${PROGRAM_NAME} [options] [AFP URL]
+
+Options:
+    --atalk-first
+        Use AppleTalk transport before IP transport, if available; normally
+        IP transport is used first, for performance reasons.
+    -4|--prefer-v4
+        Use IPv4 connectivity before IPv6, if available.
+    --debug-afp
+        Turn on debug output for the AFP module.
+    --debug-dsi
+        Turn on debug output for the DSI module.
+    --help
+        This help summary.
+
+AFP URL format:
+
+afp://[<user>[;AUTH=<uam>][:<password>]@]<host>[:<port>]/<share>[/<path>]
+afp:/at/[<user>[;AUTH=<uam>][:<password>]@]<host>[:<zone>]/<share>[/<path>]
+
+Items in [] are optional; they are as follows:
+
+  <user>     : Your username on the remote system
+  <uam>      : The auth method to force with the server
+  <password> : Your password on the remote system
+  <host>     : Hostname or IP address of the target server, IPv6 addresses
+               can be specified in square brackets
+  <zone>     : An AppleTalk zone name, or * for the local zone
+  <port>     : The port on the server to connect to
+  <share>    : The name of the exported share on the remote system
+  <path>     : A subpath inside the specified share to mount
+
+_EOT_
+    exit(1);
+}
+
 my %afpopts;
 my($atalk_first, $prefer_v4);
 Getopt::Long::Configure('no_ignore_case');
 GetOptions( 'debug-afp' => sub { $__AFP_DEBUG = 1; },
             'debug-dsi' => sub { $__DSI_DEBUG = 1; },
             'atalk-first' => \$atalk_first,
-            'prefer-v4' => \$prefer_v4);
+            '4|prefer-v4' => \$prefer_v4,
+            'h|help' => \&usage) || usage();
 
 $afpopts{aforder} = [AF_INET];
 if ($prefer_v4) {
@@ -389,7 +431,7 @@ my %commands = (
             'e'     => \$del_target_before_get,
             'O=s'   => \$basedir,
             'o=s'   => \$outputpath,
-        );
+        ); # should print usage and return if this doesn't succeed
         if (scalar(@words) < 1 or scalar(@words) > 2) {
             print <<'_EOT_';
 Error: Specify the name of the file to retrieve, and optionally the name of
@@ -449,6 +491,7 @@ _EOT_
         my(%time, %lasttime, %starttime);
         @time{'sec', 'usec'} = gettimeofday();
         %starttime = %time;
+        my $i = 0;
         while (1) {
             my $data;
             ($rc, $data) = &{$ReadFn}($session,
@@ -472,13 +515,16 @@ _EOT_
                 }
             }
             my $pcnt = ($pos + length($data)) * 100 / $sresp->{$DForkLenKey};
-            printf(' %3d%%  |%-25s|  %-28s  %5.2f %sB/sec' . "\r", $pcnt,
-                    q{*} x ($pcnt * 25 / 100), substr($fileName, 0, 28),
-                    $rate, $mult);
+            if (($i % 20 == 0) || $rc != $kFPNoErr) {
+                printf(' %3d%%  |%-25s|  %-28s  %5.2f %sB/sec' . "\r", $pcnt,
+                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, 28),
+                        $rate, $mult);
+            }
             last if $rc != $kFPNoErr;
             $pos += length($data);
             %lasttime = %time;
             @time{'sec', 'usec'} = gettimeofday();
+            $i++;
         }
         print "\n";
         close($local_fh) || carp("Couldn't close local file");
@@ -551,6 +597,7 @@ _EOT_
         %starttime = %time;
         my $total = 0;
         my $wcount = 0;
+        my $i = 0;
         while (1) {
             my $data;
             my $rcnt = read($srcFile, $data, 131_072);
@@ -573,10 +620,6 @@ _EOT_
                         ForkData    => \$dchunk);
             }
             $total += $rcnt;
-#            if ($hashmarks_enabled == 1) {
-#            my $pcnt = ($pos + length($data)) * 100 / $fileLen;
-#            printf(' %3d%%  |%-25s|  %-.42s' . "\r",
-#                    $pcnt, '*' x ($pcnt * 25 / 100), $srcFileName);
             my $rate = 0;
             my $delta = (($time{sec} - $starttime{sec}) +
                     (($time{usec} - $starttime{usec}) / 1_000_000.0));
@@ -593,18 +636,20 @@ _EOT_
                 }
             }
             my $pcnt = ($pos + length($data)) * 100 / $fileLen;
-            printf(' %3d%%  |%-25s|  %-28s  %5.2f %sB/sec' . "\r", $pcnt,
-                    q{*} x ($pcnt * 25 / 100), $fileName, $rate, $mult);
+            if (($i % 20 == 0) || $rc != $kFPNoErr) {
+                printf(' %3d%%  |%-25s|  %-28s  %5.2f %sB/sec' . "\r", $pcnt,
+                        q{*} x ($pcnt * 25 / 100), $fileName, $rate, $mult);
+            }
             last if $rc != $kFPNoErr;
             $pos += $rcnt;
             %lasttime = %time;
             @time{'sec', 'usec'} = gettimeofday();
-            #}
             if ($rc != $kFPNoErr) {
                 print 'Write to file on server failed with return code ', $rc,
                         ' (', afp_strerror($rc), ")\n";
                 last;
             }
+            $i++;
         }
         #if ($hashmarks_enabled == 1) {
         print "\n";
