@@ -126,7 +126,7 @@ MAINLOOP:
             # go home.
             if (($now - $handler->[3]) > $active_timer) {
                 $shared->{exit} = 1;
-                print {\*STDERR} "Net::DSI::session_thread(): Waiting request timed out, aborting\n";
+                print {\*STDERR} (caller(0))[3], "(): Waiting request timed out, aborting\n";
                 last MAINLOOP;
             }
         }
@@ -137,18 +137,18 @@ MAINLOOP:
             # Apple's docs say if we are 2 minutes out from receiving a
             # tickle from the peer, we should assume the connection is
             # dead.
-        #    print {\*STDERR} "Net::DSI::session_thread(): No packets in 120 seconds, setting exit flag to 1\n";
+        #    print {\*STDERR} (caller(0))[3], "(): No packets in 120 seconds, setting exit flag to 1\n";
         #    $shared->{exit} = 1;
         #    last;
         #}
-        if ($poll->poll(0.5)) {
+        if ($poll->poll(1.0)) {
             $ev = $poll->events($conn);
             if ($ev & POLLHUP) {
                 # If this happens, the socket is (almost certainly) no
                 # longer connected to the peer, so we should bail.
-                #print {\*STDERR} "Net::DSI::session_thread(): Received HUP on AFP server connection, terminating loop\n";
+                #print {\*STDERR} (caller(0))[3], "(): Received HUP on AFP server connection, terminating loop\n";
                 #last MAINLOOP;
-                print {\*STDERR} "Net::DSI::session_thread(): poll returned POLLHUP, but this is indeterminate\n";
+                print {\*STDERR} (caller(0))[3], "(): poll returned POLLHUP, but this is indeterminate\n";
             }
             # Try to get a message from the server.
             $shared->{conn_sem}->down();
@@ -157,13 +157,13 @@ MAINLOOP:
                 $length = sysread($conn, $resp, 16 - $rsz, $rsz);
                 # Some kind of error occurred...
                 if (!defined $length) {
-                    print {\*STDERR} "Net::DSI::session_thread(): socket read received error $!\n";
+                    print {\*STDERR} (caller(0))[3], "(): socket read received error $!\n";
                     $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
                 # This means the socket read returned EOF; we should go away.
                 if ($length == 0) {
-                    print {\*STDERR} "Net::DSI::session_thread(): socket read returned EOF\n";
+                    #print {\*STDERR} (caller(0))[3], "(): socket read returned EOF\n";
                     $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
@@ -184,7 +184,7 @@ MAINLOOP:
                 # DSICloseSession from server; this means the server is
                 # going away (i.e., it's shutting down).
                 if ($cmd == $OP_DSI_CLOSESESSION) {
-                    print {\*STDERR} "Net::DSI::session_thread(): Received CloseSession from server, setting exit flag to 1\n";
+                    #print {\*STDERR} (caller(0))[3], "(): Received CloseSession from server, setting exit flag to 1\n";
                     $shared->{exit} = 1;
                 }
 
@@ -203,11 +203,11 @@ MAINLOOP:
                 }
 
                 elsif ($cmd == $OP_DSI_TICKLE) {
-                    print {\*STDERR} "Net::DSI::session_thread(): Received tickle packet at $last_pkt_rcvd\n";
+                    #print {\*STDERR} (caller(0))[3], "(): Received tickle packet at $last_pkt_rcvd\n";
                 }
 
                 else {
-                    print {\*STDERR} "Net::DSI::session_thread(): Unexpected packet received:\n", Dumper( { type => $type, cmd => $cmd, id => $id, errcode => $errcode, length => $length, reserved =>$reserved } );
+                    print {\*STDERR} (caller(0))[3], "(): Unexpected packet received:\n", Dumper( { type => $type, cmd => $cmd, id => $id, errcode => $errcode, length => $length, reserved =>$reserved } );
                 }
             } else {
                 # Check for a completion handler block for the given message ID.
@@ -227,7 +227,7 @@ MAINLOOP:
                     $sem_ref = $handler->[0];
                 }
                 else {
-                    print {\*STDERR} "Net::DSI::session_thread(): Message packet received with id $id, but no handler block present\n";
+                    print {\*STDERR} (caller(0))[3], "(): Message packet received with id $id, but no handler block present\n";
                 }
             }
 
