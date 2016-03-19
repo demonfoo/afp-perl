@@ -90,6 +90,7 @@ sub new { # {{{1
     $obj->{volID}           = undef;
     $obj->{DTRefNum}        = undef;
     $obj->{afpconn}         = undef;
+    $obj->{volicon}         = undef;
     $obj->{_getattr_cache}  = {};
 
     if (exists $opts{encoding}) {
@@ -115,6 +116,11 @@ sub new { # {{{1
             %connopts);
     if (not ref $session or not $session->isa('Net::AFP')) {
         exit $session;
+    }
+
+    $obj->{volicon} = $srvinfo->{VolumeIcon};
+    if (exists $opts{novolicon}) {
+        $obj->{volicon} = undef;
     }
 
     if (not defined $urlparms{volume}) {
@@ -442,6 +448,70 @@ sub getattr { # {{{1
         ); # }}}2
         return @stat;
     }
+    if ($self->{volicon} && $file eq '/.volicon.xpm') {
+        my $timest = time;
+        my @stat = ( # {{{2
+            # device number (just make it 0, since it's not a real device)
+            0,
+            # inode number (node ID works fine)
+            0,
+            # permission mask
+            oct(100_444),
+            # link count
+            1,
+            # UID number
+            0,
+            # GID number
+            0,
+            # device special major/minor number
+            0,
+            # file size in bytes
+            length $self->{volicon},
+            # last accessed time
+            $timest,
+            # data modified time
+            $timest,
+            # inode changed time
+            $timest,
+            # preferred block size
+            $IO_BLKSIZE,
+            # size in blocks
+            int((length($self->{volicon}) + 4095) / 4096),
+        ); # }}}2
+        return @stat;
+    }
+    if ($self->{volicon} && $file eq '/autorun.inf') {
+        my $timest = time;
+        my @stat = ( # {{{2
+            # device number (just make it 0, since it's not a real device)
+            0,
+            # inode number (node ID works fine)
+            0,
+            # permission mask
+            oct(100_444),
+            # link count
+            1,
+            # UID number
+            0,
+            # GID number
+            0,
+            # device special major/minor number
+            0,
+            # file size in bytes
+            29,
+            # last accessed time
+            $timest,
+            # data modified time
+            $timest,
+            # inode changed time
+            $timest,
+            # preferred block size
+            $IO_BLKSIZE,
+            # size in blocks
+            1,
+        ); # }}}2
+        return @stat;
+    }
     my $filename = translate_path($file, $self);
 
     if (exists $self->{_getattr_cache}->{$filename}) {
@@ -610,6 +680,9 @@ sub getdir { # {{{1
 
     if ($dirname eq q{/}) {
         push @fileslist, '._metrics';
+        if ($self->{volicon}) {
+            push @fileslist, '.volicon.xpm', 'autorun.inf';
+        }
     }
 
     if (defined $self->{client_uuid}) {
@@ -1252,6 +1325,14 @@ sub open { # {{{1
     if ($file eq '/._metrics') {
         my $data = $self->generate_metrics_data();
         return(0, \$data);
+    }
+    if ($self->{volicon} && $file eq '/.volicon.xpm') {
+        my $volicon = $self->{volicon};
+        return(0, \$volicon);
+    }
+    if ($self->{volicon} && $file eq '/autorun.inf') {
+        my $autorun_text = "[autorun]\nicon=\\.volicon.xpm\n";
+        return(0, \$autorun_text);
     }
 
     my $filename = translate_path($file, $self);
@@ -2182,6 +2263,10 @@ sub readdir { # {{{1
 
         if ($dirname eq q{/}) {
             push @fileslist, [++$offset, '._metrics'];
+            if ($self->{volicon}) {
+                push @fileslist, [++$offset, '.volicon.xpm'],
+                                 [++$offset, 'autorun.inf'];
+            }
         }
     } # }}}2
     #else {

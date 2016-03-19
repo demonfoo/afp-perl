@@ -368,6 +368,7 @@ $options{allow_other} = undef;
 $options{subtype}     = 'pafpfs';
 $options{fsname}      = $path;
 delete $options{encoding};
+delete $options{novolicon};
 
 my $debug;
 our $_DEBUG;
