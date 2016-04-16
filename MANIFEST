@@ -11,7 +11,7 @@ debian/docs
 examples/afp_acl.pl
 examples/afp_chpass.pl
 examples/afpmount.pl
-examples/afpsh.pl
+examples/afpclient.pl
 lib/Fuse/AFP.pm
 lib/Net/AFP/ACL.pm
 lib/Net/AFP/Atalk.pm

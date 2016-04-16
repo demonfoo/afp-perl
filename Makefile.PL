@@ -7,7 +7,7 @@ WriteMakefile(
 	'EXE_FILES'	=>  [
         'examples/afp_acl.pl',
         'examples/afpmount.pl',
-        'examples/afpsh.pl',
+        'examples/afpclient.pl',
     ],
     'PREREQ_PM' => {
         'Log::Log4perl'     => 0,
