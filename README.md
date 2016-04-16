@@ -15,7 +15,7 @@ that allow it to do its work:
 * Net::AFP::Result - Symbols for known AFP result codes, and mappings of [result codes](https://developer.apple.com/library/mac/documentation/Networking/Reference/AFP_Reference/index.html#//apple_ref/doc/uid/TP40003548-CH6-SW1) to error strings
 * Net::AFP::Parsers - A utility module for parsing various common packed data types and structures from an AFP server
 
-This code is known to work on Linux, [FreeBSD](www.freebsd.org) (8.x), [NetBSD](www.netbsd.org) and [MacOS X](www.apple.com/osx/)/Darwin.
+This code is known to work on Linux, [FreeBSD](http://www.freebsd.org) (8.x), [NetBSD](http://www.netbsd.org) and [MacOS X](http://www.apple.com/osx/)/Darwin.
 It makes use of Perl ithreads, so requires a threaded build of Perl.
 I have attempted to test this module on both Solaris (well, OpenSolaris)
 and Windows; unfortunately there seem to be threading deficiencies on
@@ -45,7 +45,7 @@ This module requires or encourages use of these other modules and libraries:
 * Fuse is depended upon by Fuse::Class, need version 0.10_1 or later
 * Data::UUID is recommended, used internally for access checking
 * Crypt::CBC is recommended, needed for advanced UAMs
-* Crypt::CAST5 or Crypt::CAST5_PP is recommended, needed for DHX UAMs
+* Crypt::CAST5 or Crypt::CAST5\_PP is recommended, needed for DHX UAMs
 * Crypt::DES is suggested, needed for Randnum UAMs
 * Math::BigInt::GMP is recommended, speeds up DHX UAMs
 * IO::Socket::INET6 is suggested, adds v6 socket support
