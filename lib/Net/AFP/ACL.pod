@@ -21,7 +21,7 @@ to list the contents of a directory.
 
 =item $KAUTH_VNODE_LIST_DIRECTORY
 
-For a directory, the same as C<KAUTH_VNODE_READ_DATA>, which is the
+For a directory, the same as $KAUTH_VNODE_READ_DATA, which is the
 right to list the contents of a directory.
 
 =item $KAUTH_VNODE_WRITE_DATA
@@ -40,7 +40,7 @@ Right to execute a program.
 
 =item $KAUTH_VNODE_SEARCH
 
-For a directory, same as C<KAUTH_VNODE_EXECUTE> - the right to search
+For a directory, same as $KAUTH_VNODE_EXECUTE - the right to search
 the contents of a directory.
 
 =item $KAUTH_VNODE_DELETE
@@ -54,7 +54,7 @@ right to create a subdirectory in a directory.
 
 =item $KAUTH_VNODE_ADD_SUBDIRECTORY
 
-For a directory, the same as C<KAUTH_VNODE_APPEND_DATA>, which is the
+For a directory, the same as $KAUTH_VNODE_APPEND_DATA, which is the
 right to create a subdirectory in a directory.
 
 =item $KAUTH_VNODE_DELETE_CHILD
@@ -116,24 +116,24 @@ L<Net::AFP/FPSetACL> calls.
 
 =over
 
-=item C<kFileSec_UUID>
+=item $kFileSec_UUID
 
 Set this bit to get or set a UUID.
 
-=item C<kFileSec_GRPUUID>
+=item $kFileSec_GRPUUID
 
 Set this bit to get or set a Group UUID.
 
-=item C<kFileSec_ACL>
+=item $kFileSec_ACL
 
 Set this bit to get or set an ACL.
 
-=item C<kFileSec_REMOVEACL>
+=item $kFileSec_REMOVEACL
 
 Set this bit to remove an ACL. This bit is not valid when used with the
 L<Net::AFP/FPGetACL> command.
 
-=item C<kFileSec_Inherit>
+=item $kFileSec_Inherit
 
 Set this bit to inherit all ACEs from the parent directory. This constant
 is used only with the L<Net::AFP/FPSetACL> command.
