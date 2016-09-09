@@ -32,6 +32,7 @@ use threads::shared;
 use Thread::Semaphore;
 use Socket qw(TCP_NODELAY IPPROTO_TCP);
 use Readonly;
+use Class::InsideOut qw(public readonly private register id);
 
 Readonly my $OP_DSI_CLOSESESSION        => 1;   # to and from server
 Readonly my $OP_DSI_COMMAND             => 2;   # to server only
@@ -45,6 +46,10 @@ Readonly our $kRequestQuanta            => 0x00;
 # not sure if this is the canonical name for this option code...
 Readonly our $kAttentionQuanta          => 0x01;
 Readonly our $kServerReplayCacheSize    => 0x02;
+
+private     dispatcher  => my %dispatcher;
+private     conn        => my %conn;
+private     shared      => my %shared;
 
 # This function is the body of our thread. It's a hybrid dispatcher
 # arrangement, and it will also send periodic (~30 second interval)
@@ -304,15 +309,15 @@ sub new { # {{{1
         attnq       => &share([]),
     );
 
-    $obj->{Shared}      = $shared;
+    $shared{id $obj}    = $shared;
     my $thread          = threads->create(\&session_thread, $shared, $host,
                                             $port);
-    $obj->{Dispatcher}  = $thread;
+    $dispatcher{id $obj} = $thread;
     $shared->{conn_sem}->down();
-    $obj->{Conn}        = new IO::Handle;
+    $conn{id $obj}      = new IO::Handle;
     if ($shared->{running} == 1) {
-        $obj->{Conn}->fdopen($shared->{conn_fd}, 'w');
-        $obj->{Conn}->autoflush(1);
+        $conn{id $obj}->fdopen($shared->{conn_fd}, 'w');
+        $conn{id $obj}->autoflush(1);
     }
     $shared->{conn_sem}->up();
 
@@ -320,8 +325,8 @@ sub new { # {{{1
 } # }}}1
 sub close { # {{{1
     my ($self) = @_;
-    $self->{Shared}{exit} = 1;
-    $self->{Dispatcher}->join();
+    $shared{id $self}{exit} = 1;
+    $dispatcher{id $self}->join();
     return;
 } # }}}1
 
@@ -366,9 +371,9 @@ sub SendMessage { # {{{1
 
     # Cycle the request ID that DSI uses to identify the request/reply
     # pairing. I'd like to handle that part asynchronously eventually.
-    my $reqId  = $self->{Shared}{requestid}++ % 2**16;
+    my $reqId  = $shared{id $self}{requestid}++ % 2**16;
 
-    if ($self->{Shared}{running} == -1) {
+    if ($shared{id $self}{running} == -1) {
         ${$sem_r}->up() if defined $sem_r;
         return $kFPNoServer;
     }
@@ -387,23 +392,23 @@ sub SendMessage { # {{{1
     if (defined $sem_r) {
         my $handler = &share([]);
         @{$handler} = ( $sem_r, $resp_r, $rc_r, scalar(gettimeofday()) );
-        $self->{Shared}{handlers}{$reqId} = $handler;
+        $shared{id $self}{handlers}{$reqId} = $handler;
     }
 
     # Send the request packet to the server.
-    $self->{Shared}{conn_sem}->down();
+    $shared{id $self}{conn_sem}->down();
     my $wlen = 0;
     while ($wlen < length($msg)) {
-        $wlen += syswrite($self->{Conn}, $msg, length($msg) - $wlen, $wlen);
+        $wlen += syswrite($conn{id $self}, $msg, length($msg) - $wlen, $wlen);
     }
     if ($d_len) {
         $wlen = 0;
         while ($wlen < $d_len) {
-            $wlen += syswrite($self->{Conn}, ${$data_r}, $d_len - $wlen,
+            $wlen += syswrite($conn{id $self}, ${$data_r}, $d_len - $wlen,
                     $wlen);
         }
     }
-    $self->{Shared}{conn_sem}->up();
+    $shared{id $self}{conn_sem}->up();
 
     return $reqId;
 } # }}}1
