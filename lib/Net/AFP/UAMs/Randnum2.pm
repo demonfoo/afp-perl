@@ -20,7 +20,7 @@ use Net::AFP::Result;
 use Net::AFP::Versions;
 use Log::Log4perl qw(:easy);
 
-Net::AFP::UAMs::RegisterUAM(UAMNAME, __PACKAGE__, 60);
+Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 60);
 
 sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
