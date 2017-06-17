@@ -572,8 +572,8 @@ _EOT_
                 PathType    => $pathType,
                 Pathname    => $fileName);
         if ($rc != $kFPNoErr) {
-            print 'Couldn\'t create file on remote server; server returned code ',
-                    $rc, ' (', afp_strerror($rc), ")\n";
+            printf("Couldn't create file on remote server; server returned code \%d (\%s)\n",
+                    $rc, afp_strerror($rc));
             return 1;
         }
         my %resp;
