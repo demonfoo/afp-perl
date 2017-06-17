@@ -53,6 +53,9 @@ if (-d $incpath) {
 # Try including each of them via eval, so that if they explode, it won't
 # impair our ability to continue on.
 foreach my $uampath (@uampaths) {
+    if ($uampath !~ m{^/}) {
+        $uampath = './' . $uampath;
+    }
     eval { require $uampath; };
 #    if ($@) {
 #        print STDERR 'Couldn\'t include ', $uampath, ":\n";
