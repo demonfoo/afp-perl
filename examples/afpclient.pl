@@ -514,6 +514,10 @@ _EOT_
                     $rate /= 1_000.0;
                     $mult = q{M};
                 }
+                if ($rate > 1_000) {
+                    $rate /= 1_000.0;
+                    $mult = q{G};
+                }
             }
             my $pcnt = ($pos + length($data)) * 100 / $sresp->{$DForkLenKey};
             if (($i % 20 == 0) || $rc != $kFPNoErr) {
@@ -629,11 +633,15 @@ _EOT_
                 $rate = $pos / $delta;
                 if ($rate > 1_000) {
                     $rate /= 1_000.0;
-                    $mult = 'K';
+                    $mult = q{K};
                 }
                 if ($rate > 1_000) {
                     $rate /= 1_000.0;
-                    $mult = 'M';
+                    $mult = q{M};
+                }
+                if ($rate > 1_000) {
+                    $rate /= 1_000.0;
+                    $mult = q{G};
                 }
             }
             my $pcnt = ($pos + length($data)) * 100 / $fileLen;
