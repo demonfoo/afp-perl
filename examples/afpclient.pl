@@ -46,6 +46,12 @@ use Fcntl qw(:mode);
 my $term_enc = langinfo(CODESET);
 my $blksize  = 131_072;
 
+my $has_Term__ReadKey = 0;
+eval { require Term::ReadKey; 1; } and do {
+    Term::ReadKey->import;
+    $has_Term__ReadKey = 1;
+};
+
 my $has_Data__UUID = 0;
 eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
 
@@ -520,10 +526,13 @@ _EOT_
                 }
             }
             my $pcnt = ($pos + length($data)) * 100 / $sresp->{$DForkLenKey};
-            if (($i % 20 == 0) || $rc != $kFPNoErr) {
-                printf(' %3d%%  |%-25s|  %-28s  %5.2f %sB/sec' . "\r", $pcnt,
-                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, 28),
-                        $rate, $mult);
+            if (($i % 100 == 0) || $rc != $kFPNoErr) {
+                my $twidth = 80; # if we can't ascertain, go with safe default
+                if ($has_Term__ReadKey) {
+                    $twidth = (GetTerminalSize())[0];
+                }
+                printf(' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
+                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult);
             }
             last if $rc != $kFPNoErr;
             $pos += length($data);
@@ -645,9 +654,13 @@ _EOT_
                 }
             }
             my $pcnt = ($pos + length($data)) * 100 / $fileLen;
-            if (($i % 20 == 0) || $rc != $kFPNoErr) {
-                printf(' %3d%%  |%-25s|  %-.28s  %5.2f %sB/sec' . "\r", $pcnt,
-                        q{*} x ($pcnt * 25 / 100), $fileName, $rate, $mult);
+            if (($i % 100 == 0) || $rc != $kFPNoErr || $pcnt == 100) {
+                my $twidth = 80; # if we can't ascertain, go with safe default
+                if ($has_Term__ReadKey) {
+                    $twidth = (GetTerminalSize())[0];
+                }
+                printf(' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
+                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult);
             }
             last if $rc != $kFPNoErr;
             $pos += $rcnt;
