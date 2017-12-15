@@ -880,13 +880,43 @@ local $SIG{INT} = sub {
     exit(0);
 };
 
-#$attribs->{completion_function} = sub {
-#    my ($text, $line, $start) = @_;
-#    my $list = expand_globbed_path($session, $volID, $curdirnode, $text . '*');
-#    my @reallist = map { my $rv = $_->[1] ne '' ? $_->[1] : $_->[2]; $rv =~ s{ }{\\ }; $rv; } @{$list};
-#    #print "list contents:\n", Dumper(\@reallist);
-#    return @reallist;
-#};
+# Tab completion nonsense, or at least my still-early attempts at it.
+if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
+    Term::ReadLine::ReadLine() eq 'Term::ReadLine::Gnu') {
+    $attribs->{completion_function} = sub {
+        my ($text, $line, $start) = @_;
+        if ($start == 0) {
+            # try to expand commands
+            my @matches = grep(/^$text/, keys %commands);
+            return @matches;
+        }
+        my $list = expand_globbed_path($session, $volID, $curdirnode, $text . '*');
+        my @reallist = map { my $rv = $_->[1] ne '' ? $_->[1] : $_->[2] . '/'; $rv =~ s{ }{\\ }g; $rv; } @{$list};
+        my $prefix = '';
+        if ($text =~ m{^(.+/)}) {
+            $prefix = $1;
+        }
+        if (scalar(@reallist) == 1 && $reallist[0] =~ m{/$}) {
+            if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
+                $attribs->{'completion_append_character'} = '';
+            }
+            else {
+                $readline::rl_completer_terminator_character = '';
+            }
+        } else {
+            if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
+                $attribs->{'completion_append_character'} = ' ';
+            }
+            else {
+                $readline::rl_completer_terminator_character = ' ';
+            }
+        }
+        return map { $prefix . $_ } @reallist;
+    };
+}
+else {
+    print STDERR "WARNING: ReadLine implementation doesn't support tab expands\n";
+}
 
 while (1) {
     my @nameParts;
