@@ -44,6 +44,7 @@ use Fcntl qw(:mode);
 
 # Find out the character encoding for the current terminal.
 my $term_enc = langinfo(CODESET);
+my $blksize  = 131_072;
 
 my $has_Data__UUID = 0;
 eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
@@ -497,7 +498,7 @@ _EOT_
             ($rc, $data) = &{$ReadFn}($session,
                     OForkRefNum => $resp{OForkRefNum},
                     Offset      => $pos,
-                    ReqCount    => 131_072);
+                    ReqCount    => $blksize);
             print $local_fh $data;
             my $rate = 0;
             my $delta = (($time{sec} - $starttime{sec}) +
@@ -600,7 +601,7 @@ _EOT_
         my $i = 0;
         while (1) {
             my $data;
-            my $rcnt = read($srcFile, $data, 131_072);
+            my $rcnt = read($srcFile, $data, $blksize);
             last if $rcnt == 0;
             # try a direct write, and see how far we get; zero-copy is
             # preferred if possible.
