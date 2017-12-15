@@ -6,6 +6,7 @@ use warnings;
 use Net::Bonjour;
 use Net::AFP::TCP;
 use Data::Dumper;
+use Carp;
 
 my $has_atalk = 0;
 eval {
