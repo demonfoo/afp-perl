@@ -779,15 +779,17 @@ NEXT_EXPANDED:
         foreach my $fname (@words[1..$#words]) {
             my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
                     $fname);
-            my $resp = undef;
             if (not defined $DT_ID) {
                 next;
             }
-            my $rc = $session->FPGetComment($DT_ID, $dirId, $pathType,
-                    $fileName, \$resp);
+            my($rc, $resp) = $session->FPGetComment(
+                    DTRefNum => $DT_ID,
+                    DirectoryID => $dirId,
+                    PathType => $pathType,
+                    Pathname => $fileName);
             if ($rc != $kFPNoErr) {
                 print "Sorry, file/directory was not found\n";
-                return;
+                return 1;
             }
             print "Comment for \"", $fname, "\":\n", $resp, "\n";
         }
