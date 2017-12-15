@@ -889,7 +889,21 @@ local $SIG{INT} = sub {
 #};
 
 while (1) {
-    my $line = $term->readline('afpclient$ ');
+    my @nameParts;
+    my $searchID = $curdirnode;
+    while ($searchID != $topDirID) {
+        my $dirbits = $kFPParentDirIDBit | $pathFlag;
+        my($rc, $entry) = $session->FPGetFileDirParms(
+                VolumeID        => $volID,
+                DirectoryID     => $searchID,
+                DirectoryBitmap => $dirbits,
+                PathType        => $pathType,
+                Pathname        => q{});
+        push(@nameParts, $entry->{$pathkey});
+        $searchID = $entry->{ParentDirID};
+    }
+
+    my $line = $term->readline('afpclient ' . (exists $values{username} ? $values{username} . '@' : '') . $values{host} . ':' . $values{volume} . '/' . join(q{/}, reverse(@nameParts)) . '> ');
     if (!defined($line)) {
         print "\n";
         last;
