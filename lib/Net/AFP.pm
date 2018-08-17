@@ -197,7 +197,7 @@ sub PackagePath { # {{{1
 sub PackSetParams { # {{{1
     my ($Bitmap, %options) = @_;
 
-    my $ParamsBlock = q//;
+    my $ParamsBlock = q{};
 
     if ($Bitmap & $kFPAttributeBit) {
         return if not exists $options{Attribute};
@@ -268,7 +268,7 @@ sub FPAccess { # {{{1
         Bitmap      => { type => SCALAR, default => 0 },
         UUID        => {
             type    => SCALAR,
-            regex   => qr{^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$}i,
+            regex   => qr{\A[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\z}is,
         },
         ReqAccess   => {
             type        => SCALAR,
@@ -436,7 +436,6 @@ sub FPCatSearch {
 
     #DEBUG('called ', (caller 0)[3]);
     ERROR('called function ', (caller 0)[3], ' not implemented');
-    croak('Not yet implemented');
     croak('VolumeID must be provided')
             if not exists $options{VolumeID};
     croak('ReqMatches must be provided')
@@ -445,6 +444,7 @@ sub FPCatSearch {
     $options{FileRsltBitmap}        ||= 0;
     $options{DirectoryRsltBitmap}   ||= 0;
     $options{ReqBitmap}             ||= 0;
+    croak('Not yet implemented');
 
     my $msg = pack('CxnNx[4]a[16]nnN', $kFPCatSearch,
             @options{'VolumeID', 'ReqMatches', 'CatalogPosition',
@@ -453,9 +453,25 @@ sub FPCatSearch {
 }
 
 sub FPCatSearchExt {
+    my ($self, %options) = @_;
+
     #DEBUG('called ', (caller 0)[3]);
     ERROR('called function ', (caller 0)[3], ' not implemented');
+    croak('VolumeID must be provided')
+            if not exists $options{VolumeID};
+    croak('ReqMatches must be provided')
+            if not exists $options{ReqMatches};
+    $options{CatalogPosition}       ||= q{};
+    $options{FileRsltBitmap}        ||= 0;
+    $options{DirectoryRsltBitmap}   ||= 0;
+    $options{ReqBitmap}             ||= 0;
     croak('Not yet implemented');
+
+    my $msg = pack('CxnNx[4]a[16]nnN', $kFPCatSearch,
+            @options{'VolumeID', 'ReqMatches', 'CatalogPosition',
+                     'FileRsltBitmap', 'DirectoryRsltBitmap',
+                     'ReqBitmap'});
+
 }
 
 sub FPChangePassword { # {{{1
@@ -759,12 +775,12 @@ sub FPEnumerate { # {{{1
         my ($IsFileDir, $OffspringParameters) = unpack('xCa*', $Entry);
         if ($IsFileDir == 0x80) {
             # This child is a directory
-            push(@results, _ParseDirParms($DirectoryBitmap,
+            push(@results, ParseDirParms($DirectoryBitmap,
                     $OffspringParameters));
         }
         else {
             # This child is a file
-            push(@results, _ParseFileParms($FileBitmap,
+            push(@results, ParseFileParms($FileBitmap,
                     $OffspringParameters));
         }
     }
@@ -828,11 +844,11 @@ sub FPEnumerateExt { # {{{1
         # isFileDir bit, next byte is a pad
         my ($IsFileDir, $OffspringParameters) = unpack('xxCxa*', $Entry);
         if ($IsFileDir == 0x80) { # This child is a directory
-            push(@results, _ParseDirParms($DirectoryBitmap,
+            push(@results, ParseDirParms($DirectoryBitmap,
                     $OffspringParameters));
         }
         else { # This child is a file
-            push(@results, _ParseFileParms($FileBitmap,
+            push(@results, ParseFileParms($FileBitmap,
                     $OffspringParameters));
         }
     }
@@ -896,11 +912,11 @@ sub FPEnumerateExt2 { # {{{1
         # isFileDir bit, next byte is a pad
         my ($IsFileDir, $OffspringParameters) = unpack('x[2]Cxa*', $Entry);
         if ($IsFileDir == 0x80) { # This child is a directory
-            push(@results, _ParseDirParms($DirectoryBitmap,
+            push(@results, ParseDirParms($DirectoryBitmap,
                     $OffspringParameters));
         }
         else { # This child is a file
-            push(@results, _ParseFileParms($FileBitmap,
+            push(@results, ParseFileParms($FileBitmap,
                     $OffspringParameters));
         }
     }
@@ -1059,7 +1075,7 @@ sub FPGetAPPL { # {{{1
     return($rc) if $rc != $kFPNoErr;
     croak('Need to accept returned list') if not wantarray();
     my($Bitmap_n, $APPLTag, $data) = unpack('nNa*', $resp);
-    my $info = _ParseFileParms($Bitmap_n, $data);
+    my $info = ParseFileParms($Bitmap_n, $data);
     my %rvals = (
                   Bitmap            => $Bitmap_n,
                   APPLTag           => $APPLTag,
@@ -1237,7 +1253,7 @@ sub FPGetFileDirParms { # {{{1
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return $rc if $rc != $kFPNoErr;
     croak('Need to accept returned list') if not wantarray();
-    return($rc, _ParseFileDirParms($resp));
+    return($rc, ParseFileDirParms($resp));
 } # }}}1
 
 sub FPGetForkParms { # {{{1
@@ -1259,7 +1275,7 @@ sub FPGetForkParms { # {{{1
     my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetForkParms,
             $OForkRefNum, $Bitmap), \$resp);
     return $rc if $rc != $kFPNoErr;
-    ${$resp_r} = _ParseFileParms(unpack('na*', $resp));
+    ${$resp_r} = ParseFileParms(unpack('na*', $resp));
     return $rc;
 } # }}}1
 
@@ -1356,7 +1372,7 @@ sub FPGetSrvrInfo { # {{{1
     # If the response was not $kFPNoErr, the info block will not be present.
     return $rc if $rc != $kFPNoErr;
 
-    ${$resp_r} = _ParseSrvrInfo($resp);
+    ${$resp_r} = ParseSrvrInfo($resp);
     return $rc;
 } # }}}1
 
@@ -1521,7 +1537,7 @@ sub FPGetVolParms { # {{{1
     my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetVolParms, $VolumeID,
             $Bitmap), \$resp);
     return($rc) if $rc != $kFPNoErr;
-    ${$resp_r} = _ParseVolParms($resp, $self);
+    ${$resp_r} = ParseVolParms($resp, $self);
     return $rc;
 } # }}}1
 
@@ -1965,7 +1981,7 @@ sub FPOpenFork { # {{{1
     croak('Need to accept returned list') if not wantarray();
     if ($rc == $kFPNoErr) {
         my ($rBitmap, $OForkRefNum, $FileParameters) = unpack('nna*', $resp);
-        %rvals = %{ _ParseFileParms($rBitmap, $FileParameters) };
+        %rvals = %{ ParseFileParms($rBitmap, $FileParameters) };
         $rvals{OForkRefNum} = $OForkRefNum;
     }
     return($rc, %rvals);
@@ -2012,7 +2028,7 @@ sub FPOpenVol { # {{{1
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     return $rc if $rc != $kFPNoErr;
-    ${$resp_r} = _ParseVolParms($resp, $self);
+    ${$resp_r} = ParseVolParms($resp, $self);
     return $rc;
 } # }}}1
 
@@ -2214,7 +2230,7 @@ sub FPResolveID { # {{{1
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return($rc) if $rc != $kFPNoErr;
     my($Bitmap_n, $data) = unpack('na*', $resp);
-    my $info = _ParseFileParms($Bitmap_n, $data);
+    my $info = ParseFileParms($Bitmap_n, $data);
     ${$resp_r} = {
                    Bitmap               => $Bitmap_n,
                    RequestedParameters  => $info,

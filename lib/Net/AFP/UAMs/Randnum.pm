@@ -11,6 +11,7 @@ use strict;
 use warnings;
 use diagnostics;
 use integer;
+use Carp;
 
 use Readonly;
 Readonly my $UAMNAME => 'Randnum exchange';
@@ -26,10 +27,10 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    die('Object MUST be of type Net::AFP!')
+    croak('Object MUST be of type Net::AFP!')
             unless ref($session) and $session->isa('Net::AFP');
 
-    die('Password callback MUST be a subroutine ref')
+    croak('Password callback MUST be a subroutine ref')
             unless ref($pw_cb) eq 'CODE';
 
     # Pack just the username into a Pascal-style string, and send that to
@@ -55,9 +56,9 @@ sub Authenticate {
 
     # The server will send us a random 8-byte number; take that, and encrypt
     # it with the password the user gave us.
-    my ($randnum) = unpack('a8', $resp{'UserAuthInfo'});
+    my ($randnum) = unpack('a8', $resp{UserAuthInfo});
     DEBUG('$randnum is 0x', unpack('H*', $randnum));
-    my $deshash = new Crypt::DES(pack('a8', &$pw_cb()));
+    my $deshash = Crypt::DES->new(pack('a8', &{$pw_cb}()));
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;
     DEBUG('$crypted is 0x', unpack('H*', $crypted));
@@ -73,14 +74,14 @@ sub ChangePassword {
     my ($session, $username, $oldPassword, $newPassword) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    die('Object MUST be of type Net::AFP!')
+    croak('Object MUST be of type Net::AFP!')
             unless ref($session) and $session->isa('Net::AFP');
 
     # Establish encryption contexts for each of the supplied passwords. Then
     # pack the old password encrypted with the new one, and the new password
     # encrypted with the old one, as directed.
-    my $oldcrypt = new Crypt::DES(pack('a8', $oldPassword));
-    my $newcrypt = new Crypt::DES(pack('a8', $newPassword));
+    my $oldcrypt = Crypt::DES->new(pack('a8', $oldPassword));
+    my $newcrypt = Crypt::DES->new(pack('a8', $newPassword));
     my $message = pack('a8a8', $newcrypt->encrypt($oldPassword),
             $oldcrypt->encrypt($newPassword));
     undef $oldcrypt;
@@ -90,7 +91,7 @@ sub ChangePassword {
     # back to the caller.
     if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
             $kFPVerAtLeast)) {
-        $username = '';
+        $username = q{};
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;

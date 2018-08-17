@@ -10,6 +10,7 @@ use warnings;
 use diagnostics;
 use integer;
 use Data::Dumper;
+use English qw(-no_match_vars);
 
 # Enables a nice call trace on warning events.
 use Carp;
@@ -75,10 +76,10 @@ sub session_thread { # {{{1
     my $idle_timer   = $params{IdleTimer} || 120;
 
     if ($has_IO__Socket__INET6 == 1) {
-        $conn = new IO::Socket::INET6(%connect_args);
+        $conn = IO::Socket::INET6->new(%connect_args);
     }
     if (!defined($conn) || !$conn->connected()) {
-        $conn = new IO::Socket::INET(%connect_args);
+        $conn = IO::Socket::INET->new(%connect_args);
     }
     if (!defined($conn) || !$conn->connected()) {
         $shared->{running} = -1;
@@ -112,7 +113,7 @@ sub session_thread { # {{{1
 
     # Set up a poll object for checking out our socket. Also preallocate
     # several variables which will be used in the main loop.
-    my $poll = new IO::Poll;
+    my $poll = IO::Poll->new();
     $poll->mask($conn, POLLIN | POLLHUP);
     my ($data, $real_length, $resp, $type, $cmd, $id, $errcode, $length,
             $reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref, $msg,
@@ -162,7 +163,7 @@ MAINLOOP:
                 $length = sysread($conn, $resp, 16 - $rsz, $rsz);
                 # Some kind of error occurred...
                 if (!defined $length) {
-                    print {\*STDERR} (caller(0))[3], "(): socket read received error $!\n";
+                    print {\*STDERR} (caller(0))[3], "(): socket read received error ${ERRNO}\n";
                     $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
@@ -291,7 +292,7 @@ sub new { # {{{1
     $port ||= 548;
     my $obj = bless {}, $class;
 
-    my $shared = &share({});
+    my $shared = shared_clone({});
     %{$shared} = (
         # 0 means starting, 1 means running, -1 means stopped
         running     => 0,
@@ -301,12 +302,12 @@ sub new { # {{{1
         # sent to the server.
         requestid   => 0,
         conn_fd     => undef,
-        conn_sem    => new Thread::Semaphore(0),
+        conn_sem    => Thread::Semaphore->new(0),
         # completion handlers are registered here.
-        handlers    => &share({}),
+        handlers    => shared_clone({}),
         # server attention messages queued here, should have
         # Net::AFP::TCP check these
-        attnq       => &share([]),
+        attnq       => shared_clone([]),
     );
 
     $shared{id $obj}    = $shared;
@@ -314,7 +315,7 @@ sub new { # {{{1
                                             $port);
     $dispatcher{id $obj} = $thread;
     $shared->{conn_sem}->down();
-    $conn{id $obj}      = new IO::Handle;
+    $conn{id $obj}      = IO::Handle->new();
     if ($shared->{running} == 1) {
         $conn{id $obj}->fdopen($shared->{conn_fd}, 'w');
         $conn{id $obj}->autoflush(1);
@@ -354,15 +355,15 @@ sub SendMessage { # {{{1
         # Create the Thread::Semaphore object, and initialize it to 0;
         # the first down() (which will be called by whoever called us) will
         # block until up() occurs.
-        $sem_r = &share($sem_r);
-        ${$sem_r} = new Thread::Semaphore(0);
+        share($sem_r);
+        ${$sem_r} = Thread::Semaphore->new(0);
     }
 
     $resp_r  ||= *foo{SCALAR};
-    $resp_r    = &share($resp_r);
+    share($resp_r);
 
     $rc_r    ||= *bar{SCALAR};
-    $rc_r      = &share($rc_r);
+    share($rc_r);
 
     $message ||= q{};
 
@@ -390,7 +391,7 @@ sub SendMessage { # {{{1
             length($message) + $d_len, 0, $message);
 
     if (defined $sem_r) {
-        my $handler = &share([]);
+        my $handler = shared_clone([]);
         @{$handler} = ( $sem_r, $resp_r, $rc_r, scalar(gettimeofday()) );
         $shared{id $self}{handlers}{$reqId} = $handler;
     }

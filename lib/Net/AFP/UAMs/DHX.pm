@@ -15,6 +15,8 @@ use strict;
 use warnings;
 use diagnostics;
 use integer;
+use Carp;
+use Bytes::Random::Secure qw(random_bytes);
 
 use Readonly;
 Readonly my $UAMNAME => 'DHCAST128';
@@ -40,7 +42,7 @@ eval {
     $has_Crypt__CAST5 = 1;
     Crypt::CAST5->import;
 };
-die("No CAST5 implementation was available?")
+croak("No CAST5 implementation was available?")
         unless $has_Crypt__CAST5 || $has_Crypt__CAST5_PP;
 # Provides the cipher-block chaining layer over the encryption algorithm.
 use Crypt::CBC;
@@ -68,23 +70,23 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    die('Object MUST be of type Net::AFP!')
+    croak(q{Object MUST be of type Net::AFP!})
             unless ref($session) and $session->isa('Net::AFP');
 
-    die('Password callback MUST be a subroutine ref')
-            unless ref($pw_cb) eq 'CODE';
+    croak(q{Password callback MUST be a subroutine ref})
+            unless ref($pw_cb) eq q{CODE};
 
     # Moving these into the functions, to make Math::BigInt::GMP happy.
-    my $p = new Math::BigInt('0x' . unpack('H*', pack('C*', @p_bytes)));
-    my $g = new Math::BigInt('0x' . unpack('H*', pack('C*', @g_bytes)));
+    my $p = Math::BigInt->new('0x' . unpack('H*', pack('C*', @p_bytes)));
+    my $g = Math::BigInt->new('0x' . unpack('H*', pack('C*', @g_bytes)));
 
-    my $nonce_limit = new Math::BigInt(1);
+    my $nonce_limit = Math::BigInt->new(1);
     $nonce_limit->blsft(128);
 
     # Get random bytes that constitute a large exponent for the random number
     # exchange we do.
-    my $Ra_binary = Crypt::CBC->_get_random_bytes(32);
-    my $Ra = new Math::BigInt('0x' . unpack('H*', $Ra_binary));
+    my $Ra_binary = random_bytes(32);
+    my $Ra = Math::BigInt->new('0x' . unpack('H*', $Ra_binary));
     undef $Ra_binary;
     DEBUG('$Ra is ', $Ra->as_hex());
 
@@ -112,15 +114,15 @@ sub Authenticate {
         DEBUG('FPLoginExt() completed with result code ', $rc);
     }
     else {
-        my $authinfo = pack('C/a*x![s]a*', $username, $Ma_binary);
-        ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
+        my $ai = pack('C/a*x![s]a*', $username, $Ma_binary);
+        ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $ai);
         DEBUG('FPLogin() completed with result code ', $rc);
     }
     undef $Ma_binary;
     undef $authinfo;
     return $rc unless $rc == $kFPAuthContinue;
     my ($Mb_binary, $message) = unpack('a16a*', $resp{'UserAuthInfo'});
-    my $Mb = new Math::BigInt('0x' . unpack('H*', $Mb_binary));
+    my $Mb = Math::BigInt->new('0x' . unpack('H*', $Mb_binary));
     undef $Mb_binary;
     DEBUG('$Mb is ', $Mb->as_hex());
     DEBUG('$message is 0x', unpack('H*', $message));
@@ -136,14 +138,14 @@ sub Authenticate {
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
-    my $ctx = new Crypt::CBC( { key         => $K_binary,
+    my $ctx = Crypt::CBC->new({ key         => $K_binary,
                                 cipher      => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
                                 padding     => 'null',
                                 literal_key => 1,
                                 prepend_iv  => 0,
-                                iv          => $S2CIV } );
+                                iv          => $S2CIV });
     undef $K_binary;
-    $$session{'cryptctx'} = $ctx;
+    $session->{cryptctx} = $ctx;
     # Set the "magic" IV that allows us to properly decrypt what the server
     # sends to us.
     #$ctx->set_initialization_vector($S2CIV);
@@ -151,7 +153,7 @@ sub Authenticate {
     # HACK ALERT: seems decrypt() likes to drop the trailing null on me :|
     # this line should pad out to the appropriate length, which should
     # avoid this problem...
-    $decrypted .= "\0" x (32 - length($decrypted));
+    $decrypted .= q{\0} x (32 - length($decrypted));
     DEBUG('$decrypted is 0x', unpack('H*', $decrypted));
     my ($nonce_binary, $serverSig) = unpack('a16a*', $decrypted);
     undef $decrypted;
@@ -161,7 +163,7 @@ sub Authenticate {
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
-    my $nonce = new Math::BigInt('0x' . unpack('H*', $nonce_binary));
+    my $nonce = Math::BigInt->new('0x' . unpack('H*', $nonce_binary));
     undef $nonce_binary;
     DEBUG('$nonce is ', $nonce->as_hex());
     $nonce->badd(1);
@@ -169,7 +171,7 @@ sub Authenticate {
     DEBUG('$nonce is ', $nonce->as_hex(), " after increment");
     my $newnonce_text = substr($nonce->as_hex(), 2);
     undef $nonce;
-    my $authdata = pack('H*a64', zeropad($newnonce_text, 32), &$pw_cb());
+    my $authdata = pack('H*a64', zeropad($newnonce_text, 32), &{$pw_cb}());
     undef $newnonce_text;
     $ctx->set_initialization_vector($C2SIV);
     my $ciphertext = $ctx->encrypt($authdata);
@@ -187,20 +189,20 @@ sub ChangePassword {
     my($session, $username, $oldPassword, $newPassword) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    die('Object MUST be of type Net::AFP!')
+    croak('Object MUST be of type Net::AFP!')
             unless ref($session) and $session->isa('Net::AFP');
 
     # Moving these into the functions, to make Math::BigInt::GMP happy.
-    my $p = new Math::BigInt('0x' . unpack('H*', pack('C*', @p_bytes)));
-    my $g = new Math::BigInt('0x' . unpack('H*', pack('C*', @g_bytes)));
+    my $p = Math::BigInt->new('0x' . unpack('H*', pack('C*', @p_bytes)));
+    my $g = Math::BigInt->new('0x' . unpack('H*', pack('C*', @g_bytes)));
 
-    my $nonce_limit = new Math::BigInt(1);
+    my $nonce_limit = Math::BigInt->new(1);
     $nonce_limit->blsft(128);
 
     # Get random bytes that constitute a large exponent for the random number
     # exchange we do.
-    my $Ra_binary = Crypt::CBC->_get_random_bytes(32);
-    my $Ra = new Math::BigInt('0x' . unpack('H*', $Ra_binary));
+    my $Ra_binary = random_bytes(32);
+    my $Ra = Math::BigInt->new('0x' . unpack('H*', $Ra_binary));
     undef $Ra_binary;
     DEBUG('$Ra is ', $Ra->as_hex());
 
@@ -220,7 +222,7 @@ sub ChangePassword {
     # Username is always an empty string with AFP 3.0 and up.
     if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
             $kFPVerAtLeast)) {
-        $username = '';
+        $username = q{};
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, $authinfo, \$resp);
     undef $authinfo;
@@ -229,7 +231,7 @@ sub ChangePassword {
 
     # Unpack the server response for our perusal.
     my ($ID, $Mb_binary, $message) = unpack('na16a32', $resp);
-    my $Mb = new Math::BigInt('0x' . unpack('H*', $Mb_binary));
+    my $Mb = Math::BigInt->new('0x' . unpack('H*', $Mb_binary));
     undef $Mb_binary;
     DEBUG('$Mb is ', $Mb->as_hex());
     DEBUG('$message is 0x', unpack('H*', $message));
@@ -245,12 +247,12 @@ sub ChangePassword {
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
-    my $ctx = new Crypt::CBC( { key         => $K_binary,
+    my $ctx = Crypt::CBC->new({ key         => $K_binary,
                                 cipher      => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
                                 padding     => 'null',
                                 literal_key => 1,
                                 prepend_iv  => 0,
-                                iv          => $S2CIV } );
+                                iv          => $S2CIV });
     undef $K_binary;
     # Set the "magic" IV that allows us to properly decrypt what the server
     # sends to us.
@@ -269,7 +271,7 @@ sub ChangePassword {
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
-    my $nonce = new Math::BigInt('0x' . unpack('H*', $nonce_binary));
+    my $nonce = Math::BigInt->new('0x' . unpack('H*', $nonce_binary));
     undef $nonce_binary;
     DEBUG('$nonce is ', $nonce->as_hex());
     $nonce->badd(1);

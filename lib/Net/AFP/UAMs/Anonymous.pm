@@ -2,13 +2,14 @@
 # AFP protocol.
 
 package Net::AFP::UAMs::Anonymous;
+use strict;
+use warnings;
+
 use Readonly;
 Readonly my $UAMNAME => 'No User Authent';
 use Net::AFP::Result;
 use Net::AFP::Versions;
-
-use strict;
-use warnings;
+use Carp;
 
 Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, -10);
 
@@ -19,7 +20,7 @@ sub Authenticate {
     print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
 
     # Ensure that we've been handed an appropriate object.
-    die("Object MUST be of type Net::AFP!")
+    croak("Object MUST be of type Net::AFP!")
             unless ref($session) and $session->isa('Net::AFP');
     
     my $rc;
@@ -29,13 +30,13 @@ sub Authenticate {
         ($rc) = $session->FPLoginExt(
                 AFPVersion  => $AFPVersion,
                 UAM         => $UAMNAME,
-                UserName    => '');
-        print 'FPLoginExt() completed with result code ', $rc, "\n"
+                UserName    => q{});
+        print q{FPLoginExt() completed with result code }, $rc, q{\n}
                 if defined $::__AFP_DEBUG;
     }
     else {
-        ($rc) = $session->FPLogin($AFPVersion, $UAMNAME, '');
-        print 'FPLogin() completed with result code ', $rc, "\n"
+        ($rc) = $session->FPLogin($AFPVersion, $UAMNAME, q{});
+        print q{FPLogin() completed with result code }, $rc, q{\n}
                 if defined $::__AFP_DEBUG;
     }
 

@@ -27,34 +27,35 @@ sub RegisterUAM {
     my ($uamname, $class, $pref) = @_;
 
     my $uaminfo = { 'name' => $uamname, 'class' => $class, 'pref' => $pref };
-    for (my $i = 0; $i <= $#UAMReg; $i++) {
+    for my $i (0 .. $#UAMReg) {
         next if $UAMReg[$i]->{'pref'} > $pref;
         @UAMReg = (@UAMReg[0 .. ($i - 1)], $uaminfo, @UAMReg[$i .. $#UAMReg]);
         return;
     }
     push(@UAMReg, $uaminfo);
+    return;
 }
 
 # Where am I being included from? Use our own package name to get the
 # inclusion path where we should pull our own UAMs from.
 my $incname = __PACKAGE__;
-$incname =~ s{::}{/}g;
+$incname =~ s{::}{/}gs;
 $incname .= '.pm';
 # %INC contains the include paths for all currently-imported packages.
 my $incpath = $INC{$incname};
-$incpath =~ s{\.pm$}{};
+$incpath =~ s{\.pm$}{}s;
 my @uampaths;
 if (-d $incpath) {
     opendir(UAMDIR, $incpath);
-    push(@uampaths, map { $incpath . '/' . $_ } grep(/\.pm$/, readdir(UAMDIR)));
+    push(@uampaths, map { $incpath . q{/} . $_ } grep { m{\.pm$}s } readdir(UAMDIR));
     closedir(UAMDIR);
 }
 
 # Try including each of them via eval, so that if they explode, it won't
 # impair our ability to continue on.
 foreach my $uampath (@uampaths) {
-    if ($uampath !~ m{^/}) {
-        $uampath = './' . $uampath;
+    if ($uampath !~ m{^/}s) {
+        $uampath = q{./} . $uampath;
     }
     eval { require $uampath; };
 #    if ($@) {
@@ -65,7 +66,7 @@ foreach my $uampath (@uampaths) {
 #    }
 }
 
-sub GuestAuth($$) {
+sub GuestAuth {
     my($session, $AFPVersion) = @_;
     my $rc = Net::AFP::UAMs::Anonymous::Authenticate($session, $AFPVersion);
     if ($rc == $kFPNoErr) {
@@ -74,7 +75,7 @@ sub GuestAuth($$) {
     return $rc;
 }
 
-sub PasswordAuth($$$$$) {
+sub PasswordAuth {
     my($session, $AFPVersion, $SupportedUAMs, $UserName, $PwCallback) = @_;
 #    die('Need a function ref for password callback')
 #            unless ref($PwCallback) eq 'CODE';
@@ -83,13 +84,13 @@ sub PasswordAuth($$$$$) {
     # have a prioritized list of UAMs that we know are good, and try to
     # use the best ones first. OS 9.x likes to specify cleartext auth at
     # the top of the list... not so great.
-    my %ReqUAMs = map { lc($_), 1 } @$SupportedUAMs;
+    my %ReqUAMs = map { lc() => 1 } @{$SupportedUAMs};
     foreach my $uaminfo (@UAMReg) {
-        next unless exists $ReqUAMs{lc($$uaminfo{'name'})};
-        last if $uaminfo->{'pref'} < 0 and scalar(keys %ReqUAMs) > 1;
-        my $function = $$uaminfo{'class'} . '::Authenticate';
+        next unless exists $ReqUAMs{lc($uaminfo->{name})};
+        last if $uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1;
+        my $function = $uaminfo->{class} . q{::Authenticate};
         DEBUG('auth function is ', $function);
-        $session->{'username'} = $UserName;
+        $session->{username} = $UserName;
         my $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
         if ($rc == $kFPNoErr) {
             $session->{'AFPVersion'} = $AFPVersion;
@@ -106,12 +107,12 @@ sub PasswordAuth($$$$$) {
 sub ChangePassword {
     my($session, $SupportedUAMs, $UserName, $OldPW, $NewPW) = @_;
 
-    my %ReqUAMs = map { lc($_), 1 } @$SupportedUAMs;
+    my %ReqUAMs = map { lc() => 1 } @{$SupportedUAMs};
     foreach my $uaminfo (@UAMReg) {
-        next unless exists $ReqUAMs{lc($$uaminfo{'name'})};
-        next unless $$uaminfo{'class'}->can('ChangePassword');
-        last if $$uaminfo{'pref'} < 0 and scalar(keys %ReqUAMs) > 1;
-        my $function = $$uaminfo{'class'} . '::ChangePassword';
+        next unless exists $ReqUAMs{lc($uaminfo->{'name'})};
+        next unless $uaminfo->{class}->can('ChangePassword');
+        last if $uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1;
+        my $function = $uaminfo->{class} . q{::ChangePassword};
         DEBUG('password changing function is ', $function);
         #my $NewPW = &$PwCallback();
         my $rc = &{$function}($session, $UserName, $OldPW, $NewPW);

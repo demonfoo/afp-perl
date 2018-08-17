@@ -34,7 +34,7 @@ sub new { # {{{1
     $logger->debug('called ', (caller(0))[3]);
     my $obj = $class->SUPER::new($host, $port);
 
-    $obj->{'Session'} = new Net::DSI($host, $port);
+    $obj->{'Session'} = Net::DSI->new($host, $port);
     my($rc, %opts) = $obj->{'Session'}->OpenSession();
     if (exists $opts{'ServerReplayCacheSize'}) {
         $obj->{'ReplayCacheSize'} = $opts{'ServerReplayCacheSize'};
@@ -65,10 +65,10 @@ sub CheckAttnQueue { # {{{1
     my $attnq = $self->{Session}{Shared}{attnq};
     my $vol_update_checked;
     while (my $msg = shift(@{$attnq})) {
-        if ($msg & 0x8000) {    # server says it's shutting down
+        if ($msg & 0x8_000) {    # server says it's shutting down
             $logger->info('CheckAttnQueue(): Received notification of server intent to shut down');
             $logger->info('Shutdown in ', ($msg & 0xFFF), ' minutes');
-            if ($msg & 0x2000) { # server also has a message for us
+            if ($msg & 0x2_000) { # server also has a message for us
                 my $MsgData;
                 $self->FPGetSrvrMsg(1, 3, \$MsgData);
                 if ($MsgData->{'ServerMessage'} ne q{}) {
@@ -76,11 +76,11 @@ sub CheckAttnQueue { # {{{1
                 }
             }
         }
-        elsif ($msg & 0x4000) { # server says it's crashing
+        elsif ($msg & 0x4_000) { # server says it's crashing
             $logger->info('CheckAttnQueue(): Received notification server is crashing; should really attempt reconnection, I suppose...');
         }
-        elsif ($msg & 0x2000) { # server message?
-            if ($msg & 0x1000) { # server notification
+        elsif ($msg & 0x2_000) { # server message?
+            if ($msg & 0x1_000) { # server notification
                 if ($msg & 0x1) {
                     next if $vol_update_checked;
                     $logger->info('CheckAttnQueue(): ModDate updated on an attached volume, should do FPGetVolParms() to recheck');
@@ -136,13 +136,13 @@ sub GetStatus { # {{{1
 
     my $logger = get_logger('status');
     $logger->debug('called ', (caller(0))[3]);
-    my $obj = new Net::DSI($host, $port);
+    my $obj = Net::DSI->new($host, $port);
     my $resp;
     my $rc = $obj->GetStatus(\$resp);
     $obj->close();
     return $rc unless $rc == $kFPNoErr;
 
-    ${$resp_r} = _ParseSrvrInfo($resp);
+    ${$resp_r} = ParseSrvrInfo($resp);
     return $rc;
 } # }}}1
 

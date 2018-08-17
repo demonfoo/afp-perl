@@ -1,5 +1,7 @@
 package Net::AFP::DirParms;
 
+use strict;
+use warnings;
 use Exporter qw(import);
 use Readonly;
 
@@ -16,23 +18,23 @@ our %EXPORT_TAGS = (
                     $kFPUTF8NameBit $kFPUnixPrivsBit)],
 );
 
-Readonly our $kFPAttributeBit       => 0x00001;
-Readonly our $kFPParentDirIDBit     => 0x00002;
-Readonly our $kFPCreateDateBit      => 0x00004;
-Readonly our $kFPModDateBit         => 0x00008;
-Readonly our $kFPBackupDateBit      => 0x00010;
-Readonly our $kFPFinderInfoBit      => 0x00020;
-Readonly our $kFPLongNameBit        => 0x00040;
-Readonly our $kFPShortNameBit       => 0x00080;
-Readonly our $kFPNodeIDBit          => 0x00100;
-Readonly our $kFPOffspringCountBit  => 0x00200;
-Readonly our $kFPOwnerIDBit         => 0x00400;
-Readonly our $kFPGroupIDBit         => 0x00800;
-Readonly our $kFPAccessRightsBit    => 0x01000;
-Readonly our $kFPProDOSInfoBit      => 0x02000; # AFP <= 2.2
-Readonly our $kFPUTF8NameBit        => 0x02000; # AFP >= 3.0
-Readonly our $kFPUnixPrivsBit       => 0x08000; # AFP >= 3.0
-Readonly our $kFPUUID               => 0x10000; # AFP >= 3.0
+Readonly our $kFPAttributeBit       => 0x00_001;
+Readonly our $kFPParentDirIDBit     => 0x00_002;
+Readonly our $kFPCreateDateBit      => 0x00_004;
+Readonly our $kFPModDateBit         => 0x00_008;
+Readonly our $kFPBackupDateBit      => 0x00_010;
+Readonly our $kFPFinderInfoBit      => 0x00_020;
+Readonly our $kFPLongNameBit        => 0x00_040;
+Readonly our $kFPShortNameBit       => 0x00_080;
+Readonly our $kFPNodeIDBit          => 0x00_100;
+Readonly our $kFPOffspringCountBit  => 0x00_200;
+Readonly our $kFPOwnerIDBit         => 0x00_400;
+Readonly our $kFPGroupIDBit         => 0x00_800;
+Readonly our $kFPAccessRightsBit    => 0x01_000;
+Readonly our $kFPProDOSInfoBit      => 0x02_000; # AFP <= 2.2
+Readonly our $kFPUTF8NameBit        => 0x02_000; # AFP >= 3.0
+Readonly our $kFPUnixPrivsBit       => 0x08_000; # AFP >= 3.0
+Readonly our $kFPUUID               => 0x10_000; # AFP >= 3.0
 
 1;
 # vim: ts=4

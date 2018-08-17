@@ -10,6 +10,8 @@ use strict;
 use warnings;
 use diagnostics;
 use integer;
+use Carp;
+use Bytes::Random::Secure qw(random_bytes);
 
 use Readonly;
 Readonly my $UAMNAME => '2-Way Randnum exchange';
@@ -26,10 +28,10 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    die('Object MUST be of type Net::AFP!')
+    croak('Object MUST be of type Net::AFP!')
             unless ref($session) and $session->isa('Net::AFP');
 
-    die('Password callback MUST be a subroutine ref')
+    croak('Password callback MUST be a subroutine ref')
             unless ref($pw_cb) eq 'CODE';
 
     # Pack just the username into a Pascal-style string, and send that to
@@ -59,12 +61,12 @@ sub Authenticate {
     DEBUG('$randnum is 0x', unpack('H*', $randnum));
     # Explode the password out into a bit string, and rotate the leftmost bit
     # to the end of the bit vector.
-    my $bin_key = unpack('B*', pack('a8', &$pw_cb()));
-    $bin_key =~ s/^([01])(.*)$/$2$1/;
+    my $bin_key = unpack('B*', pack('a8', &{$pw_cb}()));
+    $bin_key =~ s/^([01])(.*)$/$2$1/s;
     # Pack the rotated bitstring back into binary form for use as the DES key.
     my $key = pack('B*', $bin_key);
     undef $bin_key;
-    my $deshash = new Crypt::DES($key);
+    my $deshash = Crypt::DES->new($key);
     undef $key;
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;
@@ -73,7 +75,7 @@ sub Authenticate {
     # Get some random bytes to send to the server. It will encrypt its copy
     # of the password, and send it back to us, to verify that it too has a
     # copy of the password, and it's not just phishing for hashes.
-    my $my_randnum = Crypt::CBC->_get_random_bytes(8);
+    my $my_randnum = random_bytes(8);
     DEBUG('$my_randnum is 0x', unpack('H*', $my_randnum));
 
     # Send the response back to the server. If the server doesn't think we're

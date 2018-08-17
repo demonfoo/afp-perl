@@ -603,7 +603,7 @@ sub readlink { # {{{1
     # really translate to the UNIX concept of a symlink; I might be able
     # to implement it later via file IDs, but until then, if UNIX permissions
     # aren't present, this won't work.
-    return -EINVAL() unless $self->{volAttrs} & $kSupportsUnixPrivs;
+    return -EINVAL() if not $self->{volAttrs} & $kSupportsUnixPrivs;
 
     $file = $self->{local_encode}->decode($file);
     # Break the provided path down into a directory ID and filename.
@@ -650,7 +650,7 @@ sub readlink { # {{{1
                     Offset      => $pos,
                     ReqCount    => 1024);
             return -EACCES() if $rc == $kFPAccessDenied;
-            return -EINVAL() unless $rc == $kFPNoErr or $rc == $kFPEOFErr;
+            return -EINVAL() if $rc != $kFPNoErr and $rc != $kFPEOFErr;
             $linkpath .= $readtext;
         } until ($rc == $kFPEOFErr);
         $self->{afpconn}->FPCloseFork($sresp{OForkRefNum});
@@ -720,7 +720,7 @@ sub getdir { # {{{1
     while (1) {
         ($rc, $resp) = &{$self->{EnumFn}}($self->{afpconn}, %arglist);
 
-        last unless $rc == $kFPNoErr;
+        last if $rc != $kFPNoErr;
 
         # Under some circumstances (no, this is not an error elsewhere in
         # my code, near as I can tell) on a second swipe, we'll get *one*
@@ -941,7 +941,7 @@ sub symlink { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -EPERM() unless $self->{volAttrs} & $kSupportsUnixPrivs;
+    return -EPERM() if not $self->{volAttrs} & $kSupportsUnixPrivs;
 
     $linkname = $self->{local_encode}->decode($linkname);
     my $filename = translate_path($linkname, $self);
@@ -1138,7 +1138,7 @@ sub chmod { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -EINVAL() unless $self->{volAttrs} & $kSupportsUnixPrivs;
+    return -EINVAL() if not $self->{volAttrs} & $kSupportsUnixPrivs;
 
     my $filename = translate_path($self->{local_encode}->decode($file),
             $self);
@@ -1184,7 +1184,7 @@ sub chown { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -EINVAL() unless $self->{volAttrs} & $kSupportsUnixPrivs;
+    return -EINVAL() if not $self->{volAttrs} & $kSupportsUnixPrivs;
 
     my $filename = translate_path($self->{local_encode}->decode($file),
             $self);
@@ -1602,7 +1602,7 @@ sub setxattr { # {{{1
                 return -EEXIST()  if $resp{Bitmap} & $kFileSec_ACL;
             }
             elsif ($flags & XATTR_REPLACE) {
-                return -ENODATA() unless $resp{Bitmap} & $kFileSec_ACL;
+                return -ENODATA() if not $resp{Bitmap} & $kFileSec_ACL;
             }
         }
 
@@ -1641,7 +1641,7 @@ sub setxattr { # {{{1
             }
             elsif ($flags & XATTR_REPLACE) {
                 return -ENODATA()
-                        unless $rc == $kFPItemNotFound;
+                        if $rc != $kFPItemNotFound;
             }
         }
         my $rc = $self->{afpconn}->FPAddComment(
@@ -1762,7 +1762,7 @@ sub setxattr { # {{{1
 
             return 0;
         }
-        return -EOPNOTSUPP() unless $self->{volAttrs} & $kSupportsExtAttrs;
+        return -EOPNOTSUPP() if not $self->{volAttrs} & $kSupportsExtAttrs;
 
         if (defined $self->{client_uuid}) {
             my $rc = $self->{afpconn}->FPAccess(
@@ -1879,7 +1879,7 @@ sub getxattr { # {{{1
             return -EPERM()   if $rc == $kFPAccessDenied;
             return -ENOENT()  if $rc == $kFPObjectNotFound;
             return -EBADF()   if $rc != $kFPNoErr;
-            return "\0" x 32 unless exists $resp->{FinderInfo};
+            return "\0" x 32 if not exists $resp->{FinderInfo};
             my $finfo = $resp->{FinderInfo};
             $finfo .= "\0" x (32 - length $finfo);
             return $resp->{FinderInfo};
@@ -1916,13 +1916,13 @@ sub getxattr { # {{{1
                     Offset      => 0,
                     ReqCount    => $rforklen);
             return -EACCES() if $rc == $kFPAccessDenied;
-            return -EINVAL() unless $rc == $kFPNoErr or $rc == $kFPEOFErr;
+            return -EINVAL() if $rc != $kFPNoErr and $rc != $kFPEOFErr;
 
             $self->{afpconn}->FPCloseFork($resp{OForkRefNum});
 
             return $readtext;
         }
-        return -EOPNOTSUPP() unless $self->{volAttrs} & $kSupportsExtAttrs;
+        return -EOPNOTSUPP() if not $self->{volAttrs} & $kSupportsExtAttrs;
 
         if (defined $self->{client_uuid}) {
             my $rc = $self->{afpconn}->FPAccess(
@@ -1974,7 +1974,7 @@ sub listxattr { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -EOPNOTSUPP() unless $self->{volAttrs} & $kSupportsExtAttrs;
+    return -EOPNOTSUPP() if not $self->{volAttrs} & $kSupportsExtAttrs;
     $file = $self->{local_encode}->decode($file);
     my $filename = translate_path($file, $self);
 
@@ -2182,7 +2182,7 @@ sub removexattr { # {{{1
 
             return 0;
         }
-        return -EOPNOTSUPP() unless $self->{volAttrs} & $kSupportsExtAttrs;
+        return -EOPNOTSUPP() if not $self->{volAttrs} & $kSupportsExtAttrs;
         if (defined $self->{client_uuid}) {
             my $rc = $self->{afpconn}->FPAccess(
                     VolumeID    => $self->{volID},
@@ -2502,7 +2502,7 @@ sub fgetattr { # {{{1
     my $resp;
     my $rc = $self->{afpconn}->FPGetForkParms($fh, $bitmap, \$resp);
 
-    return -EBADF() unless $rc == $kFPNoErr;
+    return -EBADF() if $rc != $kFPNoErr;
 
     # Was going to go ahead and add support for directories, but with an
     # open filehandle, that really makes no sense here at all.
@@ -2520,7 +2520,7 @@ sub fgetattr { # {{{1
             Pathname    => $resp->{$self->{pathkey}},
             FileBitmap  => $bitmap);
 
-    return -EBADF() unless $rc == $kFPNoErr;
+    return -EBADF() if $rc != $kFPNoErr;
 
     # assemble stat record {{{2
     my $uid = exists($sresp->{UnixUID}) ? $sresp->{UnixUID} : 0;
