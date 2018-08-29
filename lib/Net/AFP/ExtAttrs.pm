@@ -1,5 +1,7 @@
 package Net::AFP::ExtAttrs;
 
+use strict;
+use warnings;
 use Exporter qw(import);
 use Readonly;
 

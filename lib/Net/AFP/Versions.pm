@@ -4,15 +4,19 @@
 # on the protocol version agreed upon).
 package Net::AFP::Versions;
 
+use strict;
+use warnings;
+
 use Net::AFP::TokenTypes;
 
 use Exporter qw(import);
 use Readonly;
+use Carp;
 
 our @EXPORT = qw($kFPVerNewerThan $kFPVerAtLeast $kFPVerEqual
                  $kFPVerNoNowerThan $kFPVerOlderThan);
 
-our @versions = (
+my @versions = (
     {
         'VersionString' => 'AFP3.3',
         'MajorNumber'   => 3,
@@ -78,7 +82,7 @@ our @versions = (
     },
 );
 
-our %versionmap = map { $$_{'VersionString'}, $_ } @versions;
+my %versionmap = map { $_->{'VersionString'} => $_ } @versions;
 
 Readonly our $kFPVerNewerThan   => 0;
 Readonly our $kFPVerAtLeast     => 1;
@@ -89,7 +93,7 @@ Readonly our $kFPVerOlderThan   => 4;
 sub CompareByString {
     my($session, $verstring, $cmptype) = @_;
 
-    return undef unless exists $versionmap{$verstring};
+    return unless exists $versionmap{$verstring};
     my($major, $minor) = @{$versionmap{$verstring}}{'MajorNumber', 'MinorNumber'};
     return CompareByVersionNum($session, $major, $minor, $cmptype);
 }
@@ -97,32 +101,36 @@ sub CompareByString {
 sub CompareByVersionNum {
     my ($session, $major, $minor, $cmptype) = @_;
 
-    my $ver_str = ref($session) ? $$session{'AFPVersion'} : $session;
+    my $ver_str = ref($session) ? $session->{AFPVersion} : $session;
     my $running_ver = $versionmap{$ver_str};
-    my($r_major, $r_minor) = @$running_ver{'MajorNumber', 'MinorNumber'};
+    my($r_major, $r_minor) = @{$running_ver}{'MajorNumber', 'MinorNumber'};
 
     if ($cmptype == $kFPVerNewerThan) {
         return(1) if $r_major > $major;
         return(1) if $r_major == $major && $r_minor > $minor;
         return 0;
-    } elsif ($cmptype == $kFPVerAtLeast) {
+    }
+    if ($cmptype == $kFPVerAtLeast) {
         return(1) if $r_major > $major;
         return(1) if $r_major == $major && $r_minor >= $minor;
         return 0;
-    } elsif ($cmptype == $kFPVerEqual) {
+    }
+    if ($cmptype == $kFPVerEqual) {
         return(1) if $r_major == $major && $r_minor == $minor;
         return 0;
-    } elsif ($cmptype == $kFPVerNoNewerThan) {
+    }
+    if ($cmptype == $kFPVerNoNewerThan) {
         return(0) if $r_major > $major;
         return(0) if $r_major == $major && $r_minor > $minor;
         return 1;
-    } elsif ($cmptype == $kFPVerOlderThan) {
+    }
+    if ($cmptype == $kFPVerOlderThan) {
         return(0) if $r_major > $major;
         return(0) if $r_major == $major && $r_minor >= $minor;
         return 1;
     }
 
-    die("Invalid comparison type given");
+    croak("Invalid comparison type given");
 }
 
 sub GetPreferredVersion {
@@ -130,16 +138,16 @@ sub GetPreferredVersion {
 
     my $best_version;
 
-    foreach my $ver (@$ver_list) {
+    foreach my $ver (@{$ver_list}) {
         if (exists $versionmap{$ver}) {
-            next unless $versionmap{$ver}{'Supported'};
-            next if $using_atalk and !$versionmap{$ver}{'CanDoAtalk'};
-            unless (defined $best_version) {
+            next unless $versionmap{$ver}{Supported};
+            next if $using_atalk and not $versionmap{$ver}{CanDoAtalk};
+            if (not defined $best_version) {
                 $best_version = $versionmap{$ver};
                 next;
             }
             my($b_major, $b_minor) =
-                    @$best_version{'MajorNumber', 'MinorNumber'};
+                    @{$best_version}{'MajorNumber', 'MinorNumber'};
             my($major, $minor) =
                     @{$versionmap{$ver}}{'MajorNumber', 'MinorNumber'};
 
@@ -150,10 +158,10 @@ sub GetPreferredVersion {
         }
     }
     if (defined $best_version) {
-        return $$best_version{'VersionString'};
+        return $best_version->{VersionString};
     }
 
-    return undef;
+    return;
 }
 
 1;

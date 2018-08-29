@@ -44,6 +44,13 @@ use Fcntl qw(:mode);
 
 # Find out the character encoding for the current terminal.
 my $term_enc = langinfo(CODESET);
+my $blksize  = 131_072;
+
+my $has_Term__ReadKey = 0;
+eval { require Term::ReadKey; 1; } and do {
+    Term::ReadKey->import;
+    $has_Term__ReadKey = 1;
+};
 
 my $has_Data__UUID = 0;
 eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
@@ -497,7 +504,7 @@ _EOT_
             ($rc, $data) = &{$ReadFn}($session,
                     OForkRefNum => $resp{OForkRefNum},
                     Offset      => $pos,
-                    ReqCount    => 131_072);
+                    ReqCount    => $blksize);
             print $local_fh $data;
             my $rate = 0;
             my $delta = (($time{sec} - $starttime{sec}) +
@@ -513,12 +520,19 @@ _EOT_
                     $rate /= 1_000.0;
                     $mult = q{M};
                 }
+                if ($rate > 1_000) {
+                    $rate /= 1_000.0;
+                    $mult = q{G};
+                }
             }
             my $pcnt = ($pos + length($data)) * 100 / $sresp->{$DForkLenKey};
-            if (($i % 20 == 0) || $rc != $kFPNoErr) {
-                printf(' %3d%%  |%-25s|  %-28s  %5.2f %sB/sec' . "\r", $pcnt,
-                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, 28),
-                        $rate, $mult);
+            if (($i % 100 == 0) || $rc != $kFPNoErr) {
+                my $twidth = 80; # if we can't ascertain, go with safe default
+                if ($has_Term__ReadKey) {
+                    $twidth = (GetTerminalSize())[0];
+                }
+                printf(' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
+                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult);
             }
             last if $rc != $kFPNoErr;
             $pos += length($data);
@@ -600,7 +614,7 @@ _EOT_
         my $i = 0;
         while (1) {
             my $data;
-            my $rcnt = read($srcFile, $data, 131_072);
+            my $rcnt = read($srcFile, $data, $blksize);
             last if $rcnt == 0;
             # try a direct write, and see how far we get; zero-copy is
             # preferred if possible.
@@ -628,17 +642,25 @@ _EOT_
                 $rate = $pos / $delta;
                 if ($rate > 1_000) {
                     $rate /= 1_000.0;
-                    $mult = 'K';
+                    $mult = q{K};
                 }
                 if ($rate > 1_000) {
                     $rate /= 1_000.0;
-                    $mult = 'M';
+                    $mult = q{M};
+                }
+                if ($rate > 1_000) {
+                    $rate /= 1_000.0;
+                    $mult = q{G};
                 }
             }
             my $pcnt = ($pos + length($data)) * 100 / $fileLen;
-            if (($i % 20 == 0) || $rc != $kFPNoErr) {
-                printf(' %3d%%  |%-25s|  %-.28s  %5.2f %sB/sec' . "\r", $pcnt,
-                        q{*} x ($pcnt * 25 / 100), $fileName, $rate, $mult);
+            if (($i % 100 == 0) || $rc != $kFPNoErr || $pcnt == 100) {
+                my $twidth = 80; # if we can't ascertain, go with safe default
+                if ($has_Term__ReadKey) {
+                    $twidth = (GetTerminalSize())[0];
+                }
+                printf(' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
+                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult);
             }
             last if $rc != $kFPNoErr;
             $pos += $rcnt;
@@ -757,15 +779,17 @@ NEXT_EXPANDED:
         foreach my $fname (@words[1..$#words]) {
             my ($dirId, $fileName) = resolve_path($session, $volID, $curdirnode,
                     $fname);
-            my $resp = undef;
             if (not defined $DT_ID) {
                 next;
             }
-            my $rc = $session->FPGetComment($DT_ID, $dirId, $pathType,
-                    $fileName, \$resp);
+            my($rc, $resp) = $session->FPGetComment(
+                    DTRefNum => $DT_ID,
+                    DirectoryID => $dirId,
+                    PathType => $pathType,
+                    Pathname => $fileName);
             if ($rc != $kFPNoErr) {
                 print "Sorry, file/directory was not found\n";
-                return;
+                return 1;
             }
             print "Comment for \"", $fname, "\":\n", $resp, "\n";
         }
@@ -856,16 +880,60 @@ local $SIG{INT} = sub {
     exit(0);
 };
 
-#$attribs->{completion_function} = sub {
-#    my ($text, $line, $start) = @_;
-#    my $list = expand_globbed_path($session, $volID, $curdirnode, $text . '*');
-#    my @reallist = map { my $rv = $_->[1] ne '' ? $_->[1] : $_->[2]; $rv =~ s{ }{\\ }; $rv; } @{$list};
-#    #print "list contents:\n", Dumper(\@reallist);
-#    return @reallist;
-#};
+# Tab completion nonsense, or at least my still-early attempts at it.
+if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
+    Term::ReadLine::ReadLine() eq 'Term::ReadLine::Gnu') {
+    $attribs->{completion_function} = sub {
+        my ($text, $line, $start) = @_;
+        if ($start == 0) {
+            # try to expand commands
+            my @matches = grep(/^$text/, keys %commands);
+            return @matches;
+        }
+        my $list = expand_globbed_path($session, $volID, $curdirnode, $text . '*');
+        my @reallist = map { my $rv = $_->[1] ne '' ? $_->[1] : $_->[2] . '/'; $rv =~ s{ }{\\ }g; $rv; } @{$list};
+        my $prefix = '';
+        if ($text =~ m{^(.+/)}) {
+            $prefix = $1;
+        }
+        if (scalar(@reallist) == 1 && $reallist[0] =~ m{/$}) {
+            if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
+                $attribs->{'completion_append_character'} = '';
+            }
+            else {
+                $readline::rl_completer_terminator_character = '';
+            }
+        } else {
+            if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
+                $attribs->{'completion_append_character'} = ' ';
+            }
+            else {
+                $readline::rl_completer_terminator_character = ' ';
+            }
+        }
+        return map { $prefix . $_ } @reallist;
+    };
+}
+else {
+    print STDERR "WARNING: ReadLine implementation doesn't support tab expands\n";
+}
 
 while (1) {
-    my $line = $term->readline('afpclient$ ');
+    my @nameParts;
+    my $searchID = $curdirnode;
+    while ($searchID != $topDirID) {
+        my $dirbits = $kFPParentDirIDBit | $pathFlag;
+        my($rc, $entry) = $session->FPGetFileDirParms(
+                VolumeID        => $volID,
+                DirectoryID     => $searchID,
+                DirectoryBitmap => $dirbits,
+                PathType        => $pathType,
+                Pathname        => q{});
+        push(@nameParts, $entry->{$pathkey});
+        $searchID = $entry->{ParentDirID};
+    }
+
+    my $line = $term->readline('afpclient ' . (exists $values{username} ? $values{username} . '@' : '') . $values{host} . ':' . $values{volume} . '/' . join(q{/}, reverse(@nameParts)) . '> ');
     if (!defined($line)) {
         print "\n";
         last;

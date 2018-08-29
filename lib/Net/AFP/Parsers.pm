@@ -22,9 +22,9 @@ use Log::Log4perl qw(:easy);
 use Exporter qw(import);
 
 our @EXPORT = qw(globalTimeOffset long_convert long_unconvert ll_convert
-                 ll_unconvert uuid_unpack uuid_pack _ParseVolParms
-                 _ParseSrvrInfo _ParseFileDirParms _ParseFileParms
-                 _ParseDirParms);
+                 ll_unconvert uuid_unpack uuid_pack ParseVolParms
+                 ParseSrvrInfo ParseFileDirParms ParseFileParms
+                 ParseDirParms);
 
 my $has_Socket6 = 0;
 eval {
@@ -36,7 +36,7 @@ eval {
 };
 
 # This is zero time for AFP - 1 Jan 2000 00:00 GMT.
-sub globalTimeOffset { return 946684800; }
+sub globalTimeOffset { return 946_684_800; }
 
 sub ll_convert { # {{{1
     my($number) = @_;
@@ -60,9 +60,9 @@ sub ll_unconvert { # {{{1
 
     my $number;
 
-    if ($hi & 0x80000000) {
-        $hi = ~$hi & 0xFFFFFFFF;
-        $lo = ~$lo & 0xFFFFFFFF;
+    if ($hi & 0x80_000_000) {
+        $hi = ~$hi & 0xFF_FFF_FFF;
+        $lo = ~$lo & 0xFF_FFF_FFF;
         $number = -(($hi * (2 ** 32)) + $lo + 1);
     } else {
         $number = ($hi * (2 ** 32)) + $lo;
@@ -74,14 +74,14 @@ sub ll_unconvert { # {{{1
 sub uuid_unpack { # {{{1
     my($uuid_bin) = @_;
     my @parts = unpack('H[8]H[4]H[4]H[4]H[12]', $uuid_bin);
-    my $uuid = join('-', @parts);
+    my $uuid = join(q{-}, @parts);
     $uuid =~ tr/A-Z/a-z/;
     return $uuid;
 } # }}}1
 
 sub uuid_pack { # {{{1
     my($uuid) = @_;
-    $uuid = join('', split(/-/, $uuid));
+    $uuid = join(q{}, split(m{-}s, $uuid));
     my $uuid_bin = pack('H32', $uuid);
     return $uuid_bin;
 } # }}}1
@@ -93,7 +93,7 @@ sub uuid_pack { # {{{1
 
 # FPGetVolParms and FPOpenVol will both need this to parse volume
 # parameter info from the server.
-sub _ParseVolParms { # {{{1
+sub ParseVolParms { # {{{1
     my ($data, $obj) = @_;
     DEBUG('called ', (caller(0))[3]);
 
@@ -181,7 +181,7 @@ sub _ParseVolParms { # {{{1
 
 # The inheriting classes will need this to parse the response to the
 # FPGetSrvrInfo call.
-sub _ParseSrvrInfo { # {{{1
+sub ParseSrvrInfo { # {{{1
     my ($data) = @_;
     DEBUG('called ', (caller(0))[3]);
 
@@ -233,19 +233,19 @@ static char *volicon_xpm[] = {
 "_ c #ffffff",
 "X c #000000",
 _EOT_
-        my @data = map { [ split('', $_) ] }
+        my @data = map { [ split m{}s ] }
                 unpack('x[' . $icon_off . '](B[32])[32]', $data);
-        my @mask = map { [ split('', $_) ] }
+        my @mask = map { [ split m{}s ] }
                 unpack('x[' . ($icon_off + 128) . '](B[32])[32]', $data);
         my @xpm_rows = ();
 
         for my $i (0 .. 31) {
             my $line;
-            $line = '"';
+            $line = q{"};
             for my $j (0 .. 31) {
-                $line .= ($mask[$i][$j] ? ($data[$i][$j] ? 'X' : '_') : ' ');
+                $line .= ($mask[$i][$j] ? ($data[$i][$j] ? q{X} : q{_}) : q{ });
             }
-            $line .= '"';
+            $line .= q{"};
             push(@xpm_rows, $line);
         }
         $icon_text .= join(",\n", @xpm_rows) . "};\n";
@@ -273,21 +273,21 @@ _EOT_
                 $addrEnt->{family}  = AF_INET;
                 $addrEnt->{address} = inet_ntoa($packed);
             }
-            elsif ($entryType == 2) { # Packed IP address + port
+            if ($entryType == 2) { # Packed IP address + port
                 my($addr, $port) = unpack('a[4]S>', $packed);
                 $addrEnt->{family}  = AF_INET;
                 $addrEnt->{address} = inet_ntoa($addr);
                 $addrEnt->{port}    = $port;
             }
-            elsif ($entryType == 3) { # Packed DDP (AppleTalk) address
+            if ($entryType == 3) { # Packed DDP (AppleTalk) address
                 $addrEnt->{family}  = AF_APPLETALK;
                 $addrEnt->{address} = sprintf('%u.%u', unpack('S>Cx', $packed));
                 $addrEnt->{port}    = sprintf('%u', unpack('x[3]C', $packed));
             }
-            elsif ($entryType == 4) { # Just the DNS name
+            if ($entryType == 4) { # Just the DNS name
                 $addrEnt->{hostname} = $packed;
             }
-            elsif ($entryType == 5) { # IPv4 using SSH tunnel
+            if ($entryType == 5) { # IPv4 using SSH tunnel
                 # Apple's docs say this is a packed IP and port; the netatalk
                 # docs, however, indicate this is a string containing an FQDN
                 # hostname. Wouldn't be the first time Apple's docs lied.
@@ -296,21 +296,21 @@ _EOT_
                 $addrEnt->{hostname}   = $packed;
                 $addrEnt->{ssh_tunnel} = 1;
             }
-            elsif ($entryType == 6) { # Packed IPv6 address
+            if ($entryType == 6) { # Packed IPv6 address
                 next unless $has_Socket6;
-                $addrEnt->{family}  = &Socket6::AF_INET6();
-                $addrEnt->{address} = Socket6::inet_ntop(&Socket6::AF_INET6(),
+                $addrEnt->{family}  = Socket6::AF_INET6();
+                $addrEnt->{address} = Socket6::inet_ntop(Socket6::AF_INET6(),
                         $packed);
             }
-            elsif ($entryType == 7) { # Packed IPv6 address + port
+            if ($entryType == 7) { # Packed IPv6 address + port
                 next unless $has_Socket6;
                 my($addr, $port) = unpack('a[16]S>', $packed);
-                $addrEnt->{family}  = &Socket6::AF_INET6();
-                $addrEnt->{address} = Socket6::inet_ntop(&Socket6::AF_INET6(),
+                $addrEnt->{family}  = Socket6::AF_INET6();
+                $addrEnt->{address} = Socket6::inet_ntop(Socket6::AF_INET6(),
                         $addr);
                 $addrEnt->{port}    = $port;
             }
-            else {
+            if ($entryType < 1 || $entryType > 7) { # unknown value?
                 INFO('unknown address type ', $entryType, ', skipping');
                 next;
             }
@@ -326,7 +326,7 @@ _EOT_
     return $resp;
 } # }}}1
 
-sub _ParseFileDirParms { # {{{1
+sub ParseFileDirParms { # {{{1
     my ($data) = @_;
     DEBUG('called ', (caller(0))[3]);
 
@@ -334,14 +334,14 @@ sub _ParseFileDirParms { # {{{1
             unpack('S>S>Cxa*', $data);
 
     if ($IsFileDir & 0x80) { # This is a directory
-        return _ParseDirParms($DirectoryBitmap, $ReqParams);
+        return ParseDirParms($DirectoryBitmap, $ReqParams);
     }
     else { # This is a file
-        return _ParseFileParms($FileBitmap, $ReqParams);
+        return ParseFileParms($FileBitmap, $ReqParams);
     }
 } # }}}1
 
-sub _ParseFileParms { # {{{1
+sub ParseFileParms { # {{{1
     my ($Bitmap, $data) = @_;
     DEBUG('called ', (caller(0))[3]);
     my $resp = {};
@@ -427,7 +427,7 @@ sub _ParseFileParms { # {{{1
     return $resp;
 } # }}}1
 
-sub _ParseDirParms { # {{{1
+sub ParseDirParms { # {{{1
     my ($Bitmap, $data) = @_;
     DEBUG('called ', (caller(0))[3]);
     my $resp = {};

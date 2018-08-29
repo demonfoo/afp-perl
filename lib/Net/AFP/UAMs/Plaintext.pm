@@ -2,13 +2,14 @@
 # Cleartxt Passwrd) UAM for the AFP protocol.
 
 package Net::AFP::UAMs::Plaintext;
-use Readonly;
-Readonly my $UAMNAME => 'Cleartxt Passwrd';
-
-use Net::AFP::Versions;
-use Net::AFP::Result;
 use strict;
 use warnings;
+
+use Readonly;
+Readonly my $UAMNAME => 'Cleartxt Passwrd';
+use Net::AFP::Versions;
+use Net::AFP::Result;
+use Carp;
 
 Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 0);
 
@@ -16,13 +17,13 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    die("Object MUST be of type Net::AFP!")
+    croak("Object MUST be of type Net::AFP!")
             unless ref($session) and $session->isa('Net::AFP');
     
-    die('Password callback MUST be a subroutine ref')
+    croak('Password callback MUST be a subroutine ref')
             unless ref($pw_cb) eq 'CODE';
 
-    my $pw_data = pack('a8', &$pw_cb());
+    my $pw_data = pack('a8', &{$pw_cb}());
     my $rc;
     
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
@@ -49,12 +50,12 @@ sub ChangePassword {
     my ($session, $username, $oldPassword, $newPassword) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    die('Object MUST be of type Net::AFP!')
+    croak('Object MUST be of type Net::AFP!')
             unless ref($session) and $session->isa('Net::AFP');
 
     if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
             $kFPVerAtLeast)) {
-        $username = '';
+        $username = q{};
     }
     return $session->FPChangePassword($UAMNAME, $username,
             pack('a8', $newPassword));

@@ -1,5 +1,7 @@
 package Net::AFP::Result;
 
+use strict;
+use warnings;
 use Exporter qw(import);
 use Readonly;
 
@@ -69,7 +71,7 @@ Readonly our $kFPPwdNeedsChangeErr  => -5045;   # AFP 2.2
 Readonly our $kFPPwdPolicyErr       => -5046;   # AFP 3.0
 Readonly our $kFPDiskQuotaExceeded  => -5047;   # AFP 3.1
 
-our %errorcodes = (
+my %errorcodes = (
     $kFPNoErr               => 'No error occurred',
     -1066                   => 'Incorrect ASP version number',
     -1067                   => 'ASP transport buffer was too small',

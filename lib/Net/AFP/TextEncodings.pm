@@ -1,5 +1,7 @@
 package Net::AFP::TextEncodings;
 
+use strict;
+use warnings;
 use Readonly;
 
 Readonly our $kTextEncodingMacRoman             => 0;
