@@ -75,7 +75,7 @@ sub do_afp_connect {
         $values{$_} = uri_unescape($values{$_});
     }
 
-    if (not defined $values{'host'}) {
+    if (not defined $values{host}) {
         print STDERR "Could not extract host from AFP URL\n";
         exit(EINVAL());
     }
@@ -88,7 +88,7 @@ sub do_afp_connect {
         my @records = NBPLookup($values{host}, q{AFPServer}, $values{port},
                 undef, 1);
         croak('Could not resolve NBP name ' . $values{host} .
-		q{:AFPServer@} . ($values{'port'} ? $values{port} : q{*}))
+		q{:AFPServer@} . ($values{port} ? $values{port} : q{*}))
                 unless scalar(@records);
         ($host, $port) = @{$records[0]}[0,1];
 
@@ -98,7 +98,7 @@ sub do_afp_connect {
         $rc = Net::AFP::TCP->GetStatus(@values{'host', 'port'}, \$srvInfo);
     }
     if ($rc != $kFPNoErr) {
-        print STDERR "Could not issue GetStatus on ", $values{'host'}, "\n";
+        print STDERR "Could not issue GetStatus on ", $values{host}, "\n";
         return ENODEV();
     }
 
@@ -129,9 +129,9 @@ sub do_afp_connect {
 TRY_AFS:
     foreach my $af (@af_order) {
         my @sa_list;
-        foreach (@{$srvInfo->{'NetworkAddresses'}}) {
-            next unless exists $_->{'family'};
-            if ($_->{'family'} == $af) {
+        foreach (@{$srvInfo->{NetworkAddresses}}) {
+            next unless exists $_->{family};
+            if ($_->{family} == $af) {
                 push(@sa_list, $_)
             }
         }
@@ -143,12 +143,12 @@ TRY_SOCKADDRS:
                     carp('AF_APPLETALK endpoint selected, but atalk support not available');
                     next TRY_SOCKADDRS;
                 }
-                $session = Net::AFP::Atalk->new($sa->{'address'}, $sa->{'port'});
+                $session = Net::AFP::Atalk->new($sa->{address}, $sa->{port});
                 $using_atalk = 1;
             }
             else {
-                $session = Net::AFP::TCP->new($sa->{'address'},
-						$sa->{'port'} || 548);
+                $session = Net::AFP::TCP->new($sa->{address},
+						$sa->{port} || 548);
                 $using_atalk = 0;
             }
 
@@ -161,7 +161,7 @@ TRY_SOCKADDRS:
         return ENODEV();
     }
 
-    my $cv = Net::AFP::Versions::GetPreferredVersion(${$srvInfo}{AFPVersions},
+    my $cv = Net::AFP::Versions::GetPreferredVersion($srvInfo->{AFPVersions},
             $using_atalk);
     if (not $cv) {
         print STDERR "Couldn't agree on an AFP protocol version with the " .
