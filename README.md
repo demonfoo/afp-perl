@@ -59,6 +59,7 @@ This module requires or encourages use of these other modules and libraries:
   Term::ReadLine::Perl5 is recommended
 * PerlIO::buffersize is recommended
 * URI::Escape is required
+* Class::InsideOut is required
 
 
 #### FREQUENTLY ASKED QUESTIONS
