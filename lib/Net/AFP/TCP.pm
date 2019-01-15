@@ -34,14 +34,15 @@ sub new { # {{{1
     $logger->debug('called ', (caller(0))[3]);
     my $obj = $class->SUPER::new($host, $port);
 
-    $obj->{'Session'} = Net::DSI->new($host, $port);
-    my($rc, %opts) = $obj->{'Session'}->OpenSession();
-    if (exists $opts{'ServerReplayCacheSize'}) {
-        $obj->{'ReplayCacheSize'} = $opts{'ServerReplayCacheSize'};
-        $obj->{'ReplayCache'} = [];
+    $obj->{Session} = Net::DSI->new($host, $port);
+    my($rc, %opts) = $obj->{Session}->OpenSession();
+    $obj->{RequestQuanta} = $opts{RequestQuanta};
+    if (exists $opts{ServerReplayCacheSize}) {
+        $obj->{ReplayCacheSize} = $opts{ServerReplayCacheSize};
+        $obj->{ReplayCache} = [];
     }
     if ($rc != $kFPNoErr) {
-        $obj->{'Session'}->close();
+        $obj->{Session}->close();
         return $rc;
     }
     return $obj;
@@ -52,8 +53,8 @@ sub close { # {{{1
     my $logger = get_logger('status');
     $logger->debug('called ', (caller(0))[3]);
 
-    $self->{'Session'}->CloseSession();
-    $self->{'Session'}->close();
+    $self->{Session}->CloseSession();
+    $self->{Session}->close();
     return;
 } # }}}1
 
@@ -71,8 +72,8 @@ sub CheckAttnQueue { # {{{1
             if ($msg & 0x2_000) { # server also has a message for us
                 my $MsgData;
                 $self->FPGetSrvrMsg(1, 3, \$MsgData);
-                if ($MsgData->{'ServerMessage'} ne q{}) {
-                    $logger->info(q{Shut down message: "}, $MsgData->{'ServerMessage'}, q{"});
+                if ($MsgData->{ServerMessage} ne q{}) {
+                    $logger->info(q{Shut down message: "}, $MsgData->{ServerMessage}, q{"});
                 }
             }
         }
@@ -90,8 +91,8 @@ sub CheckAttnQueue { # {{{1
             else { # server message
                 my $MsgData;
                 $self->FPGetSrvrMsg(1, 3, \$MsgData);
-                if ($MsgData->{'ServerMessage'} ne q{}) {
-                    $logger->info(q{Server message: "}, $MsgData->{'ServerMessage'}, q{"});
+                if ($MsgData->{ServerMessage} ne q{}) {
+                    $logger->info(q{Server message: "}, $MsgData->{ServerMessage}, q{"});
                 }
             }
         }
@@ -107,14 +108,14 @@ sub SendAFPMessage { # {{{1
     my $logger = get_logger('status');
     $logger->debug('called ', (caller(0))[3]);
     $self->CheckAttnQueue();
-    if ($can_cache && exists $self->{'ReplayCache'}) {
+    if ($can_cache && exists $self->{ReplayCache}) {
         do {
-            shift(@{$self->{'ReplayCache'}});
-        } while ((scalar(@{$self->{'ReplayCache'}}) + 1) >=
-                $self->{'ReplayCacheSize'});
-        push(@{$self->{'ReplayCache'}}, $payload);
+            shift(@{$self->{ReplayCache}});
+        } while ((scalar(@{$self->{ReplayCache}}) + 1) >=
+                $self->{ReplayCacheSize});
+        push(@{$self->{ReplayCache}}, $payload);
     }
-    return $self->{'Session'}->Command($payload, $resp_r);
+    return $self->{Session}->Command($payload, $resp_r);
 } # }}}1
 
 # This is a virtual method which is not for public consumption. Only
@@ -125,7 +126,7 @@ sub SendAFPWrite { # {{{1
     my $logger = get_logger('status');
     $logger->debug('called ', (caller(0))[3]);
     $self->CheckAttnQueue();
-    return $self->{'Session'}->Write($payload, $data_r, $d_len, $resp_r);
+    return $self->{Session}->Write($payload, $data_r, $d_len, $resp_r);
 } # }}}1
 
 sub GetStatus { # {{{1
