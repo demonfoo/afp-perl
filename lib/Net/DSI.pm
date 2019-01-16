@@ -199,8 +199,8 @@ MAINLOOP:
                     $rsz = 0;
                     while ($rsz < $length) {
                         $rsz += sysread($conn, $data, $length - $rsz, $rsz);
-                        $last_pkt_rcvd = gettimeofday();
                     }
+                    $last_pkt_rcvd = gettimeofday();
                     $shared->{conn_sem}->up();
                     ($userBytes) = unpack('n', $data);
                     # Queue the notification for later processing
@@ -247,8 +247,8 @@ MAINLOOP:
             while ($real_length < $length) {
                 $real_length += sysread($conn, ${$rb_ref},
                         $length - $real_length, $real_length);
-                $last_pkt_rcvd = gettimeofday();
             }
+            $last_pkt_rcvd = gettimeofday();
             $shared->{conn_sem}->up();
 
             ${$sem_ref}->up() if defined $sem_ref;

@@ -42,7 +42,7 @@ This module requires or encourages use of these other modules and libraries:
 * Log::Log4perl is used for some message logging
 * Log::Dispatch::Syslog is used for routing log messages to syslog
 * Fuse::Class is used as the superclass for Fuse::AFP
-* Fuse is depended upon by Fuse::Class, need version 0.10_1 or later
+* Fuse is depended upon by Fuse::Class, need version 0.10\_1 or later
 * Data::UUID is recommended, used internally for access checking
 * Crypt::CBC is recommended, needed for advanced UAMs
 * Crypt::CAST5 or Crypt::CAST5\_PP is recommended, needed for DHX UAMs
@@ -51,6 +51,15 @@ This module requires or encourages use of these other modules and libraries:
 * IO::Socket::INET6 is suggested, adds v6 socket support
 * Net::Atalk is suggested, adds AppleTalk socket support
 * Net::Bonjour is suggested, adds mDNS/Bonjour service discovery
+* Bytes::Random::Secure is required for most UAMs (if you like secure UAMs)
+* Term::ReadPassword is recommended
+* Readonly is required
+* Params::Validate is required
+* Term::Readline is required for *afpclient.pl*; Term::ReadLine::Gnu or
+  Term::ReadLine::Perl5 is recommended
+* PerlIO::buffersize is recommended
+* URI::Escape is required
+* Class::InsideOut is required
 
 
 #### FREQUENTLY ASKED QUESTIONS
