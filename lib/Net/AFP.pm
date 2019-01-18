@@ -268,7 +268,7 @@ sub FPAccess { # {{{1
         Bitmap      => { type => SCALAR, default => 0 },
         UUID        => {
             type    => SCALAR,
-            regex   => qr{\A[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\z}is,
+            regex   => qr{\A[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}\z}is,
         },
         ReqAccess   => {
             type        => SCALAR,
