@@ -882,7 +882,7 @@ local $SIG{INT} = sub {
 
 # Tab completion nonsense, or at least my still-early attempts at it.
 if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
-    Term::ReadLine::ReadLine() eq 'Term::ReadLine::Gnu') {
+    Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
     $attribs->{completion_function} = sub {
         my ($text, $line, $start) = @_;
         if ($start == 0) {
