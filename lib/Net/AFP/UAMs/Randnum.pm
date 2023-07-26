@@ -7,8 +7,7 @@
 
 package Net::AFP::UAMs::Randnum;
 
-use strict;
-use warnings;
+use Modern::Perl '2021';
 use diagnostics;
 use integer;
 use Carp;

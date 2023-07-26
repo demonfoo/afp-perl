@@ -6,8 +6,7 @@
 
 package Net::AFP::UAMs::Randnum2;
 
-use strict;
-use warnings;
+use Modern::Perl '2021';
 use diagnostics;
 use integer;
 use Carp;
@@ -17,7 +16,6 @@ use Readonly;
 Readonly my $UAMNAME => '2-Way Randnum exchange';
 
 use Crypt::DES;
-use Crypt::CBC;
 use Net::AFP::Result;
 use Net::AFP::Versions;
 use Log::Log4perl qw(:easy);
