@@ -86,14 +86,14 @@ field specifying the length of the UTF-8 encoded name that follows.
 =head2 File Sharing Modes
 
 AFP controls user access to shared files in two ways. The first, described
-in L</“AFP File Server Security”>, provides security by controlling user
+in L</"AFP File Server Security">, provides security by controlling user
 access to specific directories. The second, described in this section,
-preserves data integrity by controlling a user’s access to a file while it
+preserves data integrity by controlling a user's access to a file while it
 is being used by another user.
 
 To control simultaneous file access, the file server must enforce
 synchronization rules. These rules prevent applications from damaging each
-other’s files by modifying the same version simultaneously. These rules
+other's files by modifying the same version simultaneously. These rules
 also prevent users from obtaining access to information while it is being
 changed.
 
@@ -105,7 +105,7 @@ modes and deny modes.
 
 Most file systems use a set of permissions to regulate the opening of
 files. This set includes permission to modify the contents of a file
-(read-write) and permission to see the file’s contents (read only). In
+(read-write) and permission to see the file's contents (read only). In
 a stand-alone system, these two file-access modes are sufficient.
 
 In the shared environment of a file server, this set of permissions, or
@@ -122,13 +122,13 @@ open the file with the requested access mode. A result code of
 L<Net::AFP::Result/kFPAccessDenied> is returned.
 
 * The fork is already open with a deny mode that prohibits the second
-user’s requested access. For example, the first user opened the fork
+user's requested access. For example, the first user opened the fork
 with a deny mode of DenyWrite, and the second user tries to open the for
 in the write mode. A L<Net::AFP::Result/kFPDenyConflict> result code is
 returned to the second user.
 
 * The fork is already open with an access mode that conflicts with the
-second user’s requested deny mode. For example, the first user opened the
+second user's requested deny mode. For example, the first user opened the
 fork for Write access and a deny mode of DenyNone. The second user tries
 to open the fork with a deny mode indicating DenyWrite. This request is
 not granted because the fork is already open for Write access. A
@@ -138,7 +138,7 @@ user.
 Deny modes are cumulative in that each successful opening of a fork
 combines its deny mode with previous deny modes. Therefore, if the first
 user opening a file specifies a deny mode of DenyRead, and the second
-user specifies DenyWrite, the fork’s current deny mode is
+user specifies DenyWrite, the fork's current deny mode is
 DenyRead-Write. DenyNone and DenyRead combine to form a current deny mode
 of DenyRead.
 
