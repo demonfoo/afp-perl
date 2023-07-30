@@ -11,8 +11,7 @@
 
 package Net::AFP::UAMs::DHX2;
 
-use strict;
-use warnings;
+use Modern::Perl '2021';
 use diagnostics;
 use integer;
 use Carp;
@@ -23,6 +22,9 @@ Readonly my $UAMNAME => 'DHX2';
 
 Readonly my $C2SIV => 'LWallace';
 Readonly my $S2CIV => 'CJalbert';
+
+Readonly my $nonce_len => 16;
+Readonly my $pw_len => 256;
 
 # Provides the encryption algorithm.
 my $has_Crypt__CAST5_PP = 0;
@@ -52,13 +54,13 @@ use Net::AFP::Result;
 # Provides large-integer mathematics features, necessary for the
 # cryptographic exchanges and derivation of the key.
 use Math::BigInt lib => 'GMP';
-#use Digest::MD5 qw(md5);
+use Digest::MD5 qw(md5);
 use Net::AFP::Versions;
 use Log::Log4perl qw(:easy);
 
 Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 200);
 
-sub zeropad { return('0' x ($_[1] - length($_[0])) . $_[0]); }
+sub zeropad { return("\0" x ($_[1] - length($_[0])) . $_[0]); }
 
 # Variables used by the DHX2 UAM
 # +-------------+-------------------------------------------------------------+
@@ -146,13 +148,14 @@ sub zeropad { return('0' x ($_[1] - length($_[0])) . $_[0]); }
 # +---------+-----------------+----------------------------------------------+
 sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
+    my $logger = get_logger('status');
 
     # Ensure that we've been handed an appropriate object.
     croak('Object MUST be of type Net::AFP!')
             unless ref($session) and $session->isa('Net::AFP');
 
-    my $nonce_limit = Math::BigInt->new(1);
-    $nonce_limit->blsft(128);
+    my $nonce_limit = Math::BigInt->bone();
+    $nonce_limit->blsft($nonce_len * 8);
 
     croak('Password callback MUST be a subroutine ref')
             unless ref($pw_cb) eq 'CODE';
@@ -170,12 +173,12 @@ sub Authenticate {
                 'AFPVersion'    => $AFPVersion,
                 'UAM'           => $UAMNAME,
                 'UserName'      => $username);
-        DEBUG('FPLoginExt() completed with result code ', $rc);
+        $logger->info('FPLoginExt() completed with result code ', $rc);
     }
     else {
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME,
                 pack('C/a*x![s]', $username));
-        DEBUG('FPLogin() completed with result code ', $rc);
+        $logger->info('FPLogin() completed with result code ', $rc);
     }
     return $rc unless $rc == $kFPAuthContinue;
 
@@ -189,35 +192,27 @@ sub Authenticate {
     # not a "big" number on its own.
     my $g = Math::BigInt->new($g_regular);
     undef $g_regular;
-    DEBUG('$g is ', $g->as_hex());
-    DEBUG('$len is ', $len);
+    $logger->debug('$g is ', $g->as_hex());
+    $logger->debug('$len is ', $len);
 
     # Pull p and Mb out of the data the server sent back, based on the length
     # value extracted above.
-    my $template = 'H' . ($len * 2) . 'H' . ($len * 2);
-    my ($p_text, $Mb_text) = unpack($template, $extra);
+    my $p = Math::BigInt->from_bytes(unpack('a' . $len, $extra));
+    $logger->debug('$p is ', $p->as_hex());
+    my $Mb = Math::BigInt->from_bytes(unpack('x' . $len . 'a' . $len, $extra));
     undef $extra;
-    my $p = Math::BigInt->new('0x' . $p_text);
-    undef $p_text;
-    DEBUG('$p is ', $p->as_hex());
-    my $Mb = Math::BigInt->new('0x' . $Mb_text);
-    undef $Mb_text;
-    DEBUG('$Mb is ', $Mb->as_hex());
+    $logger->debug('$Mb is ', $Mb->as_hex());
 
     # Get random bytes that constitute a large exponent for the random number
     # exchange we do.
-    my $Ra_binary = random_bytes($len);
-    my $Ra = Math::BigInt->new('0x' . unpack('H*', $Ra_binary));
-    undef $Ra_binary;
-    DEBUG('$Ra is ', $Ra->as_hex());
+    my $Ra = Math::BigInt->from_bytes(random_bytes($len));
+    $logger->debug('$Ra is ', $Ra->as_hex());
 
     # Ma = g^Ra mod p <- This gives us the "random number" that we hand to
     # the server.
     my $Ma = $g->bmodpow($Ra, $p);
     undef $g;
-    DEBUG('$Ma is ', $Ma->as_hex());
-    my $Ma_binary = pack('H*', zeropad(substr($Ma->as_hex(), 2), $len * 2));
-    undef $Ma;
+    $logger->debug('$Ma is ', $Ma->as_hex());
 
     # K = Mb^Ra mod p <- This nets us the key value that we use to encrypt
     # and decrypt ciphertext for communicating with the server.
@@ -225,38 +220,29 @@ sub Authenticate {
     undef $Mb;
     undef $Ra;
     undef $p;
-    DEBUG('$K is ', $K->as_hex());
-    my $K_binary = pack('H*', zeropad(substr($K->as_hex(), 2), $len * 2));
-    undef $K;
-    #my $K_hash = md5($K_binary);
-    #undef $K_binary;
+    $logger->debug('$K is ', $K->as_hex());
 
     # Get our nonce, which we'll send to the server in the ciphertext.
-    my $clientNonce_binary = random_bytes(16);
-    my $clientNonce = Math::BigInt->new('0x' .
-            unpack('H*', $clientNonce_binary));
-    DEBUG('$clientNonce is ', $clientNonce->as_hex());
+    my $clientNonce = Math::BigInt->from_bytes(random_bytes($nonce_len));
+    $logger->debug('$clientNonce is ', $clientNonce->as_hex());
     
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
-    my $ctx = Crypt::CBC->new({ key         => $K_binary,
+    my $ctx = Crypt::CBC->new({ key         => md5(zeropad($K->to_bytes(), $len)),
                                 cipher      => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
-                                padding     => 'null',
-                                literal_key => 0,
+                                padding     => 'none',
+                                literal_key => 1,
                                 prepend_iv  => 0,
                                 iv          => $C2SIV });
-    #undef $K_hash;
     $session->{cryptctx} = $ctx;
 
     # Encrypt the random nonce value we fetched above, then assemble the
     # message to send to the server.
-    #$ctx->set_initialization_vector($C2SIV);
-    my $ciphertext = $ctx->encrypt($clientNonce_binary);
-    undef $clientNonce_binary;
-    my $message = $Ma_binary . $ciphertext;
-    undef $Ma_binary;
+    my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len));
+    my $message = pack('a[' . $len . ']a*', zeropad($Ma->to_bytes(), $len), $ciphertext);
+    undef $Ma;
     undef $ciphertext;
-    DEBUG('$message is ', unpack('H*', $message));
+    $logger->debug('$message is ', unpack('H*', $message));
 
     # Send the message to the server containing Ma (our "public key"), and
     # the encrypted nonce value.
@@ -264,7 +250,7 @@ sub Authenticate {
     # Sending message 3.
     $rc = $session->FPLoginCont($resp{'ID'}, $message, \$sresp);
     undef $message;
-    DEBUG('FPLoginCont() completed with result code ', $rc);
+    $logger->info('FPLoginCont() completed with result code ', $rc);
     return $rc unless $rc == $kFPAuthContinue;
 
     # Decrypting message 4.
@@ -272,61 +258,56 @@ sub Authenticate {
     # incremented nonce value from us, and the server's nonce value.
     $ctx->set_initialization_vector($S2CIV);
     my $decrypted = $ctx->decrypt($sresp->{'UserAuthInfo'});
-    # HACK ALERT: seems decrypt() likes to drop the trailing null on me :|
-    # this line should pad out to the appropriate length, which should
-    # avoid this problem...
-    $decrypted .= "\0" x (32 - length($decrypted));
-    DEBUG('$decrypted is ', unpack('H*', $decrypted));
-    my ($newClientNonce_text, $serverNonce_text) = unpack('H32H32', $decrypted);
+    $logger->debug('$decrypted is ', unpack('H*', $decrypted));
 
     # Check the client nonce, and see if it really was incremented like we
     # expect it to have been.
-    my $newClientNonce = Math::BigInt->new('0x' . $newClientNonce_text);
-    undef $newClientNonce_text;
-    DEBUG('$newClientNonce is ', $newClientNonce->as_hex());
-    $clientNonce->badd(1);
+    my $newClientNonce = Math::BigInt->from_bytes(unpack('a' . $nonce_len, $decrypted));
+    $logger->debug('$newClientNonce is ', $newClientNonce->as_hex());
+    $clientNonce->binc();
     $clientNonce = $clientNonce->bmod($nonce_limit);
     croak('encryption error - nonce check failed')
-            unless $clientNonce->bcmp($newClientNonce) == 0;
+            unless $clientNonce->beq($newClientNonce);
     undef $clientNonce;
     undef $newClientNonce;
 
     # Increment the nonce value the server sent to us, to be returned as part
     # of the encrypted response.
-    my $serverNonce = Math::BigInt->new('0x' . $serverNonce_text);
-    undef $serverNonce_text;
-    DEBUG('$serverNonce is ', $serverNonce->as_hex());
-    $serverNonce->badd(1);
+    my $serverNonce = Math::BigInt->from_bytes(unpack('x' . $nonce_len . 'a' . $nonce_len,
+                                                      $decrypted));
+    undef $decrypted;
+    $logger->debug('$serverNonce is ', $serverNonce->as_hex());
+    $serverNonce->binc();
     $serverNonce = $serverNonce->bmod($nonce_limit);
-    DEBUG('$serverNonce is ', $serverNonce->as_hex(), " after increment");
-    my $newServerNonce_text = zeropad(substr($serverNonce->as_hex(), 2), 32);
-    undef $serverNonce;
+    $logger->debug('$serverNonce is ', $serverNonce->as_hex(), ' after increment');
 
     # Assemble the final message to send back to the server with the
     # incremented server nonce, and the user's password, then encrypt the
     # message.
-    my $authdata = pack('H32a256', $newServerNonce_text, &{$pw_cb}());
-    undef $newServerNonce_text;
+    my $authdata = pack('a[' . $nonce_len . ']a[' . $pw_len . ']',
+	                zeropad($serverNonce->to_bytes(), $nonce_len), &{$pw_cb}());
+    undef $serverNonce;
     $ctx->set_initialization_vector($C2SIV);
     $ciphertext = $ctx->encrypt($authdata);
-    DEBUG('$ciphertext is ', unpack('H*', $ciphertext));
+    $logger->debug('$ciphertext is ', unpack('H*', $ciphertext));
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($sresp->{'ID'}, $ciphertext);
     undef $ciphertext;
-    DEBUG('FPLoginCont() completed with result code ', $rc);
+    $logger->debug('FPLoginCont() completed with result code ', $rc);
     return $rc;
 }
 
 sub ChangePassword {
     my($session, $username, $oldPassword, $newPassword) = @_;
+    my $logger = get_logger('status');
 
     # Ensure that we've been handed an appropriate object.
     croak('Object MUST be of type Net::AFP!')
             unless ref($session) and $session->isa('Net::AFP');
 
-    my $nonce_limit = Math::BigInt->new(1);
-    $nonce_limit->blsft(128);
+    my $nonce_limit = Math::BigInt->bone();
+    $nonce_limit->blsft($nonce_len * 8);
 
     my $resp = undef;
 
@@ -335,7 +316,7 @@ sub ChangePassword {
         $username = q{};
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, undef, \$resp);
-    DEBUG('FPChangePassword() completed with result code ', $rc);
+    $logger->debug('FPChangePassword() completed with result code ', $rc);
     return $rc unless $rc == $kFPAuthContinue;
 
     # Get the value for g, and the length value for assorted things (p, Ma,
@@ -347,35 +328,27 @@ sub ChangePassword {
     # not a "big" number on its own.
     my $g = Math::BigInt->new($g_regular);
     undef $g_regular;
-    DEBUG('$g is ', $g->as_hex());
-    DEBUG('$len is ', $len);
+    $logger->debug('$g is ', $g->as_hex());
+    $logger->debug('$len is ', $len);
 
     # Pull p and Mb out of the data the server sent back, based on the length
     # value extracted above.
-    my $template = 'H' . ($len * 2) . 'H' . ($len * 2);
-    my ($p_text, $Mb_text) = unpack($template, $extra);
+    my $p = Math::BigInt->from_bytes(unpack('a' . $len, $extra));
+    $logger->debug('$p is ', $p->as_hex());
+    my $Mb = Math::BigInt->from_bytes(unpack('x' . $len . 'a' . $len, $extra));
     undef $extra;
-    my $p = Math::BigInt->new('0x' . $p_text);
-    undef $p_text;
-    DEBUG('$p is ', $p->as_hex());
-    my $Mb = Math::BigInt->new('0x' . $Mb_text);
-    undef $Mb_text;
-    DEBUG('$Mb is ', $Mb->as_hex());
+    $logger->debug('$Mb is ', $Mb->as_hex());
 
     # Get random bytes that constitute a large exponent for the random number
     # exchange we do.
-    my $Ra_binary = random_bytes($len);
-    my $Ra = Math::BigInt->new('0x' . unpack('H*', $Ra_binary));
-    undef $Ra_binary;
-    DEBUG('$Ra is ', $Ra->as_hex());
+    my $Ra = Math::BigInt->from_bytes(random_bytes($len));
+    $logger->debug('$Ra is ', $Ra->as_hex());
 
     # Ma = g^Ra mod p <- This gives us the "random number" that we hand to
     # the server.
     my $Ma = $g->bmodpow($Ra, $p);
     undef $g;
-    DEBUG('$Ma is ', $Ma->as_hex());
-    my $Ma_binary = pack('H*', zeropad(substr($Ma->as_hex(), 2), $len * 2));
-    undef $Ma;
+    $logger->debug('$Ma is ', $Ma->as_hex());
 
     # K = Mb^Ra mod p <- This nets us the key value that we use to encrypt
     # and decrypt ciphertext for communicating with the server.
@@ -383,43 +356,36 @@ sub ChangePassword {
     undef $Mb;
     undef $Ra;
     undef $p;
-    DEBUG('$K is ', $K->as_hex());
-    my $K_binary = pack('H*', zeropad(substr($K->as_hex(), 2), $len * 2));
-    undef $K;
+    $logger->debug('$K is ', $K->as_hex());
 
     # Get our nonce, which we'll send to the server in the ciphertext.
-    my $clientNonce_binary = random_bytes(16);
-    my $clientNonce = Math::BigInt->new('0x' .
-            unpack('H*', $clientNonce_binary));
-    DEBUG('$clientNonce is ', $clientNonce->as_hex());
+    my $clientNonce = Math::BigInt->from_bytes(random_bytes($nonce_len));
+    $logger->debug('$clientNonce is ', $clientNonce->as_hex());
     
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server. Note the setting of
     # literal_key to a false value, because in this method, we
     # actually want the MD5 hash of the key, not the key itself.
-    my $ctx = Crypt::CBC->new({ key         => $K_binary,
+    my $ctx = Crypt::CBC->new({ key         => md5(zeropad($K->to_bytes(), $len)),
                                 cipher      => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
-                                padding     => 'null',
-                                literal_key => 0,
+                                padding     => 'none',
+                                literal_key => 1,
                                 prepend_iv  => 0,
                                 iv          => $C2SIV });
-    undef $K_binary;
 
     # Encrypt the random nonce value we fetched above, then assemble the
     # message to send to the server.
-    #$ctx->set_initialization_vector($C2SIV);
-    my $ciphertext = $ctx->encrypt($clientNonce_binary);
-    undef $clientNonce_binary;
-    my $message = pack('na[' . $len . ']a*', $ID, $Ma_binary, $ciphertext);
-    undef $Ma_binary;
+    my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len));
+    my $message = pack('na[' . $len . ']a*', $ID, zeropad($Ma->to_bytes(), $len), $ciphertext);
+    undef $Ma;
     undef $ciphertext;
-    DEBUG('$message is ', unpack('H*', $message));
+    $logger->debug('$message is ', unpack('H*', $message));
 
     # Send the message to the server containing Ma (our "public key"), and
     # the encrypted nonce value.
     my $sresp = q{};
     $rc = $session->FPChangePassword($UAMNAME, $username, $message, \$sresp);
-    DEBUG('FPChangePassword() completed with result code ', $rc);
+    $logger->info('FPChangePassword() completed with result code ', $rc);
     return $rc unless $rc == $kFPAuthContinue;
     undef $message;
 
@@ -430,46 +396,40 @@ sub ChangePassword {
     # incremented nonce value from us, and the server's nonce value.
     $ctx->set_initialization_vector($S2CIV);
     my $decrypted = $ctx->decrypt($message);
-    # HACK ALERT: seems decrypt() likes to drop the trailing null on me :|
-    # this line should pad out to the appropriate length, which should
-    # avoid this problem...
-    $decrypted .= "\0" x (32 - length($decrypted));
     undef $message;
-    DEBUG('$decrypted is ', unpack('H*', $decrypted));
-    my ($newClientNonce_text, $serverNonce_text) = unpack('H32H32', $decrypted);
+    $logger->debug('$decrypted is ', unpack('H*', $decrypted));
 
     # Check the client nonce, and see if it really was incremented like we
     # expect it to have been.
-    my $newClientNonce = Math::BigInt->new('0x' . $newClientNonce_text);
-    undef $newClientNonce_text;
-    DEBUG('$newClientNonce is ', $newClientNonce->as_hex());
-    $clientNonce->badd(1);
+    my $newClientNonce = Math::BigInt->from_bytes(unpack('a' . $nonce_len, $decrypted));
+    $logger->debug('$newClientNonce is ', $newClientNonce->as_hex());
+    $clientNonce->binc();
     $clientNonce = $clientNonce->bmod($nonce_limit);
     croak('encryption error - nonce check failed')
-            unless $clientNonce->bcmp($newClientNonce) == 0;
+            unless $clientNonce->beq($newClientNonce);
     undef $clientNonce;
     undef $newClientNonce;
 
     # Increment the nonce value the server sent to us, to be returned as part
     # of the encrypted response.
-    my $serverNonce = Math::BigInt->new('0x' . $serverNonce_text);
-    undef $serverNonce_text;
-    DEBUG('$serverNonce is ', $serverNonce->as_hex());
-    $serverNonce->badd(1);
+    my $serverNonce = Math::BigInt->from_bytes(unpack('x' . $nonce_len . 'a' . $nonce_len,
+		                                      $decrypted));
+    undef $decrypted;
+    $logger->debug('$serverNonce is ', $serverNonce->as_hex());
+    $serverNonce->binc();
     $serverNonce = $serverNonce->bmod($nonce_limit);
-    DEBUG('$serverNonce is ', $serverNonce->as_hex(), " after increment");
-    my $newServerNonce_text = zeropad(substr($serverNonce->as_hex(), 2), 32);
-    undef $serverNonce;
+    $logger->debug('$serverNonce is ', $serverNonce->as_hex(), ' after increment');
 
     # Assemble the final message to send back to the server with the
     # incremented server nonce, the user's current password, and the
     # desired new password, then encrypt the message.
-    my $authdata = pack('H32a256a256', $newServerNonce_text, $newPassword,
-            $oldPassword);
-    undef $newServerNonce_text;
+    my $authdata = pack('a[' . $nonce_len . ']a[' . $pw_len . ']a[' . $pw_len . ']',
+	                zeropad($serverNonce->to_bytes(), $nonce_len),
+	                $newPassword, $oldPassword);
+    undef $serverNonce;
     $ctx->set_initialization_vector($C2SIV);
     $ciphertext = $ctx->encrypt($authdata);
-    DEBUG('$ciphertext is ', unpack('H*', $ciphertext));
+    $logger->debug('$ciphertext is ', unpack('H*', $ciphertext));
 
     $message = pack('na*', $ID, $ciphertext);
     undef $ciphertext;
@@ -477,7 +437,7 @@ sub ChangePassword {
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;
-    DEBUG('FPChangePassword() completed with result code ', $rc);
+    $logger->info('FPChangePassword() completed with result code ', $rc);
     return $rc;
 }
 
