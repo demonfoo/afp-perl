@@ -44,7 +44,7 @@ use Fcntl qw(:mode);
 
 # Find out the character encoding for the current terminal.
 my $term_enc = langinfo(CODESET);
-my $blksize  = 131_072;
+my $blksize  = 262_144;
 
 my $has_Term__ReadKey = 0;
 eval { require Term::ReadKey; 1; } and do {
