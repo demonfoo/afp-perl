@@ -34,7 +34,6 @@ eval {
     1;
 } and do {
     $has_Crypt__CAST5_PP = 1;
-    Crypt::CAST5_PP->import;
 };
 
 my $has_Crypt__CAST5 = 0;
@@ -43,7 +42,6 @@ eval {
     1;
 } and do {
     $has_Crypt__CAST5 = 1;
-    Crypt::CAST5->import;
 };
 croak("No CAST5 implementation was available?")
         unless $has_Crypt__CAST5 || $has_Crypt__CAST5_PP;
