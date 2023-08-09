@@ -228,7 +228,7 @@ sub Authenticate {
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
     $session->{SessionKey} = md5(zeropad($K->to_bytes(), $len));
-    my $ctx = Crypt::CBC->new({ key     => md5(zeropad($K->to_bytes(), $len)),
+    my $ctx = Crypt::CBC->new({ key     => $session->{SessionKey},
                                 cipher  => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
                                 padding => 'none',
                                 pbkdf   => 'none',
@@ -415,7 +415,6 @@ sub ChangePassword {
     $serverNonce->binc();
     $serverNonce = $serverNonce->bmod($nonce_limit);
     $session->{logger}->debug('$serverNonce is ', $serverNonce->as_hex(), " after increment");
-
 
     # Assemble the final message to send back to the server with the
     # incremented server nonce, the user's current password, and the

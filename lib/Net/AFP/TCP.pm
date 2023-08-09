@@ -66,7 +66,6 @@ sub CheckAttnQueue { # {{{1
         if ($msg & 0x8_000) {    # server says it's shutting down
             $self->{logger}->info('CheckAttnQueue(): Received notification of server intent to shut down');
             $self->{logger}->info('Shutdown in ', ($msg & 0xFFF), ' minutes');
-
             if ($msg & 0x2_000) { # server also has a message for us
                 my $MsgData;
                 $self->FPGetSrvrMsg(1, 3, \$MsgData);

@@ -134,7 +134,8 @@ sub Authenticate {
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
-    my $ctx = Crypt::CBC->new({ key     => zeropad($K->to_bytes(), $len),
+    $session->{SessionKey} = zeropad($K->to_bytes(), $len);
+    my $ctx = Crypt::CBC->new({ key     => $session->{SessionKey},
                                 cipher  => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
                                 padding => 'none',
                                 pbkdf   => 'none',
@@ -221,8 +222,7 @@ sub ChangePassword {
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
-    $session->{SessionKey} = zeropad($K->to_bytes(), $len);
-    my $ctx = Crypt::CBC->new({ key     => $session->{SessionKey},
+    my $ctx = Crypt::CBC->new({ key     => zeropad($K->to_bytes(), $len),
                                 cipher  => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
                                 padding => 'none',
                                 pbkdf   => 'none',
@@ -252,6 +252,7 @@ sub ChangePassword {
 
     # Send the response back to the server, and hope we did this right.
     my $message = pack('na*', unpack('n', $resp), $ciphertext);
+    $session->{logger}->debug('$message is 0x', unpack('H*', $message));
     undef $ciphertext;
     $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;

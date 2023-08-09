@@ -44,7 +44,6 @@ sub new { # {{{1
 
 sub close { # {{{1
     my ($self) = @_;
-    my $logger = get_logger('status');
     $self->{logger}->debug('called ', (caller(0))[3], '()');
 
     $self->{Session}->CloseSession();
