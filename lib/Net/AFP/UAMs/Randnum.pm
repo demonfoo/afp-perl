@@ -18,7 +18,7 @@ Readonly my $UAMNAME => 'Randnum exchange';
 use Crypt::DES;
 use Net::AFP::Result;
 use Net::AFP::Versions;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl;
 
 Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 50);
 
@@ -30,7 +30,7 @@ sub Authenticate {
             unless ref($session) and $session->isa('Net::AFP');
 
     croak('Password callback MUST be a subroutine ref')
-            unless ref($pw_cb) eq 'CODE';
+            if ref($pw_cb) ne 'CODE';
 
     # Pack just the username into a Pascal-style string, and send that to
     # the server.
@@ -43,12 +43,12 @@ sub Authenticate {
                 AFPVersion  => $AFPVersion,
                 UAM         => $UAMNAME,
                 UserName    => $username);
-        DEBUG('FPLoginExt() completed with result code ', $rc);
+        $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
     }
     else {
         my $authinfo = pack('C/a*', $username);
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
-        DEBUG('FPLogin() completed with result code ', $rc);
+        $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
 
     return $rc unless $rc == $kFPAuthContinue;
@@ -56,16 +56,16 @@ sub Authenticate {
     # The server will send us a random 8-byte number; take that, and encrypt
     # it with the password the user gave us.
     my ($randnum) = unpack('a8', $resp{UserAuthInfo});
-    DEBUG('$randnum is 0x', unpack('H*', $randnum));
+    $session->{logger}->debug('$randnum is 0x', unpack('H*', $randnum));
     my $deshash = Crypt::DES->new(pack('a8', &{$pw_cb}()));
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;
-    DEBUG('$crypted is 0x', unpack('H*', $crypted));
+    $session->{logger}->debug('$crypted is 0x', unpack('H*', $crypted));
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($resp{'ID'}, $crypted);
     undef $crypted;
-    DEBUG('FPLoginCont() completed with result code ', $rc);
+    $session->{logger}->debug('FPLoginCont() completed with result code ', $rc);
     return $rc;
 }
 
@@ -94,7 +94,7 @@ sub ChangePassword {
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;
-    DEBUG('FPChangePassword() completed with result code ', $rc);
+    $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
     return $rc;
 }
 

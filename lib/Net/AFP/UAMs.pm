@@ -7,9 +7,10 @@ use integer;
 
 no strict qw(refs);
 
+use Carp;
 use Net::AFP::TokenTypes;
 use Net::AFP::Result;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl;
 
 # Try to import classes for the password based auth methods. If they can't
 # be imported, it probably means they have dependencies that can't be
@@ -58,12 +59,9 @@ foreach my $uampath (@uampaths) {
         $uampath = q{./} . $uampath;
     }
     eval { require $uampath; };
-#    if ($@) {
-#        print STDERR 'Couldn\'t include ', $uampath, ":\n";
-#        print STDERR '-' x 15, ' start error text ', '-' x 15, "\n", $@;
-#        print STDERR '-' x 16, ' end error text ', '-' x 16, "\n";
-#        print STDERR "This error is not fatal; other UAMs will be tried.\n\n";
-#    }
+    if ($@) {
+        carp(sprintf(qq{Couldn't include "%s":\n%s\nThis error is not fatal; other UAMs will be tried.}, $uampath, $@));
+    }
 }
 
 sub GuestAuth {
@@ -89,7 +87,7 @@ sub PasswordAuth {
         next unless exists $ReqUAMs{lc($uaminfo->{name})};
         last if $uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1;
         my $function = $uaminfo->{class} . q{::Authenticate};
-        DEBUG('auth function is ', $function);
+        $session->{logger}->debug('auth function is ', $function);
         $session->{username} = $UserName;
         my $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
         if ($rc == $kFPNoErr) {
@@ -99,8 +97,8 @@ sub PasswordAuth {
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    DEBUG((caller(0))[3], 
-            " Could not find an agreeable UAM for authenticating to server\n");
+    $session->{logger}->error((caller(0))[3],
+            "(): Could not find an agreeable UAM for authenticating to server\n");
     return $kFPBadUAM;
 }
 
@@ -113,15 +111,15 @@ sub ChangePassword {
         next unless $uaminfo->{class}->can('ChangePassword');
         last if $uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1;
         my $function = $uaminfo->{class} . q{::ChangePassword};
-        DEBUG('password changing function is ', $function);
+        $session->{logger}->debug('password changing function is ', $function);
         #my $NewPW = &$PwCallback();
         my $rc = &{$function}($session, $UserName, $OldPW, $NewPW);
         return $rc;
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    DEBUG((caller(0))[3], 
-            " Could not find valid password changing UAM\n");
+    $session->{logger}->debug((caller(0))[3],
+            q{(): Could not find valid password changing UAM});
     return $kFPBadUAM;
 }
 

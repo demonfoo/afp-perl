@@ -41,8 +41,9 @@ use POSIX;                      # Standard error codes, access() modes, etc.
 use Time::HiRes qw(gettimeofday);
 use URI::Escape;
 use English qw(-no_match_vars);
-use Log::Log4perl qw(:easy);
+use Log::Log4perl;
 use Readonly;
+use String::Escape qw(printable);
 my $has_I18N__Langinfo = 0;
 eval {
     require I18N::Langinfo;
@@ -92,6 +93,7 @@ sub new { # {{{1
     $obj->{afpconn}         = undef;
     $obj->{volicon}         = undef;
     $obj->{_getattr_cache}  = {};
+    $obj->{logger}          = Log::Log4perl->get_logger(__PACKAGE__);
 
     if (exists $opts{encoding}) {
         $encoding = $opts{encoding};
@@ -219,13 +221,13 @@ sub new { # {{{1
     if ($rc == $kFPAccessDenied) {
         # no volume password; does apple's AFP server even support volume
         # passwords anymore? I don't really know.
-        ERROR('Server expected volume password');
+        $obj->{logger}->error('Server expected volume password');
         $obj->disconnect();
         return EACCES;
     }
     elsif ($rc == $kFPObjectNotFound || $rc == $kFPParamErr) {
         # Server didn't know the volume we asked for.
-        ERROR('Volume "', $urlparms{volume},
+        $obj->{logger}->error('Volume "', $urlparms{volume},
                 '" does not exist on server');
         $obj->disconnect();
         return ENODEV;
@@ -235,15 +237,15 @@ sub new { # {{{1
         # should never happen unless we pass bad flags (coding error) or some
         # non-AFP-specific condition causes a failure (which is out of our
         # hands)...
-        ERROR('FPOpenVol failed with error ', $rc, ' (',
+        $obj->{logger}->error('FPOpenVol failed with error ', $rc, ' (',
                 afp_strerror($rc), ')');
         $obj->disconnect();
         return ENODEV;
     }
-    DEBUG(Dumper($volinfo));
+    $obj->{logger}->debug(Dumper($volinfo));
 
     if ($volinfo->{Signature} == 3) {
-        ERROR('Volume uses variable Directory IDs; not currently supported');
+        $obj->{logger}->error('Volume uses variable Directory IDs; not currently supported');
         $obj->disconnect();
         return EINVAL;
     }
@@ -276,6 +278,7 @@ sub new { # {{{1
     # AFP prior to 2.0 doesn't provide any locking semantics, so just use
     # a bullshit empty function ref.
     $obj->{LockFn}          = sub { };
+    $obj->{MaxReplySize}    = 0x7FFF;
 
     if (Net::AFP::Versions::CompareByVersionNum($obj->{afpconn}, 2, 0,
             $kFPVerAtLeast)) {
@@ -299,6 +302,7 @@ sub new { # {{{1
     if (Net::AFP::Versions::CompareByVersionNum($obj->{afpconn}, 3, 1,
             $kFPVerAtLeast)) {
         $obj->{EnumFn}          = 'Net::AFP::FPEnumerateExt2';
+        $obj->{MaxReplySize}    = 0x3FFFF;
     }
 
     # Not checking the return code here. If this fails, $self->{DTRefNum}
@@ -312,7 +316,7 @@ sub new { # {{{1
             $obj->{client_uuid} = $uo->create_str();
         }
         else {
-            WARN('Need Data::UUID class for full ACL functionality, ACL ' .
+            $obj->{logger}->warn('Need Data::UUID class for full ACL functionality, ACL ' .
                     'checking disabled');
         }
     }
@@ -323,7 +327,7 @@ sub new { # {{{1
     # abort.
     # lookup node ID for subpath mount {{{2
     if (defined $urlparms{subpath}) {
-        DEBUG(q{Looking up directory '}, $urlparms{subpath},
+        $obj->{logger}->debug(q{Looking up directory '}, $urlparms{subpath},
                 q{' as pivot point for root node});
         my $realdirpath = translate_path($urlparms{subpath}, $obj);
         my $dirbitmap = $kFPNodeIDBit;
@@ -338,18 +342,18 @@ sub new { # {{{1
                 Pathname        => $realdirpath);
 
         if ($rc != $kFPNoErr || !exists $resp->{NodeID}) {
-            ERROR('Specified directory not found');
+            $obj->{logger}->error('Specified directory not found');
             $obj->disconnect();
             return ENOENT;
         }
 
         if ($resp->{FileIsDir} != 1) {
-            ERROR('Attempted to pivot mount root to non-directory');
+            $obj->{logger}->error('Attempted to pivot mount root to non-directory');
             $obj->disconnect();
             return ENOTDIR;
         }
         $obj->{topDirID} = $resp->{NodeID};
-        DEBUG('Mount root node ID changed to ', $obj->{topDirID});
+        $obj->{logger}->debug('Mount root node ID changed to ', $obj->{topDirID});
     } # }}}2
 
     # purify URL {{{2
@@ -411,7 +415,8 @@ sub disconnect { # {{{1
 
 sub getattr { # {{{1
     my ($self, $file) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s')},
+            (caller 0)[3], $file));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -595,7 +600,8 @@ sub getattr { # {{{1
 
 sub readlink { # {{{1
     my ($self, $file) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s')},
+            (caller 0)[3], $file));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -670,7 +676,8 @@ sub readlink { # {{{1
 
 sub getdir { # {{{1
     my ($self, $dirname) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s')},
+            (caller 0)[3], $dirname));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -711,7 +718,7 @@ sub getdir { # {{{1
             DirectoryBitmap => $self->{pathFlag},
             ReqCount        => $setsize,
             StartIndex      => 1,
-            MaxReplySize    => 0x7FFF,
+            MaxReplySize    => $self->{MaxReplySize},
             PathType        => $self->{pathType},
             Pathname        => $filename,
           );
@@ -739,10 +746,6 @@ sub getdir { # {{{1
             if ($self->{dotdothack}) { $name =~ s{^[.]![.][.](.)}{..$1}s; }
             push @fileslist, $self->{local_encode}->encode($name);
         }
-        #push(@fileslist, map {
-        #                my $name = $_->{$self->{pathkey}};
-        #                $name =~ tr{/}{:};
-        #                $self->{local_encode}->encode($name); } @$resp);
 
         # Set up for a subsequent call to get directory entries.
         $arglist{StartIndex} += scalar @{$resp};
@@ -762,7 +765,8 @@ sub getdir { # {{{1
 
 sub mknod { # {{{1
     my ($self, $file, $mode, $devnum) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x, devnum = %d)},
+            (caller 0)[3], $file, $mode, $devnum));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -811,7 +815,8 @@ sub mknod { # {{{1
 
 sub mkdir { # {{{1
     my ($self, $file, $mode) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x)},
+            (caller 0)[3], $file, $mode));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -879,8 +884,8 @@ sub mkdir { # {{{1
 
 sub unlink { # {{{1
     my ($self, $file) = @_;
-
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s')},
+            (caller 0)[3], $file));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -937,7 +942,8 @@ sub rmdir { return Fuse::AFP::unlink(@_); }
 # once. good work apple. :| doesn't happen on netatalk or OS X 10.5.
 sub symlink { # {{{1
     my ($self, $target, $linkname) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(target = '%s', linkname = '%s')},
+            (caller 0)[3], $target, $linkname));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1048,7 +1054,8 @@ sub symlink { # {{{1
 
 sub rename { # {{{1
     my ($self, $oldname, $newname) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(oldname = '%s', newname = '%s')},
+            (caller 0)[3], $oldname, $newname));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1125,16 +1132,19 @@ sub rename { # {{{1
 } # }}}1
 
 sub link { # {{{1
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    my ($self, $file, $target) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', target = %s)},
+            (caller 0)[3], $file, $target));
 
-    #$self->{callcount}{(caller 0)[3]}++;
+    $self->{callcount}{(caller 0)[3]}++;
 
     return -EOPNOTSUPP();
 } # }}}1
 
 sub chmod { # {{{1
     my ($self, $file, $mode) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %o)},
+            (caller 0)[3], $file, $mode));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1180,7 +1190,8 @@ sub chmod { # {{{1
 
 sub chown { # {{{1
     my ($self, $file, $uid, $gid) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', uid = %d, gid = %d)},
+            (caller 0)[3], $file, $uid, $gid));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1234,7 +1245,8 @@ sub chown { # {{{1
 
 sub truncate { # {{{1
     my ($self, $file, $length) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', length = %d)},
+            (caller 0)[3], $file, $length));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1288,7 +1300,8 @@ sub truncate { # {{{1
 
 sub utime { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', actime = %d, modtime = %d)},
+            (caller 0)[3], $file, $actime, $modtime));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1317,7 +1330,8 @@ sub utime { # {{{1
 
 sub open { # {{{1
     my ($self, $file, $mode) = @_;
-    DEBUG('called ', (caller 0)[3], '(\'', $file, '\', ', $mode, ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x)},
+            (caller 0)[3], $file, $mode));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1399,7 +1413,8 @@ sub open { # {{{1
 
 sub read { # {{{1
     my ($self, $file, $len, $off, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', len = %d, off = %d, fh = %d)},
+            (caller 0)[3], $file, $len, $off, $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1428,8 +1443,8 @@ sub read { # {{{1
 sub write { # {{{1
     my ($self, $file, $offset, $fh) = @_[0,1,3,4];
     my $data_r = \$_[2];
-    DEBUG('called ', (caller 0)[3], q{('}, $file, q{', [data], }, $offset,
-            q{, }, $fh, q{)});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', data = %s, offset = %d, fh = %d)},
+            (caller 0)[3], $file, q{[data]}, $offset, $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -1476,7 +1491,8 @@ sub write { # {{{1
 
 sub statfs { # {{{1
     my ($self) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s()},
+            (caller 0)[3]));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1522,7 +1538,8 @@ sub statfs { # {{{1
 
 sub flush { # {{{1
     my ($self, $file, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, $file, q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d)},
+            (caller 0)[3], $file, $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1538,7 +1555,8 @@ sub flush { # {{{1
 
 sub release { # {{{1
     my ($self, $file, $mode, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], '(\'', $file, '\', ', $mode, ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x, fh = %d)},
+            (caller 0)[3], $file, $mode, $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1552,7 +1570,8 @@ sub release { # {{{1
 
 sub fsync { # {{{1
     my ($self, $file, $flags, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, $file, q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', flags = %x, fh = %d)},
+            (caller 0)[3], $file, $flags, $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1568,7 +1587,8 @@ sub fsync { # {{{1
 
 sub setxattr { # {{{1
     my ($self, $file, $attr, $value, $flags) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', attr = '%s', value = '%s', flags = %x)},
+            (caller 0)[3], $file, $attr, printable($value), $flags));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1810,7 +1830,8 @@ sub setxattr { # {{{1
 
 sub getxattr { # {{{1
     my ($self, $file, $attr) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', attr = '%s')},
+            (caller 0)[3], $file, $attr));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1970,7 +1991,8 @@ sub getxattr { # {{{1
 
 sub listxattr { # {{{1
     my ($self, $file) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s')},
+            (caller 0)[3], $file));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2087,7 +2109,8 @@ sub listxattr { # {{{1
 
 sub removexattr { # {{{1
     my ($self, $file, $attr) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', attr = '%s')},
+            (caller 0)[3], $file, $attr));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2152,6 +2175,7 @@ sub removexattr { # {{{1
             return -ENOENT() if $rc == $kFPObjectNotFound;
             return -EINVAL() if $rc == $kFPParamErr;
             return -EROFS()  if $rc == $kFPVolLocked;
+            return -EBADF()  if $rc != $kFPNoErr;
             return 0;
         }
         elsif ($attr eq 'com.apple.ResourceFork') {
@@ -2216,7 +2240,8 @@ sub removexattr { # {{{1
 
 sub opendir { # {{{1
     my ($self, $dirname) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s')},
+            (caller 0)[3], $dirname));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2243,7 +2268,8 @@ sub opendir { # {{{1
 
 sub readdir { # {{{1
     my ($self, $dirname, $offset, $dh) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', offset = %d, dh = %d)},
+            (caller 0)[3], $dirname, $offset, $dh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2262,24 +2288,25 @@ sub readdir { # {{{1
         $entrycount -= 2;
 
         if ($dirname eq q{/}) {
+            $entrycount -= 1;
             push @fileslist, [++$offset, '._metrics'];
             if ($self->{volicon}) {
+                $entrycount -= 2;
                 push @fileslist, [++$offset, '.volicon.xpm'],
                                  [++$offset, 'autorun.inf'];
             }
         }
     } # }}}2
-    #else {
-    #    $offset -= 2;
-    #    if ($dirname eq '/') {
-    #        $offset--;
-    #    }
-    #}
 
     my $bitmap = $self->{pathFlag};
 
-    my $delta = 1;
-    if ($dirname eq q{/}) { $delta++; }
+    my $delta = 2;
+    if ($dirname eq q{/}) {
+        $delta += 1;
+        if ($self->{volicon}) {
+            $delta += 2;
+        }
+    }
     # Request entry list from server {{{2
     my($rc, $resp) = &{$self->{EnumFn}}($self->{afpconn},
                     VolumeID        => $self->{volID},
@@ -2287,8 +2314,8 @@ sub readdir { # {{{1
                     FileBitmap      => $bitmap,
                     DirectoryBitmap => $bitmap,
                     ReqCount        => $entrycount,
-                    StartIndex      => $offset - $delta,
-                    MaxReplySize    => 0x7FFF,
+                    StartIndex      => $offset - $delta + 1,
+                    MaxReplySize    => $self->{MaxReplySize},
                     PathType        => $self->{pathType},
                     Pathname        => q{});
     return -EACCES()  if $rc == $kFPAccessDenied;
@@ -2312,7 +2339,8 @@ sub readdir { # {{{1
 
 sub releasedir { # {{{1
     my ($self, $dirname, $dh) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', dh = %d)},
+            (caller 0)[3], $dirname, $dh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2323,7 +2351,8 @@ sub releasedir { # {{{1
 
 sub fsyncdir { # {{{1
     my ($self, $dirname, $flags, $dh) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', flags = %x, dh = %d)},
+            (caller 0)[3], $dirname, $flags, $dh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2339,7 +2368,8 @@ sub fsyncdir { # {{{1
 
 sub access { # {{{1
     my ($self, $file, $mode) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %o)},
+            (caller 0)[3], $file, $mode));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2379,7 +2409,8 @@ sub access { # {{{1
 
 sub create { # {{{1
     my ($self, $file, $mode, $flags) = @_;
-    DEBUG('called ', (caller 0)[3], '(\'', $file, '\', ', $mode, ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %o, flags = %x)},
+            (caller 0)[3], $file, $mode, $flags));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2435,7 +2466,8 @@ sub create { # {{{1
 
 sub ftruncate { # {{{1
     my ($self, $file, $length, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', length = %d, fh = %d)},
+            (caller 0)[3], $file, $length, $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2457,7 +2489,8 @@ sub ftruncate { # {{{1
 
 sub fgetattr { # {{{1
     my ($self, $file, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], '(', join(', ', @_), ')');
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d)},
+            (caller 0)[3], $file, $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2566,7 +2599,8 @@ sub fgetattr { # {{{1
 
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %s, lkparms = %s, fh = %d)},
+            (caller 0)[3], $file, $cmd, Dumper($lkparms), $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2577,8 +2611,8 @@ sub lock { # {{{1
     my($rc, $rstart);
     if ($lkparms->{l_whence} == SEEK_CUR) {
         # I doubt this will ever happen, but gotta be sure...
-        DEBUG('l_whence was SEEK_CUR, we have no way of knowing its ' .
-                'current offset?');
+        $self->{logger}->debug('l_whence was SEEK_CUR, we have no way of ' .
+                'knowing its current offset?');
         return -EBADF();
     }
 
@@ -2649,7 +2683,8 @@ sub lock { # {{{1
 
 sub utimens { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', actime = %f, modtime = %f)},
+            (caller 0)[3], $file, $actime, $modtime));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2660,7 +2695,8 @@ sub utimens { # {{{1
 
 sub bmap { # {{{1
     my ($self, $file, $blksz, $blkno) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', blksz = %d, blkno = %d)},
+            (caller 0)[3], $file, $blksz, $blkno));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2671,21 +2707,27 @@ sub bmap { # {{{1
 
 sub ioctl {
     my ($self, $file, $cmd, $flags, $data, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %d, flags = %x, data = %s, fh = %d)},
+            (caller 0)[3], $file, $cmd, $flags, printable($data), $fh));
+
+    $self->{callcount}{(caller 0)[3]}++;
 
     return -ENOSYS();
 }
 
 sub poll {
     my ($self, $file, $ph, $revents, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', ph = %d, revents = %d, fh = %d)},
+            (caller 0)[3], $file, $ph, $revents, $fh));
+
+    $self->{callcount}{(caller 0)[3]}++;
 
     return -ENOSYS();
 }
 
 sub write_buf {
     my ($self, $file, $off, $bufvec, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -2744,7 +2786,7 @@ sub write_buf {
 
 sub read_buf {
     my ($self, $file, $len, $off, $bufvec, $fh) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2776,14 +2818,20 @@ sub read_buf {
 
 sub flock {
     my ($self, $file, $fh, $owner, $op) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, owner = %d, op = %x)},
+            (caller 0)[3], $file, $fh, $owner, $op));
+
+    $self->{callcount}{(caller 0)[3]}++;
 
     return -ENOSYS();
 }
 
 sub fallocate {
     my ($self, $file, $fh, $mode, $off, $len) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, mode = %x, off = %d, len = %d)},
+            (caller 0)[3], $file, $fh, $mode, $off, $len));
+
+    $self->{callcount}{(caller 0)[3]}++;
 
     return -ENOSYS();
 }
@@ -2796,6 +2844,7 @@ sub generate_metrics_data { # {{{1
     my $data = __PACKAGE__ . " collected client statistics\n\n";
 
     $data .= 'FUSE API version ' . Fuse::fuse_version() . "\n";
+    #$data .= 'FUSE API version ' . join('.', Fuse::fuse_version()) . "\n";
     $data .= 'Net::AFP version ' . $Net::AFP::VERSION . "\n";
     $data .= "Calls made:\n\n";
 
@@ -2835,7 +2884,8 @@ sub generate_metrics_data { # {{{1
 sub lookup_afp_entry { # {{{1
     my ($self, $filename) = @_;
 
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(filename = '%s')},
+            (caller 0)[3], printable($filename)));
 
     # Disabling this for now, as it causes errors with dangling, but
     # otherwise well-formed, symlinks.
@@ -2880,7 +2930,8 @@ sub lookup_afp_entry { # {{{1
 
 sub translate_path { # {{{1
     my ($path, $sessobj) = @_;
-    DEBUG('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $sessobj->{logger}->debug(sprintf(q{called %s(path = '%s')},
+            (caller 0)[3], $path));
 
     my @pathparts = split m{/}s, $path;
     my @afp_path = ();
@@ -2918,6 +2969,8 @@ sub path_parent { # {{{1
 # client into the structured form to be sent to the server.
 sub acl_from_xattr { # {{{1
     my ($self, $raw_xattr, $acl_data) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(raw_xattr = '%s', acl_data = %s)},
+            (caller 0)[3], printable($raw_xattr), Dumper($acl_data)));
 
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server
@@ -2988,6 +3041,8 @@ sub acl_from_xattr { # {{{1
 # by afp_acl.pl (the tool for manipulating ACLs on an AFP share).
 sub acl_to_xattr { # {{{1
     my ($self, $acldata) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(acldata = %s)},
+            (caller 0)[3], Dumper($acldata)));
 
     my @acl_parts;
     foreach my $entry (@{$acldata->{acl_ace}}) {

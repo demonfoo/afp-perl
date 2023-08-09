@@ -17,7 +17,7 @@ sub Authenticate {
     # The latter two args (username and a password callback function) can
     # be ignored here, since they're not applicable for anonymous auth.
     my($session, $AFPVersion) = @_;
-    print 'called ', (caller(0))[3], "\n" if defined $::__AFP_DEBUG;
+    $session->{logger}->debug('called ', (caller(0))[3]);
 
     # Ensure that we've been handed an appropriate object.
     croak("Object MUST be of type Net::AFP!")
@@ -31,13 +31,11 @@ sub Authenticate {
                 AFPVersion  => $AFPVersion,
                 UAM         => $UAMNAME,
                 UserName    => q{});
-        print q{FPLoginExt() completed with result code }, $rc, q{\n}
-                if defined $::__AFP_DEBUG;
+        $session->{logger}->debug(q{FPLoginExt() completed with result code }, $rc)
     }
     else {
         ($rc) = $session->FPLogin($AFPVersion, $UAMNAME, q{});
-        print q{FPLogin() completed with result code }, $rc, q{\n}
-                if defined $::__AFP_DEBUG;
+        $session->{logger}->debug(q{FPLogin() completed with result code }, $rc)
     }
 
     return $rc;

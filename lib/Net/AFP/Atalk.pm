@@ -13,7 +13,7 @@ use Net::AFP::Parsers;
 use Net::AFP::Result;
 use Net::Atalk::ASP;
 use Exporter qw(import);
-use Log::Log4perl qw(:easy);
+use Log::Log4perl;
 
 use base qw(Net::AFP);
 our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
@@ -28,13 +28,13 @@ our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
 #          be obtained using NBPLookup() in Net::Atalk::NBP.
 sub new { # {{{1
     my ($class, $host, $port) = @_;
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     my $obj = $class->SUPER::new($host, $port);
+    $obj->{logger}->debug('called ', (caller(0))[3], '()');
 
     $obj->{Session} = Net::Atalk::ASP->new($host, $port);
     my $rc = $obj->{Session}->OpenSession();
-    $obj->{RequestQuanta} = ${$obj->{Session}->GetParms()}->{QuantumSize};
+    $obj->{Session}->GetParms(my $params);
+    $obj->{RequestQuanta} = $params->{QuantumSize};
     if ($rc != $kFPNoErr) {
         $obj->{Session}->close();
         return $rc;
@@ -45,7 +45,7 @@ sub new { # {{{1
 sub close { # {{{1
     my ($self) = @_;
     my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
+    $self->{logger}->debug('called ', (caller(0))[3], '()');
 
     $self->{Session}->CloseSession();
     $self->{Session}->close();
@@ -54,9 +54,8 @@ sub close { # {{{1
 
 sub CheckAttnQueue { # {{{1
     my ($self) = @_;
+    $self->{logger}->debug('called ', (caller(0))[3], '()');
 
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     my $attnq = $self->{Session}{Shared}{attnq};
     my $vol_update_checked;
     while (my $msg = shift(@{$attnq})) {
@@ -98,9 +97,8 @@ sub CheckAttnQueue { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
     my ($self, $payload, $resp_r) = @_;
+    $self->{logger}->debug('called ', (caller(0))[3], '()');
 
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     $self->CheckAttnQueue();
     return $self->{Session}->Command($payload, $resp_r);
 } # }}}1
@@ -109,9 +107,8 @@ sub SendAFPMessage { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPWrite { # {{{1
     my ($self, $payload, $data_r, $d_len, $resp_r) = @_;
+    $self->{logger}->debug('called ', (caller(0))[3], '()');
 
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     $self->CheckAttnQueue();
     return $self->{Session}->Write($payload, $data_r, $d_len, $resp_r);
 } # }}}1
@@ -121,9 +118,8 @@ sub GetStatus { # {{{1
     if (ref($class)) {
         croak('GetStatus() should NEVER be called against an active object');
     }
+    $self->{logger}->debug('called ', (caller(0))[3], '()');
 
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     my $obj = Net::Atalk::ASP->new($host, $port);
     my $resp;
     my $rc = $obj->GetStatus(\$resp);

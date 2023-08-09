@@ -17,6 +17,15 @@ our @EXPORT = qw($kFPVerNewerThan $kFPVerAtLeast $kFPVerEqual
                  $kFPVerNoNowerThan $kFPVerOlderThan);
 
 my @versions = (
+    # AFP 3.4 only changed an AppleTalk to POSIX error mapping.
+    {
+        'VersionString' => 'AFP3.4',
+        'MajorNumber'   => 3,
+        'MinorNumber'   => 4,
+        'Supported'     => 1,
+        'CanDoAtalk'    => 0,
+    },
+    # AFP 3.3 requires replay cache.
     {
         'VersionString' => 'AFP3.3',
         'MajorNumber'   => 3,

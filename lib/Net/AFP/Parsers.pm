@@ -7,7 +7,7 @@ use integer;
 
 # Enables a nice call trace on warning events.
 use Carp ();
-local $SIG{'__WARN__'} = \&Carp::cluck;
+local $SIG{__WARN__} = \&Carp::cluck;
 
 use Net::AFP::DirParms qw(:DEFAULT !:common);
 use Net::AFP::FileParms;
@@ -17,12 +17,12 @@ use Net::AFP::Versions;
 use Encode;
 use Unicode::Normalize qw(compose decompose);
 use Socket;
-use Log::Log4perl qw(:easy);
+use Log::Log4perl;
+use Data::Dumper;
 
 use Exporter qw(import);
 
-our @EXPORT = qw(globalTimeOffset long_convert long_unconvert ll_convert
-                 ll_unconvert uuid_unpack uuid_pack ParseVolParms
+our @EXPORT = qw(globalTimeOffset uuid_unpack uuid_pack ParseVolParms
                  ParseSrvrInfo ParseFileDirParms ParseFileParms
                  ParseDirParms);
 
@@ -32,58 +32,21 @@ eval {
     1;
 } and do {
     $has_Socket6 = 1;
-    #Socket6->import();
 };
 
 # This is zero time for AFP - 1 Jan 2000 00:00 GMT.
 sub globalTimeOffset { return 946_684_800; }
 
-sub ll_convert { # {{{1
-    my($number) = @_;
-    
-    my($hi, $lo);
-    
-    if ($number < 0) {
-        $number = (-$number - 1);
-        $hi = ~int($number / (2 ** 32)) & 0xFFFFFFFF;
-        $lo = ~int($number % (2 ** 32)) & 0xFFFFFFFF;
-    } else {
-        $hi = int($number / (2 ** 32));
-        $lo = int($number % (2 ** 32));
-    }
-
-    return($hi, $lo);
-} # }}}1
-
-sub ll_unconvert { # {{{1
-    my($hi, $lo) = @_;
-
-    my $number;
-
-    if ($hi & 0x80_000_000) {
-        $hi = ~$hi & 0xFF_FFF_FFF;
-        $lo = ~$lo & 0xFF_FFF_FFF;
-        $number = -(($hi * (2 ** 32)) + $lo + 1);
-    } else {
-        $number = ($hi * (2 ** 32)) + $lo;
-    }
-
-    return $number;
-} # }}}1
-
 sub uuid_unpack { # {{{1
     my($uuid_bin) = @_;
     my @parts = unpack('H[8]H[4]H[4]H[4]H[12]', $uuid_bin);
-    my $uuid = join(q{-}, @parts);
-    $uuid =~ tr/A-Z/a-z/;
-    return $uuid;
+    return join(q{-}, @parts);
 } # }}}1
 
 sub uuid_pack { # {{{1
     my($uuid) = @_;
-    $uuid = join(q{}, split(m{-}s, $uuid));
-    my $uuid_bin = pack('H32', $uuid);
-    return $uuid_bin;
+    $uuid =~ s{-}{}g;
+    return pack('H32', $uuid);
 } # }}}1
 
 # Parsers for assorted reply types will be placed here. This isn't really
@@ -95,7 +58,9 @@ sub uuid_pack { # {{{1
 # parameter info from the server.
 sub ParseVolParms { # {{{1
     my ($data, $obj) = @_;
-    DEBUG('called ', (caller(0))[3]);
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug(sprintf('called %s(%s)',
+                    (caller(0))[3], Dumper([unpack('H*', $data), $obj])));
 
     my $offset = 2;
     my $Bitmap = unpack('S>', $data);
@@ -112,7 +77,7 @@ sub ParseVolParms { # {{{1
     }
 
     if ($Bitmap & $kFPVolCreateDateBit) {
-        $resp->{CreateDate} = unpack('x{' . $offset . ']l>', $data) +
+        $resp->{CreateDate} = unpack('x[' . $offset . ']l>', $data) +
                 globalTimeOffset;
         $offset += 4;
     }
@@ -151,7 +116,7 @@ sub ParseVolParms { # {{{1
         $resp->{Name} = unpack('x[' . ($name_off + 2) . ']C/a', $data);
         if (Net::AFP::Versions::CompareByVersionNum($obj, 3, 0,
                 $kFPVerAtLeast)) {
-            $resp->{Name} = decode_utf8($resp->{Name});
+            $resp->{Name} = compose(decode_utf8($resp->{Name}));
         }
         else {
             $resp->{Name} = decode('MacRoman', $resp->{Name});
@@ -161,13 +126,13 @@ sub ParseVolParms { # {{{1
 
     if ($Bitmap & $kFPVolExtBytesFreeBit) {
         $resp->{ExtBytesFree} =
-                ll_unconvert(unpack('x[' . $offset . ']NN', $data));
+                unpack('x[' . $offset . ']Q>', $data);
         $offset += 8;
     }
 
     if ($Bitmap & $kFPVolExtBytesTotalBit) {
         $resp->{ExtBytesTotal} =
-                ll_unconvert(unpack('x[' . $offset . ']NN', $data));
+                unpack('x[' . $offset . ']Q>', $data);
         $offset += 8;
     }
 
@@ -183,7 +148,9 @@ sub ParseVolParms { # {{{1
 # FPGetSrvrInfo call.
 sub ParseSrvrInfo { # {{{1
     my ($data) = @_;
-    DEBUG('called ', (caller(0))[3]);
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug(sprintf('called %s(%s)',
+                    (caller(0))[3], Dumper([unpack('H*', $data)])));
 
     my $resp = {};
 
@@ -311,7 +278,7 @@ _EOT_
                 $addrEnt->{port}    = $port;
             }
             if ($entryType < 1 || $entryType > 7) { # unknown value?
-                INFO('unknown address type ', $entryType, ', skipping');
+                $logger->info('unknown address type ', $entryType, ', skipping');
                 next;
             }
             push(@{$resp->{NetworkAddresses}}, $addrEnt);
@@ -328,7 +295,9 @@ _EOT_
 
 sub ParseFileDirParms { # {{{1
     my ($data) = @_;
-    DEBUG('called ', (caller(0))[3]);
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug(sprintf('called %s(%s)',
+                    (caller(0))[3], Dumper([unpack('H*', $data)])));
 
     my ($FileBitmap, $DirectoryBitmap, $IsFileDir, $ReqParams) =
             unpack('S>S>Cxa*', $data);
@@ -343,7 +312,10 @@ sub ParseFileDirParms { # {{{1
 
 sub ParseFileParms { # {{{1
     my ($Bitmap, $data) = @_;
-    DEBUG('called ', (caller(0))[3]);
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug(sprintf('called %s(%s)',
+                    (caller(0))[3], Dumper([$Bitmap, unpack('H*', $data)])));
+
     my $resp = {};
     my $offset = 0;
 
@@ -399,7 +371,7 @@ sub ParseFileParms { # {{{1
     }
     if ($Bitmap & $kFPExtDataForkLenBit) {
         $resp->{ExtDataForkLen} =
-                ll_unconvert(unpack('x[' . $offset . ']NN', $data));
+                unpack('x[' . $offset . ']Q>', $data);
         $offset += 8;
     }
     if ($Bitmap & $kFPLaunchLimitBit) {
@@ -415,7 +387,7 @@ sub ParseFileParms { # {{{1
     }
     if ($Bitmap & $kFPExtRsrcForkLenBit) {
         $resp->{ExtRsrcForkLen} =
-                ll_unconvert(unpack('x[' . $offset . ']NN', $data));
+                unpack('x[' . $offset . ']Q>', $data);
         $offset += 8;
     }
     if ($Bitmap & $kFPUnixPrivsBit) {
@@ -429,7 +401,10 @@ sub ParseFileParms { # {{{1
 
 sub ParseDirParms { # {{{1
     my ($Bitmap, $data) = @_;
-    DEBUG('called ', (caller(0))[3]);
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug(sprintf('called %s(%s)',
+                    (caller(0))[3], Dumper([$Bitmap, unpack('H*', $data)])));
+
     my $resp = {};
     my $offset = 0;
 

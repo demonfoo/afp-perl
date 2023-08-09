@@ -21,7 +21,7 @@ sub Authenticate {
             unless ref($session) and $session->isa('Net::AFP');
     
     croak('Password callback MUST be a subroutine ref')
-            unless ref($pw_cb) eq 'CODE';
+            if ref($pw_cb) ne 'CODE';
 
     my $pw_data = pack('a8', &{$pw_cb}());
     my $rc;
@@ -33,14 +33,12 @@ sub Authenticate {
                 'UAM'           => $UAMNAME,
                 'UserName'      => $username,
                 'UserAuthInfo'  => $pw_data);
-        print 'FPLoginExt() completed with result code ', $rc, "\n"
-                if defined $::__AFP_DEBUG;
+        $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
     }
     else {
         my $authinfo = substr(pack('xC/a*x![s]a8', $username, $pw_data), 1);
         ($rc) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
-        print 'FPLogin() completed with result code ', $rc, "\n"
-                if defined $::__AFP_DEBUG;
+        $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
 
     return $rc;

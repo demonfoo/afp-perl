@@ -24,6 +24,7 @@ use Net::AFP::Versions;
 use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 use Socket;
+use Log::Log4perl;
 
 use Term::ReadLine;     # for reading input from user
 
@@ -57,21 +58,14 @@ eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
 
 my $has_Archive__Tar = 1;
 eval { require Archive::Tar; 1; } or do {
-    print "Sorry, Archive::Tar not available.\n";
+    print {*STDERR} "WARNING: Sorry, Archive::Tar not available.\n";
     $has_Archive__Tar = 0;
 };
-
-my %UUID_cache = ();
-
-# Turn on some debugging for the AFP and DSI layers. Can produce a _lot_ of
-# output - use with care.
-our $__AFP_DEBUG;
-our $__DSI_DEBUG;
 
 sub usage {
     print <<"_EOT_";
 
-afp-perl version ${Net::AFP::VERSION} - Apple Filing Protocol CLI client
+afpclient version ${Net::AFP::VERSION} - Apple Filing Protocol CLI client
 
 Usage: ${PROGRAM_NAME} [options] [AFP URL]
 
@@ -110,13 +104,38 @@ _EOT_
 }
 
 my %afpopts;
-my($atalk_first, $prefer_v4);
+my($atalk_first, $prefer_v4, $debug_afp, $debug_dsi);
 Getopt::Long::Configure('no_ignore_case');
-GetOptions( 'debug-afp' => sub { $__AFP_DEBUG = 1; },
-            'debug-dsi' => sub { $__DSI_DEBUG = 1; },
-            'atalk-first' => \$atalk_first,
+GetOptions( 'atalk-first' => \$atalk_first,
             '4|prefer-v4' => \$prefer_v4,
-            'h|help' => \&usage) || usage();
+            'debug-afp'   => \$debug_afp,
+            'debug-dsi'   => \$debug_dsi,
+            'h|help'      => \&usage) || usage();
+
+my $logconf = <<'_EOT_';
+log4perl.appender.AppLogging = Log::Log4perl::Appender::Screen
+log4perl.appender.AppLogging.layout = PatternLayout
+log4perl.appender.AppLogging.layout.ConversionPattern = [%P] %F line: %L %c - %m%n
+log4perl.appender.AppLogging.Threshold = INFO
+
+log4perl.appender.Console = Log::Log4perl::Appender::ScreenColoredLevels
+log4perl.appender.Console.layout = SimpleLayout
+
+log4perl.logger = INFO, AppLogging
+_EOT_
+
+if (defined $debug_afp) {
+    $logconf .= <<'_EOT_';
+log4perl.logger.Net.AFP = DEBUG, Console
+_EOT_
+}
+
+if (defined $debug_dsi) {
+    $logconf .= <<'_EOT_';
+log4perl.logger.Net.DSI = DEBUG, Console
+_EOT_
+}
+Log::Log4perl->init(\$logconf);
 
 $afpopts{aforder} = [AF_INET];
 if ($prefer_v4) {
@@ -131,38 +150,7 @@ if ($atalk_first) {
 }
 
 if (not scalar(@ARGV)) {
-    print <<"_EOT_";
-
-afpclient version ${Net::AFP::VERSION} - Apple Filing Protocol CLI client
-
-Usage: ${PROGRAM_NAME} [options] [AFP URL]
-
-Options:
-    --prefer-v4
-        Use IPv4 connectivity before IPv6, if available.
-    --atalk-first
-        Use AppleTalk transport before IP transport, if available; normally
-        IP transport is used first, for performance reasons.
-
-AFP URL format:
-
-afp://[<user>[;AUTH=<uam>][:<password>]@]<host>[:<port>]/<share>[/<path>]
-afp:/at/[<user>[;AUTH=<uam>][:<password>]@]<host>[:<zone>]/<share>[/<path>]
-
-Items in [] are optional; they are as follows:
-
-  <user>     : Your username on the remote system
-  <uam>      : The auth method to force with the server
-  <password> : Your password on the remote system
-  <host>     : Hostname or IP address of the target server, IPv6 addresses
-               can be specified in square brackets
-  <zone>     : An AppleTalk zone name, or * for the local zone
-  <port>     : The port on the server to connect to
-  <share>    : The name of the exported share on the remote system
-  <path>     : A subpath inside the specified share to mount
-
-_EOT_
-    exit(1);
+    usage();
 }
 
 my($url) = @ARGV;
@@ -203,7 +191,7 @@ my $volInfo;
 my $ret = $session->FPOpenVol($kFPVolAttributeBit,
         decode($term_enc, $values{volume}), undef, \$volInfo);
 if ($ret != $kFPNoErr) {
-    print "Volume was unknown?\n";
+    print {*STDERR} "ERROR: Volume was unknown?\n";
     $session->FPLogout();
     $session->close();
     exit(1);
@@ -213,11 +201,8 @@ my $volID = $volInfo->{ID};
 my $DT_ID;
 $ret = $session->FPOpenDT($volID, \$DT_ID);
 if ($ret != $kFPNoErr) {
-    print "Couldn't open Desktop DB\n";
+    print {*STDERR} "WARNING: Couldn't open Desktop DB\n";
     undef $DT_ID;
-#   $session->FPCloseVol($volID);
-#   $session->FPLogout();
-#   $session->close();
 }
 
 my $volAttrs = $volInfo->{Attribute};
@@ -229,7 +214,7 @@ if ($volAttrs & $kSupportsACLs) {
         $client_uuid = $uo->create();
     }
     else {
-        print "Need Data::UUID class for full ACL functionality, ACL checking disabled\n";
+        print {*STDERR} "WARNING: Need Data::UUID class for full ACL functionality, ACL checking disabled\n";
     }
 }
 
@@ -256,6 +241,7 @@ my $RForkLenKey     = 'RsrcForkLen';
 my $EnumFn          = \&Net::AFP::FPEnumerate;
 my $ReadFn          = \&Net::AFP::FPRead;
 my $WriteFn         = \&Net::AFP::FPWrite;
+my $MaxReplySize    = 0x7FFF;
 # I *think* large file support entered the picture as of AFP 3.0...
 if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
         $kFPVerAtLeast)) {
@@ -271,13 +257,14 @@ if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
 if (Net::AFP::Versions::CompareByVersionNum($session, 3, 1,
         $kFPVerAtLeast)) {
     $EnumFn         = \&Net::AFP::FPEnumerateExt2;
+    $MaxReplySize   = 0x3FFFF;
 }
 
 if (defined $values{subpath}) {
     my ($newDirId, $fileName) = resolve_path($session, $volID, $curdirnode,
             decode($term_enc, $values{subpath}));
     if (defined $fileName || !defined $newDirId) {
-        print 'path ', $values{subpath}, ' is not accessible, defaulting ',
+        print {*STDERR} 'WARNING: path ', $values{subpath}, ' is not accessible, defaulting ',
                 "to volume root\n";
     }
     else {
@@ -346,7 +333,7 @@ my %commands = (
                                 DirectoryBitmap => $dirBmp,
                                 ReqCount        => 1024,
                                 StartIndex      => $offset,
-                                MaxReplySize    => 2**15 - 1,
+                                MaxReplySize    => $MaxReplySize,
                                 PathType        => $pathType,
                                 Pathname        => q{});
                         if (ref($results) eq 'ARRAY') {
@@ -887,7 +874,7 @@ if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
         my ($text, $line, $start) = @_;
         if ($start == 0) {
             # try to expand commands
-            my @matches = grep(/^$text/, keys %commands);
+            my @matches = grep { m{^$text} } keys %commands;
             return @matches;
         }
         my $list = expand_globbed_path($session, $volID, $curdirnode, $text . '*');
@@ -896,26 +883,26 @@ if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
         if ($text =~ m{^(.+/)}) {
             $prefix = $1;
         }
-        if (scalar(@reallist) == 1 && $reallist[0] =~ m{/$}) {
+        if (scalar(@reallist) == 1 && $reallist[0] =~ m{/$}s) {
             if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
-                $attribs->{'completion_append_character'} = '';
+                $attribs->{'completion_append_character'} = q{};
             }
             else {
-                $readline::rl_completer_terminator_character = '';
+                $readline::rl_completer_terminator_character = q{};
             }
         } else {
             if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
-                $attribs->{'completion_append_character'} = ' ';
+                $attribs->{'completion_append_character'} = q{ };
             }
             else {
-                $readline::rl_completer_terminator_character = ' ';
+                $readline::rl_completer_terminator_character = q{ };
             }
         }
         return map { $prefix . $_ } @reallist;
     };
 }
 else {
-    print STDERR "WARNING: ReadLine implementation doesn't support tab expands\n";
+    print {*STDERR} "WARNING: ReadLine implementation doesn't support tab expands\n";
 }
 
 while (1) {
@@ -933,7 +920,7 @@ while (1) {
         $searchID = $entry->{ParentDirID};
     }
 
-    my $line = $term->readline('afpclient ' . (exists $values{username} ? $values{username} . '@' : '') . $values{host} . ':' . $values{volume} . '/' . join(q{/}, reverse(@nameParts)) . '> ');
+    my $line = $term->readline(q{afpclient } . (exists $values{username} ? $values{username} . q{@} : q{}) . $values{host} . q{:} . $values{volume} . q{/} . join(q{/}, reverse(@nameParts)) . q{> });
     if (!defined($line)) {
         print "\n";
         last;
@@ -974,7 +961,7 @@ sub do_listentries {
             $up = $ent->{UnixPerms};
         }
         else {
-            $up = $ent->{FileIsDir} ?  (S_IFDIR | 0755) : (S_IFREG | 0644);
+            $up = $ent->{FileIsDir} ?  (S_IFDIR | oct(755)) : (S_IFREG | oct(644));
         }
         my $uid = $ent->{UnixUID} || $ent->{OwnerID} || 0;
         my $user;
@@ -997,20 +984,20 @@ sub do_listentries {
         }
 
         $ent->{$pathkey} =~ tr/\//:/;
-        printf(q{%s%s%s%s%s%s%s%s%s%s %3d %-8s %-8s %8s %-11s %s},
+        printf(q{%s%s%s%s%s%s%s%s%s%s %3d %-8s %-8s %10d %-11s %s},
             ($ent->{FileIsDir} == 1 ? q{d} : S_ISLNK($up) ? q{l} : q{-}),
-            ($up & 0400 ? q{r} : q{-}),
-            ($up & 0200 ? q{w} : q{-}),
-            ($up & 04000 ? ($up & 0100 ? q{s} : q{S}) :
-                           ($up & 0100 ? q{x} : q{-})),
-            ($up & 0040 ? q{r} : q{-}),
-            ($up & 0020 ? q{w} : q{-}),
-            ($up & 02000 ? ($up & 0010 ? q{s} : q{S}) :
-                           ($up & 0010 ? q{x} : q{-})),
-            ($up & 0004 ? q{r} : q{-}),
-            ($up & 0002 ? q{w} : q{-}),
-            ($up & 01000 ? ($up & 0001 ? q{t} : q{T}) :
-                           ($up & 0001 ? q{x} : q{-})),
+            ($up & S_IRUSR ? q{r} : q{-}),
+            ($up & S_IWUSR ? q{w} : q{-}),
+            ($up & S_ISUID ? ($up & S_IXUSR ? q{s} : q{S}) :
+                           ($up & S_IXUSR ? q{x} : q{-})),
+            ($up & S_IRGRP ? q{r} : q{-}),
+            ($up & S_IWGRP ? q{w} : q{-}),
+            ($up & S_ISGID ? ($up & S_IXGRP ? q{s} : q{S}) :
+                           ($up & S_IXGRP ? q{x} : q{-})),
+            ($up & S_IROTH ? q{r} : q{-}),
+            ($up & S_IWOTH ? q{w} : q{-}),
+            ($up & S_ISVTX ? ($up & S_IXOTH ? q{t} : q{T}) :
+                           ($up & S_IXOTH ? q{x} : q{-})),
             ($ent->{FileIsDir} == 1 ? $ent->{OffspringCount} + 2 : 1),
             $user || $uid, $group || $gid,
             ($ent->{FileIsDir} == 1 ? 0 : $ent->{$DForkLenKey}),
@@ -1111,7 +1098,7 @@ sub do_listentries {
                     }
 
                     printf(" \%d: \%s:\%s \%s \%s\n", $i, $idtype,
-                            $name->{UTF8Name}, $kind, @actions);
+                            $name->{UTF8Name}, $kind, join(',', @actions));
                 }
             }
         }
@@ -1193,7 +1180,7 @@ COLLECT_PATHS:
                                DirectoryBitmap  => $dirBmp,
                                ReqCount         => 256,
                                StartIndex       => scalar(keys %entries) + 1,
-                               MaxReplySize     => 2**15 - 1,
+                               MaxReplySize     => $MaxReplySize,
                                PathType         => $pathType,
                                Pathname         => $expath->[1]);
                 if ($rc == $kFPNoErr || $rc == $kFPObjectNotFound) {

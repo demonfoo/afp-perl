@@ -13,7 +13,7 @@ use Net::AFP::Parsers;
 use Net::AFP::Result;
 use Net::DSI;
 use Exporter qw(import);
-use Log::Log4perl qw(:easy);
+use Log::Log4perl;
 
 use base qw(Net::AFP);
 our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
@@ -30,9 +30,8 @@ our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
 #          is to be used (default is 548).
 sub new { # {{{1
     my ($class, $host, $port, %params) = @_;
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     my $obj = $class->SUPER::new($host, $port);
+    $obj->{logger}->debug('called ', (caller(0))[3], '()');
 
     $obj->{Session} = Net::DSI->new($host, $port);
     my($rc, %opts) = $obj->{Session}->OpenSession();
@@ -50,8 +49,7 @@ sub new { # {{{1
 
 sub close { # {{{1
     my ($self) = @_;
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
+    $self->{logger}->debug('called ', (caller(0))[3], '()');
 
     $self->{Session}->CloseSession();
     $self->{Session}->close();
@@ -60,31 +58,35 @@ sub close { # {{{1
 
 sub CheckAttnQueue { # {{{1
     my ($self) = @_;
+    $self->{logger}->debug('called ', (caller(0))[3], '()');
 
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     my $attnq = $self->{Session}{Shared}{attnq};
     my $vol_update_checked;
     while (my $msg = shift(@{$attnq})) {
         if ($msg & 0x8_000) {    # server says it's shutting down
-            $logger->info('CheckAttnQueue(): Received notification of server intent to shut down');
-            $logger->info('Shutdown in ', ($msg & 0xFFF), ' minutes');
+            $self->{logger}->info('CheckAttnQueue(): Received notification of server intent to shut down');
+            $self->{logger}->info('Shutdown in ', ($msg & 0xFFF), ' minutes');
+
             if ($msg & 0x2_000) { # server also has a message for us
                 my $MsgData;
                 $self->FPGetSrvrMsg(1, 3, \$MsgData);
                 if ($MsgData->{ServerMessage} ne q{}) {
-                    $logger->info(q{Shut down message: "}, $MsgData->{ServerMessage}, q{"});
+                    $self->{logger}->info(q{Shut down message: "}, $MsgData->{ServerMessage}, q{"});
                 }
             }
         }
         elsif ($msg & 0x4_000) { # server says it's crashing
-            $logger->info('CheckAttnQueue(): Received notification server is crashing; should really attempt reconnection, I suppose...');
+            $self->{logger}->info(q{CheckAttnQueue(): Received notification } .
+                q{server is crashing; should really attempt reconnection, I } .
+                q{suppose...});
         }
         elsif ($msg & 0x2_000) { # server message?
             if ($msg & 0x1_000) { # server notification
                 if ($msg & 0x1) {
                     next if $vol_update_checked;
-                    $logger->info('CheckAttnQueue(): ModDate updated on an attached volume, should do FPGetVolParms() to recheck');
+                    $self->{logger}->info(q{CheckAttnQueue(): ModDate } .
+                        q{updated on an attached volume, should do } .
+                        q{FPGetVolParms() to recheck});
                     $vol_update_checked = 1;
                 }
             }
@@ -92,7 +94,7 @@ sub CheckAttnQueue { # {{{1
                 my $MsgData;
                 $self->FPGetSrvrMsg(1, 3, \$MsgData);
                 if ($MsgData->{ServerMessage} ne q{}) {
-                    $logger->info(q{Server message: "}, $MsgData->{ServerMessage}, q{"});
+                    $self->{logger}->info(q{Server message: "}, $MsgData->{ServerMessage}, q{"});
                 }
             }
         }
@@ -104,9 +106,8 @@ sub CheckAttnQueue { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
     my ($self, $payload, $resp_r, $can_cache) = @_;
+    $self->{logger}->debug('called ', (caller(0))[3], '()');
 
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     $self->CheckAttnQueue();
     if ($can_cache && exists $self->{ReplayCache}) {
         do {
@@ -122,9 +123,8 @@ sub SendAFPMessage { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPWrite { # {{{1
     my ($self, $payload, $data_r, $d_len, $resp_r) = @_;
+    $self->{logger}->debug('called ', (caller(0))[3], '()');
 
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     $self->CheckAttnQueue();
     return $self->{Session}->Write($payload, $data_r, $d_len, $resp_r);
 } # }}}1
@@ -134,9 +134,9 @@ sub GetStatus { # {{{1
     if (ref($class)) {
         croak('GetStatus() should NEVER be called against an active object');
     }
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug('called ', (caller(0))[3], '()');
 
-    my $logger = get_logger('status');
-    $logger->debug('called ', (caller(0))[3]);
     my $obj = Net::DSI->new($host, $port);
     my $resp;
     my $rc = $obj->GetStatus(\$resp);

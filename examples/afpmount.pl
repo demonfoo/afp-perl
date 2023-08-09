@@ -19,6 +19,7 @@ use Errno qw(:POSIX);
 use URI::Escape;
 use English qw(-no_match_vars);
 use Readonly;
+use Log::Log4perl;
 
 # Do conditional includes of several modules, and denote to ourselves
 # if they got imported or not.
@@ -181,7 +182,7 @@ _EOT_
 } #}}}1
 
 # Handle the command line args. {{{1
-my($interactive, $options, $prefer_v4, $atalk_first);
+my($interactive, $options, $prefer_v4, $atalk_first, $debug_afp, $debug_dsi, $debug_fuse);
 # For now accept --options/-o, and just don't do anything with the option
 # string we get, that allows mounting via fstab to work.
 GetOptions('interactive'    => \$interactive,
@@ -190,7 +191,42 @@ GetOptions('interactive'    => \$interactive,
            'list-mounts=s'  => \&list_mounts,
            'list-servers'   => \&list_servers,
            '4|prefer-v4'    => \$prefer_v4,
-           'atalk-first'    => \$atalk_first) || exit EINVAL;
+           'atalk-first'    => \$atalk_first,
+           'debug-afp'      => \$debug_afp,
+           'debug-dsi'      => \$debug_dsi,
+           'debug-fuse'     => \$debug_fuse) || exit EINVAL;
+
+my $logconf = <<'_EOT_';
+log4perl.appender.Syslog = Log::Dispatch::Syslog
+log4perl.appender.Syslog.Facility = user
+log4perl.appender.Syslog.layout = PatternLayout
+log4perl.appender.Syslog.layout.ConversionPattern = [%P] %F line: %L %c - %m%n
+
+log4perl.appender.Console = Log::Log4perl::Appender::Screen
+log4perl.appender.Console.layout = SimpleLayout
+log4perl.appender.Syslog.Threshold = INFO
+
+log4perl.logger = INFO, Syslog
+_EOT_
+
+if (defined $debug_afp) {
+    $logconf .= <<'_EOT_';
+log4perl.logger.Net.AFP = DEBUG, Console
+_EOT_
+}
+
+if (defined $debug_dsi) {
+    $logconf .= <<'_EOT_';
+log4perl.logger.Net.DSI = DEBUG, Console
+_EOT_
+}
+
+if (defined $debug_fuse) {
+    $logconf .= <<'_EOT_';
+log4perl.logger.Fuse.AFP = DEBUG, Console
+_EOT_
+}
+Log::Log4perl->init(\$logconf);
 
 my($path, $mountpoint) = @ARGV;
 
@@ -370,23 +406,15 @@ $options{fsname}      = $path;
 delete $options{encoding};
 delete $options{novolicon};
 
-my $debug;
-our $_DEBUG;
+my %mainopts;
 
 if (exists $options{debug}) {
-    $debug = 1;
     delete $options{debug};
-    $_DEBUG = 1;
-}
-
-my %mainopts = (
-                 mountpoint => $mountpoint,
-                 mountopts  => join(q{,}, map { $_ . (defined($options{$_}) ? q{=} . $options{$_} : q{}) } keys %options ),
-               );
-
-if ($debug) {
     $mainopts{debug} = 1;
 }
+
+$mainopts{mountpoint} = $mountpoint;
+$mainopts{mountopts}  = join(q{,}, map { $_ . (defined($options{$_}) ? q{=} . $options{$_} : q{}) } keys %options );
 
 $fuse->main(%mainopts);
 

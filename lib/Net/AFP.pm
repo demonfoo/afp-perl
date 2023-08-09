@@ -21,10 +21,11 @@ use Net::AFP::Versions;
 use Encode;
 use Unicode::Normalize qw(compose decompose);
 use Exporter qw(import);
-use Log::Log4perl qw(:easy);
+use Log::Log4perl;
 use Params::Validate qw(:all);
 use Carp;
 use Readonly;
+use Data::Dumper;
 # }}}1
 
 our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
@@ -130,26 +131,13 @@ Readonly our $kFPResourceDataFlag   => 0x80;
 # talk over, so we want this to be as generic as possible.
 sub new { # {{{1
     my ($class, $host, $port) = @_;
-    DEBUG('called ', (caller 0)[3]);
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug(sprintf(q{called %s(host = '%s', port = '%s'},
+                    (caller 0)[3], $host, $port));
+
     my $obj = {};
+    $obj->{logger} = $logger;
     bless $obj, $class;
-    my $logparms = <<'_EOT_';
-log4perl.logger = INFO, status
-log4perl.appender.status = Log::Dispatch::Syslog
-log4perl.appender.status.Facility = user
-log4perl.appender.status.layout = PatternLayout
-log4perl.appender.status.layout.ConversionPattern = [%P] %F line: %L %c - %m%n
-
-_EOT_
-
-#    if (defined $::__AFP_DEBUG) {
-#        $logparms .= <<_EOT_;
-#log4perl.logger = DEBUG, stderr
-#
-#_EOT_
-##        push(@logparms, { level => $DEBUG, file => 'STDERR' });
-#    }
-    Log::Log4perl->init(\$logparms);
     return $obj;
 } # }}}1
 
@@ -159,14 +147,16 @@ _EOT_
 # Outside callers should be using the methods implemented for the AFP
 # operations.
 sub SendAFPMessage { # {{{1
-    ERROR('called ', (caller 0)[3], ' at line ', (caller 0)[2],
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->error('called ', (caller 0)[3], ' at line ', (caller 0)[2],
             ((caller 0)[1] eq q/-/ ? ' on standard in' : ' in file ' .
             (caller 0)[1]));
     croak('Do not call the base class SendAFPMessage method');
 } # }}}1
 
 sub SendAFPWrite { # {{{1
-    ERROR('called ', (caller 0)[3], ' at line ', (caller 0)[2],
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->error('called ', (caller 0)[3], ' at line ', (caller 0)[2],
             ((caller 0)[1] eq q/-/ ? ' on standard in' : ' in file ' .
             (caller 0)[1]));
     croak('Do not call the base class SendAFPWrite method');
@@ -174,6 +164,7 @@ sub SendAFPWrite { # {{{1
 
 sub PackagePath { # {{{1
     my ($PathType, $Pathname, $NoEncType) = @_;
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
 
     $Pathname ||= q//;
 
@@ -189,8 +180,8 @@ sub PackagePath { # {{{1
             return pack('CNn/a*', $PathType, 0, $encodedPath);
         }
     }
-    ERROR("Invalid path type ", $PathType, "; called from '", (caller(1))[1],
-            "', line ", (caller(1))[2]);
+    $logger->error(q{Invalid path type }, $PathType, q{; called from '}, (caller(1))[1],
+            q{', line }, (caller(1))[2]);
     croak;
 } # }}}1
 
@@ -261,7 +252,8 @@ sub PackSetParams { # {{{1
 sub FPAccess { # {{{1
     my($self, @options) = @_;
 
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
     my %options = validate(@options, {
         VolumeID    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -302,7 +294,8 @@ sub FPAccess { # {{{1
 sub FPAddAPPL { # {{{1
     my($self, @options) = @_;
     
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
     my %options = validate(@options, {
         DTRefNum    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -329,7 +322,8 @@ sub FPAddAPPL { # {{{1
 sub FPAddComment { # {{{1
     my($self, @options) = @_;
 
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
     my %options = validate(@options, {
         DTRefNum    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -356,7 +350,8 @@ sub FPAddComment { # {{{1
 sub FPAddIcon { # {{{1
     my($self, @options) = @_;
 
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
     my %options = validate(@options, {
         DTRefNum    => { type => SCALAR },
         FileCreator => { type => SCALAR },
@@ -376,7 +371,8 @@ sub FPAddIcon { # {{{1
 sub FPByteRangeLock { # {{{1
     my($self, @options) = @_;
 
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
     my %options = validate(@options, {
         Flags       => {
             type        => SCALAR,
@@ -394,17 +390,17 @@ sub FPByteRangeLock { # {{{1
             @options{'Flags', 'OForkRefNum', 'Offset', 'Length'});
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
-    if ($rc == $kFPNoErr) {
-        croak('Need to accept returned list') if not wantarray();
-        return($rc, unpack('N', $resp));
-    }
-    return $rc;
+    return $rc if $rc != $kFPNoErr;
+
+    croak('Need to accept returned list') if not wantarray();
+    return($rc, unpack('N', $resp));
 } # }}}1
 
 sub FPByteRangeLockExt { # {{{1
     my($self, @options) = @_;
 
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
     my %options = validate(@options, {
         Flags       => {
             type        => SCALAR,
@@ -424,18 +420,16 @@ sub FPByteRangeLockExt { # {{{1
             ll_convert($options{Length}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
-    if ($rc == $kFPNoErr) {
-        croak('Need to accept returned list') if not wantarray();
-        return($rc, ll_unconvert(unpack('NN', $resp)));
-    }
-    return $rc;
+    return $rc if $rc != $kFPNoErr;
+
+    croak('Need to accept returned list') if not wantarray();
+    return($rc, ll_unconvert(unpack('NN', $resp)));
 } # }}}1
 
 sub FPCatSearch {
     my ($self, %options) = @_;
 
-    #DEBUG('called ', (caller 0)[3]);
-    ERROR('called function ', (caller 0)[3], ' not implemented');
+    $self->{logger}->error('called function ', (caller 0)[3], ' not implemented');
     croak('VolumeID must be provided')
             if not exists $options{VolumeID};
     croak('ReqMatches must be provided')
@@ -455,8 +449,7 @@ sub FPCatSearch {
 sub FPCatSearchExt {
     my ($self, %options) = @_;
 
-    #DEBUG('called ', (caller 0)[3]);
-    ERROR('called function ', (caller 0)[3], ' not implemented');
+    $self->{logger}->error('called function ', (caller 0)[3], ' not implemented');
     croak('VolumeID must be provided')
             if not exists $options{VolumeID};
     croak('ReqMatches must be provided')
@@ -476,7 +469,7 @@ sub FPCatSearchExt {
 
 sub FPChangePassword { # {{{1
     my ($self, @options) = @_;
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug('called ', (caller 0)[3]);
 
     my($UAM, $UserName, $UserAuthInfo, $resp_r) =
             validate_pos(@options,
@@ -494,8 +487,8 @@ sub FPChangePassword { # {{{1
 
 sub FPCloseDir { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
     my($VolumeID, $DirectoryID) = 
             validate_pos(@options, { type => SCALAR }, { type => SCALAR });
@@ -506,8 +499,8 @@ sub FPCloseDir { # {{{1
 
 sub FPCloseDT { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($DTRefNum) = validate_pos(@options, { type => SCALAR });
 
@@ -516,8 +509,8 @@ sub FPCloseDT { # {{{1
 
 sub FPCloseFork { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
 
@@ -527,8 +520,8 @@ sub FPCloseFork { # {{{1
 
 sub FPCloseVol { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($VolumeID) = validate_pos(@options, { type => SCALAR });
 
@@ -538,8 +531,9 @@ sub FPCloseVol { # {{{1
 
 sub FPCopyFile { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         SourceVolumeID      => { type => SCALAR },
         SourceDirectoryID   => { type => SCALAR },
@@ -588,8 +582,9 @@ sub FPCopyFile { # {{{1
 
 sub FPCreateDir { # {{{1
     my($self, @options) = @_;
-    
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
+
     my %options = validate(@options, {
         VolumeID    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -616,8 +611,9 @@ sub FPCreateDir { # {{{1
 
 sub FPCreateFile { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
              VolumeID       => { type => SCALAR },
              DirectoryID    => { type => SCALAR },
@@ -641,8 +637,9 @@ sub FPCreateFile { # {{{1
 
 sub FPCreateID { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -670,8 +667,8 @@ sub FPCreateID { # {{{1
 
 sub FPDelete { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($VolumeID, $DirectoryID, $PathType, $Pathname) =
             validate_pos(@options,
@@ -695,8 +692,8 @@ sub FPDelete { # {{{1
 
 sub FPDeleteID { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($VolumeID, $FileID) = validate_pos(@options,
             { type => SCALAR }, { type => SCALAR });
@@ -707,8 +704,8 @@ sub FPDeleteID { # {{{1
 
 sub FPDisconnectOldSession { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($Type, $Token) = validate_pos(@options,
             { type => SCALAR }, { type => SCALAR });
@@ -719,8 +716,9 @@ sub FPDisconnectOldSession { # {{{1
 
 sub FPEnumerate { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
         DirectoryID     => { type => SCALAR },
@@ -789,8 +787,9 @@ sub FPEnumerate { # {{{1
 
 sub FPEnumerateExt { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
         DirectoryID     => { type => SCALAR },
@@ -857,8 +856,9 @@ sub FPEnumerateExt { # {{{1
 
 sub FPEnumerateExt2 { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
         DirectoryID     => { type => SCALAR },
@@ -925,8 +925,9 @@ sub FPEnumerateExt2 { # {{{1
 
 sub FPExchangeFiles { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID            => { type => SCALAR },
         SourceDirectoryID   => { type => SCALAR },
@@ -962,8 +963,8 @@ sub FPExchangeFiles { # {{{1
 
 sub FPFlush { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($VolumeID) = validate_pos(@options, { type => SCALAR });
 
@@ -973,8 +974,8 @@ sub FPFlush { # {{{1
 
 sub FPFlushFork { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
 
@@ -984,8 +985,9 @@ sub FPFlushFork { # {{{1
 
 sub FPGetACL { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
         DirectoryID     => { type => SCALAR },
@@ -1052,8 +1054,9 @@ sub FPGetACL { # {{{1
 
 sub FPGetAPPL { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         DTRefNum    => { type => SCALAR },
         FileCreator => { type => SCALAR },
@@ -1086,7 +1089,8 @@ sub FPGetAPPL { # {{{1
 
 sub FPGetAuthMethods { # {{{1
     my($self, @options) = @_;
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($Flags, $PathType, $Pathname, $resp_r) = validate_pos(@options,
             {
@@ -1119,8 +1123,9 @@ sub FPGetAuthMethods { # {{{1
 
 sub FPGetComment { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         DTRefNum    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -1149,8 +1154,9 @@ sub FPGetComment { # {{{1
 
 sub FPGetExtAttr { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
         DirectoryID     => { type => SCALAR },
@@ -1191,11 +1197,9 @@ sub FPGetExtAttr { # {{{1
         Name            => { type => SCALAR },
     } );
 
-    my $msg = pack('CxnNnNNNNNa*x![s]n/a*', $kFPGetExtAttr,
-            @options{'VolumeID', 'DirectoryID', 'Bitmap'},
-            ll_convert($options{Offset}),
-            ll_convert($options{ReqCount}),
-            $options{MaxReplySize},
+    my $msg = pack('CxnNnQ>Q>Na*x![s]n/a*', $kFPGetExtAttr,
+            @options{'VolumeID', 'DirectoryID', 'Bitmap', 'Offset',
+                     'ReqCount', 'MaxReplySize'},
             PackagePath(@options{'PathType', 'Pathname'}),
             encode_utf8(decompose($options{Name})));
     my $resp;
@@ -1214,8 +1218,9 @@ sub FPGetExtAttr { # {{{1
 
 sub FPGetFileDirParms { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
         DirectoryID     => { type => SCALAR },
@@ -1258,8 +1263,8 @@ sub FPGetFileDirParms { # {{{1
 
 sub FPGetForkParms { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($OForkRefNum, $Bitmap, $resp_r) = validate_pos(@options,
             { type => SCALAR },
@@ -1281,8 +1286,9 @@ sub FPGetForkParms { # {{{1
 
 sub FPGetIcon { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         DTRefNum    => { type => SCALAR },
         FileCreator => { type => SCALAR },
@@ -1302,8 +1308,8 @@ sub FPGetIcon { # {{{1
 
 sub FPGetIconInfo { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($DTRefNum, $FileCreator, $IconIndex, $resp_r) =
             validate_pos(@options,
@@ -1325,28 +1331,32 @@ sub FPGetIconInfo { # {{{1
 
 sub FPGetSessionToken { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($Type, $timeStamp, $ID, $resp_r) = validate_pos(@options,
             {
                 type        => SCALAR,
                 callbacks   => {
-                    'valid type' => {
+                    'valid type' => sub {
                         $_[0] >= $kLoginWithoutID &&
                             $_[0] <= $kGetKerberosSessionKey
                     }
                 }
             },
-            { type => SCALAR },
+            { type => SCALAR, optional => 1 },
             { type => SCALAR, optional => 1, default => q{} },
             { type => SCALARREF });
 
     my $resp;
-    my $pack_mask = 'CxnN';
+    my $pack_mask = 'CxS>L>';
     my @params = ($kFPGetSessionToken, $Type, length($ID));
-    if ($Type == $kLoginWithTimeAndID || $Type == $kReconnWithTimeAndID) {
-        $pack_mask .= 'N';
+    if (defined $timeStamp) {
+        if (looks_like_number($timeStamp)) {
+            $pack_mask .= 'L>';
+        } else {
+            $pack_mask .= 'a*';
+        }
         push(@params, $timeStamp);
     }
     $pack_mask .= 'a*';
@@ -1362,8 +1372,8 @@ sub FPGetSessionToken { # {{{1
 
 sub FPGetSrvrInfo { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($resp_r) = validate_pos(@options, { type => SCALARREF });
 
@@ -1378,8 +1388,8 @@ sub FPGetSrvrInfo { # {{{1
 
 sub FPGetSrvrMsg { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($MessageType, $MessageBitmap, $resp_r) =
             validate_pos(@options,
@@ -1423,8 +1433,8 @@ sub FPGetSrvrMsg { # {{{1
 
 sub FPGetSrvrParms { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($resp_r) = validate_pos(@options, { type => SCALARREF });
 
@@ -1463,8 +1473,8 @@ sub FPGetSrvrParms { # {{{1
 
 sub FPGetUserInfo { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($Flags, $UserID, $Bitmap, $resp_r) =
             validate_pos(@options,
@@ -1520,8 +1530,8 @@ sub FPGetUserInfo { # {{{1
 
 sub FPGetVolParms { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($VolumeID, $Bitmap, $resp_r) = validate_pos(@options,
             { type => SCALAR },
@@ -1543,8 +1553,9 @@ sub FPGetVolParms { # {{{1
 
 sub FPListExtAttrs { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
         DirectoryID     => { type => SCALAR },
@@ -1599,8 +1610,8 @@ sub FPListExtAttrs { # {{{1
 
 sub FPLogin { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($AFPVersion, $UAM, $UserAuthInfo) =
             validate_pos(@options,
@@ -1627,22 +1638,30 @@ sub FPLogin { # {{{1
 sub FPLoginCont { # {{{1
     my ($self, @options) = @_;
 
-    DEBUG('called ', (caller 0)[3]);
-
     my($ID, $UserAuthInfo, $resp_r) =
             validate_pos(@options,
-                { type => SCALAR },
+                { type => SCALAR, optional => 1 },
                 { type => SCALAR, optional => 1, default => q{} },
                 { type      => SCALARREF,
                   optional  => 1,
                   default   => *foo{SCALAR}
                 });
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([$ID, unpack('H*', $UserAuthInfo), $resp_r])));
 
-    my $resp;
+
+    my($resp, $rc);
     # Unlike FPLogin, the pad byte actually does need to be there.
-    my $rc = $self->SendAFPMessage(pack('Cxna*', $kFPLoginCont, $ID,
-            $UserAuthInfo), \$resp);
-    
+
+    if (defined $ID) {
+        $rc = $self->SendAFPMessage(pack('Cxna*', $kFPLoginCont, $ID,
+                $UserAuthInfo), \$resp);
+    }
+    else {
+        $rc = $self->SendAFPMessage(pack('Cxa*', $kFPLoginCont,
+                $UserAuthInfo), \$resp);
+    }
+
     if (($rc == $kFPAuthContinue || $rc == $kFPNoErr)
             && defined($resp)) {
         ${$resp_r} = {};
@@ -1660,8 +1679,9 @@ sub FPLoginCont { # {{{1
 
 sub FPLoginExt { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         Flags           => {
             type        => SCALAR,
@@ -1724,16 +1744,15 @@ sub FPLoginExt { # {{{1
 
 sub FPLogout { # {{{1
     my ($self) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug('called ', (caller 0)[3], '()');
 
     return $self->SendAFPMessage(pack('Cx', $kFPLogout));
 } # }}}1
 
 sub FPMapID { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($Subfunction, $ID, $resp_r) =
             validate_pos(@options,
@@ -1784,8 +1803,9 @@ sub FPMapID { # {{{1
 
 sub FPMapName { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
-    DEBUG('called ', (caller 0)[3]);
     my($Subfunction, $Name, $resp_r) =
             validate_pos(@options,
                 {
@@ -1838,8 +1858,9 @@ sub FPMapName { # {{{1
 # I'm going to assume from here on out that that's the case.
 sub FPMoveAndRename { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID            => { type => SCALAR },
         SourceDirectoryID   => { type => SCALAR },
@@ -1888,8 +1909,9 @@ sub FPMoveAndRename { # {{{1
 
 sub FPOpenDir { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -1916,8 +1938,8 @@ sub FPOpenDir { # {{{1
 
 sub FPOpenDT { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($VolumeID, $resp_r) = validate_pos(@options,
             { type => SCALAR },
@@ -1933,8 +1955,9 @@ sub FPOpenDT { # {{{1
 
 sub FPOpenFork { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         Flag        => {
             type        => SCALAR,
@@ -1989,8 +2012,8 @@ sub FPOpenFork { # {{{1
 
 sub FPOpenVol { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($Bitmap, $VolumeName, $Password, $resp_r) =
             validate_pos(@options,
@@ -2034,8 +2057,9 @@ sub FPOpenVol { # {{{1
 
 sub FPRead { # {{{1
     my($self, @options) = @_;
-    
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
+
     my %options = validate(@options, {
         OForkRefNum => { type => SCALAR },
         Offset      => { type => SCALAR },
@@ -2068,16 +2092,17 @@ sub FPRead { # {{{1
 
 sub FPReadExt { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         OForkRefNum => { type => SCALAR },
         Offset      => { type => SCALAR },
         ReqCount    => { type => SCALAR },
     } );
     
-    my $msg = pack('CxnNNNN', $kFPReadExt, $options{OForkRefNum},
-            ll_convert($options{Offset}), ll_convert($options{ReqCount}));
+    my $msg = pack('CxnQ>Q>', $kFPReadExt,
+        @options{'OForkRefNum', 'Offset', 'ReqCount'});
 
     croak('Need to accept returned list') if not wantarray();
     my $rdata;
@@ -2087,8 +2112,9 @@ sub FPReadExt { # {{{1
 
 sub FPRemoveAPPL { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         DTRefNum    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -2113,7 +2139,8 @@ sub FPRemoveAPPL { # {{{1
 
 sub FPRemoveComment { # {{{1
     my($self, @options) = @_;
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($DTRefNum, $DirectoryID, $PathType, $Pathname) =
             validate_pos(@options,
@@ -2138,8 +2165,9 @@ sub FPRemoveComment { # {{{1
 
 sub FPRemoveExtAttr { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -2174,8 +2202,9 @@ sub FPRemoveExtAttr { # {{{1
 
 sub FPRename { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID    => { type => SCALAR },
         DirectoryID => { type => SCALAR },
@@ -2210,8 +2239,8 @@ sub FPRename { # {{{1
 
 sub FPResolveID { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($VolumeID, $FileID, $Bitmap, $resp_r) =
             validate_pos(@options,
@@ -2240,8 +2269,9 @@ sub FPResolveID { # {{{1
 
 sub FPSetACL { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
             VolumeID    => { type => SCALAR },
             DirectoryID => { type => SCALAR },
@@ -2300,14 +2330,15 @@ sub FPSetACL { # {{{1
         $msg .= pack('NN(a*)[' . scalar(@ace_list) . ']', scalar(@ace_list),
             $options{acl_flags}, @ace_list);
     }
-    
+
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
 sub FPSetDirParms { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
     
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID            => { type => SCALAR },
         DirectoryID         => { type => SCALAR },
@@ -2321,7 +2352,7 @@ sub FPSetDirParms { # {{{1
                             $kFPFinderInfoBit | $kFPOwnerIDBit |
                             $kFPGroupIDBit | $kFPAccessRightsBit |
                             $kFPUnixPrivsBit;
-                    !(~$mask & $_[0])
+                    !(~$mask & $_[0]);
                 },
             },
         },
@@ -2361,8 +2392,9 @@ sub FPSetDirParms { # {{{1
 
 sub FPSetExtAttr { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
         DirectoryID     => { type => SCALAR },
@@ -2398,9 +2430,8 @@ sub FPSetExtAttr { # {{{1
         AttributeData   => { type => SCALAR },
     } );
 
-    my $msg = pack('CxnNnNNa*x![s]n/a*N/a*', $kFPSetExtAttr,
-            @options{'VolumeID', 'DirectoryID', 'Bitmap'},
-            ll_convert($options{Offset}),
+    my $msg = pack('CxnNnQ>a*x![s]n/a*N/a*', $kFPSetExtAttr,
+            @options{'VolumeID', 'DirectoryID', 'Bitmap', 'Offset'},
             PackagePath(@options{'PathType', 'Pathname'}),
             encode_utf8(decompose($options{Name})),
             $options{AttributeData});
@@ -2409,8 +2440,9 @@ sub FPSetExtAttr { # {{{1
 
 sub FPSetFileDirParms { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID            => { type => SCALAR },
         DirectoryID         => { type => SCALAR },
@@ -2422,7 +2454,7 @@ sub FPSetFileDirParms { # {{{1
                     my $mask = $kFPAttributeBit | $kFPCreateDateBit |
                             $kFPModDateBit | $kFPBackupDateBit |
                             $kFPFinderInfoBit | $kFPUnixPrivsBit;
-                    !(~$mask & $_[0])
+                    !(~$mask & $_[0]);
                 },
             },
         },
@@ -2459,8 +2491,9 @@ sub FPSetFileDirParms { # {{{1
 
 sub FPSetFileParms { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         VolumeID            => { type => SCALAR },
         DirectoryID         => { type => SCALAR },
@@ -2473,7 +2506,7 @@ sub FPSetFileParms { # {{{1
                             $kFPModDateBit | $kFPBackupDateBit |
                             $kFPFinderInfoBit | $kFPLaunchLimitBit |
                             $kFPUnixPrivsBit;
-                    !(~$mask & $_[0])
+                    !(~$mask & $_[0]);
                 },
             },
         },
@@ -2510,8 +2543,8 @@ sub FPSetFileParms { # {{{1
 
 sub FPSetForkParms { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($OForkRefNum, $Bitmap, $ForkLen) = validate_pos(@options,
             { type => SCALAR },
@@ -2526,11 +2559,11 @@ sub FPSetForkParms { # {{{1
     my $packed = undef;
     if (($Bitmap & $kFPDataForkLenBit) or
         ($Bitmap & $kFPRsrcForkLenBit)) {
-        $packed = pack('N', $ForkLen);
+        $packed = pack('L>', $ForkLen);
     }
     elsif (($Bitmap & $kFPExtDataForkLenBit) or
              ($Bitmap & $kFPExtRsrcForkLenBit)) {
-        $packed = pack('NN', ll_convert($ForkLen));
+        $packed = pack('Q>', $ForkLen);
     }
 
     return $self->SendAFPMessage(pack('Cxnna*', $kFPSetForkParms,
@@ -2539,8 +2572,8 @@ sub FPSetForkParms { # {{{1
 
 sub FPSetVolParms { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($VolumeID, $Bitmap, $BackupDate) =
             validate_pos(@options,
@@ -2558,8 +2591,8 @@ sub FPSetVolParms { # {{{1
 
 sub FPSyncDir { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($VolumeID, $DirectoryID) = validate_pos(@options,
             { type => SCALAR },
@@ -2571,8 +2604,8 @@ sub FPSyncDir { # {{{1
 
 sub FPSyncFork { # {{{1
     my($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
 
@@ -2582,8 +2615,9 @@ sub FPSyncFork { # {{{1
 
 sub FPWrite { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         Flag        => {
             type        => SCALAR,
@@ -2613,8 +2647,9 @@ sub FPWrite { # {{{1
 
 sub FPWriteExt { # {{{1
     my($self, @options) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
 
-    DEBUG('called ', (caller 0)[3]);
     my %options = validate(@options, {
         Flag        => {
             type        => SCALAR,
@@ -2630,22 +2665,22 @@ sub FPWriteExt { # {{{1
     } );
     $options{ReqCount} ||= length(${$options{ForkData}});
 
-    my $msg = pack('CCnNNNN', $kFPWriteExt, @options{'Flag', 'OForkRefNum'},
-            ll_convert($options{Offset}), ll_convert($options{ReqCount}));
+    my $msg = pack('CCnQ>Q>', $kFPWriteExt, @options{'Flag', 'OForkRefNum',
+                                                     'Offset', 'ReqCount'});
 
     my $resp;
     my $rc = $self->SendAFPWrite($msg, @options{'ForkData', 'ReqCount'},
             \$resp);
     if ($rc == $kFPNoErr && wantarray()) {
-        return($rc, ll_unconvert(unpack('NN', $resp)));
+        return($rc, unpack('Q>', $resp));
     }
     return $rc;
 } # }}}1
 
 sub FPZzzzz { # {{{1
     my ($self, @options) = @_;
-
-    DEBUG('called ', (caller 0)[3]);
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper([@options])));
 
     my($Flags) = validate_pos(@options,
             {

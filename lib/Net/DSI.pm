@@ -9,6 +9,7 @@ use strict;
 use warnings;
 use diagnostics;
 use integer;
+use Log::Log4perl;
 use Data::Dumper;
 use English qw(-no_match_vars);
 
@@ -289,6 +290,7 @@ MAINLOOP:
 
 sub new { # {{{1
     my ($class, $host, $port, %params) = @_;
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
     $port ||= 548;
     my $obj = bless {}, $class;
 
@@ -308,6 +310,7 @@ sub new { # {{{1
         # server attention messages queued here, should have
         # Net::AFP::TCP check these
         attnq       => shared_clone([]),
+        #logger      => $logger,
     );
 
     $shared{id $obj}    = $shared;
@@ -324,6 +327,7 @@ sub new { # {{{1
 
     return $obj;
 } # }}}1
+
 sub close { # {{{1
     my ($self) = @_;
     $shared{id $self}{exit} = 1;
