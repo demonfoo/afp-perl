@@ -19,6 +19,7 @@ use Unicode::Normalize qw(compose decompose);
 use Socket;
 use Log::Log4perl;
 use Data::Dumper;
+use POSIX;
 
 use Exporter qw(import);
 
@@ -35,7 +36,18 @@ eval {
 };
 
 # This is zero time for AFP - 1 Jan 2000 00:00 GMT.
-sub globalTimeOffset { return 946_684_800; }
+sub globalTimeOffset {
+    my $tzval = $ENV{TZ};
+    $ENV{TZ} = q{GMT};
+    my $time = mktime(0, 0, 0, 1, 0, 100);
+    if (defined $tzval) {
+        $ENV{TZ} = $tzval;
+    }
+    else {
+        delete $ENV{TZ};
+    }
+    return $time;
+}
 
 sub uuid_unpack { # {{{1
     my($uuid_bin) = @_;
