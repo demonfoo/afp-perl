@@ -616,11 +616,10 @@ sub readlink { # {{{1
     my $filename = translate_path($file, $self);
 
     # Get the UNIX privilege info for the file.
-    my $filebitmap = $kFPUnixPrivsBit;
     my($rc, $resp) = $self->{afpconn}->FPGetFileDirParms(
             VolumeID    => $self->{volID},
             DirectoryID => $self->{topDirID},
-            FileBitmap  => $filebitmap,
+            FileBitmap  => $kFPUnixPrivsBit,
             PathType    => $self->{pathType},
             Pathname    => $filename);
     return -EACCES() if $rc == $kFPAccessDenied;
