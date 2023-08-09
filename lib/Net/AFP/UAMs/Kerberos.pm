@@ -6,13 +6,16 @@ use Readonly;
 Readonly my $UAMNAME => 'Client Krb v2';
 
 use GSSAPI;
+use Net::AFP::Parsers;
 use Net::AFP::Result;
 use Net::AFP::TokenTypes;
+use Net::AFP::SrvParms;
 use Net::AFP;
+use Data::Dumper;
 
 use strict;
 
-#Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 300);
+Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 300);
 
 sub Authenticate {
     my ($session, $AFPVersion, $username, $pw_cb, $realm) = @_;
@@ -24,60 +27,74 @@ sub Authenticate {
     die('Password callback MUST be a subroutine ref')
             unless ref($pw_cb) eq 'CODE';
 
-    # Try to get a Kerberos token, if we can...?
-    my $ctx;
-    my $gss_input_token = q();
-    my $status = GSSAPI::Context::init($ctx, GSS_C_NO_CREDENTIAL,
-            $realm, GSS_C_NO_OID, GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG,
-            0, GSS_C_NO_CHANNEL_BINDINGS, $gss_input_token, my $out_mech,
-            my $gss_output_token, my $out_flags, my $out_time);
+    my $srvInfo;
+    my $result = $session->FPGetSrvrInfo($srvInfo);
+    if (!($srvInfo->{Flags} & $kSupportsDirServices)) {
+        $session->{logger}->error('AFP server does not support KRB/dir services');
+        return $kFPBadUAM;
+    }
+    my $principal = $srvInfo->{DirectoryNames}[0];
 
-    $status || gss_exit('CLIENT::Unable to initialize security context', $status);
+    # Try to get a Kerberos token, if we can...?
+    my $ctx = new GSSAPI::Context;
+    my $target;
+    my $cred = GSS_C_NO_CREDENTIAL;
+    my $status = GSSAPI::Name->import($target, $principal, gss_nt_service_name)
+        or return $kFPMiscErr;
+
+    my $outtok;
+    my $inflags = GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG;
+    my $outflags;
+    my $challenge = '';
+    $status = $ctx->init($cred, $target, gss_mech_krb5, $inflags, 0,
+                GSS_C_NO_CHANNEL_BINDINGS, $challenge, undef, $outtok,
+                $outflags, undef);
+
+    $session->{logger}->debug(sprintf('state(0): %s; %s; output token sz: %d',
+                    $status->generic_message, $status->specific_message, length($outtok)));
+
+    if (GSSAPI::Status::GSS_ERROR($status->major)) {
+        $session->{logger}->error("GSSAPI Error (init): " . $status);
+        return $kFPMiscErr;
+    }
+
+    if ($status->major == GSS_S_COMPLETE) {
+        $session->{logger}->info('GSSAPI auth complete (we think)?');
+    }
 
     # Assuming that succeeded, now we do the first stage of the login process.
     my $resp = '';
     my $rc = $session->FPLoginExt(0, $AFPVersion, $UAMNAME, $kFPUTF8Name,
             $username, $kFPUTF8Name, $realm, undef, \$resp);
-    print 'FPLoginExt() completed with result code ', $rc, "\n"
-            if defined $::__AFP_DEBUG;
+    $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
 
     return $rc unless $rc == $kFPAuthContinue;
 
     # Now send the Kerberos ticket to the AFP server to be authorized...?
-    my $message = pack('C/a*x![s]S>/a*', $username, $gss_output_token);
+    my $message = pack('C/a*x![s]S>/a*', $username, $outtok);
     my $sresp;
+    # FIXME: I guess if we're using Kerberos v4, no ID should be passed,
+    # but how would I know? Apparently OS X only supports v5...
     $rc = $session->FPLoginCont($resp->{ID}, $message, \$sresp);
+    print Dumper(\$sresp);
 
     return $rc unless $rc == $kFPNoErr;
 
     # Get an encrypted Kerberos session key from the AFP server.
     my $enc_session_key;
-    # FIXME: What should the ID field contain? Docs don't really say...
-    $rc = $session->FPGetSessionToken(kGetKerberosSessionKey, 0, q{},
+    my $stamp = time() - globalTimeOffset;
+    $rc = $session->FPGetSessionToken($kGetKerberosSessionKey, $stamp, q{},
             \$enc_session_key);
     $status = $ctx->unwrap($enc_session_key, my $session_key,
-            my $conf_state, my $qop);
+            undef, undef);
+    if (!$status) {
+        $session->{logger}->error('GSSAPI Error (decode): ' . $status);
+        return $kFPMiscErr;
+    }
     # FIXME: Okay, should have the session key in $session_key! Now, what
     # the fuck do we do with it...
-    return $rc;
-
-}
-
-sub gss_exit {
-    my $errmsg = shift;
-    my $status = shift;
-
-    my @major_errors = $status->generic_message();
-    my @minor_errors = $status->specific_message();
-
-    print STDERR "$errmsg:\n";
-    foreach my $s (@major_errors) {
-        print STDERR "  MAJOR::$s\n";
-    }
-    foreach my $s (@minor_errors) {
-        print STDERR "  MINOR::$s\n";
-    }
-    return 1;
+    $session->{SessionKey} = $session_key;
+    return $kFPNoErr;
 }
 
 1;
