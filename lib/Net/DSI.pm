@@ -116,9 +116,9 @@ sub session_thread { # {{{1
     # several variables which will be used in the main loop.
     my $poll = IO::Poll->new();
     $poll->mask($conn, POLLIN | POLLHUP);
-    my ($data, $real_length, $resp, $type, $cmd, $id, $errcode, $length,
+    my ($data, $resp, $type, $cmd, $id, $errcode, $length,
             $reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref, $msg,
-            $wsz, $handler);
+            $wsz, $handler, $rlen);
     my $last_tickle     = gettimeofday();
     my $last_pkt_rcvd   = $last_tickle;
 MAINLOOP:
@@ -161,20 +161,19 @@ MAINLOOP:
             $shared->{conn_sem}->down();
             $rsz = 0;
             while ($rsz < 16) {
-                $length = sysread($conn, $resp, 16 - $rsz, $rsz);
+                $rsz += $rlen = sysread($conn, $resp, 16 - $rsz, $rsz);
                 # Some kind of error occurred...
-                if (!defined $length) {
+                if (!defined $rlen) {
                     print {\*STDERR} (caller(0))[3], "(): socket read received error ${ERRNO}\n";
                     $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
                 # This means the socket read returned EOF; we should go away.
-                if ($length == 0) {
+                if ($rlen == 0) {
                     #print {\*STDERR} (caller(0))[3], "(): socket read returned EOF\n";
                     $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
-                $rsz += $length;
             }
             $shared->{conn_sem}->up();
             next MAINLOOP unless $rsz == 16;
@@ -199,7 +198,19 @@ MAINLOOP:
                     $shared->{conn_sem}->down();
                     $rsz = 0;
                     while ($rsz < $length) {
-                        $rsz += sysread($conn, $data, $length - $rsz, $rsz);
+                        $rsz += $rlen = sysread($conn, $data, $length - $rsz, $rsz);
+#                        # Some kind of error occurred...
+#                        if (!defined $rlen) {
+#                            print {\*STDERR} (caller(0))[3], "(): socket read received error ${ERRNO}\n";
+#                            $shared->{conn_sem}->up();
+#                            last MAINLOOP;
+#                        }
+#                        # This means the socket read returned EOF; we should go away.
+#                        if ($rlen == 0) {
+#                            #print {\*STDERR} (caller(0))[3], "(): socket read returned EOF\n";
+#                            $shared->{conn_sem}->up();
+#                            last MAINLOOP;
+#                        }
                     }
                     $last_pkt_rcvd = gettimeofday();
                     $shared->{conn_sem}->up();
@@ -238,16 +249,28 @@ MAINLOOP:
                 }
             }
 
-            $real_length = 0;
+            $rsz = 0;
             # Perl 5.18 gets bitchy if sysread() is passed a variable
             # containing undef.
             ${$rb_ref} = q{};
             # Get any additional data from the server, if the message
             # indicated that there was a payload.
             $shared->{conn_sem}->down();
-            while ($real_length < $length) {
-                $real_length += sysread($conn, ${$rb_ref},
-                        $length - $real_length, $real_length);
+            while ($rsz < $length) {
+                $rsz += $rlen = sysread($conn, ${$rb_ref},
+                        $length - $rsz, $rsz);
+#                # Some kind of error occurred...
+#                if (!defined $rlen) {
+#                    print {\*STDERR} (caller(0))[3], "(): socket read received error ${ERRNO}\n";
+#                    $shared->{conn_sem}->up();
+#                    last MAINLOOP;
+#                }
+#                # This means the socket read returned EOF; we should go away.
+#                if ($rlen == 0) {
+#                    #print {\*STDERR} (caller(0))[3], "(): socket read returned EOF\n";
+#                    $shared->{conn_sem}->up();
+#                    last MAINLOOP;
+#                }
             }
             $last_pkt_rcvd = gettimeofday();
             $shared->{conn_sem}->up();
