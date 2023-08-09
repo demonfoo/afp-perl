@@ -293,7 +293,7 @@ sub FPAccess { # {{{1
 
 sub FPAddAPPL { # {{{1
     my($self, @options) = @_;
-    
+
     $self->{logger}->debug(sprintf(q{called %s(%s)},
                     (caller 0)[3], Dumper({@options})));
     my %options = validate(@options, {
@@ -414,16 +414,14 @@ sub FPByteRangeLockExt { # {{{1
         Length      => { type => SCALAR },
     } );
 
-    my $msg = pack('CCnNNNN', $kFPByteRangeLockExt,
-            @options{'Flags', 'OForkRefNum'},
-            ll_convert($options{Offset}),
-            ll_convert($options{Length}));
+    my $msg = pack('CCnQ>Q>', $kFPByteRangeLockExt,
+            @options{'Flags', 'OForkRefNum', 'Offset', 'Length'});
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     return $rc if $rc != $kFPNoErr;
 
     croak('Need to accept returned list') if not wantarray();
-    return($rc, ll_unconvert(unpack('NN', $resp)));
+    return($rc, unpack('Q>', $resp));
 } # }}}1
 
 sub FPCatSearch {
@@ -490,7 +488,7 @@ sub FPCloseDir { # {{{1
     $self->{logger}->debug(sprintf(q{called %s(%s)},
                     (caller 0)[3], Dumper({@options})));
 
-    my($VolumeID, $DirectoryID) = 
+    my($VolumeID, $DirectoryID) =
             validate_pos(@options, { type => SCALAR }, { type => SCALAR });
 
     return $self->SendAFPMessage(pack('CxnN', $kFPCloseDir, $VolumeID,
@@ -1317,7 +1315,7 @@ sub FPGetIconInfo { # {{{1
                 { type => SCALAR },
                 { type => SCALAR },
                 { type => SCALARREF });
-    
+
     my $resp;
     my $msg = pack('CxnNn', $kFPGetIconInfo, $DTRefNum, $FileCreator,
             $IconIndex);
@@ -1498,7 +1496,7 @@ sub FPGetUserInfo { # {{{1
             $UserID, $Bitmap), \$resp);
 
     return $rc if $rc != $kFPNoErr;
-    
+
     my $rbmp = unpack('n', $resp);
     my $offset = 2;
     ${$resp_r} = {};
@@ -1624,7 +1622,7 @@ sub FPLogin { # {{{1
     my $resp;
     my %rvals;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    
+
     croak('Need to accept returned list') if not wantarray();
     if ($rc == $kFPAuthContinue and length($resp) >= 2) {
         $rvals{ID} = unpack('n', $resp);
@@ -1652,7 +1650,6 @@ sub FPLoginCont { # {{{1
 
     my($resp, $rc);
     # Unlike FPLogin, the pad byte actually does need to be there.
-
     if (defined $ID) {
         $rc = $self->SendAFPMessage(pack('Cxna*', $kFPLoginCont, $ID,
                 $UserAuthInfo), \$resp);
@@ -1731,7 +1728,7 @@ sub FPLoginExt { # {{{1
     my $resp;
     my %rvals;
     my $rc = $self->SendAFPMessage($msg, \$resp);
-    
+
     croak('Need to accept returned list') if not wantarray();
     if ($rc == $kFPAuthContinue and length($resp) >= 2) {
         $rvals{ID} = unpack('n', $resp);
@@ -2026,7 +2023,7 @@ sub FPOpenVol { # {{{1
             { type => SCALAR },
             { type => SCALAR | UNDEF, optional => 1, default => q{} },
             { type => SCALARREF });
-    
+
     # Make sure the VolID bit is set, because it's kind of necessary.
     $Bitmap |= $kFPVolIDBit;
 
