@@ -952,7 +952,7 @@ sub FPExchangeFiles { # {{{1
     my $msg = pack('CxnNNa*a*', $kFPExchangeFiles,
             @options{qw[VolumeID SourceDirectoryID DestDirectoryID]},
             PackagePath(@options{qw[SourcePathType SourcePathname]}),
-            PackagePath(@options{qw[DestPathType DestPathname]));
+            PackagePath(@options{qw[DestPathType DestPathname]}));
     return $self->SendAFPMessage($msg, undef, 1);
 } # }}}1
 
