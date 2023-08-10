@@ -2,11 +2,9 @@
 # Authentication Method for AFP sessions. It uses a Diffie-Hellman key
 # exchange to establish a keyset that can be used for (reasonably) secure
 # password-based authentication without the need for prehashed passwords.
-# It requires the Crypt::CBC module to provide a cipher-block-chaining
-# layer, and Crypt::CAST5 to provide the CAST5 (aka CAST128) encryption
-# method used to secure the data over the wire. Math::BigInt::GMP is
-# recommended for fast large-integer operations, as Math::BigInt::Calc
-# works but is quite slow.
+# It requires CryptX for various crypto-related actions.
+# Math::BigInt::GMP is recommended for fast large-integer operations,
+# as Math::BigInt::Calc works but is quite slow.
 
 # This UAM was added as of AFP 3.0. (Later backported to Classic - AFP 2.3?)
 
@@ -15,38 +13,21 @@ use Modern::Perl '2021';
 use diagnostics;
 use integer;
 use Carp;
-use Bytes::Random::Secure qw(random_bytes);
 
 use Readonly;
 Readonly my $UAMNAME => 'DHCAST128';
 
-Readonly my $C2SIV => 'LWallace';
-Readonly my $S2CIV => 'CJalbert';
+# Crypt::Mode::CBC doesn't like if I make these Readonly.
+my $C2SIV = 'LWallace';
+my $S2CIV = 'CJalbert';
 
 Readonly my $len => 16;
 Readonly my $nonce_len => 16;
 Readonly my $pw_len => 64;
 
-# Provides the encryption algorithm.
-my $has_Crypt__CAST5_PP = 0;
-eval {
-    require Crypt::CAST5_PP;
-    1;
-} and do {
-    $has_Crypt__CAST5_PP = 1;
-};
-
-my $has_Crypt__CAST5 = 0;
-eval {
-    require Crypt::CAST5;
-    1;
-} and do {
-    $has_Crypt__CAST5 = 1;
-};
-croak("No CAST5 implementation was available?")
-        unless $has_Crypt__CAST5 || $has_Crypt__CAST5_PP;
-# Provides the cipher-block chaining layer over the encryption algorithm.
-use Crypt::CBC;
+# CryptX modules for crypto-related functionality.
+use Crypt::Mode::CBC;
+use Crypt::PRNG qw(random_bytes);
 # Pull in the module containing all the result code symbols.
 use Net::AFP::Result;
 # Provides large-integer mathematics features, necessary for the
@@ -133,14 +114,9 @@ sub Authenticate {
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
     $session->{SessionKey} = zeropad($K->to_bytes(), $len);
-    my $ctx = Crypt::CBC->new({ key     => $session->{SessionKey},
-                                cipher  => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
-                                padding => 'none',
-                                pbkdf   => 'none',
-                                header  => 'none',
-                                iv      => $S2CIV });
+    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
     undef $K;
-    my $decrypted = $ctx->decrypt($message);
+    my $decrypted = $ctx->decrypt($message, $session->{SessionKey}, $S2CIV);
     $session->{logger}->debug('$decrypted is 0x', unpack('H*', $decrypted));
 
     # The nonce is a random value that the server sends as a check; we add
@@ -155,8 +131,7 @@ sub Authenticate {
     my $authdata = pack('a[' . $nonce_len . ']a[' . $pw_len . ']',
 	                zeropad($nonce->to_bytes(), $nonce_len), &{$pw_cb}());
     undef $nonce;
-    $ctx->set_initialization_vector($C2SIV);
-    my $ciphertext = $ctx->encrypt($authdata);
+    my $ciphertext = $ctx->encrypt($authdata, $session->{SessionKey}, $C2SIV);
     undef $authdata;
     $session->{logger}->debug('$ciphertext is 0x', unpack('H*', $ciphertext));
 
@@ -220,14 +195,11 @@ sub ChangePassword {
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
-    my $ctx = Crypt::CBC->new({ key     => zeropad($K->to_bytes(), $len),
-                                cipher  => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
-                                padding => 'none',
-                                pbkdf   => 'none',
-                                header  => 'none',
-                                iv      => $S2CIV });
+    my $key = zeropad($K->to_bytes(), $len);
     undef $K;
-    my $decrypted = $ctx->decrypt(unpack('x2x' . $len . 'a32', $resp));
+    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
+    my $decrypted = $ctx->decrypt(unpack('x2x' . $len . 'a32', $resp), $key,
+            $S2CIV);
     $session->{logger}->debug('$decrypted is 0x', unpack('H*', $decrypted));
 
     # The nonce is a random value that the server sends as a check; we add
@@ -243,8 +215,7 @@ sub ChangePassword {
 	                zeropad($nonce->to_bytes(), $nonce_len), $newPassword,
                     $oldPassword);
     undef $nonce;
-    $ctx->set_initialization_vector($C2SIV);
-    my $ciphertext = $ctx->encrypt($authdata);
+    my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     undef $authdata;
     $session->{logger}->debug('$ciphertext is 0x', unpack('H*', $ciphertext));
 

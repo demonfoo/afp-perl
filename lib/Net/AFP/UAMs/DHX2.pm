@@ -1,7 +1,5 @@
 # This package fairly correctly implements the DHX2 User Authentication Method
-# for AFP sessions. It requires the Crypt::CBC module to provide a
-# cipher-block-chaining layer, and Crypt::CAST5 to provide the CAST5 (aka
-# CAST128) encryption method used to secure the data over the wire.
+# for AFP sessions. It requires CryptX for various crypto-related actions.
 # Math::BigInt::GMP is strongly recommended for fast large-integer
 # operations; the values this UAM deals with are much larger than the older
 # DHCAST128 UAM, causing the authentication process to be very slow with
@@ -15,44 +13,26 @@ use Modern::Perl '2021';
 use diagnostics;
 use integer;
 use Carp;
-use Bytes::Random::Secure qw(random_bytes);
 
 use Readonly;
 Readonly my $UAMNAME => 'DHX2';
 
-Readonly my $C2SIV => 'LWallace';
-Readonly my $S2CIV => 'CJalbert';
+# Crypt::Mode::CBC doesn't like if I make these Readonly.
+my $C2SIV = 'LWallace';
+my $S2CIV = 'CJalbert';
 
 Readonly my $nonce_len => 16;
 Readonly my $pw_len => 256;
 
-# Provides the encryption algorithm.
-my $has_Crypt__CAST5_PP = 0;
-eval {
-    require Crypt::CAST5_PP;
-    1;
-} and do {
-    $has_Crypt__CAST5_PP = 1;
-};
-
-my $has_Crypt__CAST5 = 0;
-eval {
-    require Crypt::CAST5;
-    1;
-} and do {
-    $has_Crypt__CAST5 = 1;
-};
-croak("No CAST5 implementation was available?")
-        unless $has_Crypt__CAST5 || $has_Crypt__CAST5_PP;
-
-# Provides the cipher-block chaining layer over the encryption algorithm.
-use Crypt::CBC;
+# CryptX modules for crypto-related functionality.
+use Crypt::Mode::CBC;
+use Crypt::PRNG qw(random_bytes);
+use Crypt::Digest::MD5 qw(md5);
 # Pull in the module containing all the result code symbols.
 use Net::AFP::Result;
 # Provides large-integer mathematics features, necessary for the
 # cryptographic exchanges and derivation of the key.
 use Math::BigInt lib => 'GMP';
-use Digest::MD5 qw(md5);
 use Net::AFP::Versions;
 use Log::Log4perl;
 
@@ -226,16 +206,12 @@ sub Authenticate {
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
     $session->{SessionKey} = md5(zeropad($K->to_bytes(), $len));
-    my $ctx = Crypt::CBC->new({ key     => $session->{SessionKey},
-                                cipher  => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
-                                padding => 'none',
-                                pbkdf   => 'none',
-                                header  => 'none',
-                                iv      => $C2SIV });
+    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
 
     # Encrypt the random nonce value we fetched above, then assemble the
     # message to send to the server.
-    my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len));
+    my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
+            $session->{SessionKey}, $C2SIV);
     my $message = pack('a[' . $len . ']a*', zeropad($Ma->to_bytes(), $len), $ciphertext);
     undef $Ma;
     undef $ciphertext;
@@ -253,8 +229,8 @@ sub Authenticate {
     # Decrypting message 4.
     # Decrypt the message from the server, and separate the (hopefully)
     # incremented nonce value from us, and the server's nonce value.
-    $ctx->set_initialization_vector($S2CIV);
-    my $decrypted = $ctx->decrypt($sresp->{UserAuthInfo});
+    my $decrypted = $ctx->decrypt($sresp->{UserAuthInfo},
+            $session->{SessionKey}, $S2CIV);
     $session->{logger}->debug('$decrypted is ', unpack('H*', $decrypted));
 
     # Check the client nonce, and see if it really was incremented like we
@@ -284,8 +260,7 @@ sub Authenticate {
     my $authdata = pack('a[' . $nonce_len . ']a[' . $pw_len . ']',
 	                zeropad($serverNonce->to_bytes(), $nonce_len), &{$pw_cb}());
     undef $serverNonce;
-    $ctx->set_initialization_vector($C2SIV);
-    $ciphertext = $ctx->encrypt($authdata);
+    $ciphertext = $ctx->encrypt($authdata, $session->{SessionKey}, $C2SIV);
     $session->{logger}->debug('$ciphertext is ', unpack('H*', $ciphertext));
 
     # Send the response back to the server, and hope we did this right.
@@ -360,16 +335,13 @@ sub ChangePassword {
 
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
-    my $ctx = Crypt::CBC->new({ key     => md5(zeropad($K->to_bytes(), $len)),
-                                cipher  => $has_Crypt__CAST5 ? 'CAST5' : 'CAST5_PP',
-                                padding => 'none',
-                                pbkdf   => 'none',
-                                header  => 'none',
-                                iv      => $C2SIV });
+    my $key = md5(zeropad($K->to_bytes(), $len));
+    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
 
     # Encrypt the random nonce value we fetched above, then assemble the
     # message to send to the server.
-    my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len));
+    my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
+            $key, $C2SIV);
     my $message = pack('na[' . $len . ']a*', $ID, zeropad($Ma->to_bytes(), $len), $ciphertext);
     undef $Ma;
     undef $ciphertext;
@@ -388,8 +360,7 @@ sub ChangePassword {
 
     # Decrypt the message from the server, and separate the (hopefully)
     # incremented nonce value from us, and the server's nonce value.
-    $ctx->set_initialization_vector($S2CIV);
-    my $decrypted = $ctx->decrypt($message);
+    my $decrypted = $ctx->decrypt($message, $key, $S2CIV);
     undef $message;
     $session->{logger}->debug('$decrypted is ', unpack('H*', $decrypted));
 
@@ -421,8 +392,7 @@ sub ChangePassword {
 	                zeropad($serverNonce->to_bytes(), $nonce_len),
 	                $newPassword, $oldPassword);
     undef $serverNonce;
-    $ctx->set_initialization_vector($C2SIV);
-    $ciphertext = $ctx->encrypt($authdata);
+    $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     $session->{logger}->debug('$ciphertext is ', unpack('H*', $ciphertext));
 
     $message = pack('na*', $ID, $ciphertext);
