@@ -67,9 +67,9 @@ sub GetCred {
     $ctx->set_initialization_vector($S2CIV);
     my $token = $ctx->decrypt($resp);
     print "decrypted token data is: ", unpack('H*', $token), "\n";
-    $session->{'cred', 's', 'm', 'exp', 'sessionInfo'} =
+    @{$session}{qw[cred s m exp sessionInfo]} =
         unpack('a[' . length($token) - 24 .  ']a[8]L>L>a[8]', $token);
-    $session->{t1} = $t1;
+    ${$session}{t1} = $t1;
 
     return 0;
 }
@@ -104,7 +104,7 @@ sub RefreshCred {
 
     $newctx->set_initialization_vector($S2CIV);
     my $token = $newctx->decrypt($resp);
-    $session->{'cred', 's', 'm', 'exp', 'sessionInfo'} =
+    @{$session}{qw[cred s m exp sessionInfo]} =
         unpack('a[' . length($token) - 24 .  ']a[8]L>L>a[8]', $token);
     return 0;
 }

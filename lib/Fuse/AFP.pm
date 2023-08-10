@@ -66,7 +66,7 @@ my $has_Data__UUID = 0;
 eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
 
 # Use a nice large blocksize to require fewer transactions with the server.
-Readonly my $IO_BLKSIZE         => 0x20_000;
+Readonly my $IO_BLKSIZE         => 0x40_000;
 
 # Special magic extended attribute names to take advantage of certain
 # AFP features.
@@ -107,7 +107,7 @@ sub new { # {{{1
     my($session, %urlparms);
     my $callback = sub {
         my(%values) = @_;
-        return &{$pw_cb}(@values{'username', 'host', 'password'});
+        return &{$pw_cb}(@values{qw[username host password]});
     };
     my $srvinfo;
     my %connopts;
@@ -3062,7 +3062,7 @@ sub acl_to_xattr { # {{{1
         }
         push(@acl_parts, pack('LS/aLL', $name->{Bitmap},
                 encode_utf8($name->{UTF8Name}),
-                @{$entry}{'ace_flags', 'ace_rights'}));
+                @{$entry}{qw[ace_flags ace_rights]}));
     }
     # Pack the ACL into a single byte sequence, and push it to
     # the client.

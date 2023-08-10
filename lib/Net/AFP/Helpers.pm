@@ -95,7 +95,7 @@ sub do_afp_connect {
         $rc = Net::AFP::Atalk->GetStatus($host, $port, \$srvInfo);
     }
     else {
-        $rc = Net::AFP::TCP->GetStatus(@values{'host', 'port'}, \$srvInfo);
+        $rc = Net::AFP::TCP->GetStatus(@values{qw[host port]}, \$srvInfo);
     }
     if ($rc != $kFPNoErr) {
         print STDERR "Could not issue GetStatus on ", $values{host}, "\n";

@@ -103,7 +103,7 @@ sub CompareByString {
     my($session, $verstring, $cmptype) = @_;
 
     return unless exists $versionmap{$verstring};
-    my($major, $minor) = @{$versionmap{$verstring}}{'MajorNumber', 'MinorNumber'};
+    my($major, $minor) = @{$versionmap{$verstring}}{qw[MajorNumber MinorNumber]};
     return CompareByVersionNum($session, $major, $minor, $cmptype);
 }
 
@@ -112,7 +112,7 @@ sub CompareByVersionNum {
 
     my $ver_str = ref($session) ? $session->{AFPVersion} : $session;
     my $running_ver = $versionmap{$ver_str};
-    my($r_major, $r_minor) = @{$running_ver}{'MajorNumber', 'MinorNumber'};
+    my($r_major, $r_minor) = @{$running_ver}{qw[MajorNumber MinorNumber]};
 
     if ($cmptype == $kFPVerNewerThan) {
         return(1) if $r_major > $major;
@@ -156,9 +156,9 @@ sub GetPreferredVersion {
                 next;
             }
             my($b_major, $b_minor) =
-                    @{$best_version}{'MajorNumber', 'MinorNumber'};
+                    @{$best_version}{qw[MajorNumber MinorNumber]};
             my($major, $minor) =
-                    @{$versionmap{$ver}}{'MajorNumber', 'MinorNumber'};
+                    @{$versionmap{$ver}}qw[MajorNumber MinorNumber]};
 
             if (($major > $b_major) ||
                     (($major == $b_major) && ($minor > $b_minor))) {

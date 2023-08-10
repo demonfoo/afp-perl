@@ -392,7 +392,7 @@ sub ParseFileParms { # {{{1
     }
     if ($Bitmap & $kFPUTF8NameBit) {
         my $position = unpack('x[' . $offset . ']S>', $data);
-        @{$resp}{'UTF8Hint', 'UTF8Name'} =
+        @{$resp}{qw[UTF8Hint UTF8Name]} =
                 unpack('x[' . $position . ']L>S>/a', $data);
         $resp->{UTF8Name} = compose(decode_utf8($resp->{UTF8Name}));
         $offset += 6;
@@ -403,7 +403,7 @@ sub ParseFileParms { # {{{1
         $offset += 8;
     }
     if ($Bitmap & $kFPUnixPrivsBit) {
-        @{$resp}{'UnixUID', 'UnixGID', 'UnixPerms', 'UnixAccessRights'} =
+        @{$resp}{qw[UnixUID UnixGID UnixPerms UnixAccessRights]} =
             unpack('x[' . $offset . ']L>L>L>L>', $data);
         $offset += 16;
     }
@@ -480,13 +480,13 @@ sub ParseDirParms { # {{{1
     }
     if ($Bitmap & $kFPUTF8NameBit) {
         my $position = unpack('x' . $offset . 'S>', $data);
-        @{$resp}{'UTF8Hint', 'UTF8Name'} =
+        @{$resp}{qw[UTF8Hint UTF8Name]} =
                 unpack('x' . $position . 'L>S>/a', $data);
         $resp->{UTF8Name} = compose(decode_utf8($resp->{UTF8Name}));
         $offset += 6;
     }
     if ($Bitmap & $kFPUnixPrivsBit) {
-        @{$resp}{'UnixUID', 'UnixGID', 'UnixPerms', 'UnixAccessRights'} =
+        @{$resp}{qw[UnixUID UnixGID UnixPerms UnixAccessRights]} =
             unpack('x[' . $offset . ']L>L>L>L>', $data);
         $offset += 16;
     }
