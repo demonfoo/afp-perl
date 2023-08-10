@@ -874,7 +874,7 @@ if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
         my ($text, $line, $start) = @_;
         if ($start == 0) {
             # try to expand commands
-            my @matches = grep { m{^$text} } keys %commands;
+            my @matches = grep { m{^$text}s } keys %commands;
             return @matches;
         }
         my $list = expand_globbed_path($session, $volID, $curdirnode, $text . '*');
