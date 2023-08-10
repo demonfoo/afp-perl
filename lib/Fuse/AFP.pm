@@ -71,6 +71,7 @@ Readonly my $IO_BLKSIZE         => 0x40_000;
 # Special magic extended attribute names to take advantage of certain
 # AFP features.
 Readonly my $ACL_XATTR          => 'system.afp_acl';
+Readonly my $ACL_NFS4_XATTR     => 'system.nfs4_acl';
 Readonly my $COMMENT_XATTR      => 'system.comment';
 
 # }}}1
@@ -316,8 +317,8 @@ sub new { # {{{1
             $obj->{client_uuid} = $uo->create_str();
         }
         else {
-            $obj->{logger}->warn('Need Data::UUID class for full ACL functionality, ACL ' .
-                    'checking disabled');
+            $obj->{logger}->info(q{Need Data::UUID class for full ACL } .
+                    q{functionality, ACL checking disabled});
         }
     }
     # }}}2
@@ -1596,7 +1597,8 @@ sub setxattr { # {{{1
     $attr = $self->{local_encode}->decode($attr);
 
     # handle ACL xattr {{{2
-    if ($attr eq $ACL_XATTR && defined($self->{client_uuid})) {
+    if (($attr eq $ACL_XATTR || $attr eq $ACL_NFS4_XATTR)
+            && defined($self->{client_uuid})) {
         my $rc = $self->{afpconn}->FPAccess(
                 VolumeID    => $self->{volID},
                 DirectoryID => $self->{topDirID},
@@ -1626,7 +1628,16 @@ sub setxattr { # {{{1
         }
 
         my $acl;
-        my $rv = $self->acl_from_xattr($value, \$acl);
+        my $rv;
+        if ($attr eq $ACL_XATTR) {
+            # Format is AFP ACL (well, _my_ serialization of it anyway).
+            $rv = $self->acl_from_xattr($value, \$acl);
+        }
+        elsif ($attr eq $ACL_NFS4_XATTR) {
+            # Format is NFSv4 ACL.
+            $rv = $self->acl_from_nfsv4_xattr($value, \$acl, $filename);
+        }
+
         if ($rv != 0) {
             return $rv;
         }
@@ -1838,7 +1849,7 @@ sub getxattr { # {{{1
     my $filename = translate_path($file, $self);
     $attr = $self->{local_encode}->decode($attr);
     # handle ACL xattr {{{2
-    if ($attr eq $ACL_XATTR &&
+    if (($attr eq $ACL_XATTR || $attr eq $ACL_NFS4_XATTR) &&
             defined($self->{client_uuid})) {
         my $rc = $self->{afpconn}->FPAccess(
                 VolumeID    => $self->{volID},
@@ -1864,7 +1875,14 @@ sub getxattr { # {{{1
         # Check to see if the server actually sent us an ACL in its
         # response; if the file has no ACL, it'll just not return one.
         if ($resp{Bitmap} & $kFileSec_ACL) {
-            return $self->acl_to_xattr(\%resp);
+            if ($attr eq $ACL_XATTR) {
+                # Format is AFP ACL (well, _my_ serialization of it anyway).
+                return $self->acl_to_xattr(\%resp);
+            }
+            elsif ($attr eq $ACL_NFS4_XATTR) {
+                # Format is NFSv4 ACL.
+                return $self->acl_to_nfsv4_xattr(\%resp, $filename);
+            }
         }
     } # }}}2
     # handle comment xattr {{{2
@@ -2087,6 +2105,7 @@ sub listxattr { # {{{1
         if ($rc == $kFPNoErr && ($resp{Bitmap} & $kFileSec_ACL)) {
             push @attrs, $ACL_XATTR;
         }
+        push @attrs, $ACL_NFS4_XATTR;
     } # }}}2
     # If the desktop DB was opened (should have been...), check for a
     # finder comment on the file.
@@ -2117,7 +2136,7 @@ sub removexattr { # {{{1
     my $filename = translate_path($file, $self);
     $attr = $self->{local_encode}->decode($attr);
     # handle ACL xattr {{{2
-    if ($attr eq $ACL_XATTR &&
+    if (($attr eq $ACL_XATTR || $attr eq $ACL_NFS4_XATTR) &&
             defined($self->{client_uuid})) {
         my $rc = $self->{afpconn}->FPAccess(
                 VolumeID    => $self->{volID},
@@ -3067,6 +3086,349 @@ sub acl_to_xattr { # {{{1
     # Pack the ACL into a single byte sequence, and push it to
     # the client.
     return pack('LS/(a*)', $acldata->{acl_flags}, @acl_parts);
+} # }}}1
+
+Readonly my $NFS4_ACL_WHO_OWNER_STRING       => q{OWNER@};
+Readonly my $NFS4_ACL_WHO_GROUP_STRING       => q{GROUP@};
+Readonly my $NFS4_ACL_WHO_EVERYONE_STRING    => q{EVERYONE@};
+
+# for nfs4_ace.type
+Readonly my $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE => 0;
+Readonly my $NFS4_ACE_ACCESS_DENIED_ACE_TYPE  => 1;
+Readonly my $NFS4_ACE_SYSTEM_AUDIT_ACE_TYPE   => 2;
+Readonly my $NFS4_ACE_SYSTEM_ALARM_ACE_TYPE   => 3;
+
+# for nfs4_ace.whotype
+Readonly my $NFS4_ACL_WHO_NAMED    => 0;
+Readonly my $NFS4_ACL_WHO_OWNER    => 1;
+Readonly my $NFS4_ACL_WHO_GROUP    => 2;
+Readonly my $NFS4_ACL_WHO_EVERYONE => 3;
+
+# for nfs4_ace.flag
+Readonly my $NFS4_ACE_FILE_INHERIT_ACE           => 0x00000001;
+Readonly my $NFS4_ACE_DIRECTORY_INHERIT_ACE      => 0x00000002;
+Readonly my $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE   => 0x00000004;
+Readonly my $NFS4_ACE_INHERIT_ONLY_ACE           => 0x00000008;
+Readonly my $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG => 0x00000010;
+Readonly my $NFS4_ACE_FAILED_ACCESS_ACE_FLAG     => 0x00000020;
+Readonly my $NFS4_ACE_IDENTIFIER_GROUP           => 0x00000040;
+
+# for nfs4_ace.access_mask
+Readonly my $NFS4_ACE_READ_DATA         => 0x00000001;
+Readonly my $NFS4_ACE_LIST_DIRECTORY    => 0x00000001;
+Readonly my $NFS4_ACE_WRITE_DATA        => 0x00000002;
+Readonly my $NFS4_ACE_ADD_FILE          => 0x00000002;
+Readonly my $NFS4_ACE_APPEND_DATA       => 0x00000004;
+Readonly my $NFS4_ACE_ADD_SUBDIRECTORY  => 0x00000004;
+Readonly my $NFS4_ACE_READ_NAMED_ATTRS  => 0x00000008;
+Readonly my $NFS4_ACE_WRITE_NAMED_ATTRS => 0x00000010;
+Readonly my $NFS4_ACE_EXECUTE           => 0x00000020;
+Readonly my $NFS4_ACE_DELETE_CHILD      => 0x00000040;
+Readonly my $NFS4_ACE_READ_ATTRIBUTES   => 0x00000080;
+Readonly my $NFS4_ACE_WRITE_ATTRIBUTES  => 0x00000100;
+Readonly my $NFS4_ACE_DELETE            => 0x00010000;
+Readonly my $NFS4_ACE_READ_ACL          => 0x00020000;
+Readonly my $NFS4_ACE_WRITE_ACL         => 0x00040000;
+Readonly my $NFS4_ACE_WRITE_OWNER       => 0x00080000;
+Readonly my $NFS4_ACE_SYNCHRONIZE       => 0x00100000;
+
+Readonly my $NFS4_ACE_GENERIC_READ => ($NFS4_ACE_READ_DATA |
+                                       $NFS4_ACE_READ_ATTRIBUTES |
+                                       $NFS4_ACE_READ_NAMED_ATTRS |
+                                       $NFS4_ACE_READ_ACL |
+                                       $NFS4_ACE_SYNCHRONIZE);
+
+Readonly my $NFS4_ACE_GENERIC_WRITE => ($NFS4_ACE_WRITE_DATA |
+                                        $NFS4_ACE_APPEND_DATA |
+                                        $NFS4_ACE_READ_ATTRIBUTES |
+                                        $NFS4_ACE_WRITE_ATTRIBUTES |
+                                        $NFS4_ACE_WRITE_NAMED_ATTRS |
+                                        $NFS4_ACE_READ_ACL |
+                                        $NFS4_ACE_WRITE_ACL |
+                                        $NFS4_ACE_DELETE_CHILD |
+                                        $NFS4_ACE_SYNCHRONIZE);
+
+Readonly my $NFS4_ACE_GENERIC_EXECUTE => ($NFS4_ACE_EXECUTE |
+                                          $NFS4_ACE_READ_ATTRIBUTES |
+                                          $NFS4_ACE_READ_ACL |
+                                          $NFS4_ACE_SYNCHRONIZE);
+
+Readonly my $NFS4_ACE_MASK_ALL => ($NFS4_ACE_GENERIC_READ |
+                                   $NFS4_ACE_GENERIC_WRITE |
+                                   $NFS4_ACE_GENERIC_EXECUTE |
+                                   $NFS4_ACE_DELETE |
+                                   $NFS4_ACE_WRITE_OWNER);
+
+my %afp_to_nfs4_access_bits = (
+    $KAUTH_VNODE_READ_DATA           => $NFS4_ACE_READ_DATA,
+    $KAUTH_VNODE_WRITE_DATA          => $NFS4_ACE_WRITE_DATA,
+    $KAUTH_VNODE_EXECUTE             => $NFS4_ACE_EXECUTE,
+    $KAUTH_VNODE_DELETE              => $NFS4_ACE_DELETE,
+    $KAUTH_VNODE_APPEND_DATA         => $NFS4_ACE_APPEND_DATA,
+    $KAUTH_VNODE_DELETE_CHILD        => $NFS4_ACE_DELETE_CHILD,
+    $KAUTH_VNODE_READ_ATTRIBUTES     => $NFS4_ACE_READ_ATTRIBUTES,
+    $KAUTH_VNODE_WRITE_ATTRIBUTES    => $NFS4_ACE_WRITE_ATTRIBUTES,
+    $KAUTH_VNODE_READ_EXTATTRIBUTES  => $NFS4_ACE_READ_NAMED_ATTRS,
+    $KAUTH_VNODE_WRITE_EXTATTRIBUTES => $NFS4_ACE_WRITE_NAMED_ATTRS,
+    $KAUTH_VNODE_READ_SECURITY       => $NFS4_ACE_READ_ACL,
+    $KAUTH_VNODE_WRITE_SECURITY      => $NFS4_ACE_WRITE_ACL,
+    $KAUTH_VNODE_TAKE_OWNERSHIP      => $NFS4_ACE_WRITE_OWNER,
+    $KAUTH_VNODE_SYNCHRONIZE         => $NFS4_ACE_SYNCHRONIZE,
+);
+
+my %afp_ace_flags_to_nfs4_flag_bits = (
+    $KAUTH_ACE_FILE_INHERIT      => $NFS4_ACE_FILE_INHERIT_ACE,
+    $KAUTH_ACE_DIRECTORY_INHERIT => $NFS4_ACE_DIRECTORY_INHERIT_ACE,
+    $KAUTH_ACE_LIMIT_INHERIT     => $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE,
+    $KAUTH_ACE_ONLY_INHERIT      => $NFS4_ACE_INHERIT_ONLY_ACE,
+    $KAUTH_ACE_SUCCESS           => $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG,
+    $KAUTH_ACE_FAILURE           => $NFS4_ACE_FAILED_ACCESS_ACE_FLAG,
+);
+
+my %afp_ace_type_to_nfs4_type_values = (
+    $KAUTH_ACE_PERMIT => $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE,
+    $KAUTH_ACE_DENY   => $NFS4_ACE_ACCESS_DENIED_ACE_TYPE,
+    $KAUTH_ACE_AUDIT  => $NFS4_ACE_SYSTEM_AUDIT_ACE_TYPE,
+    $KAUTH_ACE_ALARM  => $NFS4_ACE_SYSTEM_ALARM_ACE_TYPE,
+);
+
+my %nfs4_type_to_afp_ace_type_values = ();
+for my $key (keys %afp_ace_type_to_nfs4_type_values) {
+    $nfs4_type_to_afp_ace_type_values{$afp_ace_type_to_nfs4_type_values{$key}} = $key;
+}
+
+my %nfs4_reserved_who_names  = (
+    $NFS4_ACL_WHO_OWNER_STRING    => {
+        off        => 6,
+        rights_off => 0,
+    },
+    $NFS4_ACL_WHO_GROUP_STRING    => {
+        off        => 3,
+        rights_off => 8,
+    },
+    $NFS4_ACL_WHO_EVERYONE_STRING => {
+        off        => 0,
+        rights_off => 16,
+    },
+);
+
+sub acl_from_nfsv4_xattr { # {{{1
+    my ($self, $raw_xattr, $acl_data, $filename) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(raw_xattr = '%s', acl_data = %s)},
+            (caller 0)[3], printable($raw_xattr), Dumper($acl_data)));
+
+    # unpack the ACL from the client, so we can structure it to be handed
+    # up to the AFP server
+    my @acl_parts = unpack 'L>/(L>L>L>L>/ax![L])', $raw_xattr;
+    my @entries;
+    my $unix_mode = 0;
+    my $afp_rights = 0;
+    while (my ($type, $flag, $access_mask, $who) = @acl_parts) {
+        $who = decode_utf8($who);
+        @acl_parts = @acl_parts[4..$#acl_parts];
+        my $entry = {};
+        # access_mask (NFSv4) -> ace_rights (AFP)
+        $entry->{ace_rights} = 0;
+        for my $key (keys %afp_to_nfs4_access_bits) {
+            if (($access_mask & $afp_to_nfs4_access_bits{$key}) ==
+              $afp_to_nfs4_access_bits{$key}) {
+                $entry->{ace_rights} |= $key;
+            }
+        }
+
+        # flag, type (NFSv4) -> ace_flags (AFP)
+        $entry->{ace_flags} = 0;
+        for my $key (keys %afp_ace_flags_to_nfs4_flag_bits) {
+            if (($flag & $afp_ace_flags_to_nfs4_flag_bits{$key}) ==
+              $afp_ace_flags_to_nfs4_flag_bits{$key}) {
+                $entry->{ace_flags} |= $key;
+            }
+        }
+        $entry->{ace_flags} |= $nfs4_type_to_afp_ace_type_values{$type};
+
+        # who, flag (NFSv4) -> ace_applicable (AFP)
+        my $uuid;
+        # Collect the UNIX perms mode for changing the actual perms later.
+        if (exists $nfs4_reserved_who_names{$who}) {
+            my $params = $nfs4_reserved_who_names{$who};
+            if ($access_mask == $NFS4_ACE_MASK_ALL) {
+                $unix_mode |= (0x7 << $params->{off});
+                $afp_rights |= (0x7 << $params->{rights_off});
+                next;
+            }
+
+            if (($access_mask & $NFS4_ACE_GENERIC_READ) ==
+              $NFS4_ACE_GENERIC_READ) {
+                $unix_mode |= (0x4 << $params->{off});
+                $afp_rights |= (0x4 << $params->{rights_off});
+            }
+            if (($access_mask & $NFS4_ACE_GENERIC_WRITE) ==
+              $NFS4_ACE_GENERIC_WRITE) {
+                $unix_mode |= (0x2 << $params->{off});
+                $afp_rights |= (0x2 << $params->{rights_off});
+            }
+            if (($access_mask & $NFS4_ACE_GENERIC_EXECUTE) ==
+              $NFS4_ACE_GENERIC_EXECUTE) {
+                $unix_mode |= (0x1 << $params->{off});
+                $afp_rights |= (0x1 << $params->{rights_off});
+            }
+            next;
+        }
+        $who =~ s{\@local$}{};
+        if ($flag & $NFS4_ACE_IDENTIFIER_GROUP) {
+            if (exists $self->{g_uuidmap}->{$who}) {
+                $uuid = $self->{g_uuidmap}->${who};
+            }
+            else {
+                my $rc = $self->{afpconn}->FPMapName($kUTF8NameToGroupUUID,
+                        $who, \$uuid);
+                return -EINVAL if $rc != $kFPNoErr;
+            }
+        }
+        else {
+            if (exists $self->{u_uuidmap}->{$who}) {
+                $uuid = $self->{u_uuidmap}->${who};
+            }
+            else {
+                my $rc = $self->{afpconn}->FPMapName($kUTF8NameToUserUUID,
+                        $who, \$uuid);
+                return -EINVAL if $rc != $kFPNoErr;
+            }
+        }
+        $entry->{ace_applicable} = $uuid;
+
+        push @entries, $entry;
+    }
+
+    # Actually do the UNIX perms update here...
+    my($trc, $resp) = $self->{afpconn}->FPGetFileDirParms(
+            VolumeID    => $self->{volID},
+            DirectoryID => $self->{topDirID},
+            FileBitmap  => $kFPUnixPrivsBit,
+            PathType    => $self->{pathType},
+            Pathname    => $filename);
+    return -EBADF() if $trc != $kFPNoErr;
+
+    # We want the type and suid/sgid/sticky bits preserved.
+    $unix_mode |= ($resp->{UnixPerms} & ~0777);
+
+    $trc = $self->{afpconn}->FPSetFileDirParms(
+            VolumeID            => $self->{volID},
+            DirectoryID         => $self->{topDirID},
+            Bitmap              => $kFPUnixPrivsBit,
+            PathType            => $self->{pathType},
+            Pathname            => $filename,
+            UnixPerms           => $unix_mode,
+            UnixUID             => $resp->{UnixUID},
+            UnixGID             => $resp->{UnixGID},
+            UnixAccessRights    => $afp_rights);
+    return -EBADF() if $trc != $kFPNoErr;
+    delete $self->{_getattr_cache}->{$filename};
+
+    ${$acl_data} = {
+                acl_ace     => [ @entries ],
+                # dunno what these flags actually do, and 0 seems to be
+                # a safe value.
+                acl_flags   => 0,
+              };
+    return 0;
+} # }}}1
+
+my @nfs4_def_acl_params = (
+    {
+      who => $NFS4_ACL_WHO_OWNER_STRING,
+      off => 6,
+      flag => 0,
+    },
+    {
+      who => $NFS4_ACL_WHO_GROUP_STRING,
+      off => 3,
+      flag => $NFS4_ACE_IDENTIFIER_GROUP,
+    },
+    {
+      who => $NFS4_ACL_WHO_EVERYONE_STRING,
+      off => 0,
+      flag => 0,
+    },
+);
+
+sub acl_to_nfsv4_xattr { # {{{1
+    my ($self, $acldata, $filename) = @_;
+    $self->{logger}->debug(sprintf(q{called %s(acldata = %s)},
+            (caller 0)[3], Dumper($acldata)));
+
+    my (@acl_parts, $is_dir);
+    foreach my $entry (@{$acldata->{acl_ace}}) {
+        my ($type, $flag, $access_mask, $who) = (0, 0, 0, q{});
+        my $name;
+        # ace_applicable (AFP) -> who, whotype (NFSv4)
+        if (exists $self->{u_uuidmap_r}->{$entry->{ace_applicable}}) {
+            $name = $self->{u_uuidmap_r}->{$entry->{ace_applicable}};
+        }
+        elsif (exists $self->{g_uuidmap_r}->{$entry->{ace_applicable}}) {
+            $name = $self->{g_uuidmap_r}->{$entry->{ace_applicable}};
+            $flag |= $NFS4_ACE_IDENTIFIER_GROUP;
+        }
+        else {
+            my $rc = $self->{afpconn}->FPMapID($kUserUUIDToUTF8Name,
+                    $entry->{ace_applicable}, \$name);
+            return -EBADF() if $rc != $kFPNoErr;
+            if ($name->{Bitmap} == 2) {
+                $flag |= $NFS4_ACE_IDENTIFIER_GROUP;
+            }
+        }
+        $who = $name->{UTF8Name} . '@local';
+
+        # ace_flags (AFP) -> flag, type (NFSv4)
+        my $kind = $entry->{ace_flags} & $KAUTH_ACE_KINDMASK;
+        $type = $afp_ace_type_to_nfs4_type_values{$kind};
+        for my $key (keys %afp_ace_flags_to_nfs4_flag_bits) {
+            if (($entry->{ace_flags} & $key) == $key) {
+                $flag |= $afp_ace_flags_to_nfs4_flag_bits{$key};
+            }
+        }
+
+        # ace_rights (AFP) -> access_mask (NFSv4)
+        for my $key (keys %afp_to_nfs4_access_bits) {
+            # transcribe the access bits appropriately
+            if (($entry->{ace_rights} & $key) == $key) {
+                $access_mask |= $afp_to_nfs4_access_bits{$key};
+            }
+        }
+        push(@acl_parts, $type, $flag, $access_mask,
+            encode_utf8($who));
+    }
+
+    # get UNIX access rights and form the default owner/group/everyone entries
+    my($rc, $resp) = $self->{afpconn}->FPGetFileDirParms(
+            VolumeID    => $self->{volID},
+            DirectoryID => $self->{topDirID},
+            FileBitmap  => $kFPUnixPrivsBit,
+            PathType    => $self->{pathType},
+            Pathname    => $filename);
+
+    for my $params (@nfs4_def_acl_params) {
+        my $access_mask = 0;
+        my $perms = ($resp->{UnixPerms} >> $params->{off}) & 7;
+        if (($perms & 7) == 7) {
+                $access_mask |= $NFS4_ACE_MASK_ALL;
+        }
+        else {
+            if ($perms & 4) {
+                $access_mask |= $NFS4_ACE_GENERIC_READ;
+            }
+            if ($perms & 2) {
+                $access_mask |= $NFS4_ACE_GENERIC_WRITE;
+            }
+            if ($perms & 1) {
+                $access_mask |= $NFS4_ACE_GENERIC_EXECUTE;
+            }
+        }
+        push(@acl_parts, $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE, $params->{flag},
+            $access_mask, encode_utf8($params->{who}));
+    }
+
+    return pack('L>(L>L>L>L>/ax![L])*', scalar(@{$acldata->{acl_ace}}) + 3, @acl_parts);
 } # }}}1
 
 1;
