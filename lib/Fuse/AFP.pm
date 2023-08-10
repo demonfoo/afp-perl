@@ -32,7 +32,8 @@ use Net::AFP::ACL;
 use Encode;                     # handle encoding/decoding strings
 use Socket;                     # for socket related constants for
                                 # parent/child IPC code
-use Fcntl qw(:mode :DEFAULT);   # for O_* (access mode) and S_* (permission
+use Fcntl qw(:mode :DEFAULT :flock);
+                                # for O_* (access mode) and S_* (permission
                                 # mode) macros
 use Data::Dumper;               # for diagnostic output when debugging is on
 use Fuse qw(:all);              # Still need this for extended attribute
@@ -1449,9 +1450,7 @@ sub write { # {{{1
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
 
-    if (ref $fh) {
-        return -EBADF();
-    }
+    return -EBADF() if ref $fh;
 
     my $ts_start = gettimeofday();
     my($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
@@ -1543,9 +1542,7 @@ sub flush { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    if (ref $fh) {
-        return 0;
-    }
+    return 0 if ref $fh;
 
     my $rc = $self->{afpconn}->FPFlushFork($fh);
 
@@ -1560,9 +1557,7 @@ sub release { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    if (ref $fh) {
-        return 0;
-    }
+    return 0 if ref $fh;
 
     $self->{afpconn}->FPCloseFork($fh);
     return 0;
@@ -1575,9 +1570,7 @@ sub fsync { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    if (ref $fh) {
-        return 0;
-    }
+    return 0 if ref $fh;
 
     if (!$flags) {
         return $self->flush($file, $fh);
@@ -2489,9 +2482,7 @@ sub ftruncate { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    if (ref $fh) {
-        return -EBADF();
-    }
+    return -EBADF() if ref $fh;
 
     my $rc = $self->{afpconn}->FPSetForkParms($fh,
             $self->{DForkLenFlag}, $length);
@@ -2617,14 +2608,13 @@ sub fgetattr { # {{{1
 
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %s, lkparms = %s, fh = %d)},
-            (caller 0)[3], $file, $cmd, Dumper($lkparms), $fh));
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %s, } .
+            q{lkparms = %s, fh = %d)}, (caller 0)[3], $file, $cmd,
+            Dumper($lkparms), $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    if (ref $fh) {
-        return -EOPNOTSUPP();
-    }
+    return -EOPNOTSUPP() if ref $fh;
 
     my($rc, $rstart);
     if ($lkparms->{l_whence} == SEEK_CUR) {
@@ -2642,13 +2632,12 @@ sub lock { # {{{1
         if ($lkparms->{l_whence} == SEEK_END) {
             $flags |= $kFPStartEndFlag;
         }
-        ($rc, $rstart) = $self->{LockFn}(
-                                $self->{afpconn},
-                                Flags       => $flags,
-                                OForkRefNum => $fh,
-                                Offset      => $lkparms->{l_start},
-                                Length      => $lkparms->{l_len} || -1,
-                              );
+        ($rc, $rstart) = $self->{LockFn}($self->{afpconn},
+            Flags       => $flags,
+            OForkRefNum => $fh,
+            Offset      => $lkparms->{l_start},
+            Length      => $lkparms->{l_len} || -1,
+        );
         return -ENOLCK() if $rc == $kFPNoMoreLocks;
         return -EACCES() if $rc == $kFPLockErr;
         return -EACCES() if $rc == $kFPRangeOverlap;
@@ -2750,9 +2739,7 @@ sub write_buf {
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
 
-    if (ref $fh) {
-        return -EBADF();
-    }
+    return -EBADF() if ref $fh;
 
     # FIXME: At some point I'd like to alter the AFP library to let me pass
     # multiple strings and/or FD numbers + lengths, and be able to splice()
@@ -2836,12 +2823,40 @@ sub read_buf {
 
 sub flock {
     my ($self, $file, $fh, $owner, $op) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, owner = %d, op = %x)},
-            (caller 0)[3], $file, $fh, $owner, $op));
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, } .
+            q{owner = %d, op = %x)}, (caller 0)[3], $file, $fh, $owner, $op));
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -ENOSYS();
+    return -EOPNOTSUPP() if ref $fh;
+
+    if ($op & LOCK_SH) {
+        # create a shared lock
+        return -EOPNOTSUPP();
+    }
+    elsif ($op & LOCK_EX) {
+        # create an exclusive lock
+        my($rc, $rstart) = $self->{LockFn}($self->{afpconn},
+            Flags       => 0,
+            OForkRefNum => $fh,
+            Offset      => 0,
+            Length      => -1,
+        );
+        return -ENOLCK() if $rc == $kFPNoMoreLocks;
+        return -EBADF()  if $rc != $kFPNoErr;
+    }
+    elsif ($op & LOCK_UN) {
+        # release existing lock
+        my($rc, $rstart) = $self->{LockFn}($self->{afpconn},
+            Flags       => $kFPLockUnlockFlag,
+            OForkRefNum => $fh,
+            Offset      => 0,
+            Length      => -1,
+        );
+        return -ENOLCK() if $rc == $kFPRangeNotLocked;
+        return -EBADF()  if $rc != $kFPNoErr;
+    }
+    return -EINVAL();
 }
 
 sub fallocate {
