@@ -21,9 +21,9 @@ Readonly my $UAMNAME => 'DHCAST128';
 my $C2SIV = 'LWallace';
 my $S2CIV = 'CJalbert';
 
-Readonly my $len => 16;
+Readonly my $len       => 16;
 Readonly my $nonce_len => 16;
-Readonly my $pw_len => 64;
+Readonly my $pw_len    => 64;
 
 # CryptX modules for crypto-related functionality.
 use Crypt::Mode::CBC;

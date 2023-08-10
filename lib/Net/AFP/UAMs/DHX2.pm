@@ -22,7 +22,7 @@ my $C2SIV = 'LWallace';
 my $S2CIV = 'CJalbert';
 
 Readonly my $nonce_len => 16;
-Readonly my $pw_len => 256;
+Readonly my $pw_len    => 256;
 
 # CryptX modules for crypto-related functionality.
 use Crypt::Mode::CBC;
@@ -239,7 +239,7 @@ sub Authenticate {
     $session->{logger}->debug('$newClientNonce is ', $newClientNonce->as_hex());
     $clientNonce->binc();
     $clientNonce = $clientNonce->bmod($nonce_limit);
-    croak('encryption error - nonce check failed')
+    croak('encryption error - nonce check failed; ' . $clientNonce->as_hex() . ' != ' . $newClientNonce->as_hex())
             unless $clientNonce->beq($newClientNonce);
     undef $clientNonce;
     undef $newClientNonce;
@@ -370,7 +370,7 @@ sub ChangePassword {
     $session->{logger}->debug('$newClientNonce is ', $newClientNonce->as_hex());
     $clientNonce->binc();
     $clientNonce = $clientNonce->bmod($nonce_limit);
-    croak('encryption error - nonce check failed')
+    croak('encryption error - nonce check failed; ' . $clientNonce->as_hex() . ' != ' . $newClientNonce->as_hex())
             unless $clientNonce->beq($newClientNonce);
     undef $clientNonce;
     undef $newClientNonce;
