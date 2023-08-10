@@ -1138,8 +1138,8 @@ sub FPGetComment { # {{{1
     croak('Need to accept returned list') unless wantarray();
 
     my $msg = pack('CxnNa*', $kFPGetComment,
-            @options{'DTRefNum', 'DirectoryID'},
-            PackagePath(@options{'PathType', 'Pathname'}));
+            @options{qw[DTRefNum DirectoryID]},
+            PackagePath(@options{qw[PathType Pathname]}));
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return $rc if $rc != $kFPNoErr;
@@ -2314,7 +2314,7 @@ sub FPSetACL { # {{{1
         foreach my $ace (@{$options{acl_ace}}) {
             push(@ace_list, pack('a[16]NN',
                     uuid_pack(${$ace}{ace_applicable}),
-                    @{$ace}{'ace_flags', 'ace_rights'}));
+                    @{$ace}{qw[ace_flags ace_rights]}));
         }
         $msg .= pack('NN(a*)[' . scalar(@ace_list) . ']', scalar(@ace_list),
             $options{acl_flags}, @ace_list);
