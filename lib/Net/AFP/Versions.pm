@@ -158,7 +158,7 @@ sub GetPreferredVersion {
             my($b_major, $b_minor) =
                     @{$best_version}{qw[MajorNumber MinorNumber]};
             my($major, $minor) =
-                    @{$versionmap{$ver}}qw[MajorNumber MinorNumber]};
+                    @{$versionmap{$ver}}{qw[MajorNumber MinorNumber]};
 
             if (($major > $b_major) ||
                     (($major == $b_major) && ($minor > $b_minor))) {
