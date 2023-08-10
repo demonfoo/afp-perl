@@ -15,7 +15,9 @@ use Net::AFP::TokenTypes;
 use Net::AFP::ACL;
 use Net::AFP::ExtAttrs;
 use Net::AFP::FileParms qw(:DEFAULT !:common);
+use Net::AFP::FileAttrs;
 use Net::AFP::DirParms;
+use Net::AFP::DirAttrs;
 use Net::AFP::MapParms;
 use Net::AFP::Versions;
 use Encode;
@@ -26,6 +28,7 @@ use Params::Validate qw(:all);
 use Carp;
 use Readonly;
 use Data::Dumper;
+use Scalar::Util qw(looks_like_number);
 # }}}1
 
 our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
@@ -185,65 +188,133 @@ sub PackagePath { # {{{1
     croak;
 } # }}}1
 
+my @ParamsList = (
+                   {
+                     FlagBit       => $kFPAttributeBit,
+                     PackTemplate  => 'S>',
+                     OptionNames   => ['Attribute'],
+                   },
+                   {
+                     FlagBit       => $kFPCreateDateBit,
+                     FixupFunction => sub { return $_[0] - globalTimeOffset },
+                     PackTemplate  => 'l>',
+                     OptionNames   => ['CreateDate'],
+                   },
+                   {
+                     FlagBit       => $kFPModDateBit,
+                     FixupFunction => sub { return $_[0] - globalTimeOffset },
+                     PackTemplate  => 'l>',
+                     OptionNames   => ['ModDate'],
+                   },
+                   {
+                     FlagBit       => $kFPBackupDateBit,
+                     FixupFunction => sub { return $_[0] - globalTimeOffset },
+                     PackTemplate  => 'l>',
+                     OptionNames   => ['BackupDate'],
+                   },
+                   {
+                     FlagBit       => $kFPFinderInfoBit,
+                     PackTemplate  => 'a[32]',
+                     OptionNames   => ['FinderInfo'],
+                   },
+                   {
+                     FlagBit       => $kFPLongNameBit,
+                     PackTemplate  => 'C/a*',
+                     OptionNames   => ['LongName'],
+                     FixupFunction => sub { encode('MacRoman', $_[0]) },
+                   },
+                   {
+                     FlagBit       => $kFPShortNameBit,
+                     PackTemplate  => 'C/a*',
+                     OptionNames   => ['ShortName'],
+                     FixupFunction => sub { encode('MacRoman', $_[0]) },
+                   },
+                   {
+                     FlagBit       => $kFPDataForkLenBit,
+                     PackTemplate  => 'L>',
+                     OptionNames   => ['DataForkLen'],
+                     MustBeFile    => 1,
+                   },
+                   {
+                     FlagBit       => $kFPOffspringCountBit,
+                     PackTemplate  => 'L>',
+                     OptionNames   => ['OffspringCount'],
+                     MustBeDir     => 1,
+                   },
+                   {
+                     FlagBit       => $kFPRsrcForkLenBit,
+                     PackTemplate  => 'L>',
+                     OptionNames   => ['RsrcForkLen'],
+                     MustBeFile    => 1,
+                   },
+                   {
+                     FlagBit       => $kFPOwnerIDBit,
+                     PackTemplate  => 'L>',
+                     OptionNames   => ['OwnerID'],
+                     MustBeDir     => 1,
+                   },
+                   {
+                     FlagBit       => $kFPExtDataForkLenBit,
+                     PackTemplate  => 'Q>',
+                     OptionNames   => ['ExtDataForkLen'],
+                     MustBeFile    => 1,
+                   },
+                   {
+                     FlagBit       => $kFPGroupIDBit,
+                     PackTemplate  => 'L>',
+                     OptionNames   => ['GroupID'],
+                     MustBeDir     => 1,
+                   },
+                   # $kFPLaunchLimitBit? what it do? can has knows?
+                   {
+                     FlagBit       => $kFPLaunchLimitBit,
+                     PackTemplate  => 'L>',
+                     OptionNames   => ['LaunchLimit'],
+                     MustBeFile    => 1,
+                   },
+                   {
+                     FlagBit       => $kFPAccessRightsBit,
+                     PackTemplate  => 'L>',
+                     OptionNames   => ['AccessRights'],
+                     MustBeDir     => 1,
+                   },
+                   {
+                     FlagBit       => $kFPUTF8NameBit,
+                     PackTemplate  => 'S>/a*',
+                     OptionNames   => ['UTF8Name'],
+                     FixupFunction => sub { encode_utf8(decompose($_[0])) },
+                   },
+                   {
+                     FlagBit       => $kFPExtRsrcForkLenBit,
+                     PackTemplate  => 'Q>',
+                     OptionNames   => ['ExtRsrcForkLen'],
+                     MustBeFile    => 1,
+                   },
+                   {
+                     FlagBit       => $kFPUnixPrivsBit,
+                     PackTemplate  => 'L>L>L>L>',
+                     OptionNames   => [qw{UnixUID UnixGID UnixPerms UnixAccessRights}],
+                   },
+                 );
+
 sub PackSetParams { # {{{1
-    my ($Bitmap, %options) = @_;
+    my ($Bitmap, $is_file, %options) = @_;
 
     my $ParamsBlock = q{};
 
-    if ($Bitmap & $kFPAttributeBit) {
-        return if not exists $options{Attribute};
-        $ParamsBlock .= pack('n', $options{Attribute});
-    }
-
-    if ($Bitmap & $kFPCreateDateBit) {
-        return if not exists $options{CreateDate};
-        my $time = $options{CreateDate} - globalTimeOffset;
-        $ParamsBlock .= pack('l>', $time);
-    }
-
-    if ($Bitmap & $kFPModDateBit) {
-        return if not exists $options{ModDate};
-        my $time = $options{ModDate} - globalTimeOffset;
-        $ParamsBlock .= pack('l>', $time);
-    }
-
-    if ($Bitmap & $kFPBackupDateBit) {
-        return if not exists $options{BackupDate};
-        my $time = $options{BackupDate} - globalTimeOffset;
-        $ParamsBlock .= pack('l>', $time);
-    }
-
-    if ($Bitmap & $kFPFinderInfoBit) {
-        return if not exists $options{FinderInfo};
-        $ParamsBlock .= pack('a[32]', $options{FinderInfo});
-    }
-
-    if ($Bitmap & $kFPOwnerIDBit) {
-        return if not exists $options{OwnerID};
-        $ParamsBlock .= pack('N', $options{OwnerID});
-    }
-
-    if ($Bitmap & $kFPGroupIDBit) {
-        return if not exists $options{GroupID};
-        $ParamsBlock .= pack('N', $options{GroupID});
-    }
-
-    if ($Bitmap & $kFPAccessRightsBit) {
-        return if not exists $options{AccessRights};
-        $ParamsBlock .= pack('N', $options{AccessRights});
-    }
-
-    # $kFPLaunchLimitBit? what it do? can has knows?
-
-    if ($Bitmap & $kFPUnixPrivsBit) {
-        return if not exists $options{UnixUID};
-        return if not exists $options{UnixGID};
-        return if not exists $options{UnixPerms};
-        return if not exists $options{UnixAccessRights};
-
-        $ParamsBlock .= pack('NNNN', @options{'UnixUID', 'UnixGID',
-                                              'UnixPerms',
-                                              'UnixAccessRights'});
+    foreach my $Param (@ParamsList) {
+        if ($Bitmap & ${$Param}{FlagBit}) {
+            next if $is_file == 1 && exists ${$Param}{MustBeDir} && ${$Param}{MustBeDir} == 1;
+            next if $is_file == 0 && exists ${$Param}{MustBeFile} && ${$Param}{MustBeFile} == 1;
+            for my $optnam (@{${$Param}{OptionNames}}) {
+                return if not exists $options{$optnam};
+            }
+            my @values = @options{@{${$Param}{OptionNames}}};
+            if (exists ${$Param}{FixupFunction}) {
+                @values = &{$$Param{FixupFunction}}(@values);
+            }
+            $ParamsBlock .= pack($$Param{PackTemplate}, @values);
+        }
     }
 
     return $ParamsBlock;
@@ -414,55 +485,580 @@ sub FPByteRangeLockExt { # {{{1
         Length      => { type => SCALAR },
     } );
 
-    my $msg = pack('CCnQ>Q>', $kFPByteRangeLockExt,
+    my $msg = pack('CCS>Q>Q>', $kFPByteRangeLockExt,
             @options{qw[Flags OForkRefNum Offset Length]});
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     return $rc if $rc != $kFPNoErr;
-
     croak('Need to accept returned list') if not wantarray();
     return($rc, unpack('Q>', $resp));
 } # }}}1
 
 sub FPCatSearch {
-    my ($self, %options) = @_;
+    my ($self, @options) = @_;
 
-    $self->{logger}->error('called function ', (caller 0)[3], ' not implemented');
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
+    my %options = validate(@options, {
+        VolumeID            => { type => SCALAR },
+        ReqMatches          => {
+            type            => SCALAR,
+        },
+        CatalogPosition     => {
+            type            => SCALAR,
+            default         => "\0" x 16,
+            callbacks       => {
+                'valid position val' => sub {
+                    length($_[0]) == 16
+                },
+            },
+        },
+        FileRsltBitmap      => {
+            type            => SCALAR,
+            default         => 0,
+            callbacks       => {
+                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+            },
+        },
+        DirectoryRsltBitmap => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+            },
+        },
+        UTF8Name            => {
+            type        => SCALAR,
+            optional    => 1,
+        },
+        Attributes          => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub {
+                    my $mask = $Net::AFP::FileAttrs::kFPDeleteInhibitBit |
+                               $Net::AFP::FileAttrs::kFPRenameInhibitBit |
+                               $Net::AFP::FileAttrs::kFPWriteInhibitBit;
+                    !($_[0] & ~$mask);
+                }
+            },
+            optional    => 1,
+        },
+        ParentDirID         => {
+            type        => SCALAR,
+            optional    => 1,
+        },
+        CreateDate          => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        ModDate             => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        BackupDate          => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        FinderInfo          => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    return 1 unless length($_[0]) eq 32;
+                },
+            },
+            optional    => 1,
+        },
+        LongName            => {
+            type        => SCALAR,
+            optional    => 1,
+        },
+        DataForkLen         => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        RsrcForkLen         => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        ExtDataForkLen      => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        ExtRsrcForkLen      => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        OffspringCount      => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        MatchPartialNames   => {
+            type        => SCALAR,
+            optional    => 1,
+        },
+    });
     croak('VolumeID must be provided')
             if not exists $options{VolumeID};
-    croak('ReqMatches must be provided')
-            if not exists $options{ReqMatches};
-    $options{CatalogPosition}       ||= q{};
-    $options{FileRsltBitmap}        ||= 0;
-    $options{DirectoryRsltBitmap}   ||= 0;
-    $options{ReqBitmap}             ||= 0;
-    croak('Not yet implemented');
 
-    my $msg = pack('CxnNx[4]a[16]nnN', $kFPCatSearch,
-            @options{'VolumeID', 'ReqMatches', 'CatalogPosition',
-                     'FileRsltBitmap', 'DirectoryRsltBitmap',
-                     'ReqBitmap'});
+    my(%Specification1, %Specification2);
+    my @items = ( [ 'Attributes',     $kFPAttributeBit,      1, 1, 'Attribute' ],
+                  [ 'ParentDirID',    $kFPParentDirIDBit,    1, 1 ],
+                  [ 'CreateDate',     $kFPCreateDateBit,     1, 1 ],
+                  [ 'ModDate',        $kFPModDateBit,        1, 1 ],
+                  [ 'BackupDate',     $kFPBackupDateBit,     1, 1 ],
+                  [ 'FinderInfo',     $kFPFinderInfoBit,     1, 1 ],
+                  [ 'LongName',       $kFPLongNameBit,       1, 1 ],
+                  [ 'OffspringCount', $kFPOffspringCountBit, 0, 1 ],
+                  [ 'DataForkLen',    $kFPDataForkLenBit,    1, 0 ],
+                  [ 'RsrcForkLen',    $kFPRsrcForkLenBit,    1, 0 ],
+                  [ 'ExtDataForkLen', $kFPExtDataForkLenBit, 1, 0 ],
+                  [ 'ExtRsrcForkLen', $kFPExtRsrcForkLenBit, 1, 0 ],
+                  [ 'UTF8Name',       $kFPUTF8NameBit,       1, 1 ],
+                  [ 'MatchPartialNames', 0x80000000,         1, 1 ] );
+
+    my %not_in_spec2 = ( 'LongName' => 1, 'UTF8Name' => 1 );
+
+    my $is_range = 0;
+    my $Bitmap = 0;
+    for my $item (@items) {
+        if (exists $options{$items[0]}) {
+            my $key = $items[0];
+            if (defined $items[4]) {
+                $key = $items[4];
+            }
+            if (ref($options{$items[0]}) eq q{ARRAY}) {
+                $Specification1{$key} = $options{$items[0]}->[0];
+                $Specification2{$key} = $options{$items[0]}->[1];
+                $is_range = 1;
+            }
+            elsif (ref($options{$items[0]}) eq q{}) {
+                $Specification1{$key} = $options{$items[0]};
+                if (!$not_in_spec2{$items[0]}) {
+                    $Specification2{$key} = $options{$items[0]};
+                }
+            }
+            $Bitmap |= $items[1];
+        }
+    }
+
+    my $is_file = 2;
+    if ($options{DirectoryRsltBitmap} == 0) {
+        $is_file = 1;
+    }
+    elsif ($options{FileRsltBitmap} == 0) {
+        $is_file = 0;
+    }
+    my $msg = pack('CxS>L>x[4]a[16]S>S>L>', $kFPCatSearch,
+            @options{qw[VolumeID ReqMatches CatalogPosition FileRsltBitmap
+            DirectoryRsltBitmap]}, $Bitmap);
+    # FIXME: pack() doesn't let me do 'Cx/a' for the mask with a pad byte
+    # in between. Should see if there's a solution. This is a ghetto
+    # workaround, for now.
+    $msg .= pack('S</a', PackSetParams($Bitmap, $is_file, %Specification1));
+    if ($is_range == 1) {
+        $msg .= pack('S</a', PackSetParams($Bitmap, $is_file, %Specification2));
+    }
+
+    my $resp;
+    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
+    return $rc if $rc != $kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
+
+    my $results = {};
+    # this pack mask is hella wonky, but it should do what I need.
+    my ($catpos, $filebmp, $dirbmp, @paramlist) =
+        unpack('a[16]S>S>L>/(xCXXCx/a![s])', $resp);
+    $results->{CatalogPosition} = $catpos;
+    my $op = $results->{OffspringParameters} = [];
+    while (scalar(@paramlist) > 0) {
+        my $isfiledir = shift(@paramlist);
+        my $paramdata = shift(@paramlist);
+        if ($isfiledir & 0x80) {
+            push(@{$op}, ParseDirParms($dirbmp, $paramdata));
+        }
+        else {
+            push(@{$op}, ParseFileParms($filebmp, $paramdata));
+        }
+    }
+    return($rc, $results);
 }
 
 sub FPCatSearchExt {
-    my ($self, %options) = @_;
+    my ($self, @options) = @_;
 
-    $self->{logger}->error('called function ', (caller 0)[3], ' not implemented');
+    $self->{logger}->debug(sprintf(q{called %s(%s)},
+                    (caller 0)[3], Dumper({@options})));
+    my %options = validate(@options, {
+        VolumeID            => { type => SCALAR },
+        ReqMatches          => {
+            type            => SCALAR,
+        },
+        CatalogPosition     => {
+            type            => SCALAR,
+            default         => "\0" x 16,
+            callbacks       => {
+                'valid position val' => sub {
+                    length($_[0]) == 16
+                },
+            },
+        },
+        FileRsltBitmap      => {
+            type            => SCALAR,
+            default         => 0,
+            callbacks       => {
+                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+            },
+        },
+        DirectoryRsltBitmap => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+            },
+        },
+        UTF8Name            => {
+            type        => SCALAR,
+            optional    => 1,
+        },
+        Attributes          => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub {
+                    my $mask = $Net::AFP::FileAttrs::kFPDeleteInhibitBit |
+                               $Net::AFP::FileAttrs::kFPRenameInhibitBit |
+                               $Net::AFP::FileAttrs::kFPWriteInhibitBit;
+                    !($_[0] & ~$mask);
+                }
+            },
+            optional    => 1,
+        },
+        ParentDirID         => {
+            type        => SCALAR,
+            optional    => 1,
+        },
+        CreateDate          => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        ModDate             => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        BackupDate          => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        FinderInfo          => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    return 1 unless length($_[0]) eq 32;
+                },
+            },
+            optional    => 1,
+        },
+        LongName            => {
+            type        => SCALAR,
+            optional    => 1,
+        },
+        DataForkLen         => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        RsrcForkLen         => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        ExtDataForkLen      => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        ExtRsrcForkLen      => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        OffspringCount      => {
+            type        => SCALAR | ARRAYREF,
+            callbacks   => {
+                'value check' => sub {
+                    if (ref($_[0]) eq q{ARRAY}) {
+                        return 1 if scalar(@{$_[0]}) != 2;
+                        return 1 unless looks_like_number($_[0]->[0]);
+                        return 1 unless looks_like_number($_[0]->[1]);
+                    }
+                    else {
+                        return 1 unless looks_like_number($_[0]);
+                    }
+                },
+            },
+            optional    => 1,
+        },
+        MatchPartialNames   => {
+            type        => SCALAR,
+            optional    => 1,
+        },
+    });
     croak('VolumeID must be provided')
             if not exists $options{VolumeID};
-    croak('ReqMatches must be provided')
-            if not exists $options{ReqMatches};
-    $options{CatalogPosition}       ||= q{};
-    $options{FileRsltBitmap}        ||= 0;
-    $options{DirectoryRsltBitmap}   ||= 0;
-    $options{ReqBitmap}             ||= 0;
-    croak('Not yet implemented');
 
-    my $msg = pack('CxnNx[4]a[16]nnN', $kFPCatSearch,
-            @options{'VolumeID', 'ReqMatches', 'CatalogPosition',
-                     'FileRsltBitmap', 'DirectoryRsltBitmap',
-                     'ReqBitmap'});
+    my(%Specification1, %Specification2);
+    my @items = ( [ 'Attributes',     $kFPAttributeBit,      1, 1, 'Attribute' ],
+                  [ 'ParentDirID',    $kFPParentDirIDBit,    1, 1 ],
+                  [ 'CreateDate',     $kFPCreateDateBit,     1, 1 ],
+                  [ 'ModDate',        $kFPModDateBit,        1, 1 ],
+                  [ 'BackupDate',     $kFPBackupDateBit,     1, 1 ],
+                  [ 'FinderInfo',     $kFPFinderInfoBit,     1, 1 ],
+                  [ 'LongName',       $kFPLongNameBit,       1, 1 ],
+                  [ 'OffspringCount', $kFPOffspringCountBit, 0, 1 ],
+                  [ 'DataForkLen',    $kFPDataForkLenBit,    1, 0 ],
+                  [ 'RsrcForkLen',    $kFPRsrcForkLenBit,    1, 0 ],
+                  [ 'ExtDataForkLen', $kFPExtDataForkLenBit, 1, 0 ],
+                  [ 'ExtRsrcForkLen', $kFPExtRsrcForkLenBit, 1, 0 ],
+                  [ 'UTF8Name',       $kFPUTF8NameBit,       1, 1 ],
+                  [ 'MatchPartialNames', 0x80000000,         1, 1 ] );
 
+    my %not_in_spec2 = ( 'LongName' => 1, 'UTF8Name' => 1 );
+
+    my $is_range = 0;
+    my $Bitmap = 0;
+    for my $item (@items) {
+        if (exists $options{$items[0]}) {
+            my $key = $items[0];
+            if (defined $items[4]) {
+                $key = $items[4];
+            }
+            if (ref($options{$items[0]}) eq q{ARRAY}) {
+                $Specification1{$key} = $options{$items[0]}->[0];
+                $Specification2{$key} = $options{$items[0]}->[1];
+                $is_range = 1;
+            }
+            elsif (ref($options{$items[0]}) eq q{}) {
+                $Specification1{$key} = $options{$items[0]};
+                if (!$not_in_spec2{$items[0]}) {
+                    $Specification2{$key} = $options{$items[0]};
+                }
+            }
+            $Bitmap |= $items[1];
+        }
+    }
+
+    my $is_file = 2;
+    if ($options{DirectoryRsltBitmap} == 0) {
+        $is_file = 1;
+    }
+    elsif ($options{FileRsltBitmap} == 0) {
+        $is_file = 0;
+    }
+    my $msg = pack('CxS>L>x[4]a[16]S>S>L>', $kFPCatSearchExt,
+            @options{qw[VolumeID ReqMatches CatalogPosition FileRsltBitmap
+            DirectoryRsltBitmap]}, $Bitmap);
+    $msg .= pack('c/a*', PackSetParams($Bitmap, $is_file, %Specification1));
+    if ($is_range == 1) {
+        $msg .= pack('c/a*', PackSetParams($Bitmap, $is_file, %Specification2));
+    }
+
+    my $resp;
+    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
+    return $rc if $rc != $kFPNoErr;
+    croak('Need to accept returned list') if not wantarray();
+
+    my $results = {};
+    # this pack mask is hella wonky, but it should do what I need.
+    my ($catpos, $filebmp, $dirbmp, @paramlist) =
+        unpack('a[16]S>S>L>/(xxCXXXS>xx/a![s])', $resp);
+    $results->{CatalogPosition} = $catpos;
+    my $op = $results->{OffspringParameters} = [];
+    while (scalar(@paramlist) > 0) {
+        my $isfiledir = shift(@paramlist);
+        my $paramdata = shift(@paramlist);
+        if ($isfiledir & 0x80) {
+            push(@{$op}, ParseDirParms($dirbmp, $paramdata));
+        }
+        else {
+            push(@{$op}, ParseFileParms($filebmp, $paramdata));
+        }
+    }
+    return($rc, $results);
 }
 
 sub FPChangePassword { # {{{1
@@ -2369,7 +2965,7 @@ sub FPSetDirParms { # {{{1
         UnixAccessRights    => { type => SCALAR, optional => 1 },
     } );
 
-    my $ParamsBlock = PackSetParams($options{Bitmap}, %options);
+    my $ParamsBlock = PackSetParams($options{Bitmap}, 0, %options);
     return $kFPParamErr if !defined $ParamsBlock;
 
     my $msg = pack('CxnNna*x![s]a*', $kFPSetDirParms,
@@ -2468,7 +3064,7 @@ sub FPSetFileDirParms { # {{{1
         UnixAccessRights    => { type => SCALAR, optional => 1 },
     } );
 
-    my $ParamsBlock = PackSetParams($options{Bitmap}, %options);
+    my $ParamsBlock = PackSetParams($options{Bitmap}, 1, %options);
     return $kFPParamErr if !defined $ParamsBlock;
 
     my $msg = pack('CxnNna*x![s]a*', $kFPSetFileDirParms,
@@ -2520,7 +3116,7 @@ sub FPSetFileParms { # {{{1
         UnixAccessRights    => { type => SCALAR, optional => 1 },
     } );
 
-    my $ParamsBlock = PackSetParams($options{Bitmap}, %options);
+    my $ParamsBlock = PackSetParams($options{Bitmap}, 1, %options);
     return $kFPParamErr if !defined $ParamsBlock;
 
     my $msg = pack('CxnNna*x![s]a*', $kFPSetFileParms,
