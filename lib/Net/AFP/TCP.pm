@@ -105,7 +105,7 @@ sub CheckAttnQueue { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
     my ($self, $payload, $resp_r, $can_cache) = @_;
-    $self->{logger}->debug('called ', (caller(0))[3], '()');
+    #$self->{logger}->debug('called ', (caller(0))[3], '()');
 
     $self->CheckAttnQueue();
     if ($can_cache && exists $self->{ReplayCache}) {
@@ -122,7 +122,7 @@ sub SendAFPMessage { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPWrite { # {{{1
     my ($self, $payload, $data_r, $d_len, $resp_r) = @_;
-    $self->{logger}->debug('called ', (caller(0))[3], '()');
+    #$self->{logger}->debug('called ', (caller(0))[3], '()');
 
     $self->CheckAttnQueue();
     return $self->{Session}->Write($payload, $data_r, $d_len, $resp_r);
