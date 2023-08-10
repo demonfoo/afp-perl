@@ -62,6 +62,8 @@ private     shared      => my %shared;
 # allow potential callers to know if the thread is in play or not.
 sub session_thread { # {{{1
     my($shared, $host, $port, %params) = @_;
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug('called ', (caller(0))[3], '()');
 
     # Set up the connection to the server. Then we need to check that we've
     # connected successfully.
@@ -76,6 +78,7 @@ sub session_thread { # {{{1
     my $active_timer = $params{ActiveTimer} || 60;
     my $idle_timer   = $params{IdleTimer} || 120;
 
+    $logger->debug('connecting to AFP server');
     if ($has_IO__Socket__INET6 == 1) {
         $conn = IO::Socket::INET6->new(%connect_args);
     }
@@ -83,6 +86,7 @@ sub session_thread { # {{{1
         $conn = IO::Socket::INET->new(%connect_args);
     }
     if (!defined($conn) || !$conn->connected()) {
+        $logger->debug('connection attempt failed, aborting');
         $shared->{running} = -1;
         # gotta do this so new() completes, one way or another...
         $shared->{conn_sem}->up();
@@ -99,6 +103,7 @@ sub session_thread { # {{{1
 
     # Tell the TCP stack that we don't want Nagle's algorithm; for our
     # purposes, all it's going to do is screw us up.
+    $logger->debug('setting up socket and shared data');
     setsockopt($conn, IPPROTO_TCP, TCP_NODELAY, 1);
     $shared->{conn_fd}      = fileno($conn);
     $shared->{running}      = 1;
@@ -121,11 +126,13 @@ sub session_thread { # {{{1
             $wsz, $handler, $rlen);
     my $last_tickle     = gettimeofday();
     my $last_pkt_rcvd   = $last_tickle;
+    $logger->debug('starting DSI thread main loop');
 MAINLOOP:
     while ($shared->{exit} == 0) {
         $now = gettimeofday();
         # Scan the handlers list to see if there are any callouts that
         # haven't been responded to.
+        #$logger->debug('checking for unanswered handlers');
         keys %{$handlers};
         while (($id, $handler) = each %{$handlers}) {
             # If we find that a transaction hasn't been responded to in at
@@ -133,7 +140,7 @@ MAINLOOP:
             # go home.
             if (($now - $handler->[3]) > $active_timer) {
                 $shared->{exit} = 1;
-                print {\*STDERR} (caller(0))[3], "(): Waiting request timed out, aborting\n";
+                $logger->fatal((caller(0))[3], '(): Waiting request timed out, aborting');
                 last MAINLOOP;
             }
         }
@@ -148,29 +155,30 @@ MAINLOOP:
         #    $shared->{exit} = 1;
         #    last;
         #}
-        if ($poll->poll(1.0)) {
+        if ($poll->poll(0.25)) {
             $ev = $poll->events($conn);
             if ($ev & POLLHUP) {
                 # If this happens, the socket is (almost certainly) no
                 # longer connected to the peer, so we should bail.
                 #print {\*STDERR} (caller(0))[3], "(): Received HUP on AFP server connection, terminating loop\n";
                 #last MAINLOOP;
-                print {\*STDERR} (caller(0))[3], "(): poll returned POLLHUP, but this is indeterminate\n";
+                $logger->warn((caller(0))[3], '(): poll returned POLLHUP, but this is indeterminate');
             }
             # Try to get a message from the server.
+            #$logger->debug('reading from socket');
             $shared->{conn_sem}->down();
             $rsz = 0;
             while ($rsz < 16) {
                 $rsz += $rlen = sysread($conn, $resp, 16 - $rsz, $rsz);
                 # Some kind of error occurred...
                 if (!defined $rlen) {
-                    print {\*STDERR} (caller(0))[3], "(): socket read received error ${ERRNO}\n";
+                    $logger->fatal((caller(0))[3] . '(): socket read received error ' . ${ERRNO});
                     $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
                 # This means the socket read returned EOF; we should go away.
                 if ($rlen == 0) {
-                    #print {\*STDERR} (caller(0))[3], "(): socket read returned EOF\n";
+                    $logger->fatal((caller(0))[3] . '(): socket read returned EOF');
                     $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
@@ -190,7 +198,7 @@ MAINLOOP:
                 # DSICloseSession from server; this means the server is
                 # going away (i.e., it's shutting down).
                 if ($cmd == $OP_DSI_CLOSESESSION) {
-                    #print {\*STDERR} (caller(0))[3], "(): Received CloseSession from server, setting exit flag to 1\n";
+                    $logger->debug((caller(0))[3], '(): Received CloseSession from server, setting exit flag to 1');
                     $shared->{exit} = 1;
                 }
 
@@ -225,7 +233,10 @@ MAINLOOP:
                 }
 
                 else {
-                    print {\*STDERR} (caller(0))[3], "(): Unexpected packet received:\n", Dumper( { type => $type, cmd => $cmd, id => $id, errcode => $errcode, length => $length, reserved =>$reserved } );
+                    $logger->warn((caller(0))[3], "(): Unexpected packet received:\n",
+                            Dumper( { type => $type, cmd => $cmd, id => $id,
+                                            errcode => $errcode, length => $length,
+                                            reserved =>$reserved } ));
                 }
             } else {
                 # Check for a completion handler block for the given message ID.
@@ -241,11 +252,11 @@ MAINLOOP:
                     # release the semaphore, after which the caller will
                     # continue (if it had a semaphore, it should be blocking
                     # on down())
-                    #${$$handler[0]}->up();
                     $sem_ref = $handler->[0];
                 }
                 else {
-                    print {\*STDERR} (caller(0))[3], "(): Message packet received with id $id, but no handler block present\n";
+                    $logger->warn((caller(0))[3], '(): Message packet received with id ',
+                            $id, ', but no handler block present');
                 }
             }
 
@@ -294,6 +305,7 @@ MAINLOOP:
             $last_tickle = $now;
         }
     }
+    $logger->debug('exiting main loop');
     $shared->{running} = -1;
     undef $shared->{conn_fd};
     close($conn);
@@ -302,6 +314,7 @@ MAINLOOP:
     # deal with netatalk shutting down the connection right away when FPLogout
     # is received, instead of waiting for the client to send DSICloseSession.
     # Thanks again, netatalk. :| )
+    $logger->debug('cleaning up any pending handlers');
     keys %{$handlers};
     while (($id, $handler) = each %{$handlers}) {
         $handler = $handlers->{$id};
@@ -316,6 +329,7 @@ sub new { # {{{1
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
     $port ||= 548;
     my $obj = bless {}, $class;
+    $logger->debug('called ', (caller(0))[3], '()');
 
     my $shared = shared_clone({});
     %{$shared} = (
@@ -337,6 +351,7 @@ sub new { # {{{1
     );
 
     $shared{id $obj}    = $shared;
+    $logger->debug('starting session_thread');
     my $thread          = threads->create(\&session_thread, $shared, $host,
                                             $port);
     $dispatcher{id $obj} = $thread;
@@ -353,6 +368,8 @@ sub new { # {{{1
 
 sub close { # {{{1
     my ($self) = @_;
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug('called ', (caller(0))[3], '()');
     $shared{id $self}{exit} = 1;
     $dispatcher{id $self}->join();
     return;
@@ -377,6 +394,8 @@ sub close { # {{{1
 #               desired, this should be undef.
 sub SendMessage { # {{{1
     my ($self, $cmd, $message, $data_r, $d_len, $sem_r, $resp_r, $rc_r) = @_;
+    #my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    #$logger->debug('called ', (caller(0))[3], '()');
 
     if (defined $sem_r) {
         # Create the Thread::Semaphore object, and initialize it to 0;
@@ -444,6 +463,8 @@ sub SendMessage { # {{{1
 sub DSICloseSession { return CloseSession(@_); }
 sub CloseSession { # {{{1
     my ($self) = @_;
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug('called ', (caller(0))[3], '()');
 
     # Issue the DSICloseSession command to the server. Apparently the
     # server doesn't have anything to say in response.
@@ -470,6 +491,8 @@ sub Command { # {{{1
 sub DSIGetStatus { return GetStatus(@_); }
 sub GetStatus { # {{{1
     my ($self, $resp_r) = @_;
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug('called ', (caller(0))[3], '()');
 
     # Require that the caller provide a ref to stuff the reply block into.
     # This command is always going to provide a reply block, and the
@@ -489,6 +512,8 @@ sub GetStatus { # {{{1
 sub DSIOpenSession { return OpenSession(@_); }
 sub OpenSession { # {{{1
     my ($self, %options) = @_;
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug('called ', (caller(0))[3], '()');
 
     my $options_packed = q{};
     foreach my $key (keys %options) {
@@ -537,6 +562,8 @@ sub OpenSession { # {{{1
 # do dispatch duty, so it can handle things like that.
 sub DSITickle { # {{{1
     my ($self) = @_;
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug('called ', (caller(0))[3], '()');
 
     my $reqId = $self->SendMessage($OP_DSI_TICKLE);
     return;
@@ -546,6 +573,8 @@ sub DSIWrite { return Write(@_); }
 sub Write { # {{{1
     # This should only be used for FPWrite and FPAddIcon
     my ($self, $message, $data_r, $d_len, $resp_r) = @_;
+    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    $logger->debug('called ', (caller(0))[3], '()');
 
     my $sem;
     my $rc;
