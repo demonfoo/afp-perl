@@ -17,12 +17,12 @@ use English qw(-no_match_vars);
 use Carp;
 local $SIG{__WARN__} = \&Carp::cluck;
 
-my $has_IO__Socket__INET6 = 0;
+my $has_IO__Socket__IP = 0;
 eval {
-    require IO::Socket::INET6;
+    require IO::Socket::IP;
     1;
 } and do {
-    $has_IO__Socket__INET6 = 1;
+    $has_IO__Socket__IP = 1;
 };
 use IO::Socket::INET;
 use IO::Poll qw(POLLIN POLLHUP);
@@ -79,8 +79,8 @@ sub session_thread { # {{{1
     my $idle_timer   = $params{IdleTimer} || 120;
 
     $logger->debug('connecting to AFP server');
-    if ($has_IO__Socket__INET6 == 1) {
-        $conn = IO::Socket::INET6->new(%connect_args);
+    if ($has_IO__Socket__IP == 1) {
+        $conn = IO::Socket::IP->new(%connect_args);
     }
     if (!defined($conn) || !$conn->connected()) {
         $conn = IO::Socket::INET->new(%connect_args);
@@ -112,7 +112,7 @@ sub session_thread { # {{{1
     $shared->{peeraddr}     = $conn->peeraddr();
     $shared->{peerport}     = $conn->peerport();
     $shared->{sockdomain}   = AF_INET;
-    if (ref($conn) eq 'IO::Socket::INET6') {
+    if (ref($conn) eq 'IO::Socket::IP') {
         $shared->{sockdomain} = $conn->sockdomain();
     }
     $shared->{conn_sem}->up();

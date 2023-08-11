@@ -46,10 +46,9 @@ This module requires or encourages use of these other modules and libraries:
 * Data::UUID is recommended, used internally for access checking
 * CryptX is strongly recommended; all UAMs other than plaintext need it
 * Math::BigInt::GMP is recommended, speeds up DHX UAMs
-* IO::Socket::INET6 is suggested, adds v6 socket support
+* IO::Socket::IP is suggested, adds v6 socket support
 * Net::Atalk is suggested, adds AppleTalk socket support
 * Net::Bonjour is suggested, adds mDNS/Bonjour service discovery
-* Bytes::Random::Secure is required for most UAMs (if you like secure UAMs)
 * Term::ReadPassword is recommended
 * Readonly is required
 * Params::Validate is required

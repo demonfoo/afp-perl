@@ -34,7 +34,7 @@ advanced features:
    * Encrypted login (via Diffie-Hellman exchange)
    * UNIX ownership/permissions
    * UTF-8 filenames
-   * IPv6 support, with IO::Socket::INET6
+   * IPv6 support, with IO::Socket::IP
 
 It also remains compatible with classic Mac OS; I've mounted filesystems
 from Mac System 7, but it should work with versions even older than that, at

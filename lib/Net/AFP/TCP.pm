@@ -25,7 +25,7 @@ our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
 #           'Net::AFP::TCP->new'.
 #   $host: The IP address (a DNS name should work as well) of the AFP over
 #          TCP server we wish to connect to. (IPv6 addresses will work as
-#          well, if IO::Socket::INET6 is available.)
+#          well, if IO::Socket::IP is available.)
 #   $port: The port to connect to. Should be 'undef' if the default port
 #          is to be used (default is 548).
 sub new { # {{{1

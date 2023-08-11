@@ -25,7 +25,7 @@ prefix:    %(echo %{_prefix})
 source:    Net-AFP-%{version}.tar.gz
 autoreq:   0
 requires:  perl >= 5.10.0, perl(Log::Log4perl), perl(Math::BigInt::GMP), perl(Data::UUID), perl(CryptX), perl(Log::Dispatch), perl(Fuse), perl(Fuse::Class)
-#suggests: perl(Net::Atalk), perl(IO::Socket::INET6), nss-mdns
+#suggests: perl(Net::Atalk), perl(IO::Socket::IP), nss-mdns
 
 %description
 Net::AFP is a collection of packages which implement a working Apple Filing
@@ -43,7 +43,7 @@ This module supports several advanced AFP features:
    * Encrypted login (via Diffie-Hellman exchange)
    * UNIX ownership/permissions
    * UTF-8 filenames
-   * IPv6 support, with IO::Socket::INET6
+   * IPv6 support, with IO::Socket::IP
 
 %package -n afp-perl
 summary:   Apple Filing Protocol FUSE client in Perl

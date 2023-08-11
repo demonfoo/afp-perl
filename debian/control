@@ -10,7 +10,7 @@ Architecture: all
 Depends: perl (>= 5.8.0), perl-modules, liblog-log4perl-perl,
  libmath-bigint-gmp-perl, libdata-uuid-perl, libcryptx-perl,
  liblog-dispatch-perl, libfuse-class-perl
-Suggests: libnet-atalk-perl, libio-socket-inet6-perl, libnss-mdns
+Suggests: libnet-atalk-perl, libio-socket-ip-perl, libnss-mdns
 Description: Apple Filing Protocol implementation in Perl
  Net::AFP is a collection of packages which implement a working Apple Filing
  Protocol stack in Perl. It supports AFP over TCP, for mounting shares from
@@ -27,7 +27,7 @@ Description: Apple Filing Protocol implementation in Perl
    * Encrypted login (via Diffie-Hellman exchange)
    * UNIX ownership/permissions
    * UTF-8 filenames
-   * IPv6 support, with IO::Socket::INET6
+   * IPv6 support, with IO::Socket::IP
 
 Package: afp-perl
 Architecture: all
