@@ -23,18 +23,15 @@ WriteMakefile(
         prereqs   => {
             runtime => {
                 recommends => {
-                    'Crypt::CAST5'          => 0,
-                    'Crypt::CBC'            => 0,
+                    'CryptX'                => 0,
                     'Math::BigInt::GMP'     => 0,
                     'Data::UUID'            => 0,
                     'PerlIO::buffersize'    => 0,
                     'Term::ReadPassword'    => 0,
                     'Net::Bonjour'          => 0,
-                    'Bytes::Random::Secure' => 0,
                     'Term::ReadLine'        => 0,
                 },
                 'suggests' => {
-                    'Crypt::DES'            => 0,
                     'Socket::INET6'         => 0,
                     'Net::Atalk'            => 0,
                     'Term::ReadLine::Gnu'   => 0,

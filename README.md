@@ -44,14 +44,11 @@ This module requires or encourages use of these other modules and libraries:
 * Fuse::Class is used as the superclass for Fuse::AFP
 * Fuse is depended upon by Fuse::Class, need version 0.10\_1 or later
 * Data::UUID is recommended, used internally for access checking
-* Crypt::CBC is recommended, needed for advanced UAMs
-* Crypt::CAST5 or Crypt::CAST5\_PP is recommended, needed for DHX UAMs
-* Crypt::DES is suggested, needed for Randnum UAMs
+* CryptX is strongly recommended; all UAMs other than plaintext need it
 * Math::BigInt::GMP is recommended, speeds up DHX UAMs
-* IO::Socket::INET6 is suggested, adds v6 socket support
+* IO::Socket::IP is suggested, adds v6 socket support
 * Net::Atalk is suggested, adds AppleTalk socket support
 * Net::Bonjour is suggested, adds mDNS/Bonjour service discovery
-* Bytes::Random::Secure is required for most UAMs (if you like secure UAMs)
 * Term::ReadPassword is recommended
 * Readonly is required
 * Params::Validate is required

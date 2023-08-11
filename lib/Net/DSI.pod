@@ -22,7 +22,7 @@ provided by TCP, and the transactional interface AFP requires.
 Create a new DSI session object which will connect to the indicated host,
 and (optionally) the indicated port. If no port is specified, the default
 TCP port will be used for the connection. The host may be an IPv4 or
-IPv6 (if L<IO::Socket::INET6> is present) address, or a DNS name.
+IPv6 (if L<IO::Socket::IP> is present) address, or a DNS name.
 
 =back
 
@@ -122,7 +122,7 @@ Requires a threaded version of Perl to run.
 Most of the required packages are included in the Perl distribution, so
 they do not need to be installed on your system.
 
-IO::Socket::INET6 can optionally be used. It adds the ability to connect
+IO::Socket::IP can optionally be used. It adds the ability to connect
 to AFP servers that listen on IPv6 sockets.
 
 =head1 BUGS AND LIMITATIONS
@@ -144,6 +144,6 @@ Derrik Pates <demon@now.ai>
 
 =head1 SEE ALSO
 
-C<IO::Socket::INET>, C<IO::Socket::INET6>, C<Net::AFP>, C<Net::AFP::TCP>
+C<IO::Socket::INET>, C<IO::Socket::IP>, C<Net::AFP>, C<Net::AFP::TCP>
 
 =cut
