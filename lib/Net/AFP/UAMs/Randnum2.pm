@@ -1,5 +1,5 @@
 # This package implements the 2-Way Random Number Exchange User Authentication
-# Method for AFP. It uses Crypt::DES for the actual DES encryption used
+# Method for AFP. It uses Crypt::Cipher::DES for the actual DES encryption used
 # as part of the authentication process.
 
 # This UAM was added as of AFP 2.1.
@@ -15,7 +15,7 @@ use Bytes::Random::Secure qw(random_bytes);
 use Readonly;
 Readonly my $UAMNAME => '2-Way Randnum exchange';
 
-use Crypt::DES;
+use Crypt::Cipher::DES;
 use Net::AFP::Result;
 use Net::AFP::Versions;
 use Log::Log4perl;
@@ -64,7 +64,7 @@ sub Authenticate {
     # Pack the rotated bitstring back into binary form for use as the DES key.
     my $key = pack('B*', $bin_key);
     undef $bin_key;
-    my $deshash = Crypt::DES->new($key);
+    my $deshash = Crypt::Cipher::DES->new($key);
     undef $key;
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;

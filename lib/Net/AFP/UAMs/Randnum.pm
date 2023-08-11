@@ -1,5 +1,5 @@
 # This package implements the Random Number Exchange User Authentication
-# Method for AFP. It uses Crypt::DES for the actual DES encryption used
+# Method for AFP. It uses Crypt::Cipher::DES for the actual DES encryption used
 # as part of the authentication process.
 # This UAM is considered deprecated by Apple, and OS X no longer supports
 # its use. This is for legacy compatibility only. (Does that apply to
@@ -15,7 +15,7 @@ use Carp;
 use Readonly;
 Readonly my $UAMNAME => 'Randnum exchange';
 
-use Crypt::DES;
+use Crypt::Cipher::DES;
 use Net::AFP::Result;
 use Net::AFP::Versions;
 use Log::Log4perl;
@@ -57,7 +57,7 @@ sub Authenticate {
     # it with the password the user gave us.
     my ($randnum) = unpack('a8', $resp{UserAuthInfo});
     $session->{logger}->debug('$randnum is 0x', unpack('H*', $randnum));
-    my $deshash = Crypt::DES->new(pack('a8', &{$pw_cb}()));
+    my $deshash = Crypt::Cipher::DES->new(pack('a8', &{$pw_cb}()));
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;
     $session->{logger}->debug('$crypted is 0x', unpack('H*', $crypted));
@@ -79,9 +79,9 @@ sub ChangePassword {
     # Establish encryption contexts for each of the supplied passwords. Then
     # pack the old password encrypted with the new one, and the new password
     # encrypted with the old one, as directed.
-    my $oldcrypt = Crypt::DES->new(pack('a8', $oldPassword));
-    my $newcrypt = Crypt::DES->new(pack('a8', $newPassword));
-    my $message = pack('a8a8', $newcrypt->encrypt($oldPassword),
+    my $oldcrypt = Crypt::Cipher::DES->new(pack('a8', $oldPassword));
+    my $newcrypt = Crypt::Cipher::DES->new(pack('a8', $newPassword));
+    my $message = pack('a[8]a[8]', $newcrypt->encrypt($oldPassword),
             $oldcrypt->encrypt($newPassword));
     undef $oldcrypt;
     undef $newcrypt;

@@ -24,8 +24,8 @@ buildarch: noarch
 prefix:    %(echo %{_prefix})
 source:    Net-AFP-%{version}.tar.gz
 autoreq:   0
-requires:  perl >= 5.8.0, perl(Log::Log4perl), perl(Math::BigInt::GMP), perl(Data::UUID), perl(Crypt::CBC), perl(Crypt::CAST5_PP), perl(Log::Dispatch), perl(Fuse), perl(Fuse::Class)
-#suggests: perl(Net::Atalk), perl(Crypt::DES), perl(IO::Socket::INET6), nss-mdns
+requires:  perl >= 5.10.0, perl(Log::Log4perl), perl(Math::BigInt::GMP), perl(Data::UUID), perl(CryptX), perl(Log::Dispatch), perl(Fuse), perl(Fuse::Class)
+#suggests: perl(Net::Atalk), perl(IO::Socket::INET6), nss-mdns
 
 %description
 Net::AFP is a collection of packages which implement a working Apple Filing
@@ -57,12 +57,12 @@ also includes an additional tool (afp_acl.pl) for managing ACLs on remote
 Apple Filing Protocol shares, if your server supports ACLs (OS X 10.3 and
 later).
 
-%package -n afpsh-perl
+%package -n afpclient-perl
 summary:   An FTP-style client for accessing AFP shares
 autoreq:   0
 requires:  perl >= 5.10.0, perl(Net::AFP), perl(Text::Glob), perl(Term::ReadPassword)
 #suggests:  perl(Archive::Tar), perl(Term::ReadLine::Gnu)
-%description -n afpsh-perl
+%description -n afpclient-perl
 A command-line tool, similar to FTP or smbclient, which can be used to
 transfer files to/from AFP servers.
 
@@ -159,8 +159,8 @@ ln -sf /usr/local/bin/afpmount.pl %{buildroot}/sbin/mount.pafpfs
 /usr/local/bin/afp_acl.pl
 /usr/local/bin/afp_chpass.pl
 /sbin/mount.pafpfs
-%files -n afpsh-perl
-/usr/local/bin/afpsh.pl
+%files -n afpclient-perl
+/usr/local/bin/afpclient.pl
 %defattr(-,root,root)
 
 %post -n afp-perl
