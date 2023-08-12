@@ -93,10 +93,10 @@ sub Reconnect {
     my $clientNonce = random_bytes($nonce_len);
     my $ciphertext = $ctx->encrypt($clientNonce, $k, $C2SIV);
     my $sig = pack('a[16]L>L>a[' . $nonce_len . ']a*', $hashval, $n, $t2,
-                   $ciphertext, $session->{cred});
+            $ciphertext, $session->{cred});
     $sig = hmac(q{MD5}, $session->{s}, $sig);
-    my $authinfo = pack('a[16]a[16]L>L>a*a*', $sig, $hashval, $n, $t2,
-                        $ciphertext, $session->{cred});
+    my $authinfo = pack('a[16]a[16]L>L>a[' . $nonce_len . ']a*', $sig,
+            $hashval, $n, $t2, $ciphertext, $session->{cred});
     undef $ciphertext;
 
     # this is step 1
