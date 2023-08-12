@@ -747,12 +747,11 @@ sub FPCatSearch {
     my $msg = pack('CxS>L>x[4]a[16]S>S>L>', $kFPCatSearch,
             @options{qw[VolumeID ReqMatches CatalogPosition FileRsltBitmap
             DirectoryRsltBitmap]}, $Bitmap);
-    # FIXME: pack() doesn't let me do 'Cx/a' for the mask with a pad byte
-    # in between. Should see if there's a solution. This is a ghetto
-    # workaround, for now.
-    $msg .= pack('S</a', PackSetParams($Bitmap, $is_file, %Specification1));
+    my $params = PackSetParams($Bitmap, $is_file, %Specification1);
+    $msg .= pack('Cx/a', length($params), $params);
     if ($is_range == 1) {
-        $msg .= pack('S</a', PackSetParams($Bitmap, $is_file, %Specification2));
+        $params = PackSetParams($Bitmap, $is_file, %Specification2);
+        $msg .= pack('Cx/a', length($params), $params);
     }
 
     my $resp;
