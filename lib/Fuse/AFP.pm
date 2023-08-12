@@ -3296,13 +3296,16 @@ sub acl_from_nfsv4_xattr { # {{{1
             }
             next;
         }
-        $who =~ s{\@local$}{};
+        my $resp;
+        my $rc = $self->{afpconn}->FPGetSrvrInfo(\$resp);
+        return -EINVAL if $rc != $kFPNoErr;
+        $who =~ s{\@$resp->{UTF8ServerName}$}{};
         if ($flag & $NFS4_ACE_IDENTIFIER_GROUP) {
             if (exists $self->{g_uuidmap}->{$who}) {
                 $uuid = $self->{g_uuidmap}->${who};
             }
             else {
-                my $rc = $self->{afpconn}->FPMapName($kUTF8NameToGroupUUID,
+                $rc = $self->{afpconn}->FPMapName($kUTF8NameToGroupUUID,
                         $who, \$uuid);
                 return -EINVAL if $rc != $kFPNoErr;
             }
@@ -3312,7 +3315,7 @@ sub acl_from_nfsv4_xattr { # {{{1
                 $uuid = $self->{u_uuidmap}->${who};
             }
             else {
-                my $rc = $self->{afpconn}->FPMapName($kUTF8NameToUserUUID,
+                $rc = $self->{afpconn}->FPMapName($kUTF8NameToUserUUID,
                         $who, \$uuid);
                 return -EINVAL if $rc != $kFPNoErr;
             }
@@ -3399,7 +3402,9 @@ sub acl_to_nfsv4_xattr { # {{{1
                 $flag |= $NFS4_ACE_IDENTIFIER_GROUP;
             }
         }
-        $who = $name->{UTF8Name} . '@local';
+        my $resp;
+        my $rc = $self->{afpconn}->FPGetSrvrInfo(\$resp);
+        $who = $name->{UTF8Name} . '@' . $resp->{UTF8ServerName};
 
         # ace_flags (AFP) -> flag, type (NFSv4)
         my $kind = $entry->{ace_flags} & $KAUTH_ACE_KINDMASK;
@@ -3422,7 +3427,7 @@ sub acl_to_nfsv4_xattr { # {{{1
     }
 
     # get UNIX access rights and form the default owner/group/everyone entries
-    my($rc, $resp) = $self->{afpconn}->FPGetFileDirParms(
+    my ($rc, $resp) = $self->{afpconn}->FPGetFileDirParms(
             VolumeID    => $self->{volID},
             DirectoryID => $self->{topDirID},
             FileBitmap  => $kFPUnixPrivsBit,
