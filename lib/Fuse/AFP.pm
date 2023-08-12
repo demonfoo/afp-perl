@@ -2690,8 +2690,10 @@ sub lock { # {{{1
 
 sub utimens { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', actime = [%d, %d], modtime = [%d, %d])},
-            (caller 0)[3], $file, @{$actime}, @{$modtime}));
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', actime = %s, modtime = %s)},
+            (caller 0)[3], $file,
+            ref $actime ? sprintf('[%d, %d]', @{$actime}) : sprintf('%f', $actime),
+            ref $modtime ? sprintf('[%d, %d]', @{$modtime}) : sprintf('%f', $modtime) ));
 
     $self->{callcount}{(caller 0)[3]}++;
 
