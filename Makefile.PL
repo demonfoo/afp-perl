@@ -17,6 +17,7 @@ WriteMakefile(
         'URI::Escape'           => 0,
         'Readonly'              => 0,
         'Class::InsideOut'      => 0,
+        'String::Escape'        => 0,
     },
     META_MERGE => {
         'meta-spec' => { version => 2 },
