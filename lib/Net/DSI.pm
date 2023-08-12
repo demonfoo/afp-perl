@@ -207,18 +207,6 @@ MAINLOOP:
                     $rsz = 0;
                     while ($rsz < $length) {
                         $rsz += $rlen = sysread($conn, $data, $length - $rsz, $rsz);
-#                        # Some kind of error occurred...
-#                        if (!defined $rlen) {
-#                            print {\*STDERR} (caller(0))[3], "(): socket read received error ${ERRNO}\n";
-#                            $shared->{conn_sem}->up();
-#                            last MAINLOOP;
-#                        }
-#                        # This means the socket read returned EOF; we should go away.
-#                        if ($rlen == 0) {
-#                            #print {\*STDERR} (caller(0))[3], "(): socket read returned EOF\n";
-#                            $shared->{conn_sem}->up();
-#                            last MAINLOOP;
-#                        }
                     }
                     $last_pkt_rcvd = gettimeofday();
                     $shared->{conn_sem}->up();
@@ -270,18 +258,6 @@ MAINLOOP:
             while ($rsz < $length) {
                 $rsz += $rlen = sysread($conn, ${$rb_ref},
                         $length - $rsz, $rsz);
-#                # Some kind of error occurred...
-#                if (!defined $rlen) {
-#                    print {\*STDERR} (caller(0))[3], "(): socket read received error ${ERRNO}\n";
-#                    $shared->{conn_sem}->up();
-#                    last MAINLOOP;
-#                }
-#                # This means the socket read returned EOF; we should go away.
-#                if ($rlen == 0) {
-#                    #print {\*STDERR} (caller(0))[3], "(): socket read returned EOF\n";
-#                    $shared->{conn_sem}->up();
-#                    last MAINLOOP;
-#                }
             }
             $last_pkt_rcvd = gettimeofday();
             $shared->{conn_sem}->up();
