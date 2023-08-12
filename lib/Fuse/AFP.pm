@@ -2699,7 +2699,8 @@ sub utimens { # {{{1
 
     # Mostly to test that things work. AFP doesn't really support sub-second
     # time resolution anyway.
-    return $self->utime($file, ${$actime}[0], ${$modtime}[0]);
+    return $self->utime($file, ref $actime ? ${$actime}[0] : $actime,
+        ref $modtime ? ${$modtime}[0] : $modtime);
 } # }}}1
 
 sub bmap { # {{{1
