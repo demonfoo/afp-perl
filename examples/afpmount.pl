@@ -185,9 +185,9 @@ _EOT_
 my($interactive, $options, $prefer_v4, $atalk_first, $debug_afp, $debug_dsi, $debug_fuse);
 # For now accept --options/-o, and just don't do anything with the option
 # string we get, that allows mounting via fstab to work.
-GetOptions('interactive'    => \$interactive,
-           'options=s'      => \$options,
-           'help'           => \&usage,
+GetOptions('i|interactive'  => \$interactive,
+           'o|options=s'    => \$options,
+           'h|help'         => \&usage,
            'list-mounts=s'  => \&list_mounts,
            'list-servers'   => \&list_servers,
            '4|prefer-v4'    => \$prefer_v4,
@@ -413,8 +413,11 @@ if (exists $options{debug}) {
     $mainopts{debug} = 1;
 }
 
-$mainopts{mountpoint} = $mountpoint;
-$mainopts{mountopts}  = join(q{,}, map { $_ . (defined($options{$_}) ? q{=} . $options{$_} : q{}) } keys %options );
+$mainopts{mountpoint}       = $mountpoint;
+$mainopts{mountopts}        = join(q{,}, map { $_ . (defined($options{$_}) ? q{=} . $options{$_} : q{}) } keys %options );
+$mainopts{nullpath_ok}      = 1;
+$mainopts{nopath}           = 1;
+$mainopts{utimens_as_array} = 1;
 
 $fuse->main(%mainopts);
 

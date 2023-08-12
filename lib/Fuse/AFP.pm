@@ -1415,7 +1415,7 @@ sub open { # {{{1
 sub read { # {{{1
     my ($self, $file, $len, $off, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', len = %d, off = %d, fh = %d)},
-            (caller 0)[3], $file, $len, $off, $fh));
+            (caller 0)[3], $file || '', $len, $off, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1445,7 +1445,7 @@ sub write { # {{{1
     my ($self, $file, $offset, $fh) = @_[0,1,3,4];
     my $data_r = \$_[2];
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', data = %s, offset = %d, fh = %d)},
-            (caller 0)[3], $file, q{[data]}, $offset, $fh));
+            (caller 0)[3], $file || '', q{[data]}, $offset, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -1538,7 +1538,7 @@ sub statfs { # {{{1
 sub flush { # {{{1
     my ($self, $file, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d)},
-            (caller 0)[3], $file, $fh));
+            (caller 0)[3], $file || '', ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1553,7 +1553,7 @@ sub flush { # {{{1
 sub release { # {{{1
     my ($self, $file, $mode, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x, fh = %d)},
-            (caller 0)[3], $file, $mode, $fh));
+            (caller 0)[3], $file || '', $mode, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1566,7 +1566,7 @@ sub release { # {{{1
 sub fsync { # {{{1
     my ($self, $file, $flags, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', flags = %x, fh = %d)},
-            (caller 0)[3], $file, $flags, $fh));
+            (caller 0)[3], $file || '', $flags, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2280,7 +2280,7 @@ sub opendir { # {{{1
 sub readdir { # {{{1
     my ($self, $dirname, $offset, $dh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', offset = %d, dh = %d)},
-            (caller 0)[3], $dirname, $offset, $dh));
+            (caller 0)[3], $dirname || '', $offset, $dh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2298,7 +2298,7 @@ sub readdir { # {{{1
         push @fileslist, [++$offset, q{.}], [++$offset, q{..}];
         $entrycount -= 2;
 
-        if ($dirname eq q{/}) {
+        if ($self->{topDirID} == $dh) {
             $entrycount -= 1;
             push @fileslist, [++$offset, '._metrics'];
             if ($self->{volicon}) {
@@ -2312,7 +2312,7 @@ sub readdir { # {{{1
     my $bitmap = $self->{pathFlag};
 
     my $delta = 2;
-    if ($dirname eq q{/}) {
+    if ($self->{topDirID} == $dh) {
         $delta += 1;
         if ($self->{volicon}) {
             $delta += 2;
@@ -2351,7 +2351,7 @@ sub readdir { # {{{1
 sub releasedir { # {{{1
     my ($self, $dirname, $dh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', dh = %d)},
-            (caller 0)[3], $dirname, $dh));
+            (caller 0)[3], $dirname || '', $dh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2478,7 +2478,7 @@ sub create { # {{{1
 sub ftruncate { # {{{1
     my ($self, $file, $length, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', length = %d, fh = %d)},
-            (caller 0)[3], $file, $length, $fh));
+            (caller 0)[3], $file || '', $length, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2499,7 +2499,7 @@ sub ftruncate { # {{{1
 sub fgetattr { # {{{1
     my ($self, $file, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d)},
-            (caller 0)[3], $file, $fh));
+            (caller 0)[3], $file || '', ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2609,8 +2609,8 @@ sub fgetattr { # {{{1
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %s, } .
-            q{lkparms = %s, fh = %d)}, (caller 0)[3], $file, $cmd,
-            Dumper($lkparms), $fh));
+            q{lkparms = %s, fh = %d)}, (caller 0)[3], $file || '', $cmd,
+            Dumper($lkparms), ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2690,14 +2690,14 @@ sub lock { # {{{1
 
 sub utimens { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', actime = %f, modtime = %f)},
-            (caller 0)[3], $file, $actime, $modtime));
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', actime = [%d, %d], modtime = [%d, %d])},
+            (caller 0)[3], $file, @{$actime}, @{$modtime}));
 
     $self->{callcount}{(caller 0)[3]}++;
 
     # Mostly to test that things work. AFP doesn't really support sub-second
     # time resolution anyway.
-    return $self->utime($file, $actime, $modtime);
+    return $self->utime($file, ${$actime}[0], ${$modtime}[0]);
 } # }}}1
 
 sub bmap { # {{{1
@@ -2715,7 +2715,7 @@ sub bmap { # {{{1
 sub ioctl {
     my ($self, $file, $cmd, $flags, $data, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %d, flags = %x, data = %s, fh = %d)},
-            (caller 0)[3], $file, $cmd, $flags, printable($data), $fh));
+            (caller 0)[3], $file || '', $cmd, $flags, printable($data), ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2725,7 +2725,7 @@ sub ioctl {
 sub poll {
     my ($self, $file, $ph, $revents, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', ph = %d, revents = %d, fh = %d)},
-            (caller 0)[3], $file, $ph, $revents, $fh));
+            (caller 0)[3], $file || '', $ph, $revents, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2735,6 +2735,9 @@ sub poll {
 sub write_buf {
     my ($self, $file, $off, $bufvec, $fh) = @_;
     $self->{logger}->debug('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', $off = %d,} .
+            q{ $bufvec = [...], $fh = %d)}, (caller 0)[3], $file || '', $off,
+            $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -2791,7 +2794,9 @@ sub write_buf {
 
 sub read_buf {
     my ($self, $file, $len, $off, $bufvec, $fh) = @_;
-    $self->{logger}->debug('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', len = %d, } .
+            q{$off = %d, $bufvec = [...], $fh = %d)}, (caller 0)[3],
+            $file || '', $len, $off, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2824,7 +2829,8 @@ sub read_buf {
 sub flock {
     my ($self, $file, $fh, $owner, $op) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, } .
-            q{owner = %d, op = %x)}, (caller 0)[3], $file, $fh, $owner, $op));
+            q{owner = %d, op = %x)}, (caller 0)[3], $file || '', $fh,
+            $owner, $op));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2861,8 +2867,9 @@ sub flock {
 
 sub fallocate {
     my ($self, $file, $fh, $mode, $off, $len) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, mode = %x, off = %d, len = %d)},
-            (caller 0)[3], $file, $fh, $mode, $off, $len));
+    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, } .
+            q{mode = %x, off = %d, len = %d)}, (caller 0)[3], $file || '',
+            $fh, $mode, $off, $len));
 
     $self->{callcount}{(caller 0)[3]}++;
 
