@@ -72,6 +72,10 @@ Readonly my $IO_BLKSIZE         => 0x40_000;
 # Special magic extended attribute names to take advantage of certain
 # AFP features.
 Readonly my $ACL_XATTR          => 'system.afp_acl';
+# This rejiggers the ACL data to/from the format that nfs4_setfacl and
+# nfs4_getfacl like (for Linux). Pretty sure this won't work on FreeBSD
+# et al., but I'm not finding anything to indicate that setfacl/getfacl
+# on other OSes actually work with FUSE.
 Readonly my $ACL_NFS4_XATTR     => 'system.nfs4_acl';
 Readonly my $COMMENT_XATTR      => 'system.comment';
 
@@ -3222,20 +3226,32 @@ for my $key (keys %afp_ace_type_to_nfs4_type_values) {
     $nfs4_type_to_afp_ace_type_values{$afp_ace_type_to_nfs4_type_values{$key}} = $key;
 }
 
-my %nfs4_reserved_who_names  = (
-    $NFS4_ACL_WHO_OWNER_STRING    => {
-        off        => 6,
-        rights_off => 0,
+my @nfs4_def_acl_params = (
+    {
+      who        => $NFS4_ACL_WHO_OWNER_STRING,
+      off        => 6,
+      flag       => 0,
+      rights_off => 0,
     },
-    $NFS4_ACL_WHO_GROUP_STRING    => {
-        off        => 3,
-        rights_off => 8,
+    {
+      who        => $NFS4_ACL_WHO_GROUP_STRING,
+      off        => 3,
+      flag       => $NFS4_ACE_IDENTIFIER_GROUP,
+      rights_off => 8,
     },
-    $NFS4_ACL_WHO_EVERYONE_STRING => {
-        off        => 0,
-        rights_off => 16,
+    {
+      who        => $NFS4_ACL_WHO_EVERYONE_STRING,
+      off        => 0,
+      flag       => 0,
+      rights_off => 16,
     },
 );
+
+my %nfs4_reserved_who_names;
+# instead of having two things with similar stuff, keep one source of truth
+for my $item (@nfs4_def_acl_params) {
+    $nfs4_reserved_who_names{${$item}{who}} = $item;
+}
 
 sub acl_from_nfsv4_xattr { # {{{1
     my ($self, $raw_xattr, $acl_data, $filename) = @_;
@@ -3338,7 +3354,7 @@ sub acl_from_nfsv4_xattr { # {{{1
     return -EBADF() if $trc != $kFPNoErr;
 
     # We want the type and suid/sgid/sticky bits preserved.
-    $unix_mode |= ($resp->{UnixPerms} & ~0777);
+    $unix_mode |= ($resp->{UnixPerms} & ~(S_IRWXU | S_IRWXG | S_IRWXO));
 
     $trc = $self->{afpconn}->FPSetFileDirParms(
             VolumeID            => $self->{volID},
@@ -3361,24 +3377,6 @@ sub acl_from_nfsv4_xattr { # {{{1
               };
     return 0;
 } # }}}1
-
-my @nfs4_def_acl_params = (
-    {
-      who => $NFS4_ACL_WHO_OWNER_STRING,
-      off => 6,
-      flag => 0,
-    },
-    {
-      who => $NFS4_ACL_WHO_GROUP_STRING,
-      off => 3,
-      flag => $NFS4_ACE_IDENTIFIER_GROUP,
-    },
-    {
-      who => $NFS4_ACL_WHO_EVERYONE_STRING,
-      off => 0,
-      flag => 0,
-    },
-);
 
 sub acl_to_nfsv4_xattr { # {{{1
     my ($self, $acldata, $filename) = @_;
