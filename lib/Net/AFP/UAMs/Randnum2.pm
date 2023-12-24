@@ -10,7 +10,7 @@ use Modern::Perl '2021';
 use diagnostics;
 use integer;
 use Carp;
-use Bytes::Random::Secure qw(random_bytes);
+use Crypt::PRNG qw(random_bytes);
 
 use Readonly;
 Readonly my $UAMNAME => '2-Way Randnum exchange';
