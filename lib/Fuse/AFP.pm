@@ -813,7 +813,7 @@ sub mknod { # {{{1
 
         # Need to set the file mode (if possible) to the mode requested by
         # the call...
-        return $self->chmod($file_n, $mode & oct 7777);
+        return $self->chmod($file_n, S_IMODE($mode));
     }
     return -EOPNOTSUPP();
 } # }}}1
@@ -2473,7 +2473,7 @@ sub create { # {{{1
     # We're ignoring this call's return value intentionally; on an AirPort
     # Disk device, UNIX modes are provided, but you can't change them, so
     # if this fails, it's acceptable.
-    $self->chmod($file_n, $mode & oct 7777);
+    $self->chmod($file_n, S_IMODE($mode));
     #return $rc if $rc;
 
     return($rc, $fh);
@@ -3141,6 +3141,7 @@ Readonly my $NFS4_ACE_INHERIT_ONLY_ACE           => 0x00000008;
 Readonly my $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG => 0x00000010;
 Readonly my $NFS4_ACE_FAILED_ACCESS_ACE_FLAG     => 0x00000020;
 Readonly my $NFS4_ACE_IDENTIFIER_GROUP           => 0x00000040;
+Readonly my $NFS4_ACE_INHERITED_ACE              => 0x00000080;
 
 # for nfs4_ace.access_mask
 Readonly my $NFS4_ACE_READ_DATA         => 0x00000001;
@@ -3160,33 +3161,10 @@ Readonly my $NFS4_ACE_READ_ACL          => 0x00020000;
 Readonly my $NFS4_ACE_WRITE_ACL         => 0x00040000;
 Readonly my $NFS4_ACE_WRITE_OWNER       => 0x00080000;
 Readonly my $NFS4_ACE_SYNCHRONIZE       => 0x00100000;
-
-Readonly my $NFS4_ACE_GENERIC_READ => ($NFS4_ACE_READ_DATA |
-                                       $NFS4_ACE_READ_ATTRIBUTES |
-                                       $NFS4_ACE_READ_NAMED_ATTRS |
-                                       $NFS4_ACE_READ_ACL |
-                                       $NFS4_ACE_SYNCHRONIZE);
-
-Readonly my $NFS4_ACE_GENERIC_WRITE => ($NFS4_ACE_WRITE_DATA |
-                                        $NFS4_ACE_APPEND_DATA |
-                                        $NFS4_ACE_READ_ATTRIBUTES |
-                                        $NFS4_ACE_WRITE_ATTRIBUTES |
-                                        $NFS4_ACE_WRITE_NAMED_ATTRS |
-                                        $NFS4_ACE_READ_ACL |
-                                        $NFS4_ACE_WRITE_ACL |
-                                        $NFS4_ACE_DELETE_CHILD |
-                                        $NFS4_ACE_SYNCHRONIZE);
-
-Readonly my $NFS4_ACE_GENERIC_EXECUTE => ($NFS4_ACE_EXECUTE |
-                                          $NFS4_ACE_READ_ATTRIBUTES |
-                                          $NFS4_ACE_READ_ACL |
-                                          $NFS4_ACE_SYNCHRONIZE);
-
-Readonly my $NFS4_ACE_MASK_ALL => ($NFS4_ACE_GENERIC_READ |
-                                   $NFS4_ACE_GENERIC_WRITE |
-                                   $NFS4_ACE_GENERIC_EXECUTE |
-                                   $NFS4_ACE_DELETE |
-                                   $NFS4_ACE_WRITE_OWNER);
+Readonly my $NFS4_ACE_GENERIC_READ      => 0x00120081;
+Readonly my $NFS4_ACE_GENERIC_WRITE     => 0x00160106;
+Readonly my $NFS4_ACE_GENERIC_EXECUTE   => 0x001200A0;
+Readonly my $NFS4_ACE_MASK_ALL          => 0x001F01FF;
 
 my %afp_to_nfs4_access_bits = (
     $KAUTH_VNODE_READ_DATA           => $NFS4_ACE_READ_DATA,
