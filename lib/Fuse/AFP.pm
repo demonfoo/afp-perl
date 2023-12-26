@@ -3133,34 +3133,40 @@ Readonly my $NFS4_ACL_WHO_OWNER    => 1;
 Readonly my $NFS4_ACL_WHO_GROUP    => 2;
 Readonly my $NFS4_ACL_WHO_EVERYONE => 3;
 
+Readonly my $NFS4_ACL_AUTO_INHERIT => (1<<0);
+Readonly my $NFS4_ACL_PROTECTED    => (1<<1);
+Readonly my $NFS4_ACL_DEFAULTED    => (1<<2);
+
 # for nfs4_ace.flag
-Readonly my $NFS4_ACE_FILE_INHERIT_ACE           => 0x00000001;
-Readonly my $NFS4_ACE_DIRECTORY_INHERIT_ACE      => 0x00000002;
-Readonly my $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE   => 0x00000004;
-Readonly my $NFS4_ACE_INHERIT_ONLY_ACE           => 0x00000008;
-Readonly my $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG => 0x00000010;
-Readonly my $NFS4_ACE_FAILED_ACCESS_ACE_FLAG     => 0x00000020;
-Readonly my $NFS4_ACE_IDENTIFIER_GROUP           => 0x00000040;
-Readonly my $NFS4_ACE_INHERITED_ACE              => 0x00000080;
+Readonly my $NFS4_ACE_FILE_INHERIT_ACE           => (1<<0);
+Readonly my $NFS4_ACE_DIRECTORY_INHERIT_ACE      => (1<<1);
+Readonly my $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE   => (1<<2);
+Readonly my $NFS4_ACE_INHERIT_ONLY_ACE           => (1<<3);
+Readonly my $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG => (1<<4);
+Readonly my $NFS4_ACE_FAILED_ACCESS_ACE_FLAG     => (1<<5);
+Readonly my $NFS4_ACE_IDENTIFIER_GROUP           => (1<<6);
+Readonly my $NFS4_ACE_INHERITED_ACE              => (1<<7);
 
 # for nfs4_ace.access_mask
-Readonly my $NFS4_ACE_READ_DATA         => 0x00000001;
-Readonly my $NFS4_ACE_LIST_DIRECTORY    => 0x00000001;
-Readonly my $NFS4_ACE_WRITE_DATA        => 0x00000002;
-Readonly my $NFS4_ACE_ADD_FILE          => 0x00000002;
-Readonly my $NFS4_ACE_APPEND_DATA       => 0x00000004;
-Readonly my $NFS4_ACE_ADD_SUBDIRECTORY  => 0x00000004;
-Readonly my $NFS4_ACE_READ_NAMED_ATTRS  => 0x00000008;
-Readonly my $NFS4_ACE_WRITE_NAMED_ATTRS => 0x00000010;
-Readonly my $NFS4_ACE_EXECUTE           => 0x00000020;
-Readonly my $NFS4_ACE_DELETE_CHILD      => 0x00000040;
-Readonly my $NFS4_ACE_READ_ATTRIBUTES   => 0x00000080;
-Readonly my $NFS4_ACE_WRITE_ATTRIBUTES  => 0x00000100;
-Readonly my $NFS4_ACE_DELETE            => 0x00010000;
-Readonly my $NFS4_ACE_READ_ACL          => 0x00020000;
-Readonly my $NFS4_ACE_WRITE_ACL         => 0x00040000;
-Readonly my $NFS4_ACE_WRITE_OWNER       => 0x00080000;
-Readonly my $NFS4_ACE_SYNCHRONIZE       => 0x00100000;
+Readonly my $NFS4_ACE_READ_DATA         => (1<<0);
+Readonly my $NFS4_ACE_LIST_DIRECTORY    => (1<<0);
+Readonly my $NFS4_ACE_WRITE_DATA        => (1<<1);
+Readonly my $NFS4_ACE_ADD_FILE          => (1<<1);
+Readonly my $NFS4_ACE_APPEND_DATA       => (1<<2);
+Readonly my $NFS4_ACE_ADD_SUBDIRECTORY  => (1<<2);
+Readonly my $NFS4_ACE_READ_NAMED_ATTRS  => (1<<3);
+Readonly my $NFS4_ACE_WRITE_NAMED_ATTRS => (1<<4);
+Readonly my $NFS4_ACE_EXECUTE           => (1<<5);
+Readonly my $NFS4_ACE_DELETE_CHILD      => (1<<6);
+Readonly my $NFS4_ACE_READ_ATTRIBUTES   => (1<<7);
+Readonly my $NFS4_ACE_WRITE_ATTRIBUTES  => (1<<8);
+Readonly my $NFS4_ACE_WRITE_RETENTION   => (1<<9);
+Readonly my $NFS4_ACE_WRITE_RETENTION_HOLD => (1<<10);
+Readonly my $NFS4_ACE_DELETE            => (1<<16);
+Readonly my $NFS4_ACE_READ_ACL          => (1<<17);
+Readonly my $NFS4_ACE_WRITE_ACL         => (1<<18);
+Readonly my $NFS4_ACE_WRITE_OWNER       => (1<<19);
+Readonly my $NFS4_ACE_SYNCHRONIZE       => (1<<20);
 Readonly my $NFS4_ACE_GENERIC_READ      => 0x00120081;
 Readonly my $NFS4_ACE_GENERIC_WRITE     => 0x00160106;
 Readonly my $NFS4_ACE_GENERIC_EXECUTE   => 0x001200A0;
@@ -3190,6 +3196,7 @@ my %afp_ace_flags_to_nfs4_flag_bits = (
     $KAUTH_ACE_ONLY_INHERIT      => $NFS4_ACE_INHERIT_ONLY_ACE,
     $KAUTH_ACE_SUCCESS           => $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG,
     $KAUTH_ACE_FAILURE           => $NFS4_ACE_FAILED_ACCESS_ACE_FLAG,
+    $KAUTH_ACE_INHERITED         => $NFS4_ACE_INHERITED_ACE,
 );
 
 my %afp_ace_type_to_nfs4_type_values = (
