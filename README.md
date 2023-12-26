@@ -17,9 +17,9 @@ that allow it to do its work:
 
 This code is known to work on Linux, [FreeBSD](http://www.freebsd.org) (8.x), [NetBSD](http://www.netbsd.org) and [MacOS X](http://www.apple.com/osx/)/Darwin.
 It makes use of Perl ithreads, so requires a threaded build of Perl.
-I have attempted to test this module on both Solaris (well, OpenSolaris)
-and Windows; unfortunately there seem to be threading deficiencies on
-both that make the code non-functional there.
+I have attempted to test this module on Windows; unfortunately there seem
+to be threading deficiencies on Windows that make the code non-functional
+there.
 
 More information is available on AFP [here](http://developer.apple.com/library/mac/#documentation/Networking/Conceptual/AFP/Introduction/Introduction.html).
 
@@ -45,6 +45,7 @@ This module requires or encourages use of these other modules and libraries:
 * Fuse is depended upon by Fuse::Class, need version 0.10\_1 or later
 * Data::UUID is recommended, used internally for access checking
 * CryptX is strongly recommended; all UAMs other than plaintext need it
+* Crypt::DH::GMP is recommended, for DHX UAMs
 * Math::BigInt::GMP is recommended, speeds up DHX UAMs
 * IO::Socket::IP is suggested, adds v6 socket support
 * Net::Atalk is suggested, adds AppleTalk socket support
