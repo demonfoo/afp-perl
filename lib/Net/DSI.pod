@@ -131,9 +131,6 @@ None currently known.
 
 =head1 INCOMPATIBILITIES
 
-Does not work on Nexenta. Don't currently know if it will work on any version
-of Solaris.
-
 Has some sort of socket/threading interaction on Windows systems. It gets
 connected, but sending packets gets slower and slower the more it does it.
 Seems to happen with both Strawberry Perl and ActivePerl.
