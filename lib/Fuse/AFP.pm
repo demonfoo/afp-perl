@@ -2724,7 +2724,7 @@ sub bmap { # {{{1
 
     # This is not a local filesystem that lives on a block device, so bmap()
     # is nonsensical.
-    return -ENOSYS();
+    return -EOPNOTSUPP();
 } # }}}1
 
 sub ioctl {
