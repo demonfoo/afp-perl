@@ -427,6 +427,10 @@ sub getattr { # {{{1
     $self->{callcount}{(caller 0)[3]}++;
 
     $file = $self->{local_encode}->decode($file);
+
+    $self->{afpconn}->FPGetUserInfo(0x1, 0, 0x3, \my $selfinfo);
+    my $uidmap = $self->{uidmap};
+    my $gidmap = $self->{gidmap};
     if ($file eq '/._metrics') {
         my $timest = time;
         my @stat = ( # {{{2
@@ -435,13 +439,13 @@ sub getattr { # {{{1
             # inode number (node ID works fine)
             0,
             # permission mask
-            oct(100_444),
+            S_IFREG | S_IRUSR | S_IRGRP | S_IROTH,
             # link count
             1,
             # UID number
-            0,
+            exists $$uidmap{$selfinfo->{UserID}} ? $$uidmap{$selfinfo->{UserID}} : $selfinfo->{UserID},
             # GID number
-            0,
+            exists $$gidmap{$selfinfo->{PrimaryGroupID}} ? $$gidmap{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
             # device special major/minor number
             0,
             # file size in bytes
@@ -467,13 +471,13 @@ sub getattr { # {{{1
             # inode number (node ID works fine)
             0,
             # permission mask
-            oct(100_444),
+            S_IFREG | S_IRUSR | S_IRGRP | S_IROTH,
             # link count
             1,
             # UID number
-            0,
+            exists $$uidmap{$selfinfo->{UserID}} ? $$uidmap{$selfinfo->{UserID}} : $selfinfo->{UserID},
             # GID number
-            0,
+            exists $$gidmap{$selfinfo->{PrimaryGroupID}} ? $$gidmap{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
             # device special major/minor number
             0,
             # file size in bytes
@@ -499,13 +503,13 @@ sub getattr { # {{{1
             # inode number (node ID works fine)
             0,
             # permission mask
-            oct(100_444),
+            S_IFREG | S_IRUSR | S_IRGRP | S_IROTH,
             # link count
             1,
             # UID number
-            0,
+            exists $$uidmap{$selfinfo->{UserID}} ? $$uidmap{$selfinfo->{UserID}} : $selfinfo->{UserID},
             # GID number
-            0,
+            exists $$gidmap{$selfinfo->{PrimaryGroupID}} ? $$gidmap{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
             # device special major/minor number
             0,
             # file size in bytes
@@ -2507,6 +2511,9 @@ sub fgetattr { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
+    $self->{afpconn}->FPGetUserInfo(0x1, 0, 0x3, \my $selfinfo);
+    my $uidmap = $self->{uidmap};
+    my $gidmap = $self->{gidmap};
     if (ref $fh) {
         my $timest = time;
         my @stat = (
@@ -2515,13 +2522,13 @@ sub fgetattr { # {{{1
             # inode number (node ID works fine)
             0,
             # permission mask
-            oct(100_444),
+            S_ISREG | S_IRUSR | S_IRGRP | S_IROTH,
             # link count
             1,
             # UID number
-            0,
+            exists $$uidmap{$selfinfo->{UserID}} ? $$uidmap{$selfinfo->{UserID}} : $selfinfo->{UserID},
             # GID number
-            0,
+            exists $$gidmap{$selfinfo->{PrimaryGroupID}} ? $$gidmap{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
             # device special major/minor number
             0,
             # file size in bytes
@@ -2535,7 +2542,7 @@ sub fgetattr { # {{{1
             # preferred block size
             $IO_BLKSIZE,
             # size in blocks
-            1,
+            int((length(${$fh}) + 4095) / 4096),
         ); # }}}2
         return(@stat)
     }
@@ -2585,7 +2592,8 @@ sub fgetattr { # {{{1
         # inode number (node ID works fine)
         $sresp->{NodeID},
         # permission mask
-        exists($sresp->{UnixPerms}) ? $sresp->{UnixPerms} : oct(100_644),
+        exists($sresp->{UnixPerms}) ? $sresp->{UnixPerms} :
+                (S_IFREG | S_IRUSR | S_IRGRP | S_IROTH),
         # link count
         1,
         # UID number
@@ -2803,14 +2811,14 @@ sub read_buf {
     my ($self, $file, $len, $off, $bufvec, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', len = %d, } .
             q{$off = %d, $bufvec = [...], $fh = %d)}, (caller 0)[3],
-            $file || '', $len, $off, ref($fh) ? -1 : $fh));
+            $file || '', $len, $off, ref $fh ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
     if (ref $fh) {
         # this is gonna be the /._metrics file...
         if ($off > length ${$fh}) {
-            return q{};
+            return 0;
         }
         if ($off + $len > length ${$fh}) {
             $len = length(${$fh}) - $off;
