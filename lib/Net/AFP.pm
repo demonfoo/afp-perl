@@ -496,9 +496,9 @@ sub FPByteRangeLockExt { # {{{1
 
 sub FPCatSearch {
     my ($self, @options) = @_;
-
     $self->{logger}->debug(sprintf(q{called %s(%s)},
                     (caller 0)[3], Dumper({@options})));
+
     my %options = validate(@options, {
         VolumeID            => { type => SCALAR },
         ReqMatches          => {
