@@ -28,6 +28,7 @@ Readonly my $pw_len    => 64;
 # CryptX modules for crypto-related functionality.
 use Crypt::Mode::CBC;
 use Crypt::PRNG qw(random_bytes);
+use Crypt::DH::GMP;
 # Pull in the module containing all the result code symbols.
 use Net::AFP::Result;
 # Provides large-integer mathematics features, necessary for the
@@ -46,7 +47,14 @@ my @p_bytes = (0xba, 0x28, 0x73, 0xdf, 0xb0, 0x60, 0x57, 0xd4, 0x3f, 0x20,
                0x24, 0x74, 0x4c, 0xee, 0xe7, 0x5b);
 my @g_bytes = (0x07);
 
-sub zeropad { return("\0" x ($_[1] - length($_[0])) . $_[0]); }
+sub zeropad {
+    if (length($_[0]) > $_[1]) {
+        return substr $_[0], length($_[0]) - $_[1], $_[1];
+    }
+    else {
+        return("\0" x ($_[1] - length($_[0])) . $_[0]);
+    }
+}
 
 sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
@@ -59,26 +67,16 @@ sub Authenticate {
             if ref($pw_cb) ne q{CODE};
 
     # Moving these into the functions, to make Math::BigInt::GMP happy.
-    my $p = Math::BigInt->from_bytes(pack('C*', @p_bytes));
-    my $g = Math::BigInt->from_bytes(pack('C*', @g_bytes));
+    my $dh = Crypt::DH::GMP->new(
+            p => Math::BigInt->from_bytes(pack('C*', @p_bytes)),
+            g => Math::BigInt->from_bytes(pack('C*', @g_bytes)));
+    $dh->generate_keys();
 
     my $nonce_limit = Math::BigInt->bone();
     $nonce_limit->blsft($nonce_len * 8);
 
-    # Get random bytes that constitute a large exponent for the random number
-    # exchange we do.
-    my $Ra = Math::BigInt->from_bytes(random_bytes(32));
-    $session->{logger}->debug('$Ra is ', $Ra->as_hex());
-
-    # Ma = g^Ra mod p <- This gives us the "random number" that we hand to
-    # the server.
-    my $Ma = $g->bmodpow($Ra, $p);
-    $session->{logger}->debug('$Ma is ', $Ma->as_hex());
-
     # Send the "random number" to the server as the first stage of the
     # authentication process, along with the username.
-    my $authinfo = pack('C/a*x![s]a*', $username, zeropad($Ma->to_bytes(), $len));
-    $session->{logger}->debug('$authinfo is 0x', unpack('H*', $authinfo));
     my %resp;
     my $rc;
     
@@ -88,28 +86,21 @@ sub Authenticate {
                 AFPVersion   => $AFPVersion,
                 UAM          => $UAMNAME,
                 UserName     => $username,
-                UserAuthInfo => zeropad($Ma->to_bytes(), $len));
+                UserAuthInfo => zeropad(pack('B*', $dh->pub_key_twoc()), $len));
         $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
     }
     else {
-        my $ai = pack('C/a*x![s]a*', $username, zeropad($Ma->to_bytes(), $len));
+        my $ai = pack('C/a*x![s]a*', $username, zeropad(pack('B*', $dh->pub_key_twoc()), $len));
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $ai);
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
-    undef $Ma;
-    undef $authinfo;
     return $rc if $rc != $kFPAuthContinue;
-    my $Mb = Math::BigInt->from_bytes(unpack('a' . $len, $resp{UserAuthInfo}));
-    $session->{logger}->debug('$Mb is ', $Mb->as_hex());
+    my $K = Math::BigInt->from_bin($dh->compute_key_twoc(
+                    Math::BigInt->from_bytes(unpack('a' . $len, $resp{UserAuthInfo}))));
+    $session->{logger}->debug('$K is ', $K->as_hex());
+
     my $message = unpack('x' . $len . 'a*', $resp{UserAuthInfo});
     $session->{logger}->debug('$message is 0x', unpack('H*', $message));
-
-    # K = Mb^Ra mod p <- This nets us the key value that we use to encrypt
-    # and decrypt ciphertext for communicating with the server.
-    my $K = $Mb->bmodpow($Ra, $p);
-    undef $Ra;
-    undef $Mb;
-    $session->{logger}->debug('$K is ', $K->as_hex());
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
@@ -150,25 +141,17 @@ sub ChangePassword {
             unless ref($session) and $session->isa('Net::AFP');
 
     # Moving these into the functions, to make Math::BigInt::GMP happy.
-    my $p = Math::BigInt->from_bytes(pack('C*', @p_bytes));
-    my $g = Math::BigInt->from_bytes(pack('C*', @g_bytes));
+    my $dh = Crypt::DH::GMP->new(
+            p => Math::BigInt->from_bytes(pack('C*', @p_bytes)),
+            g => Math::BigInt->from_bytes(pack('C*', @g_bytes)));
+    $dh->generate_keys();
 
     my $nonce_limit = Math::BigInt->bone();
     $nonce_limit->blsft($nonce_len * 8);
 
-    # Get random bytes that constitute a large exponent for the random number
-    # exchange we do.
-    my $Ra = Math::BigInt->from_bytes(random_bytes(32));
-    $session->{logger}->debug('$Ra is ', $Ra->as_hex());
-
-    # Ma = g^Ra mod p <- This gives us the "random number" that we hand to
-    # the server.
-    my $Ma = $g->bmodpow($Ra, $p);
-    $session->{logger}->debug('$Ma is ', $Ma->as_hex());
-
     # Send an ID value of 0, followed by our Ma value.
-    my $authinfo = pack('na[' . $len . ']', 0, zeropad($Ma->to_bytes(), $len));
-    undef $Ma;
+    my $authinfo = pack('na[' . $len . ']', 0,
+            zeropad(pack('B*', $dh->pub_key_twoc()), $len));
     $session->{logger}->debug('$authinfo is 0x', unpack('H*', $authinfo));
     my $resp = undef;
 
@@ -183,14 +166,8 @@ sub ChangePassword {
     return $rc if $rc != $kFPAuthContinue;
 
     # Unpack the server response for our perusal.
-    my $Mb = Math::BigInt->from_bytes(unpack('x2a' . $len, $resp));
-    $session->{logger}->debug('$Mb is ', $Mb->as_hex());
-
-    # K = Mb^Ra mod p <- This nets us the key value that we use to encrypt
-    # and decrypt ciphertext for communicating with the server.
-    my $K = $Mb->bmodpow($Ra, $p);
-    undef $Ra;
-    undef $Mb;
+    my $K = Math::BigInt->from_bin($dh->compute_key_twoc(
+                    Math::BigInt->from_bytes(unpack('x2a' . $len, $resp))));
     $session->{logger}->debug('$K is ', $K->as_hex());
 
     # Set up an encryption context with the key we derived, and decrypt the

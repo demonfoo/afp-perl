@@ -28,6 +28,7 @@ Readonly my $pw_len    => 256;
 use Crypt::Mode::CBC;
 use Crypt::PRNG qw(random_bytes);
 use Crypt::Digest::MD5 qw(md5);
+use Crypt::DH::GMP;
 # Pull in the module containing all the result code symbols.
 use Net::AFP::Result;
 # Provides large-integer mathematics features, necessary for the
@@ -38,7 +39,14 @@ use Log::Log4perl;
 
 Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 200);
 
-sub zeropad { return("\0" x ($_[1] - length($_[0])) . $_[0]); }
+sub zeropad {
+    if (length($_[0]) > $_[1]) {
+        return substr $_[0], length($_[0]) - $_[1], $_[1];
+    }
+    else {
+        return("\0" x ($_[1] - length($_[0])) . $_[0]);
+    }
+}
 
 # Variables used by the DHX2 UAM
 # +-------------+-------------------------------------------------------------+
@@ -176,27 +184,15 @@ sub Authenticate {
     # value extracted above.
     my $p = Math::BigInt->from_bytes(unpack('a' . $len, $extra));
     $session->{logger}->debug('$p is ', $p->as_hex());
-    my $Mb = Math::BigInt->from_bytes(unpack('x' . $len . 'a' . $len, $extra));
-    undef $extra;
-    $session->{logger}->debug('$Mb is ', $Mb->as_hex());
 
-    # Get random bytes that constitute a large exponent for the random number
-    # exchange we do.
-    my $Ra = Math::BigInt->from_bytes(random_bytes($len));
-    $session->{logger}->debug('$Ra is ', $Ra->as_hex());
-
-    # Ma = g^Ra mod p <- This gives us the "random number" that we hand to
-    # the server.
-    my $Ma = $g->bmodpow($Ra, $p);
-    undef $g;
-    $session->{logger}->debug('$Ma is ', $Ma->as_hex());
-
-    # K = Mb^Ra mod p <- This nets us the key value that we use to encrypt
-    # and decrypt ciphertext for communicating with the server.
-    my $K = $Mb->bmodpow($Ra, $p);
-    undef $Mb;
-    undef $Ra;
+    my $dh = Crypt::DH::GMP->new(p => $p, g => $g);
     undef $p;
+    undef $g;
+    $dh->generate_keys();
+
+    my $K = Math::BigInt->from_bin($dh->compute_key_twoc(
+                    Math::BigInt->from_bytes(unpack('x' . $len . 'a' . $len, $extra))));
+    undef $extra;
     $session->{logger}->debug('$K is ', $K->as_hex());
 
     # Get our nonce, which we'll send to the server in the ciphertext.
@@ -212,8 +208,8 @@ sub Authenticate {
     # message to send to the server.
     my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
             $session->{SessionKey}, $C2SIV);
-    my $message = pack('a[' . $len . ']a*', zeropad($Ma->to_bytes(), $len), $ciphertext);
-    undef $Ma;
+    my $message = pack('a[' . $len . ']a*',
+            zeropad(pack('B*', $dh->pub_key_twoc()), $len), $ciphertext);
     undef $ciphertext;
     $session->{logger}->debug('$message is ', unpack('H*', $message));
 
@@ -306,27 +302,15 @@ sub ChangePassword {
     # value extracted above.
     my $p = Math::BigInt->from_bytes(unpack('a' . $len, $extra));
     $session->{logger}->debug('$p is ', $p->as_hex());
-    my $Mb = Math::BigInt->from_bytes(unpack('x' . $len . 'a' . $len, $extra));
-    undef $extra;
-    $session->{logger}->debug('$Mb is ', $Mb->as_hex());
 
-    # Get random bytes that constitute a large exponent for the random number
-    # exchange we do.
-    my $Ra = Math::BigInt->from_bytes(random_bytes($len));
-    $session->{logger}->debug('$Ra is ', $Ra->as_hex());
-
-    # Ma = g^Ra mod p <- This gives us the "random number" that we hand to
-    # the server.
-    my $Ma = $g->bmodpow($Ra, $p);
-    undef $g;
-    $session->{logger}->debug('$Ma is ', $Ma->as_hex());
-
-    # K = Mb^Ra mod p <- This nets us the key value that we use to encrypt
-    # and decrypt ciphertext for communicating with the server.
-    my $K = $Mb->bmodpow($Ra, $p);
-    undef $Mb;
-    undef $Ra;
+    my $dh = Crypt::DH::GMP->new(p => $p, g => $g);
     undef $p;
+    undef $g;
+    $dh->generate_keys();
+
+    my $K = Math::BigInt->from_bin($dh->compute_key_twoc(
+                    Math::BigInt->from_bytes(unpack('x' . $len . 'a' . $len, $extra))));
+    undef $extra;
     $session->{logger}->debug('$K is ', $K->as_hex());
 
     # Get our nonce, which we'll send to the server in the ciphertext.
@@ -342,8 +326,8 @@ sub ChangePassword {
     # message to send to the server.
     my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
             $key, $C2SIV);
-    my $message = pack('na[' . $len . ']a*', $ID, zeropad($Ma->to_bytes(), $len), $ciphertext);
-    undef $Ma;
+    my $message = pack('na[' . $len . ']a*', $ID,
+            zeropad(pack('B*', $dh->pub_key_twoc()), $len), $ciphertext);
     undef $ciphertext;
     $session->{logger}->debug('$message is ', unpack('H*', $message));
 
