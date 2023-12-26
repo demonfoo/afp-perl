@@ -14,7 +14,7 @@ use Readonly;
 use Carp;
 
 our @EXPORT = qw($kFPVerNewerThan $kFPVerAtLeast $kFPVerEqual
-                 $kFPVerNoNowerThan $kFPVerOlderThan);
+                 $kFPVerNoNewerThan $kFPVerOlderThan);
 
 my @versions = (
     # AFP 3.4 only changed an AppleTalk to POSIX error mapping.
