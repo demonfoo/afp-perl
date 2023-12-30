@@ -819,7 +819,7 @@ sub mknod { # {{{1
         # the call...
         return $self->chmod($file_n, S_IMODE($mode));
     }
-    return -EOPNOTSUPP();
+    return -ENOTSUP();
 } # }}}1
 
 sub mkdir { # {{{1
@@ -1147,7 +1147,7 @@ sub link { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -EOPNOTSUPP();
+    return -ENOTSUP();
 } # }}}1
 
 sub chmod { # {{{1
@@ -1681,10 +1681,10 @@ sub setxattr { # {{{1
                 PathType    => $self->{pathType},
                 Pathname    => $filename,
                 Comment     => $value);
-        return -EACCES()     if $rc == $kFPAccessDenied;
-        return -ENOENT()     if $rc == $kFPObjectNotFound;
-        return -EOPNOTSUPP() if $rc == $kFPCallNotSupported;
-        return -EBADF()      if $rc != $kFPNoErr;
+        return -EACCES()  if $rc == $kFPAccessDenied;
+        return -ENOENT()  if $rc == $kFPObjectNotFound;
+        return -ENOTSUP() if $rc == $kFPCallNotSupported;
+        return -EBADF()   if $rc != $kFPNoErr;
         return 0;
     } # }}}2
     # general xattr handling {{{2
@@ -1793,7 +1793,7 @@ sub setxattr { # {{{1
 
             return 0;
         }
-        return -EOPNOTSUPP() if not $self->{volAttrs} & $kSupportsExtAttrs;
+        return -ENOTSUP() if not $self->{volAttrs} & $kSupportsExtAttrs;
 
         if (defined $self->{client_uuid}) {
             my $rc = $self->{afpconn}->FPAccess(
@@ -1836,7 +1836,7 @@ sub setxattr { # {{{1
         return -EBADF()  if $rc != $kFPNoErr;
         return 0;
     } # }}}2
-    return -EOPNOTSUPP();
+    return -ENOTSUP();
 } # }}}1
 
 sub getxattr { # {{{1
@@ -1961,7 +1961,7 @@ sub getxattr { # {{{1
 
             return $readtext;
         }
-        return -EOPNOTSUPP() if not $self->{volAttrs} & $kSupportsExtAttrs;
+        return -ENOTSUP() if not $self->{volAttrs} & $kSupportsExtAttrs;
 
         if (defined $self->{client_uuid}) {
             my $rc = $self->{afpconn}->FPAccess(
@@ -2004,7 +2004,7 @@ sub getxattr { # {{{1
             return $resp{AttributeData};
         }
     } # }}}2
-    return -EOPNOTSUPP();
+    return -ENOTSUP();
 } # }}}1
 
 sub listxattr { # {{{1
@@ -2014,7 +2014,7 @@ sub listxattr { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -EOPNOTSUPP() if not $self->{volAttrs} & $kSupportsExtAttrs;
+    return -ENOTSUP() if not $self->{volAttrs} & $kSupportsExtAttrs;
     $file = $self->{local_encode}->decode($file);
     my $filename = translate_path($file, $self);
 
@@ -2225,7 +2225,7 @@ sub removexattr { # {{{1
 
             return 0;
         }
-        return -EOPNOTSUPP() if not $self->{volAttrs} & $kSupportsExtAttrs;
+        return -ENOTSUP() if not $self->{volAttrs} & $kSupportsExtAttrs;
         if (defined $self->{client_uuid}) {
             my $rc = $self->{afpconn}->FPAccess(
                     VolumeID    => $self->{volID},
@@ -2438,7 +2438,7 @@ sub create { # {{{1
     my $filename = translate_path($file, $self);
 
     # afaik this should only ever happen for a plain file...
-    return -EOPNOTSUPP() if !S_ISREG($mode);
+    return -ENOTSUP() if !S_ISREG($mode);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($filename));
     return $rc if $rc;
@@ -2626,7 +2626,7 @@ sub lock { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -EOPNOTSUPP() if ref $fh;
+    return -ENOTSUP() if ref $fh;
 
     my($rc, $rstart);
     if ($lkparms->{l_whence} == SEEK_CUR) {
@@ -2724,7 +2724,7 @@ sub bmap { # {{{1
 
     # This is not a local filesystem that lives on a block device, so bmap()
     # is nonsensical.
-    return -EOPNOTSUPP();
+    return -ENOTBLK();
 } # }}}1
 
 sub ioctl {
@@ -2849,11 +2849,11 @@ sub flock {
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -EOPNOTSUPP() if ref $fh;
+    return -ENOTSUP() if ref $fh;
 
     if ($op & LOCK_SH) {
         # create a shared lock
-        return -EOPNOTSUPP();
+        return -ENOTSUP();
     }
     elsif ($op & LOCK_EX) {
         # create an exclusive lock
@@ -2888,7 +2888,8 @@ sub fallocate {
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    return -ENOSYS();
+    # AFP doesn't have any notion of this.
+    return -ENOTSUP();
 }
 
 # misc. helper functions below:
