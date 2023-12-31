@@ -66,10 +66,9 @@ sub Authenticate {
     croak(q{Password callback MUST be a subroutine ref})
             if ref($pw_cb) ne q{CODE};
 
-    # Moving these into the functions, to make Math::BigInt::GMP happy.
     my $dh = Crypt::DH::GMP->new(
-            p => Math::BigInt->from_bytes(pack('C*', @p_bytes)),
-            g => Math::BigInt->from_bytes(pack('C*', @g_bytes)));
+            p => '0x' . unpack('H*', pack('C*', @p_bytes)),
+            g => '0x' . unpack('H*', pack('C*', @g_bytes)));
     $dh->generate_keys();
 
     my $nonce_limit = Math::BigInt->bone();
@@ -95,16 +94,16 @@ sub Authenticate {
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
     return $rc if $rc != $kFPAuthContinue;
-    my $K = Math::BigInt->from_bin($dh->compute_key_twoc(
-                    Math::BigInt->from_bytes(unpack('a' . $len, $resp{UserAuthInfo}))));
-    $session->{logger}->debug('$K is ', $K->as_hex());
+    my $K = pack('B*', $dh->compute_key_twoc(
+                    '0x' . unpack('H' . ($len * 2), $resp{UserAuthInfo})));
+    $session->{logger}->debug('$K is ', unpack('H*', $K));
 
     my $message = unpack('x' . $len . 'a*', $resp{UserAuthInfo});
     $session->{logger}->debug('$message is 0x', unpack('H*', $message));
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
-    $session->{SessionKey} = zeropad($K->to_bytes(), $len);
+    $session->{SessionKey} = zeropad($K, $len);
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
     undef $K;
     my $decrypted = $ctx->decrypt($message, $session->{SessionKey}, $S2CIV);
@@ -140,10 +139,9 @@ sub ChangePassword {
     croak('Object MUST be of type Net::AFP!')
             unless ref($session) and $session->isa('Net::AFP');
 
-    # Moving these into the functions, to make Math::BigInt::GMP happy.
     my $dh = Crypt::DH::GMP->new(
-            p => Math::BigInt->from_bytes(pack('C*', @p_bytes)),
-            g => Math::BigInt->from_bytes(pack('C*', @g_bytes)));
+            p => '0x' . unpack('H*', pack('C*', @p_bytes)),
+            g => '0x' . unpack('H*', pack('C*', @g_bytes)));
     $dh->generate_keys();
 
     my $nonce_limit = Math::BigInt->bone();
@@ -166,13 +164,13 @@ sub ChangePassword {
     return $rc if $rc != $kFPAuthContinue;
 
     # Unpack the server response for our perusal.
-    my $K = Math::BigInt->from_bin($dh->compute_key_twoc(
-                    Math::BigInt->from_bytes(unpack('x2a' . $len, $resp))));
-    $session->{logger}->debug('$K is ', $K->as_hex());
+    my $K = pack('B*', $dh->compute_key_twoc(
+                    '0x' . unpack('x2H' . ($len * 2), $resp)));
+    $session->{logger}->debug('$K is ', unpack('H*', $K));
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
-    my $key = zeropad($K->to_bytes(), $len);
+    my $key = zeropad($K, $len);
     undef $K;
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
     my $decrypted = $ctx->decrypt(unpack('x2x' . $len . 'a32', $resp), $key,

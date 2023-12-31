@@ -170,30 +170,25 @@ sub Authenticate {
     # Received message 2, parsing below.
     # Get the value for g, and the length value for assorted things (p, Ma,
     # Mb, Ra, Rb).
-    my ($g_regular, $len, $extra) = unpack('Nna*', $resp{UserAuthInfo});
+    my ($g, $len, $extra) = unpack('Nna*', $resp{UserAuthInfo});
 
-    # We need g to be a Math::BigInt object, so we can do large-value
-    # exponentiation later (for deriving Ma and K) - even though it's
-    # not a "big" number on its own.
-    my $g = Math::BigInt->new($g_regular);
-    undef $g_regular;
-    $session->{logger}->debug('$g is ', $g->as_hex());
+    $session->{logger}->debug('$g is ', $g);
     $session->{logger}->debug('$len is ', $len);
 
     # Pull p and Mb out of the data the server sent back, based on the length
     # value extracted above.
-    my $p = Math::BigInt->from_bytes(unpack('a' . $len, $extra));
-    $session->{logger}->debug('$p is ', $p->as_hex());
+    my $p = '0x' . unpack('H*', unpack('a' . $len, $extra));
+    $session->{logger}->debug('$p is ', $p);
 
     my $dh = Crypt::DH::GMP->new(p => $p, g => $g);
     undef $p;
     undef $g;
     $dh->generate_keys();
 
-    my $K = Math::BigInt->from_bin($dh->compute_key_twoc(
-                    Math::BigInt->from_bytes(unpack('x' . $len . 'a' . $len, $extra))));
+    my $K = pack('B*', $dh->compute_key_twoc(
+                    '0x' . unpack('x' . $len . 'H' . ($len * 2), $extra)));
     undef $extra;
-    $session->{logger}->debug('$K is ', $K->as_hex());
+    $session->{logger}->debug('$K is ', unpack('H*', $K));
 
     # Get our nonce, which we'll send to the server in the ciphertext.
     my $clientNonce = Math::BigInt->from_bytes(random_bytes($nonce_len));
@@ -201,7 +196,8 @@ sub Authenticate {
 
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
-    $session->{SessionKey} = md5(zeropad($K->to_bytes(), $len));
+    $session->{SessionKey} = md5(zeropad($K, $len));
+    undef $K;
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
 
     # Encrypt the random nonce value we fetched above, then assemble the
@@ -288,30 +284,25 @@ sub ChangePassword {
 
     # Get the value for g, and the length value for assorted things (p, Ma,
     # Mb, Ra, Rb).
-    my ($ID, $g_regular, $len, $extra) = unpack('nNna*', $resp);
+    my ($ID, $g, $len, $extra) = unpack('nNna*', $resp);
 
-    # We need g to be a Math::BigInt object, so we can do large-value
-    # exponentiation later (for deriving Ma and K) - even though it's
-    # not a "big" number on its own.
-    my $g = Math::BigInt->new($g_regular);
-    undef $g_regular;
-    $session->{logger}->debug('$g is ', $g->as_hex());
+    $session->{logger}->debug('$g is ', $g);
     $session->{logger}->debug('$len is ', $len);
 
     # Pull p and Mb out of the data the server sent back, based on the length
     # value extracted above.
-    my $p = Math::BigInt->from_bytes(unpack('a' . $len, $extra));
-    $session->{logger}->debug('$p is ', $p->as_hex());
+    my $p = '0x' . unpack('H*', unpack('a' . $len, $extra));
+    $session->{logger}->debug('$p is ', $p);
 
     my $dh = Crypt::DH::GMP->new(p => $p, g => $g);
     undef $p;
     undef $g;
     $dh->generate_keys();
 
-    my $K = Math::BigInt->from_bin($dh->compute_key_twoc(
-                    Math::BigInt->from_bytes(unpack('x' . $len . 'a' . $len, $extra))));
+    my $K = pack('B*', $dh->compute_key_twoc(
+                    '0x' . unpack('x' . $len . 'H' . ($len * 2), $extra)));
     undef $extra;
-    $session->{logger}->debug('$K is ', $K->as_hex());
+    $session->{logger}->debug('$K is ', unpack('H*', $K));
 
     # Get our nonce, which we'll send to the server in the ciphertext.
     my $clientNonce = Math::BigInt->from_bytes(random_bytes($nonce_len));
@@ -319,7 +310,8 @@ sub ChangePassword {
 
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
-    my $key = md5(zeropad($K->to_bytes(), $len));
+    my $key = md5(zeropad($K, $len));
+    undef $K;
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
 
     # Encrypt the random nonce value we fetched above, then assemble the
