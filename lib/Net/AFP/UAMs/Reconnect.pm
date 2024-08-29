@@ -26,9 +26,9 @@ use Crypt::Mac::HMAC qw(hmac);
 sub GetCred {
     my($session) = @_;
 
-    unless (exists $session->{SessionKey}) {
+    if (not exists $session->{SessionKey}) {
         print "No encryption context was stored; must use DHCAST128/DHX2 for Recon1!\n";
-        return undef;
+        return;
     }
 
     my $t1 = time() - globalTimeOffset;
@@ -44,7 +44,7 @@ sub GetCred {
     my $token = $ctx->decrypt($resp, $session->{SessionKey}, $S2CIV);
     print "decrypted token data is: ", unpack('H*', $token), "\n";
     @{$session}{qw[cred s m exp sessionInfo]} =
-        unpack('a[' . length($token) - 24 .  ']a[8]L>L>a[8]', $token);
+        unpack('a[' . (length($token) - 24) .  ']a[8]L>L>a[8]', $token);
     ${$session}{t1} = $t1;
 
     return 0;
@@ -53,9 +53,9 @@ sub GetCred {
 sub RefreshCred {
     my($session) = @_;
 
-    unless (exists $session->{SessionKey} and exists $session->{cred}) {
+    if (not exists $session->{SessionKey} or not exists $session->{cred}) {
         print "No encryption context was stored; must use DHCAST128/DHX2 for Recon1!\n";
-        return undef;
+        return;
     }
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
     my $ciphertext = $ctx->encrypt(pack('L>a*', $session->{t1}, $session->{cred}),
@@ -69,7 +69,7 @@ sub RefreshCred {
     my $newkey = md5($session->{SessionKey} . $session->{cred});
     my $token = $ctx->decrypt($resp, $newkey, $C2SIV);
     @{$session}{qw[cred s m exp sessionInfo]} =
-        unpack('a[' . length($token) - 24 .  ']a[8]L>L>a[8]', $token);
+        unpack('a[' . (length($token) - 24) .  ']a[8]L>L>a[8]', $token);
     return 0;
 }
 
@@ -85,7 +85,7 @@ sub Reconnect {
     my $k;
     # Compute the given number of iterations of MD5; the prior iteration
     # is used as the key for encrypting the nonce.
-    for (my $i = 0; $i < $n; $i++) {
+    for my $i (0 .. $n - 1) {
         $k = $hashval;
         $hashval = md5($hashval);
     }

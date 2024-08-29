@@ -1,6 +1,8 @@
 # This UAM was added as of AFP 3.1.
-
 package Net::AFP::UAMs::Kerberos;
+
+use strict;
+use warnings;
 
 use Readonly;
 Readonly my $UAMNAME => 'Client Krb v2';
@@ -12,8 +14,7 @@ use Net::AFP::TokenTypes;
 use Net::AFP::SrvParms;
 use Net::AFP;
 use Data::Dumper;
-
-use strict;
+use Carp qw(croak);
 
 Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 300);
 
@@ -21,10 +22,10 @@ sub Authenticate {
     my ($session, $AFPVersion, $username, $pw_cb, $realm) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    die('Object MUST be of type Net::AFP!')
+    croak('Object MUST be of type Net::AFP!')
             unless ref($session) and $session->isa('Net::AFP');
 
-    die('Password callback MUST be a subroutine ref')
+    croak('Password callback MUST be a subroutine ref')
             unless ref($pw_cb) eq 'CODE';
 
     my $srvInfo;
@@ -36,7 +37,7 @@ sub Authenticate {
     my $principal = $srvInfo->{DirectoryNames}[0];
 
     # Try to get a Kerberos token, if we can...?
-    my $ctx = new GSSAPI::Context;
+    my $ctx = GSSAPI::Context->new;
     my $target;
     my $cred = GSS_C_NO_CREDENTIAL;
     my $status = GSSAPI::Name->import($target, $principal, gss_nt_service_name)
@@ -45,7 +46,7 @@ sub Authenticate {
     my $outtok;
     my $inflags = GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG;
     my $outflags;
-    my $challenge = '';
+    my $challenge = q{};
     $status = $ctx->init($cred, $target, gss_mech_krb5, $inflags, 0,
                 GSS_C_NO_CHANNEL_BINDINGS, $challenge, undef, $outtok,
                 $outflags, undef);
@@ -63,7 +64,7 @@ sub Authenticate {
     }
 
     # Assuming that succeeded, now we do the first stage of the login process.
-    my $resp = '';
+    my $resp = q{};
     my $rc = $session->FPLoginExt(0, $AFPVersion, $UAMNAME, $kFPUTF8Name,
             $username, $kFPUTF8Name, $realm, undef, \$resp);
     $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
