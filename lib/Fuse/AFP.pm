@@ -28,6 +28,7 @@ use Net::AFP::MapParms;         # mapping function operation codes
 use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 use Net::AFP::ExtAttrs;
+use Net::AFP::AccessRights;
 use Net::AFP::ACL;
 use Encode;                     # handle encoding/decoding strings
 use Socket;                     # for socket related constants for
@@ -443,9 +444,9 @@ sub getattr { # {{{1
             # link count
             1,
             # UID number
-            exists $$uidmap{$selfinfo->{UserID}} ? $$uidmap{$selfinfo->{UserID}} : $selfinfo->{UserID},
+            exists ${$uidmap}{$selfinfo->{UserID}} ? ${$uidmap}{$selfinfo->{UserID}} : $selfinfo->{UserID},
             # GID number
-            exists $$gidmap{$selfinfo->{PrimaryGroupID}} ? $$gidmap{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
+            exists ${$gidmap}{$selfinfo->{PrimaryGroupID}} ? ${$gidmap}{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
             # device special major/minor number
             0,
             # file size in bytes
@@ -475,9 +476,9 @@ sub getattr { # {{{1
             # link count
             1,
             # UID number
-            exists $$uidmap{$selfinfo->{UserID}} ? $$uidmap{$selfinfo->{UserID}} : $selfinfo->{UserID},
+            exists ${$uidmap}{$selfinfo->{UserID}} ? ${$uidmap}{$selfinfo->{UserID}} : $selfinfo->{UserID},
             # GID number
-            exists $$gidmap{$selfinfo->{PrimaryGroupID}} ? $$gidmap{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
+            exists ${$gidmap}{$selfinfo->{PrimaryGroupID}} ? ${$gidmap}{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
             # device special major/minor number
             0,
             # file size in bytes
@@ -507,9 +508,9 @@ sub getattr { # {{{1
             # link count
             1,
             # UID number
-            exists $$uidmap{$selfinfo->{UserID}} ? $$uidmap{$selfinfo->{UserID}} : $selfinfo->{UserID},
+            exists ${$uidmap}{$selfinfo->{UserID}} ? ${$uidmap}{$selfinfo->{UserID}} : $selfinfo->{UserID},
             # GID number
-            exists $$gidmap{$selfinfo->{PrimaryGroupID}} ? $$gidmap{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
+            exists ${$gidmap}{$selfinfo->{PrimaryGroupID}} ? ${$gidmap}{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
             # device special major/minor number
             0,
             # file size in bytes
@@ -1423,7 +1424,7 @@ sub open { # {{{1
 sub read { # {{{1
     my ($self, $file, $len, $off, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', len = %d, off = %d, fh = %d)},
-            (caller 0)[3], $file || '', $len, $off, ref($fh) ? -1 : $fh));
+            (caller 0)[3], $file || q{}, $len, $off, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1453,7 +1454,7 @@ sub write { # {{{1
     my ($self, $file, $offset, $fh) = @_[0,1,3,4];
     my $data_r = \$_[2];
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', data = %s, offset = %d, fh = %d)},
-            (caller 0)[3], $file || '', q{[data]}, $offset, ref($fh) ? -1 : $fh));
+            (caller 0)[3], $file || q{}, q{[data]}, $offset, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -1546,7 +1547,7 @@ sub statfs { # {{{1
 sub flush { # {{{1
     my ($self, $file, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d)},
-            (caller 0)[3], $file || '', ref($fh) ? -1 : $fh));
+            (caller 0)[3], $file || q{}, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1561,7 +1562,7 @@ sub flush { # {{{1
 sub release { # {{{1
     my ($self, $file, $mode, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x, fh = %d)},
-            (caller 0)[3], $file || '', $mode, ref($fh) ? -1 : $fh));
+            (caller 0)[3], $file || q{}, $mode, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1574,7 +1575,7 @@ sub release { # {{{1
 sub fsync { # {{{1
     my ($self, $file, $flags, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', flags = %x, fh = %d)},
-            (caller 0)[3], $file || '', $flags, ref($fh) ? -1 : $fh));
+            (caller 0)[3], $file || q{}, $flags, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2288,7 +2289,7 @@ sub opendir { # {{{1
 sub readdir { # {{{1
     my ($self, $dirname, $offset, $dh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', offset = %d, dh = %d)},
-            (caller 0)[3], $dirname || '', $offset, $dh));
+            (caller 0)[3], $dirname || q{}, $offset, $dh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2359,7 +2360,7 @@ sub readdir { # {{{1
 sub releasedir { # {{{1
     my ($self, $dirname, $dh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', dh = %d)},
-            (caller 0)[3], $dirname || '', $dh));
+            (caller 0)[3], $dirname || q{}, $dh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2486,7 +2487,7 @@ sub create { # {{{1
 sub ftruncate { # {{{1
     my ($self, $file, $length, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', length = %d, fh = %d)},
-            (caller 0)[3], $file || '', $length, ref($fh) ? -1 : $fh));
+            (caller 0)[3], $file || q{}, $length, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2507,7 +2508,7 @@ sub ftruncate { # {{{1
 sub fgetattr { # {{{1
     my ($self, $file, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d)},
-            (caller 0)[3], $file || '', ref($fh) ? -1 : $fh));
+            (caller 0)[3], $file || q{}, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2526,9 +2527,9 @@ sub fgetattr { # {{{1
             # link count
             1,
             # UID number
-            exists $$uidmap{$selfinfo->{UserID}} ? $$uidmap{$selfinfo->{UserID}} : $selfinfo->{UserID},
+            exists ${$uidmap}{$selfinfo->{UserID}} ? ${$uidmap}{$selfinfo->{UserID}} : $selfinfo->{UserID},
             # GID number
-            exists $$gidmap{$selfinfo->{PrimaryGroupID}} ? $$gidmap{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
+            exists ${$gidmap}{$selfinfo->{PrimaryGroupID}} ? ${$gidmap}{$selfinfo->{PrimaryGroupID}} : $selfinfo->{PrimaryGroupID},
             # device special major/minor number
             0,
             # file size in bytes
@@ -2621,7 +2622,7 @@ sub fgetattr { # {{{1
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %s, } .
-            q{lkparms = %s, fh = %d)}, (caller 0)[3], $file || '', $cmd,
+            q{lkparms = %s, fh = %d)}, (caller 0)[3], $file || q{}, $cmd,
             Dumper($lkparms), ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
@@ -2730,7 +2731,7 @@ sub bmap { # {{{1
 sub ioctl {
     my ($self, $file, $cmd, $flags, $data, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %d, flags = %x, data = %s, fh = %d)},
-            (caller 0)[3], $file || '', $cmd, $flags, printable($data), ref($fh) ? -1 : $fh));
+            (caller 0)[3], $file || q{}, $cmd, $flags, printable($data), ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2740,7 +2741,7 @@ sub ioctl {
 sub poll {
     my ($self, $file, $ph, $revents, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', ph = %d, revents = %d, fh = %d)},
-            (caller 0)[3], $file || '', $ph, $revents, ref($fh) ? -1 : $fh));
+            (caller 0)[3], $file || q{}, $ph, $revents, ref($fh) ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2751,7 +2752,7 @@ sub write_buf {
     my ($self, $file, $off, $bufvec, $fh) = @_;
     $self->{logger}->debug('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', $off = %d,} .
-            q{ $bufvec = [...], $fh = %d)}, (caller 0)[3], $file || '', $off,
+            q{ $bufvec = [...], $fh = %d)}, (caller 0)[3], $file || q{}, $off,
             $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
@@ -2811,7 +2812,7 @@ sub read_buf {
     my ($self, $file, $len, $off, $bufvec, $fh) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', len = %d, } .
             q{$off = %d, $bufvec = [...], $fh = %d)}, (caller 0)[3],
-            $file || '', $len, $off, ref $fh ? -1 : $fh));
+            $file || q{}, $len, $off, ref $fh ? -1 : $fh));
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2844,7 +2845,7 @@ sub read_buf {
 sub flock {
     my ($self, $file, $fh, $owner, $op) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, } .
-            q{owner = %d, op = %x)}, (caller 0)[3], $file || '', $fh,
+            q{owner = %d, op = %x)}, (caller 0)[3], $file || q{}, $fh,
             $owner, $op));
 
     $self->{callcount}{(caller 0)[3]}++;
@@ -2883,7 +2884,7 @@ sub flock {
 sub fallocate {
     my ($self, $file, $fh, $mode, $off, $len) = @_;
     $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, } .
-            q{mode = %x, off = %d, len = %d)}, (caller 0)[3], $file || '',
+            q{mode = %x, off = %d, len = %d)}, (caller 0)[3], $file || q{},
             $fh, $mode, $off, $len));
 
     $self->{callcount}{(caller 0)[3]}++;
@@ -3126,6 +3127,7 @@ sub acl_to_xattr { # {{{1
     return pack('LS/(a*)', $acldata->{acl_flags}, @acl_parts);
 } # }}}1
 
+# for nfs4_ace.who
 Readonly my $NFS4_ACL_WHO_OWNER_STRING       => q{OWNER@};
 Readonly my $NFS4_ACL_WHO_GROUP_STRING       => q{GROUP@};
 Readonly my $NFS4_ACL_WHO_EVERYONE_STRING    => q{EVERYONE@};
@@ -3141,10 +3143,6 @@ Readonly my $NFS4_ACL_WHO_NAMED    => 0;
 Readonly my $NFS4_ACL_WHO_OWNER    => 1;
 Readonly my $NFS4_ACL_WHO_GROUP    => 2;
 Readonly my $NFS4_ACL_WHO_EVERYONE => 3;
-
-Readonly my $NFS4_ACL_AUTO_INHERIT => (1<<0);
-Readonly my $NFS4_ACL_PROTECTED    => (1<<1);
-Readonly my $NFS4_ACL_DEFAULTED    => (1<<2);
 
 # for nfs4_ace.flag
 Readonly my $NFS4_ACE_FILE_INHERIT_ACE           => (1<<0);
@@ -3221,24 +3219,75 @@ for my $key (keys %afp_ace_type_to_nfs4_type_values) {
 }
 
 my @nfs4_def_acl_params = (
-    {
-      who        => $NFS4_ACL_WHO_OWNER_STRING,
-      off        => 6,
-      flag       => 0,
-      rights_off => 0,
-    },
-    {
-      who        => $NFS4_ACL_WHO_GROUP_STRING,
-      off        => 3,
-      flag       => $NFS4_ACE_IDENTIFIER_GROUP,
-      rights_off => 8,
-    },
-    {
-      who        => $NFS4_ACL_WHO_EVERYONE_STRING,
-      off        => 0,
-      flag       => 0,
-      rights_off => 16,
-    },
+  {
+    who           => $NFS4_ACL_WHO_OWNER_STRING,
+    flag          => 0,
+    unix_mode     => S_IRWXU,
+    access_rights => $kRPOwner | $kWPOwner | $kSPOwner,
+    access_flags  => [
+      {
+        acl_mask      => $NFS4_ACE_GENERIC_READ,
+        unix_mode     => S_IRUSR,
+        access_rights => $kRPOwner,
+      },
+      {
+        acl_mask      => $NFS4_ACE_GENERIC_WRITE,
+        unix_mode     => S_IWUSR,
+        access_rights => $kWPOwner,
+      },
+      {
+        acl_mask      => $NFS4_ACE_GENERIC_EXECUTE,
+        unix_mode     => S_IXUSR,
+        access_rights => $kSPOwner,
+      },
+    ],
+  },
+  {
+    who           => $NFS4_ACL_WHO_GROUP_STRING,
+    flag          => $NFS4_ACE_IDENTIFIER_GROUP,
+    unix_mode     => S_IRWXG,
+    access_rights => $kRPGroup | $kWPGroup | $kSPGroup,
+    access_flags  => [
+      {
+        acl_mask      => $NFS4_ACE_GENERIC_READ,
+        unix_mode     => S_IRGRP,
+        access_rights => $kRPGroup,
+      },
+      {
+        acl_mask      => $NFS4_ACE_GENERIC_WRITE,
+        unix_mode     => S_IWGRP,
+        access_rights => $kWPGroup,
+      },
+      {
+        acl_mask      => $NFS4_ACE_GENERIC_EXECUTE,
+        unix_mode     => S_IXGRP,
+        access_rights => $kSPGroup,
+      },
+    ],
+  },
+  {
+    who           => $NFS4_ACL_WHO_EVERYONE_STRING,
+    flag          => 0,
+    unix_mode     => S_IRWXO,
+    access_rights => $kRPOther | $kWPOther | $kSPOther,
+    access_flags  => [
+      {
+        acl_mask      => $NFS4_ACE_GENERIC_READ,
+        unix_mode     => S_IROTH,
+        access_rights => $kRPOther,
+      },
+      {
+        acl_mask      => $NFS4_ACE_GENERIC_WRITE,
+        unix_mode     => S_IWOTH,
+        access_rights => $kWPOther,
+      },
+      {
+        acl_mask      => $NFS4_ACE_GENERIC_EXECUTE,
+        unix_mode     => S_IXOTH,
+        access_rights => $kSPOther,
+      },
+    ],
+  },
 );
 
 my %nfs4_reserved_who_names;
@@ -3287,25 +3336,16 @@ sub acl_from_nfsv4_xattr { # {{{1
         if (exists $nfs4_reserved_who_names{$who}) {
             my $params = $nfs4_reserved_who_names{$who};
             if ($access_mask == $NFS4_ACE_MASK_ALL) {
-                $unix_mode |= (0x7 << $params->{off});
-                $afp_rights |= (0x7 << $params->{rights_off});
+                $unix_mode  |= $params->{unix_mode};
+                $afp_rights |= $params->{access_rights};
                 next;
             }
 
-            if (($access_mask & $NFS4_ACE_GENERIC_READ) ==
-              $NFS4_ACE_GENERIC_READ) {
-                $unix_mode |= (0x4 << $params->{off});
-                $afp_rights |= (0x4 << $params->{rights_off});
-            }
-            if (($access_mask & $NFS4_ACE_GENERIC_WRITE) ==
-              $NFS4_ACE_GENERIC_WRITE) {
-                $unix_mode |= (0x2 << $params->{off});
-                $afp_rights |= (0x2 << $params->{rights_off});
-            }
-            if (($access_mask & $NFS4_ACE_GENERIC_EXECUTE) ==
-              $NFS4_ACE_GENERIC_EXECUTE) {
-                $unix_mode |= (0x1 << $params->{off});
-                $afp_rights |= (0x1 << $params->{rights_off});
+            for my $ent (@{$params->{access_flags}}) {
+                if (($access_mask & $ent->{acl_mask}) == $ent->{acl_mask}) {
+                    $unix_mode  |= $ent->{unix_mode};
+                    $afp_rights |= $ent->{access_rights};
+                }
             }
             next;
         }
@@ -3339,18 +3379,18 @@ sub acl_from_nfsv4_xattr { # {{{1
     }
 
     # Actually do the UNIX perms update here...
-    my($trc, $resp) = $self->{afpconn}->FPGetFileDirParms(
+    my($rc, $resp) = $self->{afpconn}->FPGetFileDirParms(
             VolumeID    => $self->{volID},
             DirectoryID => $self->{topDirID},
             FileBitmap  => $kFPUnixPrivsBit,
             PathType    => $self->{pathType},
             Pathname    => $filename);
-    return -EBADF() if $trc != $kFPNoErr;
+    return -EBADF() if $rc != $kFPNoErr;
 
     # We want the type and suid/sgid/sticky bits preserved.
     $unix_mode |= ($resp->{UnixPerms} & ~(S_IRWXU | S_IRWXG | S_IRWXO));
 
-    $trc = $self->{afpconn}->FPSetFileDirParms(
+    $rc = $self->{afpconn}->FPSetFileDirParms(
             VolumeID            => $self->{volID},
             DirectoryID         => $self->{topDirID},
             Bitmap              => $kFPUnixPrivsBit,
@@ -3360,7 +3400,7 @@ sub acl_from_nfsv4_xattr { # {{{1
             UnixUID             => $resp->{UnixUID},
             UnixGID             => $resp->{UnixGID},
             UnixAccessRights    => $afp_rights);
-    return -EBADF() if $trc != $kFPNoErr;
+    return -EBADF() if $rc != $kFPNoErr;
     delete $self->{_getattr_cache}->{$filename};
 
     ${$acl_data} = {
@@ -3377,7 +3417,7 @@ sub acl_to_nfsv4_xattr { # {{{1
     $self->{logger}->debug(sprintf(q{called %s(acldata = %s)},
             (caller 0)[3], Dumper($acldata)));
 
-    my (@acl_parts, $is_dir);
+    my @acl_parts;
     foreach my $entry (@{$acldata->{acl_ace}}) {
         my ($type, $flag, $access_mask, $who) = (0, 0, 0, q{});
         my $name;
@@ -3399,7 +3439,7 @@ sub acl_to_nfsv4_xattr { # {{{1
         }
         my $resp;
         my $rc = $self->{afpconn}->FPGetSrvrInfo(\$resp);
-        $who = $name->{UTF8Name} . '@' . $resp->{UTF8ServerName};
+        $who = $name->{UTF8Name} . q{@} . $resp->{UTF8ServerName};
 
         # ace_flags (AFP) -> flag, type (NFSv4)
         my $kind = $entry->{ace_flags} & $KAUTH_ACE_KINDMASK;
@@ -3431,19 +3471,14 @@ sub acl_to_nfsv4_xattr { # {{{1
 
     for my $params (@nfs4_def_acl_params) {
         my $access_mask = 0;
-        my $perms = ($resp->{UnixPerms} >> $params->{off}) & 7;
-        if (($perms & 7) == 7) {
-                $access_mask |= $NFS4_ACE_MASK_ALL;
+        if (($resp->{UnixPerms} & $params->{unix_mode}) == $params->{unix_mode}) {
+            $access_mask |= $NFS4_ACE_MASK_ALL;
         }
         else {
-            if ($perms & 4) {
-                $access_mask |= $NFS4_ACE_GENERIC_READ;
-            }
-            if ($perms & 2) {
-                $access_mask |= $NFS4_ACE_GENERIC_WRITE;
-            }
-            if ($perms & 1) {
-                $access_mask |= $NFS4_ACE_GENERIC_EXECUTE;
+            for my $ent (@{$params->{access_flags}}) {
+                if ($resp->{UnixPerms} & $ent->{unix_mode}) {
+                    $access_mask |= $ent->{acl_mask}
+                }
             }
         }
         push(@acl_parts, $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE, $params->{flag},
