@@ -59,11 +59,11 @@ sub ENODATA() {
     return($OSNAME eq 'freebsd' ? Errno::ENOATTR() : Errno::ENODATA());
 }
 
-# We need Data::UUID for a portable means to get a UUID to identify
-# ourselves to the AFP server for FPAccess() calls; if it's there, it's
-# definitely preferred.
-my $has_Data__UUID = 0;
-eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
+# We need UUID for a portable means to get a UUID to identify ourselves to
+# the AFP server for FPAccess() calls; if it's there, it's definitely
+# preferred.
+my $has_UUID = 0;
+eval { require UUID; 1; } and do { $has_UUID = 1; };
 
 # Use a nice large blocksize to require fewer transactions with the server.
 Readonly my $IO_BLKSIZE         => 0x40_000;
@@ -260,7 +260,7 @@ sub new { # {{{1
     # Copy out the attribute value, since there are some flags we should
     # really be checking in there (you know, for UTF8 support, extended
     # attributes, ACLs, things like that)...
-    $obj->{volAttrs}   = $volinfo->{Attribute};
+    $obj->{volAttrs}    = $volinfo->{Attribute};
 
     $obj->{pathType}    = $kFPLongName; # AFP long names by default
     $obj->{pathFlag}    = $kFPLongNameBit;
@@ -317,12 +317,12 @@ sub new { # {{{1
     $obj->{afpconn}->FPOpenDT($obj->{volID}, \$obj->{DTRefNum});
 
     if ($obj->{volAttrs} & $kSupportsACLs) {
-        if ($has_Data__UUID) {
-            my $uo = Data::UUID->new();
-            $obj->{client_uuid} = $uo->create_str();
+        if ($has_UUID) {
+            UUID::generate($obj->{client_uuid});
+            UUID::unparse($obj->{client_uuid}, $obj->{client_uuid});
         }
         else {
-            $obj->{logger}->info(q{Need Data::UUID class for full ACL } .
+            $obj->{logger}->info(q{Need UUID class for full ACL } .
                     q{functionality, ACL checking disabled});
         }
     }
@@ -641,51 +641,53 @@ sub readlink { # {{{1
     # The UNIX privilege info is pretty universal, so just use the standard
     # macros to see if the permissions show it to be a symlink.
     # process symlink {{{2
-    if (S_ISLNK($resp->{UnixPerms})) {
-        # Now we have to open the "data fork" of this pseudo-file, read the
-        # "contents" (a single line containing the path of the symbolic
-        # link), and return that.
-        my %sresp;
-        ($rc, %sresp) = $self->{afpconn}->FPOpenFork(
-                VolumeID    => $self->{volID},
-                DirectoryID => $self->{topDirID},
-                AccessMode  => $kFPAccessReadOnly,
-                PathType    => $self->{pathType},
-                Pathname    => $filename);
-        return -EACCES() if $rc == $kFPAccessDenied;
-        return -ENOENT() if $rc == $kFPObjectNotFound;
-        return -EINVAL() if $rc == $kFPParamErr;
-        return -EMFILE() if $rc == $kFPTooManyFilesOpen;
-        return -EBADF()  if $rc != $kFPNoErr;
+    if (not S_ISLNK($resp->{UnixPerms})) {
+        return -EINVAL();
+    }
 
-        my $linkpath;
-        my $pos = 0;
-        do {
-            my $readtext;
-            {
-                no strict qw(refs);
-                ($rc, $readtext) = &{$self->{ReadFn}}($self->{afpconn},
-                        OForkRefNum => $sresp{OForkRefNum},
-                        Offset      => $pos,
-                        ReqCount    => 1024);
-            }
-            return -EACCES() if $rc == $kFPAccessDenied;
-            return -EINVAL() if $rc != $kFPNoErr and $rc != $kFPEOFErr;
-            $linkpath .= $readtext;
-        } while ($rc != $kFPEOFErr);
-        $self->{afpconn}->FPCloseFork($sresp{OForkRefNum});
-        if ($self->{dotdothack}) {
-            # If this hack is active (for AirPort Disk volumes only,
-            # currently), make sure any elements of the path that start
-            # with .. get fixed up appropriately.
-            my @parts = split m{/}sm, $linkpath;
-            foreach (@parts) { s{^[.]![.][.](.)}{..$1}sm; }
-            $linkpath = join q{/}, @parts;
+    # Now we have to open the "data fork" of this pseudo-file, read the
+    # "contents" (a single line containing the path of the symbolic
+    # link), and return that.
+    my %sresp;
+    ($rc, %sresp) = $self->{afpconn}->FPOpenFork(
+            VolumeID    => $self->{volID},
+            DirectoryID => $self->{topDirID},
+            AccessMode  => $kFPAccessReadOnly,
+            PathType    => $self->{pathType},
+            Pathname    => $filename);
+    return -EACCES() if $rc == $kFPAccessDenied;
+    return -ENOENT() if $rc == $kFPObjectNotFound;
+    return -EINVAL() if $rc == $kFPParamErr;
+    return -EMFILE() if $rc == $kFPTooManyFilesOpen;
+    return -EBADF()  if $rc != $kFPNoErr;
+
+    my $linkpath;
+    my $pos = 0;
+    do {
+        my $readtext;
+        {
+            no strict qw(refs);
+            ($rc, $readtext) = &{$self->{ReadFn}}($self->{afpconn},
+                    OForkRefNum => $sresp{OForkRefNum},
+                    Offset      => $pos,
+                    ReqCount    => 1024);
         }
-        return $self->{local_encode}->encode($linkpath);
-    } # }}}2
+        return -EACCES() if $rc == $kFPAccessDenied;
+        return -EINVAL() if $rc != $kFPNoErr and $rc != $kFPEOFErr;
+        $linkpath .= $readtext;
+    } while ($rc != $kFPEOFErr);
+    $self->{afpconn}->FPCloseFork($sresp{OForkRefNum});
+    if ($self->{dotdothack}) {
+        # If this hack is active (for AirPort Disk volumes only,
+        # currently), make sure any elements of the path that start
+        # with .. get fixed up appropriately.
+        my @parts = split m{/}sm, $linkpath;
+        foreach (@parts) { s{^[.]![.][.](.)}{..$1}sm; }
+        $linkpath = join q{/}, @parts;
+    }
+    return $self->{local_encode}->encode($linkpath);
+    # }}}2
 
-    return -EINVAL();
 } # }}}1
 
 sub getdir { # {{{1
@@ -791,43 +793,44 @@ sub mknod { # {{{1
     $file = $self->{local_encode}->decode($file);
     my $filename = translate_path($file, $self);
 
-    if (S_ISREG($mode)) {
-        my ($rc, $resp) = $self->lookup_afp_entry(path_parent($filename));
-        return $rc if $rc;
-        if (defined $self->{client_uuid}) {
-            $rc = $self->{afpconn}->FPAccess(
-                    VolumeID    => $self->{volID},
-                    DirectoryID => $self->{topDirID},
-                    UUID        => $self->{client_uuid},
-                    ReqAccess   => $KAUTH_VNODE_ADD_FILE,
-                    PathType    => $self->{pathType},
-                    Pathname    => path_parent($filename),
-            );
-            return -EACCES() if $rc == $kFPAccessDenied;
-            return -ENOENT() if $rc == $kFPObjectNotFound;
-            return -EBADF()  if $rc != $kFPNoErr;
-        }
+    if (not S_ISREG($mode)) {
+        return -ENOTSUP();
+    }
 
-        $rc = $self->{afpconn}->FPCreateFile(
+    my ($rc, $resp) = $self->lookup_afp_entry(path_parent($filename));
+    return $rc if $rc;
+    if (defined $self->{client_uuid}) {
+        $rc = $self->{afpconn}->FPAccess(
                 VolumeID    => $self->{volID},
-                DirectoryID => $resp->{NodeID},
+                DirectoryID => $self->{topDirID},
+                UUID        => $self->{client_uuid},
+                ReqAccess   => $KAUTH_VNODE_ADD_FILE,
                 PathType    => $self->{pathType},
-                Pathname    => node_name($filename),
+                Pathname    => path_parent($filename),
         );
         return -EACCES() if $rc == $kFPAccessDenied;
-        return -ENOSPC() if $rc == $kFPDiskFull;
-        return -EBUSY()  if $rc == $kFPFileBusy;
-        return -EEXIST() if $rc == $kFPObjectExists;
         return -ENOENT() if $rc == $kFPObjectNotFound;
-        return -EINVAL() if $rc == $kFPParamErr;
-        return -EROFS()  if $rc == $kFPVolLocked;
         return -EBADF()  if $rc != $kFPNoErr;
-
-        # Need to set the file mode (if possible) to the mode requested by
-        # the call...
-        return $self->chmod($file_n, S_IMODE($mode));
     }
-    return -ENOTSUP();
+
+    $rc = $self->{afpconn}->FPCreateFile(
+            VolumeID    => $self->{volID},
+            DirectoryID => $resp->{NodeID},
+            PathType    => $self->{pathType},
+            Pathname    => node_name($filename),
+    );
+    return -EACCES() if $rc == $kFPAccessDenied;
+    return -ENOSPC() if $rc == $kFPDiskFull;
+    return -EBUSY()  if $rc == $kFPFileBusy;
+    return -EEXIST() if $rc == $kFPObjectExists;
+    return -ENOENT() if $rc == $kFPObjectNotFound;
+    return -EINVAL() if $rc == $kFPParamErr;
+    return -EROFS()  if $rc == $kFPVolLocked;
+    return -EBADF()  if $rc != $kFPNoErr;
+
+    # Need to set the file mode (if possible) to the mode requested by
+    # the call...
+    return $self->chmod($file_n, S_IMODE($mode));
 } # }}}1
 
 sub mkdir { # {{{1
@@ -1035,7 +1038,7 @@ sub symlink { # {{{1
 
     my $lastwritten;
     {
-    no strict qw(refs);
+        no strict qw(refs);
         ($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
                 OForkRefNum => $forkid,
                 Offset      => 0,
@@ -2466,7 +2469,7 @@ sub create { # {{{1
     my $filename = translate_path($file, $self);
 
     # afaik this should only ever happen for a plain file...
-    return -ENOTSUP() if !S_ISREG($mode);
+    return -ENOTSUP() if not S_ISREG($mode);
 
     my ($rc, $resp) = $self->lookup_afp_entry(path_parent($filename));
     return $rc if $rc;
@@ -2778,8 +2781,8 @@ sub poll {
 sub write_buf {
     my ($self, $file, $off, $bufvec, $fh) = @_;
     $self->{logger}->debug('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', $off = %d,} .
-            q{ $bufvec = [...], $fh = %d)}, (caller 0)[3], $file || q{}, $off,
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', off = %d,} .
+            q{ bufvec = [...], fh = %d)}, (caller 0)[3], $file || q{}, $off,
             $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
@@ -2842,7 +2845,7 @@ sub write_buf {
 sub read_buf {
     my ($self, $file, $len, $off, $bufvec, $fh) = @_;
     $self->{logger}->debug(sprintf q{called %s(file = '%s', len = %d, } .
-            q{$off = %d, $bufvec = [...], $fh = %d)}, (caller 0)[3],
+            q{off = %d, bufvec = [...], fh = %d)}, (caller 0)[3],
             $file || q{}, $len, $off, ref $fh ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
@@ -3160,89 +3163,89 @@ sub acl_to_xattr { # {{{1
 } # }}}1
 
 # for nfs4_ace.who
-Readonly my $NFS4_ACL_WHO_OWNER_STRING       => q{OWNER@};
-Readonly my $NFS4_ACL_WHO_GROUP_STRING       => q{GROUP@};
-Readonly my $NFS4_ACL_WHO_EVERYONE_STRING    => q{EVERYONE@};
+Readonly my $NFS4_ACL_WHO_OWNER_STRING              => q{OWNER@};
+Readonly my $NFS4_ACL_WHO_GROUP_STRING              => q{GROUP@};
+Readonly my $NFS4_ACL_WHO_EVERYONE_STRING           => q{EVERYONE@};
 
 # for nfs4_ace.type
-Readonly my $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE => 0;
-Readonly my $NFS4_ACE_ACCESS_DENIED_ACE_TYPE  => 1;
-Readonly my $NFS4_ACE_SYSTEM_AUDIT_ACE_TYPE   => 2;
-Readonly my $NFS4_ACE_SYSTEM_ALARM_ACE_TYPE   => 3;
+Readonly my $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE       => 0;
+Readonly my $NFS4_ACE_ACCESS_DENIED_ACE_TYPE        => 1;
+Readonly my $NFS4_ACE_SYSTEM_AUDIT_ACE_TYPE         => 2;
+Readonly my $NFS4_ACE_SYSTEM_ALARM_ACE_TYPE         => 3;
 
 # for nfs4_ace.whotype
-Readonly my $NFS4_ACL_WHO_NAMED    => 0;
-Readonly my $NFS4_ACL_WHO_OWNER    => 1;
-Readonly my $NFS4_ACL_WHO_GROUP    => 2;
-Readonly my $NFS4_ACL_WHO_EVERYONE => 3;
+Readonly my $NFS4_ACL_WHO_NAMED                     => 0;
+Readonly my $NFS4_ACL_WHO_OWNER                     => 1;
+Readonly my $NFS4_ACL_WHO_GROUP                     => 2;
+Readonly my $NFS4_ACL_WHO_EVERYONE                  => 3;
 
 # for nfs4_ace.flag
-Readonly my $NFS4_ACE_FILE_INHERIT_ACE           => 1<<0;
-Readonly my $NFS4_ACE_DIRECTORY_INHERIT_ACE      => 1<<1;
-Readonly my $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE   => 1<<2;
-Readonly my $NFS4_ACE_INHERIT_ONLY_ACE           => 1<<3;
-Readonly my $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG => 1<<4;
-Readonly my $NFS4_ACE_FAILED_ACCESS_ACE_FLAG     => 1<<5;
-Readonly my $NFS4_ACE_IDENTIFIER_GROUP           => 1<<6;
-Readonly my $NFS4_ACE_INHERITED_ACE              => 1<<7;
+Readonly my $NFS4_ACE_FILE_INHERIT_ACE              => 1<<0;
+Readonly my $NFS4_ACE_DIRECTORY_INHERIT_ACE         => 1<<1;
+Readonly my $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE      => 1<<2;
+Readonly my $NFS4_ACE_INHERIT_ONLY_ACE              => 1<<3;
+Readonly my $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG    => 1<<4;
+Readonly my $NFS4_ACE_FAILED_ACCESS_ACE_FLAG        => 1<<5;
+Readonly my $NFS4_ACE_IDENTIFIER_GROUP              => 1<<6;
+Readonly my $NFS4_ACE_INHERITED_ACE                 => 1<<7;
 
 # for nfs4_ace.access_mask
-Readonly my $NFS4_ACE_READ_DATA         => 1<<0;
-Readonly my $NFS4_ACE_LIST_DIRECTORY    => 1<<0;
-Readonly my $NFS4_ACE_WRITE_DATA        => 1<<1;
-Readonly my $NFS4_ACE_ADD_FILE          => 1<<1;
-Readonly my $NFS4_ACE_APPEND_DATA       => 1<<2;
-Readonly my $NFS4_ACE_ADD_SUBDIRECTORY  => 1<<2;
-Readonly my $NFS4_ACE_READ_NAMED_ATTRS  => 1<<3;
-Readonly my $NFS4_ACE_WRITE_NAMED_ATTRS => 1<<4;
-Readonly my $NFS4_ACE_EXECUTE           => 1<<5;
-Readonly my $NFS4_ACE_DELETE_CHILD      => 1<<6;
-Readonly my $NFS4_ACE_READ_ATTRIBUTES   => 1<<7;
-Readonly my $NFS4_ACE_WRITE_ATTRIBUTES  => 1<<8;
-Readonly my $NFS4_ACE_WRITE_RETENTION   => 1<<9;
-Readonly my $NFS4_ACE_WRITE_RETENTION_HOLD => 1<<10;
-Readonly my $NFS4_ACE_DELETE            => 1<<16;
-Readonly my $NFS4_ACE_READ_ACL          => 1<<17;
-Readonly my $NFS4_ACE_WRITE_ACL         => 1<<18;
-Readonly my $NFS4_ACE_WRITE_OWNER       => 1<<19;
-Readonly my $NFS4_ACE_SYNCHRONIZE       => 1<<20;
-Readonly my $NFS4_ACE_GENERIC_READ      => 0x00120081;
-Readonly my $NFS4_ACE_GENERIC_WRITE     => 0x00160106;
-Readonly my $NFS4_ACE_GENERIC_EXECUTE   => 0x001200A0;
-Readonly my $NFS4_ACE_MASK_ALL          => 0x001F01FF;
+Readonly my $NFS4_ACE_READ_DATA                     => 1<<0;
+Readonly my $NFS4_ACE_LIST_DIRECTORY                => 1<<0;
+Readonly my $NFS4_ACE_WRITE_DATA                    => 1<<1;
+Readonly my $NFS4_ACE_ADD_FILE                      => 1<<1;
+Readonly my $NFS4_ACE_APPEND_DATA                   => 1<<2;
+Readonly my $NFS4_ACE_ADD_SUBDIRECTORY              => 1<<2;
+Readonly my $NFS4_ACE_READ_NAMED_ATTRS              => 1<<3;
+Readonly my $NFS4_ACE_WRITE_NAMED_ATTRS             => 1<<4;
+Readonly my $NFS4_ACE_EXECUTE                       => 1<<5;
+Readonly my $NFS4_ACE_DELETE_CHILD                  => 1<<6;
+Readonly my $NFS4_ACE_READ_ATTRIBUTES               => 1<<7;
+Readonly my $NFS4_ACE_WRITE_ATTRIBUTES              => 1<<8;
+Readonly my $NFS4_ACE_WRITE_RETENTION               => 1<<9;
+Readonly my $NFS4_ACE_WRITE_RETENTION_HOLD          => 1<<10;
+Readonly my $NFS4_ACE_DELETE                        => 1<<16;
+Readonly my $NFS4_ACE_READ_ACL                      => 1<<17;
+Readonly my $NFS4_ACE_WRITE_ACL                     => 1<<18;
+Readonly my $NFS4_ACE_WRITE_OWNER                   => 1<<19;
+Readonly my $NFS4_ACE_SYNCHRONIZE                   => 1<<20;
+Readonly my $NFS4_ACE_GENERIC_READ                  => 0x00120081;
+Readonly my $NFS4_ACE_GENERIC_WRITE                 => 0x00160106;
+Readonly my $NFS4_ACE_GENERIC_EXECUTE               => 0x001200A0;
+Readonly my $NFS4_ACE_MASK_ALL                      => 0x001F01FF;
 
 my %afp_to_nfs4_access_bits = (
-    $KAUTH_VNODE_READ_DATA           => $NFS4_ACE_READ_DATA,
-    $KAUTH_VNODE_WRITE_DATA          => $NFS4_ACE_WRITE_DATA,
-    $KAUTH_VNODE_EXECUTE             => $NFS4_ACE_EXECUTE,
-    $KAUTH_VNODE_DELETE              => $NFS4_ACE_DELETE,
-    $KAUTH_VNODE_APPEND_DATA         => $NFS4_ACE_APPEND_DATA,
-    $KAUTH_VNODE_DELETE_CHILD        => $NFS4_ACE_DELETE_CHILD,
-    $KAUTH_VNODE_READ_ATTRIBUTES     => $NFS4_ACE_READ_ATTRIBUTES,
-    $KAUTH_VNODE_WRITE_ATTRIBUTES    => $NFS4_ACE_WRITE_ATTRIBUTES,
-    $KAUTH_VNODE_READ_EXTATTRIBUTES  => $NFS4_ACE_READ_NAMED_ATTRS,
-    $KAUTH_VNODE_WRITE_EXTATTRIBUTES => $NFS4_ACE_WRITE_NAMED_ATTRS,
-    $KAUTH_VNODE_READ_SECURITY       => $NFS4_ACE_READ_ACL,
-    $KAUTH_VNODE_WRITE_SECURITY      => $NFS4_ACE_WRITE_ACL,
-    $KAUTH_VNODE_TAKE_OWNERSHIP      => $NFS4_ACE_WRITE_OWNER,
-    $KAUTH_VNODE_SYNCHRONIZE         => $NFS4_ACE_SYNCHRONIZE,
+    $KAUTH_VNODE_READ_DATA              => $NFS4_ACE_READ_DATA,
+    $KAUTH_VNODE_WRITE_DATA             => $NFS4_ACE_WRITE_DATA,
+    $KAUTH_VNODE_EXECUTE                => $NFS4_ACE_EXECUTE,
+    $KAUTH_VNODE_DELETE                 => $NFS4_ACE_DELETE,
+    $KAUTH_VNODE_APPEND_DATA            => $NFS4_ACE_APPEND_DATA,
+    $KAUTH_VNODE_DELETE_CHILD           => $NFS4_ACE_DELETE_CHILD,
+    $KAUTH_VNODE_READ_ATTRIBUTES        => $NFS4_ACE_READ_ATTRIBUTES,
+    $KAUTH_VNODE_WRITE_ATTRIBUTES       => $NFS4_ACE_WRITE_ATTRIBUTES,
+    $KAUTH_VNODE_READ_EXTATTRIBUTES     => $NFS4_ACE_READ_NAMED_ATTRS,
+    $KAUTH_VNODE_WRITE_EXTATTRIBUTES    => $NFS4_ACE_WRITE_NAMED_ATTRS,
+    $KAUTH_VNODE_READ_SECURITY          => $NFS4_ACE_READ_ACL,
+    $KAUTH_VNODE_WRITE_SECURITY         => $NFS4_ACE_WRITE_ACL,
+    $KAUTH_VNODE_TAKE_OWNERSHIP         => $NFS4_ACE_WRITE_OWNER,
+    $KAUTH_VNODE_SYNCHRONIZE            => $NFS4_ACE_SYNCHRONIZE,
 );
 
 my %afp_ace_flags_to_nfs4_flag_bits = (
-    $KAUTH_ACE_FILE_INHERIT      => $NFS4_ACE_FILE_INHERIT_ACE,
-    $KAUTH_ACE_DIRECTORY_INHERIT => $NFS4_ACE_DIRECTORY_INHERIT_ACE,
-    $KAUTH_ACE_LIMIT_INHERIT     => $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE,
-    $KAUTH_ACE_ONLY_INHERIT      => $NFS4_ACE_INHERIT_ONLY_ACE,
-    $KAUTH_ACE_SUCCESS           => $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG,
-    $KAUTH_ACE_FAILURE           => $NFS4_ACE_FAILED_ACCESS_ACE_FLAG,
-    $KAUTH_ACE_INHERITED         => $NFS4_ACE_INHERITED_ACE,
+    $KAUTH_ACE_FILE_INHERIT         => $NFS4_ACE_FILE_INHERIT_ACE,
+    $KAUTH_ACE_DIRECTORY_INHERIT    => $NFS4_ACE_DIRECTORY_INHERIT_ACE,
+    $KAUTH_ACE_LIMIT_INHERIT        => $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE,
+    $KAUTH_ACE_ONLY_INHERIT         => $NFS4_ACE_INHERIT_ONLY_ACE,
+    $KAUTH_ACE_SUCCESS              => $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG,
+    $KAUTH_ACE_FAILURE              => $NFS4_ACE_FAILED_ACCESS_ACE_FLAG,
+    $KAUTH_ACE_INHERITED            => $NFS4_ACE_INHERITED_ACE,
 );
 
 my %afp_ace_type_to_nfs4_type_values = (
-    $KAUTH_ACE_PERMIT => $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE,
-    $KAUTH_ACE_DENY   => $NFS4_ACE_ACCESS_DENIED_ACE_TYPE,
-    $KAUTH_ACE_AUDIT  => $NFS4_ACE_SYSTEM_AUDIT_ACE_TYPE,
-    $KAUTH_ACE_ALARM  => $NFS4_ACE_SYSTEM_ALARM_ACE_TYPE,
+    $KAUTH_ACE_PERMIT   => $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE,
+    $KAUTH_ACE_DENY     => $NFS4_ACE_ACCESS_DENIED_ACE_TYPE,
+    $KAUTH_ACE_AUDIT    => $NFS4_ACE_SYSTEM_AUDIT_ACE_TYPE,
+    $KAUTH_ACE_ALARM    => $NFS4_ACE_SYSTEM_ALARM_ACE_TYPE,
 );
 
 my %nfs4_type_to_afp_ace_type_values = ();

@@ -29,6 +29,9 @@ use Carp;
 use Readonly;
 use Data::Dumper;
 use Scalar::Util qw(looks_like_number);
+
+my $has_UUID = 0;
+eval { require UUID; 1; } and do { $has_UUID = 1; };
 # }}}1
 
 our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
@@ -355,9 +358,14 @@ sub FPAccess { # {{{1
         Pathname    => { type => SCALAR },
     } );
 
+    my $uuid;
+    if (not $has_UUID) {
+        croak('Module UUID was not available!');
+    }
+    UUID::parse($options{UUID}, $uuid);
     my $msg = pack 'CxnNna[16]Na*', $kFPAccess,
             @options{qw[VolumeID DirectoryID Bitmap]},
-            uuid_pack($options{UUID}), $options{ReqAccess},
+            $uuid, $options{ReqAccess},
             PackagePath(@options{qw[PathType Pathname]});
     return $self->SendAFPMessage($msg);
 } # }}}1
@@ -1598,14 +1606,18 @@ sub FPGetACL { # {{{1
     my %rvals;
     ($rvals{Bitmap}, $resp) = unpack 'na*', $resp;
 
+    if (not $has_UUID) {
+        croak('Module UUID was not available!');
+    }
+
     if ($rvals{Bitmap} & $kFileSec_UUID) {
         ($rvals{UUID}, $resp) = unpack 'a[16]a*', $resp;
-        $rvals{UUID} = uuid_unpack($rvals{UUID});
+        UUID::unparse($rvals{UUID}, $rvals{UUID});
     }
 
     if ($rvals{Bitmap} & $kFileSec_GRPUUID) {
         ($rvals{GRPUUID}, $resp) = unpack 'a[16]a*', $resp;
-        $rvals{GRPUUID} = uuid_unpack($rvals{GRPUUID});
+        UUID::unparse($rvals{GRPUUID}, $rvals{GRPUUID});
     }
 
     if ($rvals{Bitmap} & $kFileSec_ACL) {
@@ -1614,8 +1626,10 @@ sub FPGetACL { # {{{1
         my @entries = unpack "(a[16]NN)[${acl_entrycount}]", $resp;
         my @acl_ace = ();
         for my $i (0 .. $acl_entrycount - 1) {
+            my $uuid = shift @entries;
+            UUID::unparse($uuid, $uuid);
             $acl_ace[$i] = {
-                             ace_applicable => uuid_unpack(shift @entries),
+                             ace_applicable => $uuid,
                              ace_flags      => shift(@entries),
                              ace_rights     => shift(@entries),
                            };
@@ -2093,7 +2107,11 @@ sub FPGetUserInfo { # {{{1
         }
     }
     if ($rbmp & 0x4) {
-        ${$resp_r}->{UUID} = uuid_unpack(unpack "x[${offset}]a[16]", $resp);
+        if (not $has_UUID) {
+            croak('Module UUID was not available!');
+        }
+
+        UUID::unparse(unpack("x[${offset}]a[16]", $resp), ${$resp_r}->{UUID});
         $offset += 16;
     }
 
@@ -2343,8 +2361,12 @@ sub FPMapID { # {{{1
     my @pack_args = ($kFPMapID, $Subfunction);
     if ($Subfunction == $kUserUUIDToUTF8Name ||
             $Subfunction == $kGroupUUIDToUTF8Name) {
+        if (not $has_UUID) {
+            croak('Module UUID was not available!');
+        }
+
         $pack_mask .= 'a[16]';
-        $ID = uuid_pack($ID);
+        UUID::parse($ID, $ID);
     }
     else {
         $pack_mask .= 'N';
@@ -2412,7 +2434,11 @@ sub FPMapName { # {{{1
     return $rc if $rc != $kFPNoErr;
     if ($Subfunction == $kUTF8NameToUserUUID ||
             $Subfunction == $kUTF8NameToGroupUUID) {
-        ${$resp_r} = uuid_unpack($resp);
+        if (not $has_UUID) {
+            croak('Module UUID was not available!');
+        }
+
+        UUID::unparse($resp, ${$resp_r});
     }
     else {
         (${$resp_r}) = unpack 'N', $resp;
@@ -2874,15 +2900,23 @@ sub FPSetACL { # {{{1
     my $msg = pack 'CxnNna*x![s]', $kFPSetACL,
             @options{qw[VolumeID DirectoryID Bitmap]},
             PackagePath(@options{qw[PathType Pathname]});
+
+    if (not $has_UUID) {
+        croak('Module UUID was not available!');
+    }
+    my $tmp;
+
     if ($options{Bitmap} & $kFileSec_UUID) {
         croak('UUID must be provided')
                 if not exists $options{UUID};
-        $msg .= uuid_pack($options{UUID});
+        UUID::parse($options{UUID}, $tmp);
+        $msg .= $tmp;
     }
     if ($options{Bitmap} & $kFileSec_GRPUUID) {
         croak('GRPUUID must be provided')
                 if not exists $options{GRPUUID};
-        $msg .= uuid_pack($options{GRPUUID});
+        UUID::parse($options{GRPUUID}, $tmp);
+        $msg .= $tmp;
     }
     if ($options{Bitmap} & $kFileSec_ACL) {
         croak('acl_ace must be provided')
@@ -2891,8 +2925,8 @@ sub FPSetACL { # {{{1
                 if not exists $options{acl_flags};
         my @ace_list;
         foreach my $ace (@{$options{acl_ace}}) {
-            push @ace_list, pack 'a[16]NN',
-                    uuid_pack(${$ace}{ace_applicable}),
+            UUID::parse(${$ace}{ace_applicable}, $tmp);
+            push @ace_list, pack 'a[16]NN', $tmp,
                     @{$ace}{qw[ace_flags ace_rights]};
         }
         $msg .= pack 'NN(a*)[' . scalar(@ace_list) . ']', scalar(@ace_list),

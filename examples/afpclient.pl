@@ -65,8 +65,8 @@ eval { require Term::ReadKey; 1; } and do {
     $has_Term__ReadKey = 1;
 };
 
-my $has_Data__UUID = 0;
-eval { require Data::UUID; 1; } and do { $has_Data__UUID = 1; };
+my $has_UUID = 0;
+eval { require UUID; 1; } and do { $has_UUID = 1; };
 
 my $has_Archive__Tar = 1;
 eval { require Archive::Tar; 1; } or do {
@@ -221,12 +221,12 @@ my $volAttrs = $volInfo->{Attribute};
 
 my $client_uuid;
 if ($volAttrs & $kSupportsACLs) {
-    if ($has_Data__UUID) {
-        my $uo = Data::UUID->new();
-        $client_uuid = $uo->create();
+    if ($has_UUID) {
+        UUID::generate($client_uuid);
+        UUID::unparse($client_uuid, $client_uuid);
     }
     else {
-        print {*STDERR} "WARNING: Need Data::UUID class for full ACL functionality, ACL checking disabled\n";
+        print {*STDERR} "WARNING: Need UUID class for full ACL functionality, ACL checking disabled\n";
     }
 }
 

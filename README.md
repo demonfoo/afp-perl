@@ -43,7 +43,7 @@ This module requires or encourages use of these other modules and libraries:
 * Log::Dispatch::Syslog is used for routing log messages to syslog
 * Fuse::Class is used as the superclass for Fuse::AFP
 * Fuse is depended upon by Fuse::Class, need version 0.10\_1 or later
-* Data::UUID is recommended, used internally for access checking
+* UUID is recommended, used internally for access checking
 * CryptX is strongly recommended; all UAMs other than plaintext need it
 * Crypt::DH::GMP is recommended, for DHX UAMs
 * Math::BigInt::GMP is recommended, speeds up DHX UAMs

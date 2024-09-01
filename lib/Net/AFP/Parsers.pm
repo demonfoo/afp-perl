@@ -23,7 +23,7 @@ use POSIX;
 
 use Exporter qw(import);
 
-our @EXPORT = qw(globalTimeOffset uuid_unpack uuid_pack ParseVolParms
+our @EXPORT = qw(globalTimeOffset ParseVolParms
                  ParseSrvrInfo ParseFileDirParms ParseFileParms
                  ParseDirParms);
 
@@ -34,18 +34,6 @@ sub globalTimeOffset {
     my $time = mktime(0, 0, 0, 1, 0, 100);
     return $time;
 }
-
-sub uuid_unpack { # {{{1
-    my($uuid_bin) = @_;
-    my @parts = unpack 'H[8]H[4]H[4]H[4]H[12]', $uuid_bin;
-    return join q{-}, @parts;
-} # }}}1
-
-sub uuid_pack { # {{{1
-    my($uuid) = @_;
-    $uuid =~ s{-}{}gsm;
-    return pack 'H32', $uuid;
-} # }}}1
 
 # Parsers for assorted reply types will be placed here. This isn't really
 # intended for public consumption - these are only for use in the
