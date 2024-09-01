@@ -35,7 +35,14 @@ use Getopt::Long qw(GetOptionsFromArray);
 use Data::Dumper;       # for debugging; remove later
 use POSIX;              # for POSIX time handling
 use File::Basename;
-use Term::ReadPassword;
+if ($OSNAME eq 'MSWin32') {
+    require Term::ReadPassword::Win32;
+    Term::ReadPassword::Win32->import;
+}
+else {
+    require Term::ReadPassword;
+    Term::ReadPassword->import;
+}
 use Time::HiRes qw(gettimeofday);
 use Text::Glob qw(match_glob);
 use Encode;
@@ -46,6 +53,11 @@ use Fcntl qw(:mode);
 # Find out the character encoding for the current terminal.
 my $term_enc = langinfo(CODESET);
 my $blksize  = 262_144;
+
+# If you're in Windows, you'll probably just get a codepage number.
+if ($OSNAME eq 'MSWin32' && $term_enc =~ m{^\d+$}sm) {
+    $term_enc = 'cp-' . $term_enc;
+}
 
 my $has_Term__ReadKey = 0;
 eval { require Term::ReadKey; 1; } and do {
@@ -100,7 +112,7 @@ Items in [] are optional; they are as follows:
   <path>     : A subpath inside the specified share to mount
 
 _EOT_
-    exit(1);
+    exit 1;
 }
 
 my %afpopts;
@@ -139,17 +151,17 @@ Log::Log4perl->init(\$logconf);
 
 $afpopts{aforder} = [AF_INET];
 if ($prefer_v4) {
-    push(@{$afpopts{aforder}}, AF_INET6);
+    push @{$afpopts{aforder}}, AF_INET6;
 } else {
-    unshift(@{$afpopts{aforder}}, AF_INET6);
+    unshift @{$afpopts{aforder}}, AF_INET6;
 }
 if ($atalk_first) {
-    unshift(@{$afpopts{aforder}}, AF_APPLETALK);
+    unshift @{$afpopts{aforder}}, AF_APPLETALK;
 } else {
-    push(@{$afpopts{aforder}}, AF_APPLETALK);
+    push @{$afpopts{aforder}}, AF_APPLETALK;
 }
 
-if (not scalar(@ARGV)) {
+if (not scalar @ARGV) {
     usage();
 }
 
@@ -162,8 +174,8 @@ my $pw_cb = sub {
     return read_password($prompt);
 };
 my($session, %values) = do_afp_connect($pw_cb, $url || q{}, undef, %afpopts);
-if (not ref($session) or not $session->isa('Net::AFP')) {
-    exit($session);
+if (not ref $session or not $session->isa('Net::AFP')) {
+    exit $session;
 }
 
 # If no volume was named, contact the server and find out the volumes
@@ -177,14 +189,14 @@ Volume Name                                 | UNIX privs? | Volume pass?
 -------------------------------------------------------------------------
 _EOT_
     foreach my $volume (@{$srvrParms->{Volumes}}) {
-        printf("\%-43s |     \%-3s     |     \%s\n", $volume->{VolName},
+        printf "\%-43s |     \%-3s     |     \%s\n", $volume->{VolName},
                 $volume->{HasUNIXPrivs} ? 'Yes' : 'No',
-                $volume->{HasPassword} ? 'Yes' : 'No');
+                $volume->{HasPassword} ? 'Yes' : 'No';
     }
 
     $session->FPLogout();
     $session->close();
-    exit(0);
+    exit 0;
 }
 
 my $volInfo;
@@ -194,7 +206,7 @@ if ($ret != $kFPNoErr) {
     print {*STDERR} "ERROR: Volume was unknown?\n";
     $session->FPLogout();
     $session->close();
-    exit(1);
+    exit 1;
 }
 
 my $volID = $volInfo->{ID};
@@ -293,14 +305,14 @@ my %commands = (
             $printDirNames = 1;
         }
         if (scalar(@words) < 2) {
-            push(@words, q{.});
+            push @words, q{.};
         }
         foreach my $item (@words[1 .. $#words]) {
             my $results;
             my $rc;
             my $expansion_list = expand_globbed_path($session, $volID, $curdirnode, $item);
             if (!ref($expansion_list) || scalar(@{$expansion_list}) < 1) {
-                print "Sorry, couldn't find any matches for entry \"", $item, "\"\n";
+                printf qq{Sorry, couldn't find any matches for entry "%s"\n}, $item;
                 next;
             }
             if (scalar(@{$expansion_list}) > 1) {
@@ -319,7 +331,7 @@ my %commands = (
                             PathType        => $pathType,
                             Pathname        => $fileName);
                     if ($rc == $kFPNoErr) {
-                        push(@records, $resp);
+                        push @records, $resp;
                     }
                 }
                 else {
@@ -337,8 +349,8 @@ my %commands = (
                                 PathType        => $pathType,
                                 Pathname        => q{});
                         if (ref($results) eq 'ARRAY') {
-                            push(@records, @{$results});
-                            $offset += scalar(@{$results});
+                            push @records, @{$results};
+                            $offset += scalar @{$results};
                         }
                     } while ($rc == $kFPNoErr);
                 }
@@ -383,7 +395,7 @@ my %commands = (
                         ReqCount    => 1024);
                 print $data;
                 last if $rc != $kFPNoErr || $data eq q{};
-                $pos += length($data);
+                $pos += length $data;
             }
             $rc = $session->FPCloseFork($resp{OForkRefNum});
             if ($rc != $kFPNoErr) {
@@ -467,6 +479,7 @@ _EOT_
             $session->FPCloseFork($resp{OForkRefNum});
             return 1;
         }
+        binmode $local_fh;
 
         my $sresp = q{};
         my $bitmap = $DForkLenFlag | $RForkLenFlag;
@@ -492,7 +505,7 @@ _EOT_
                     OForkRefNum => $resp{OForkRefNum},
                     Offset      => $pos,
                     ReqCount    => $blksize);
-            print $local_fh $data;
+            print {$local_fh} $data;
             my $rate = 0;
             my $delta = (($time{sec} - $starttime{sec}) +
                     (($time{usec} - $starttime{usec}) / 1_000_000.0));
@@ -512,23 +525,23 @@ _EOT_
                     $mult = q{G};
                 }
             }
-            my $pcnt = ($pos + length($data)) * 100 / $sresp->{$DForkLenKey};
+            my $pcnt = ($pos + length $data) * 100 / $sresp->{$DForkLenKey};
             if (($i % 100 == 0) || $rc != $kFPNoErr) {
                 my $twidth = 80; # if we can't ascertain, go with safe default
                 if ($has_Term__ReadKey) {
                     $twidth = (GetTerminalSize())[0];
                 }
-                printf(' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
-                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult);
+                printf ' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
+                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult;
             }
             last if $rc != $kFPNoErr;
-            $pos += length($data);
+            $pos += length $data;
             %lasttime = %time;
             @time{'sec', 'usec'} = gettimeofday();
             $i++;
         }
         print "\n";
-        close($local_fh) || carp("Couldn't close local file");
+        close($local_fh) || carp(q{Couldn't close local file});
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != $kFPNoErr) {
             print 'close attempt failed with code ', $rc, ' (',
@@ -566,6 +579,7 @@ _EOT_
             print "couldn't open source file\n";
             return 1;
         }
+        binmode $srcFile;
         my $rc = $session->FPCreateFile(
                 Flag        => $kFPHardCreate,
                 VolumeID    => $volID,
@@ -573,8 +587,8 @@ _EOT_
                 PathType    => $pathType,
                 Pathname    => $fileName);
         if ($rc != $kFPNoErr) {
-            printf("Couldn't create file on remote server; server returned code \%d (\%s)\n",
-                    $rc, afp_strerror($rc));
+            printf "Couldn't create file on remote server; server returned code \%d (\%s)\n",
+                    $rc, afp_strerror($rc);
             return 1;
         }
         my %resp;
@@ -590,7 +604,7 @@ _EOT_
             return 1;
         }
 
-        my $fileLen = (stat($srcFile))[7];
+        my $fileLen = (stat $srcFile)[7];
         STDOUT->autoflush(1);
         my $pos = 0;
         my(%time, %lasttime, %starttime);
@@ -601,7 +615,7 @@ _EOT_
         my $i = 0;
         while (1) {
             my $data;
-            my $rcnt = read($srcFile, $data, $blksize);
+            my $rcnt = read $srcFile, $data, $blksize;
             last if $rcnt == 0;
             # try a direct write, and see how far we get; zero-copy is
             # preferred if possible.
@@ -612,8 +626,8 @@ _EOT_
                     ForkData    => \$data);
 
             while ($wcount < ($total + $rcnt) && $rc == $kFPNoErr) {
-                my $dchunk = substr($data, $wcount - $total,
-                        $total + $rcnt - $wcount);
+                my $dchunk = substr $data, $wcount - $total,
+                        $total + $rcnt - $wcount;
                 ($rc, $wcount) = &{$WriteFn}($session,
                         Flag        => $kFPStartEndFlag,
                         OForkRefNum => $resp{OForkRefNum},
@@ -640,14 +654,14 @@ _EOT_
                     $mult = q{G};
                 }
             }
-            my $pcnt = ($pos + length($data)) * 100 / $fileLen;
+            my $pcnt = ($pos + length $data) * 100 / $fileLen;
             if (($i % 100 == 0) || $rc != $kFPNoErr || $pcnt == 100) {
                 my $twidth = 80; # if we can't ascertain, go with safe default
                 if ($has_Term__ReadKey) {
                     $twidth = (GetTerminalSize())[0];
                 }
-                printf(' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
-                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult);
+                printf ' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
+                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult;
             }
             last if $rc != $kFPNoErr;
             $pos += $rcnt;
@@ -663,7 +677,7 @@ _EOT_
         #if ($hashmarks_enabled == 1) {
         print "\n";
         #}
-        close($srcFile) || carp("Couldn't close local file");
+        close($srcFile) || carp(q{Couldn't close local file});
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != $kFPNoErr) {
             print 'close attempt failed with code ', $rc, ' (',
@@ -702,7 +716,7 @@ NEXT_ARG:
         foreach my $item (@words[1 .. $#words]) {
             my $expansion_list = expand_globbed_path($session, $volID, $curdirnode, $words[1]);
             if (!ref($expansion_list) || scalar(@{$expansion_list}) < 1) {
-                print "Sorry, couldn't find any matches for entry \"", $item, "\"\n";
+                printf qq{Sorry, couldn't find any matches for entry "%s"\n}, $item;
                 next NEXT_ARG;
             }
 NEXT_EXPANDED:
@@ -731,10 +745,10 @@ NEXT_EXPANDED:
                     DirectoryBitmap => $dirbits,
                     PathType        => $pathType,
                     Pathname        => q{});
-            push(@nameParts, $entry->{$pathkey});
+            push @nameParts, $entry->{$pathkey};
             $searchID = $entry->{ParentDirID};
         }
-        print q{current directory is /}, join(q{/}, reverse(@nameParts)), "\n";
+        print q{current directory is /}, join(q{/}, reverse @nameParts), "\n";
         return 1;
     },
     exit    => sub {
@@ -756,7 +770,7 @@ NEXT_EXPANDED:
                 print "Sorry, file/directory was not found\n";
                 return 1;
             }
-            print "ACL for \"", $fname, "\":\n";
+            printf qq{ACL for "%s":\n}, $fname;
             print Dumper(\%resp);
         }
         return 1;
@@ -778,7 +792,7 @@ NEXT_EXPANDED:
                 print "Sorry, file/directory was not found\n";
                 return 1;
             }
-            print "Comment for \"", $fname, "\":\n", $resp, "\n";
+            printf qq{Comment for "%s":\n%s\n}, $fname, $resp;
         }
         return 1;
     },
@@ -807,7 +821,7 @@ files to change the mode of.
 _EOT_
             return 1;
         }
-        my $mode = oct($words[1]);
+        my $mode = oct $words[1];
     },
     allinfo => sub {
         my @words = @_;
@@ -864,7 +878,7 @@ local $SIG{INT} = sub {
     $session->FPCloseVol($volID);
     $session->FPLogout();
     $session->close();
-    exit(0);
+    exit 0;
 };
 
 # Tab completion nonsense, or at least my still-early attempts at it.
@@ -874,16 +888,16 @@ if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
         my ($text, $line, $start) = @_;
         if ($start == 0) {
             # try to expand commands
-            my @matches = grep { m{^$text}s } keys %commands;
+            my @matches = grep { m{^$text}sm } keys %commands;
             return @matches;
         }
-        my $list = expand_globbed_path($session, $volID, $curdirnode, $text . '*');
-        my @reallist = map { my $rv = $_->[1] ne '' ? $_->[1] : $_->[2] . '/'; $rv =~ s{ }{\\ }g; $rv; } @{$list};
-        my $prefix = '';
-        if ($text =~ m{^(.+/)}) {
+        my $list = expand_globbed_path($session, $volID, $curdirnode, $text . q{*});
+        my @reallist = map { my $rv = $_->[1] ne q{} ? $_->[1] : $_->[2] . q{/}; $rv =~ s{ }{\\ }gsm; $rv; } @{$list};
+        my $prefix = q{};
+        if ($text =~ m{^(.+/)}sm) {
             $prefix = $1;
         }
-        if (scalar(@reallist) == 1 && $reallist[0] =~ m{/$}s) {
+        if (scalar(@reallist) == 1 && $reallist[0] =~ m{/$}sm) {
             if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
                 $attribs->{'completion_append_character'} = q{};
             }
@@ -916,12 +930,12 @@ while (1) {
                 DirectoryBitmap => $dirbits,
                 PathType        => $pathType,
                 Pathname        => q{});
-        push(@nameParts, $entry->{$pathkey});
+        push @nameParts, $entry->{$pathkey};
         $searchID = $entry->{ParentDirID};
     }
 
-    my $line = $term->readline(q{afpclient } . (exists $values{username} ? $values{username} . q{@} : q{}) . $values{host} . q{:} . $values{volume} . q{/} . join(q{/}, reverse(@nameParts)) . q{> });
-    if (!defined($line)) {
+    my $line = $term->readline(q{afpclient } . (exists $values{username} ? $values{username} . q{@} : q{}) . $values{host} . q{:} . $values{volume} . q{/} . join(q{/}, reverse @nameParts) . q{> });
+    if (not defined $line) {
         print "\n";
         last;
     }
@@ -961,7 +975,7 @@ sub do_listentries {
             $up = $ent->{UnixPerms};
         }
         else {
-            $up = $ent->{FileIsDir} ?  (S_IFDIR | oct(755)) : (S_IFREG | oct(644));
+            $up = $ent->{FileIsDir} ?  (S_IFDIR | oct 755) : (S_IFREG | oct 644);
         }
         my $uid = $ent->{UnixUID} || $ent->{OwnerID} || 0;
         my $user;
@@ -984,7 +998,7 @@ sub do_listentries {
         }
 
         $ent->{$pathkey} =~ tr/\//:/;
-        printf(q{%s%s%s%s%s%s%s%s%s%s %3d %-8s %-8s %10d %-11s %s},
+        printf q{%s%s%s%s%s%s%s%s%s%s %3d %-8s %-8s %10d %-11s %s},
             ($ent->{FileIsDir} == 1 ? q{d} : S_ISLNK($up) ? q{l} : q{-}),
             ($up & S_IRUSR ? q{r} : q{-}),
             ($up & S_IWUSR ? q{w} : q{-}),
@@ -1001,8 +1015,8 @@ sub do_listentries {
             ($ent->{FileIsDir} == 1 ? $ent->{OffspringCount} + 2 : 1),
             $user || $uid, $group || $gid,
             ($ent->{FileIsDir} == 1 ? 0 : $ent->{$DForkLenKey}),
-            strftime($tfmt, localtime($fmodtime)),
-            $ent->{$pathkey});
+            strftime($tfmt, localtime $fmodtime),
+            $ent->{$pathkey};
         if (S_ISLNK($up)) {
             # Read link path and print that out too...
             my ($rc, %resp) = $session->FPOpenFork(
@@ -1055,50 +1069,50 @@ sub do_listentries {
                     my @actions = ();
                     my $rights = $entry->{ace_rights};
                     if ($rights & $KAUTH_VNODE_READ_DATA) {
-                        push(@actions, $ent->{FileIsDir} ? 'list' : 'read');
+                        push @actions, $ent->{FileIsDir} ? 'list' : 'read';
                     }
                     if ($rights & $KAUTH_VNODE_WRITE_DATA) {
-                        push(@actions, $ent->{FileIsDir} ? 'add_file' :
-                                'write');
+                        push @actions, $ent->{FileIsDir} ? 'add_file' :
+                                'write';
                     }
                     if ($rights & $KAUTH_VNODE_EXECUTE) {
-                        push(@actions, $ent->{FileIsDir} ? 'search' :
-                                'execute');
+                        push @actions, $ent->{FileIsDir} ? 'search' :
+                                'execute';
                     }
                     if ($rights & $KAUTH_VNODE_DELETE) {
-                        push(@actions, 'delete');
+                        push @actions, 'delete';
                     }
                     if ($rights & $KAUTH_VNODE_APPEND_DATA) {
-                        push(@actions, $ent->{FileIsDir} ?
-                                'add_subdirectory' : 'append');
+                        push @actions, $ent->{FileIsDir} ?
+                                'add_subdirectory' : 'append';
                     }
                     if ($rights & $KAUTH_VNODE_DELETE_CHILD) {
-                        push(@actions, 'delete_child');
+                        push @actions, 'delete_child';
                     }
                     if ($rights & $KAUTH_VNODE_READ_ATTRIBUTES) {
-                        push(@actions, 'readattr');
+                        push @actions, 'readattr';
                     }
                     if ($rights & $KAUTH_VNODE_WRITE_ATTRIBUTES) {
-                        push(@actions, 'writeattr');
+                        push @actions, 'writeattr';
                     }
                     if ($rights & $KAUTH_VNODE_READ_EXTATTRIBUTES) {
-                        push(@actions, 'readextattr');
+                        push @actions, 'readextattr';
                     }
                     if ($rights & $KAUTH_VNODE_WRITE_EXTATTRIBUTES) {
-                        push(@actions, 'writeextattr');
+                        push @actions, 'writeextattr';
                     }
                     if ($rights & $KAUTH_VNODE_READ_SECURITY) {
-                        push(@actions, 'readsecurity');
+                        push @actions, 'readsecurity';
                     }
                     if ($rights & $KAUTH_VNODE_WRITE_SECURITY) {
-                        push(@actions, 'writesecurity');
+                        push @actions, 'writesecurity';
                     }
                     if ($rights & $KAUTH_VNODE_CHANGE_OWNER) {
-                        push(@actions, 'chown');
+                        push @actions, 'chown';
                     }
 
-                    printf(" \%d: \%s:\%s \%s \%s\n", $i, $idtype,
-                            $name->{UTF8Name}, $kind, join(',', @actions));
+                    printf qq{ %d: %s:%s %s %s\n}, $i, $idtype,
+                            $name->{UTF8Name}, $kind, join q{,}, @actions;
                 }
             }
         }
@@ -1112,14 +1126,14 @@ sub expand_globbed_path {
     my $dirBmp = $kFPNodeIDBit | $kFPParentDirIDBit | $pathFlag;
     my $fileBmp = $dirBmp;
     my $fileName = undef;
-    my @pathElements = split(m{/}s, $path);
+    my @pathElements = split m{/}sm, $path;
     my $curNode = $dirid;
 
     my @nameParts;
 
     if (!defined($pathElements[0]) || ($pathElements[0] eq q{})) {
         $curNode = 2;
-        shift(@pathElements);
+        shift @pathElements;
     }
     else {
         my $searchID = $curNode;
@@ -1131,16 +1145,16 @@ sub expand_globbed_path {
                     DirectoryBitmap => $dirbits,
                     PathType        => $pathType,
                     Pathname        => q{});
-            unshift(@nameParts, $entry->{$pathkey});
+            unshift @nameParts, $entry->{$pathkey};
             $searchID = $entry->{ParentDirID};
         }
     }
     my @expanded_paths = ( [ $curNode, q{}, @nameParts ] );
-    my $pathElem = shift(@pathElements);
+    my $pathElem = shift @pathElements;
     while (defined $pathElem) {
         my (@newpaths);
         if ($pathElem eq q{} or $pathElem eq q{.}) {
-            $pathElem = shift(@pathElements);
+            $pathElem = shift @pathElements;
             next;
         }
         if ($pathElem eq q{..}) {
@@ -1158,12 +1172,12 @@ sub expand_globbed_path {
                         Pathname        => q{});
                 next if $rc != $kFPNoErr;
                 next if exists $dupchk{$resp->{ParentDirID}};
-                push(@newpaths, [ $resp->{ParentDirID}, q{},
-                        @{$expath}[3 .. $#{$expath}] ]);
+                push @newpaths, [ $resp->{ParentDirID}, q{},
+                        @{$expath}[3 .. $#{$expath}] ];
                 $dupchk{$resp->{ParentDirID}} = 1;
             }
             @expanded_paths = @newpaths;
-            $pathElem = shift(@pathElements);
+            $pathElem = shift @pathElements;
             next;
         }
         $pathElem =~ tr/:/\//;
@@ -1197,23 +1211,24 @@ COLLECT_PATHS:
                 }
             }
             my @matches = sort {$a cmp $b} match_glob($pathElem,
-                    keys(%entries));
+                    keys %entries);
             foreach my $match (@matches) {
                 $match =~ tr/\//:/;
                 my $nelem = [];
                 if ($entries{$match}{FileIsDir}) {
                     @{$nelem} = ($entries{$match}{NodeID}, q{}, $match,
-                            @{$expath}[2 .. $#{$expath}]);
-                } else {
-                    @{$nelem} = ($expath->[0], $match,
-                            @{$expath}[2 .. $#{$expath}]);
+                            @{$expath}[2 .. $#{$expath}],);
                 }
-                push(@newpaths, $nelem);
+                else {
+                    @{$nelem} = ($expath->[0], $match,
+                            @{$expath}[2 .. $#{$expath}],);
+                }
+                push @newpaths, $nelem;
             }
         }
         @expanded_paths = @newpaths;
 
-        $pathElem = shift(@pathElements);
+        $pathElem = shift @pathElements;
     }
 
     return [ @expanded_paths ];
@@ -1226,10 +1241,10 @@ COLLECT_PATHS:
 sub resolve_path {
     my ($sess, $volid, $dirid, $path, $lastIfDir, $lastNoExist) = @_;
 
-    if (!defined($lastIfDir)) {
+    if (not defined $lastIfDir) {
         $lastIfDir = 0;
     }
-    if (!defined($lastNoExist)) {
+    if (not defined $lastNoExist) {
         $lastNoExist = 0;
     }
 
@@ -1237,11 +1252,11 @@ sub resolve_path {
     my $fileBmp = 0;
     my $fileName = undef;
 
-    my @pathElements = split(m{/}s, $path);
+    my @pathElements = split m{/}sm, $path;
     my $curNode = $dirid;
     if (!defined($pathElements[0]) || ($pathElements[0] eq q{})) {
         $curNode = 2;
-        shift(@pathElements);
+        shift @pathElements;
     }
     foreach my $i (0 .. $#pathElements) {
         my $elem = $pathElements[$i];
@@ -1274,7 +1289,7 @@ sub resolve_path {
         $curNode = ($getParentID == 1 ? $resp->{ParentDirID} :
                 $resp->{NodeID});
     }
-    return($curNode, $fileName);
+    return $curNode, $fileName;
 }
 
 if (defined $DT_ID) {
@@ -1283,7 +1298,7 @@ if (defined $DT_ID) {
 $session->FPCloseVol($volID);
 $session->FPLogout();
 $session->close();
-exit(0);
+exit 0;
 
 
 # vim: ts=4 et ai

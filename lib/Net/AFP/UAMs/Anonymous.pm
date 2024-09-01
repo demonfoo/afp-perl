@@ -17,12 +17,13 @@ sub Authenticate {
     # The latter two args (username and a password callback function) can
     # be ignored here, since they're not applicable for anonymous auth.
     my($session, $AFPVersion) = @_;
-    $session->{logger}->debug('called ', (caller(0))[3]);
+    $session->{logger}->debug('called ', (caller 0)[3]);
 
     # Ensure that we've been handed an appropriate object.
-    croak("Object MUST be of type Net::AFP!")
-            unless ref($session) and $session->isa('Net::AFP');
-    
+    if (not ref $session or not $session->isa('Net::AFP')) {
+        croak('Object MUST be of type Net::AFP!');
+    }
+
     my $rc;
 
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,

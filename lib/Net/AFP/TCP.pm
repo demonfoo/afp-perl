@@ -31,7 +31,7 @@ our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
 sub new { # {{{1
     my ($class, $host, $port, %params) = @_;
     my $obj = $class->SUPER::new($host, $port);
-    $obj->{logger}->debug('called ', (caller(0))[3], '()');
+    $obj->{logger}->debug('called ', (caller 0)[3], '()');
 
     $obj->{Session} = Net::DSI->new($host, $port);
     my($rc, %opts) = $obj->{Session}->OpenSession();
@@ -49,7 +49,7 @@ sub new { # {{{1
 
 sub close { # {{{1
     my ($self) = @_;
-    $self->{logger}->debug('called ', (caller(0))[3], '()');
+    $self->{logger}->debug('called ', (caller 0)[3], '()');
 
     $self->{Session}->CloseSession();
     $self->{Session}->close();
@@ -58,11 +58,11 @@ sub close { # {{{1
 
 sub CheckAttnQueue { # {{{1
     my ($self) = @_;
-    $self->{logger}->debug('called ', (caller(0))[3], '()');
+    $self->{logger}->debug('called ', (caller 0)[3], '()');
 
     my $attnq = $self->{Session}{Shared}{attnq};
     my $vol_update_checked;
-    while (my $msg = shift(@{$attnq})) {
+    while (my $msg = shift @{$attnq}) {
         if ($msg & 0x8_000) {    # server says it's shutting down
             $self->{logger}->info('CheckAttnQueue(): Received notification of server intent to shut down');
             $self->{logger}->info('Shutdown in ', ($msg & 0xFFF), ' minutes');
@@ -110,10 +110,10 @@ sub SendAFPMessage { # {{{1
     $self->CheckAttnQueue();
     if ($can_cache && exists $self->{ReplayCache}) {
         do {
-            shift(@{$self->{ReplayCache}});
+            shift @{$self->{ReplayCache}};
         } while ((scalar(@{$self->{ReplayCache}}) + 1) >=
                 $self->{ReplayCacheSize});
-        push(@{$self->{ReplayCache}}, $payload);
+        push @{$self->{ReplayCache}}, $payload;
     }
     return $self->{Session}->Command($payload, $resp_r);
 } # }}}1
@@ -130,17 +130,19 @@ sub SendAFPWrite { # {{{1
 
 sub GetStatus { # {{{1
     my ($class, $host, $port, $resp_r) = @_;
-    if (ref($class)) {
+    if (ref $class) {
         croak('GetStatus() should NEVER be called against an active object');
     }
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug('called ', (caller(0))[3], '()');
+    $logger->debug('called ', (caller 0)[3], '()');
 
     my $obj = Net::DSI->new($host, $port);
     my $resp;
     my $rc = $obj->GetStatus(\$resp);
     $obj->close();
-    return $rc unless $rc == $kFPNoErr;
+    if ($rc != $kFPNoErr) {
+        return $rc;
+    }
 
     ${$resp_r} = ParseSrvrInfo($resp);
     return $rc;

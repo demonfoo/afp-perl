@@ -5,8 +5,8 @@ use base qw(Fuse::Class);
 
 # imports {{{1
 use strict;
-no strict qw(refs); # for looser handling of subroutine refs, since proper
-                    # CODE refs don't work across threads
+#no strict qw(refs); # for looser handling of subroutine refs, since proper
+#                    # CODE refs don't work across threads
 use warnings;
 no warnings qw(redefine);
 use diagnostics;
@@ -113,6 +113,7 @@ sub new { # {{{1
 
     my($session, %urlparms);
     my $callback = sub {
+        no strict qw(refs);
         my(%values) = @_;
         return &{$pw_cb}(@values{qw[username host password]});
     };
@@ -165,7 +166,7 @@ sub new { # {{{1
     # This is sort of a hack. Seems that instead of returning '0' as the
     # user ID from the FPGetUserInfo call, the AirPort Disk AFP server
     # tells us the user ID is 1. What is this crap. But anyway.
-    if ($srvinfo->{MachineType} =~ m{\AAirPort}s) {
+    if ($srvinfo->{MachineType} =~ m{\AAirPort}sm) {
         $selfinfo->{UserID} = 0;
         $obj->{dotdothack} = 1;
     }
@@ -198,7 +199,7 @@ sub new { # {{{1
 
     my $gidmap = {};
     my $g_uuidmap = {};
-    my $mapped_gid = (split m{\s+}s, $REAL_GROUP_ID)[0];
+    my $mapped_gid = (split m{\s+}sm, $REAL_GROUP_ID)[0];
     if (exists $opts{gid}) {
         $mapped_gid = int $opts{gid};
     }
@@ -372,7 +373,7 @@ sub new { # {{{1
     if (defined $urlparms{username}) {
         $scrubbed_url .= uri_escape($urlparms{username}) . q{@};
     }
-    if ($urlparms{host} =~ m{:}s) {
+    if ($urlparms{host} =~ m{:}sm) {
         $scrubbed_url .= q{[} . $urlparms{host} . q{]};
     }
     else {
@@ -385,8 +386,8 @@ sub new { # {{{1
     if (defined $urlparms{volume}) {
         $scrubbed_url .= uri_escape($urlparms{volume});
         if (defined $urlparms{subpath}) {
-            $scrubbed_url .= join(q{/}, map { uri_escape($_) } split m{/}s,
-                    $urlparms{subpath});
+            $scrubbed_url .= join q{/}, map { uri_escape($_) } split m{/}sm,
+                    $urlparms{subpath};
         }
     }
     $_[1] = $scrubbed_url;
@@ -410,10 +411,12 @@ sub disconnect { # {{{1
     my ($self) = @_;
 
     if (defined $self->{afpconn}) {
-        $self->{afpconn}->FPCloseDT($self->{DTRefNum})
-                if defined $self->{DTRefNum};
-        $self->{afpconn}->FPCloseVol($self->{volID})
-                if defined $self->{volID};
+        if (defined $self->{DTRefNum}) {
+            $self->{afpconn}->FPCloseDT($self->{DTRefNum});
+        }
+        if (defined $self->{volID}) {
+            $self->{afpconn}->FPCloseVol($self->{volID});
+        }
         $self->{afpconn}->FPLogout();
         $self->{afpconn}->close();
     }
@@ -422,8 +425,8 @@ sub disconnect { # {{{1
 
 sub getattr { # {{{1
     my ($self, $file) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s')},
-            (caller 0)[3], $file));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s')},
+            (caller 0)[3], $file);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -611,8 +614,8 @@ sub getattr { # {{{1
 
 sub readlink { # {{{1
     my ($self, $file) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s')},
-            (caller 0)[3], $file));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s')},
+            (caller 0)[3], $file);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -661,21 +664,24 @@ sub readlink { # {{{1
         my $pos = 0;
         do {
             my $readtext;
-            ($rc, $readtext) = &{$self->{ReadFn}}($self->{afpconn},
-                    OForkRefNum => $sresp{OForkRefNum},
-                    Offset      => $pos,
-                    ReqCount    => 1024);
+            {
+                no strict qw(refs);
+                ($rc, $readtext) = &{$self->{ReadFn}}($self->{afpconn},
+                        OForkRefNum => $sresp{OForkRefNum},
+                        Offset      => $pos,
+                        ReqCount    => 1024);
+            }
             return -EACCES() if $rc == $kFPAccessDenied;
             return -EINVAL() if $rc != $kFPNoErr and $rc != $kFPEOFErr;
             $linkpath .= $readtext;
-        } until ($rc == $kFPEOFErr);
+        } while ($rc != $kFPEOFErr);
         $self->{afpconn}->FPCloseFork($sresp{OForkRefNum});
         if ($self->{dotdothack}) {
             # If this hack is active (for AirPort Disk volumes only,
             # currently), make sure any elements of the path that start
             # with .. get fixed up appropriately.
-            my @parts = split m{/}s, $linkpath;
-            foreach (@parts) { s{^[.]![.][.](.)}{..$1}s; }
+            my @parts = split m{/}sm, $linkpath;
+            foreach (@parts) { s{^[.]![.][.](.)}{..$1}sm; }
             $linkpath = join q{/}, @parts;
         }
         return $self->{local_encode}->encode($linkpath);
@@ -686,8 +692,8 @@ sub readlink { # {{{1
 
 sub getdir { # {{{1
     my ($self, $dirname) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s')},
-            (caller 0)[3], $dirname));
+    $self->{logger}->debug(sprintf q{called %s(dirname = '%s')},
+            (caller 0)[3], $dirname);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -735,7 +741,10 @@ sub getdir { # {{{1
     my $rc = undef;
     # loop reading entries {{{2
     while (1) {
-        ($rc, $resp) = &{$self->{EnumFn}}($self->{afpconn}, %arglist);
+        {
+            no strict qw(refs);
+            ($rc, $resp) = &{$self->{EnumFn}}($self->{afpconn}, %arglist);
+        }
 
         last if $rc != $kFPNoErr;
 
@@ -753,7 +762,7 @@ sub getdir { # {{{1
         foreach my $elem (@{$resp}) {
             my $name = $elem->{$self->{pathkey}};
             $name =~ tr{/}{:};
-            if ($self->{dotdothack}) { $name =~ s{^[.]![.][.](.)}{..$1}s; }
+            if ($self->{dotdothack}) { $name =~ s{^[.]![.][.](.)}{..$1}sm; }
             push @fileslist, $self->{local_encode}->encode($name);
         }
 
@@ -775,8 +784,8 @@ sub getdir { # {{{1
 
 sub mknod { # {{{1
     my ($self, $file, $mode, $devnum) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x, devnum = %d)},
-            (caller 0)[3], $file, $mode, $devnum));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %x, devnum = %d)},
+            (caller 0)[3], $file, $mode, $devnum);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -825,8 +834,8 @@ sub mknod { # {{{1
 
 sub mkdir { # {{{1
     my ($self, $file, $mode) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x)},
-            (caller 0)[3], $file, $mode));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %x)},
+            (caller 0)[3], $file, $mode);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -894,8 +903,8 @@ sub mkdir { # {{{1
 
 sub unlink { # {{{1
     my ($self, $file) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s')},
-            (caller 0)[3], $file));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s')},
+            (caller 0)[3], $file);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -952,8 +961,8 @@ sub rmdir { return Fuse::AFP::unlink(@_); }
 # once. good work apple. :| doesn't happen on netatalk or OS X 10.5.
 sub symlink { # {{{1
     my ($self, $target, $linkname) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(target = '%s', linkname = '%s')},
-            (caller 0)[3], $target, $linkname));
+    $self->{logger}->debug(sprintf q{called %s(target = '%s', linkname = '%s')},
+            (caller 0)[3], $target, $linkname);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1020,17 +1029,20 @@ sub symlink { # {{{1
         # If this hack is active (for AirPort Disk volumes only, currently),
         # make sure any elements of the path that start with .. get fixed
         # up appropriately.
-        my @parts = split m{/}s, $target;
-        foreach (@parts) { s{^[.][.](.)}{.!..$1}s; }
+        my @parts = split m{/}sm, $target;
+        foreach (@parts) { s{^[.][.](.)}{.!..$1}sm; }
         $target = join q{/}, @parts;
     }
     my $forkid = $sresp{OForkRefNum};
 
     my $lastwritten;
-    ($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
-            OForkRefNum => $forkid,
-            Offset      => 0,
-            ForkData    => \$target);
+    {
+    no strict qw(refs);
+        ($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
+                OForkRefNum => $forkid,
+                Offset      => 0,
+                ForkData    => \$target);
+    }
 
     $self->{afpconn}->FPCloseFork($forkid);
 
@@ -1064,8 +1076,8 @@ sub symlink { # {{{1
 
 sub rename { # {{{1
     my ($self, $oldname, $newname) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(oldname = '%s', newname = '%s')},
-            (caller 0)[3], $oldname, $newname));
+    $self->{logger}->debug(sprintf q{called %s(oldname = '%s', newname = '%s')},
+            (caller 0)[3], $oldname, $newname);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1143,8 +1155,8 @@ sub rename { # {{{1
 
 sub link { # {{{1
     my ($self, $file, $target) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', target = %s)},
-            (caller 0)[3], $file, $target));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', target = %s)},
+            (caller 0)[3], $file, $target);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1153,8 +1165,8 @@ sub link { # {{{1
 
 sub chmod { # {{{1
     my ($self, $file, $mode) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %o)},
-            (caller 0)[3], $file, $mode));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %o)},
+            (caller 0)[3], $file, $mode);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1200,8 +1212,8 @@ sub chmod { # {{{1
 
 sub chown { # {{{1
     my ($self, $file, $uid, $gid) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', uid = %d, gid = %d)},
-            (caller 0)[3], $file, $uid, $gid));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', uid = %d, gid = %d)},
+            (caller 0)[3], $file, $uid, $gid);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1255,8 +1267,8 @@ sub chown { # {{{1
 
 sub truncate { # {{{1
     my ($self, $file, $length) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', length = %d)},
-            (caller 0)[3], $file, $length));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', length = %d)},
+            (caller 0)[3], $file, $length);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1310,8 +1322,8 @@ sub truncate { # {{{1
 
 sub utime { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', actime = %d, modtime = %d)},
-            (caller 0)[3], $file, $actime, $modtime));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', actime = %d, modtime = %d)},
+            (caller 0)[3], $file, $actime, $modtime);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1340,8 +1352,8 @@ sub utime { # {{{1
 
 sub open { # {{{1
     my ($self, $file, $mode) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x)},
-            (caller 0)[3], $file, $mode));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %x)},
+            (caller 0)[3], $file, $mode);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1423,8 +1435,8 @@ sub open { # {{{1
 
 sub read { # {{{1
     my ($self, $file, $len, $off, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', len = %d, off = %d, fh = %d)},
-            (caller 0)[3], $file || q{}, $len, $off, ref($fh) ? -1 : $fh));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', len = %d, off = %d, fh = %d)},
+            (caller 0)[3], $file || q{}, $len, $off, ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1435,13 +1447,17 @@ sub read { # {{{1
         if ($off + $len > length ${$fh}) {
             $len = length(${$fh}) - $off;
         }
-        return substr(${$fh}, $off, $len);
+        return substr ${$fh}, $off, $len;
     }
 
-    my($rc, $resp) = &{$self->{ReadFn}}($self->{afpconn},
-            OForkRefNum => $fh,
-            Offset      => $off,
-            ReqCount    => $len);
+    my($rc, $resp);
+    {
+        no strict qw(refs);
+        ($rc, $resp) = &{$self->{ReadFn}}($self->{afpconn},
+                OForkRefNum => $fh,
+                Offset      => $off,
+                ReqCount    => $len);
+    }
     return $resp      if $rc == $kFPNoErr
             or $rc == $kFPEOFErr;
     return -EBADF()   if $rc == $kFPAccessDenied;
@@ -1453,8 +1469,8 @@ sub read { # {{{1
 sub write { # {{{1
     my ($self, $file, $offset, $fh) = @_[0,1,3,4];
     my $data_r = \$_[2];
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', data = %s, offset = %d, fh = %d)},
-            (caller 0)[3], $file || q{}, q{[data]}, $offset, ref($fh) ? -1 : $fh));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', data = %s, offset = %d, fh = %d)},
+            (caller 0)[3], $file || q{}, q{[data]}, $offset, ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -1462,11 +1478,15 @@ sub write { # {{{1
     return -EBADF() if ref $fh;
 
     my $ts_start = gettimeofday();
-    my($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
-            OForkRefNum => $fh,
-            Offset      => $offset,
-            ReqCount    => length(${$data_r}),
-            ForkData    => $data_r);
+    my($rc, $lastwritten);
+    {
+        no strict qw(refs);
+        ($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
+                OForkRefNum => $fh,
+                Offset      => $offset,
+                ReqCount    => length(${$data_r}),
+                ForkData    => $data_r);
+    }
     my $wr_time = gettimeofday() - $ts_start;
 
     return -EACCES()     if $rc == $kFPAccessDenied;
@@ -1499,8 +1519,7 @@ sub write { # {{{1
 
 sub statfs { # {{{1
     my ($self) = @_;
-    $self->{logger}->debug(sprintf(q{called %s()},
-            (caller 0)[3]));
+    $self->{logger}->debug(sprintf q{called %s()}, (caller 0)[3]);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1546,8 +1565,8 @@ sub statfs { # {{{1
 
 sub flush { # {{{1
     my ($self, $file, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d)},
-            (caller 0)[3], $file || q{}, ref($fh) ? -1 : $fh));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', fh = %d)},
+            (caller 0)[3], $file || q{}, ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1561,8 +1580,8 @@ sub flush { # {{{1
 
 sub release { # {{{1
     my ($self, $file, $mode, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %x, fh = %d)},
-            (caller 0)[3], $file || q{}, $mode, ref($fh) ? -1 : $fh));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %x, fh = %d)},
+            (caller 0)[3], $file || q{}, $mode, ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1574,8 +1593,8 @@ sub release { # {{{1
 
 sub fsync { # {{{1
     my ($self, $file, $flags, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', flags = %x, fh = %d)},
-            (caller 0)[3], $file || q{}, $flags, ref($fh) ? -1 : $fh));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', flags = %x, fh = %d)},
+            (caller 0)[3], $file || q{}, $flags, ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1589,8 +1608,8 @@ sub fsync { # {{{1
 
 sub setxattr { # {{{1
     my ($self, $file, $attr, $value, $flags) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', attr = '%s', value = '%s', flags = %x)},
-            (caller 0)[3], $file, $attr, printable($value), $flags));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', attr = '%s', value = '%s', flags = %x)},
+            (caller 0)[3], $file, $attr, printable($value), $flags);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1689,9 +1708,9 @@ sub setxattr { # {{{1
         return 0;
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ m{^user[.]}s || $OSNAME eq 'darwin') {
+    elsif ($attr =~ m{^user[.]}sm || $OSNAME eq 'darwin') {
         if ($OSNAME ne 'darwin') {
-            $attr =~ s{^user[.]}{}s;
+            $attr =~ s{^user[.]}{}sm;
         }
 
         if ($attr eq 'com.apple.FinderInfo' &&
@@ -1779,11 +1798,14 @@ sub setxattr { # {{{1
             return -EROFS()  if $rc == $kFPVolLocked;
             return -EBADF()  if $rc != $kFPNoErr;
 
-            $rc = &{$self->{WriteFn}}($self->{afpconn},
-                    OForkRefNum   => $resp{OForkRefNum},
-                    Offset        => 0,
-                    ReqCount      => length($value),
-                    ForkData      => \$value);
+            {
+                no strict qw(refs);
+                $rc = &{$self->{WriteFn}}($self->{afpconn},
+                        OForkRefNum   => $resp{OForkRefNum},
+                        Offset        => 0,
+                        ReqCount      => length($value),
+                        ForkData      => \$value);
+            }
             return -EACCES()  if $rc == $kFPAccessDenied;
             return -ENOSPC()  if $rc == $kFPDiskFull;
             return -ETXTBSY() if $rc == $kFPLockErr;
@@ -1842,8 +1864,8 @@ sub setxattr { # {{{1
 
 sub getxattr { # {{{1
     my ($self, $file, $attr) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', attr = '%s')},
-            (caller 0)[3], $file, $attr));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', attr = '%s')},
+            (caller 0)[3], $file, $attr);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1902,9 +1924,9 @@ sub getxattr { # {{{1
         }
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ m{^user[.]}s || $OSNAME eq 'darwin') {
+    elsif ($attr =~ m{^user[.]}sm || $OSNAME eq 'darwin') {
         if ($OSNAME ne 'darwin') {
-            $attr =~ s{^user[.]}{}s;
+            $attr =~ s{^user[.]}{}sm;
         }
 
         if ($attr eq 'com.apple.FinderInfo' &&
@@ -1951,10 +1973,13 @@ sub getxattr { # {{{1
             return -EBADF()  if $rc != $kFPNoErr;
 
             my $readtext;
-            ($rc, $readtext) = &{$self->{ReadFn}}($self->{afpconn},
-                    OForkRefNum => $resp{OForkRefNum},
-                    Offset      => 0,
-                    ReqCount    => $rforklen);
+            {
+                no strict qw(refs);
+                ($rc, $readtext) = &{$self->{ReadFn}}($self->{afpconn},
+                        OForkRefNum => $resp{OForkRefNum},
+                        Offset      => 0,
+                        ReqCount    => $rforklen);
+            }
             return -EACCES() if $rc == $kFPAccessDenied;
             return -EINVAL() if $rc != $kFPNoErr and $rc != $kFPEOFErr;
 
@@ -2010,8 +2035,8 @@ sub getxattr { # {{{1
 
 sub listxattr { # {{{1
     my ($self, $file) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s')},
-            (caller 0)[3], $file));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s')},
+            (caller 0)[3], $file);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2129,8 +2154,8 @@ sub listxattr { # {{{1
 
 sub removexattr { # {{{1
     my ($self, $file, $attr) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', attr = '%s')},
-            (caller 0)[3], $file, $attr));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', attr = '%s')},
+            (caller 0)[3], $file, $attr);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2177,9 +2202,9 @@ sub removexattr { # {{{1
         return 0;
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ m{^user[.]}s || $OSNAME eq 'darwin') {
+    elsif ($attr =~ m{^user[.]}sm || $OSNAME eq 'darwin') {
         if ($OSNAME ne 'darwin') {
-            $attr =~ s{^user[.]}{}s;
+            $attr =~ s{^user[.]}{}sm;
         }
 
         if ($attr eq 'com.apple.FinderInfo' &&
@@ -2260,8 +2285,8 @@ sub removexattr { # {{{1
 
 sub opendir { # {{{1
     my ($self, $dirname) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s')},
-            (caller 0)[3], $dirname));
+    $self->{logger}->debug(sprintf q{called %s(dirname = '%s')},
+            (caller 0)[3], $dirname);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2288,8 +2313,8 @@ sub opendir { # {{{1
 
 sub readdir { # {{{1
     my ($self, $dirname, $offset, $dh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', offset = %d, dh = %d)},
-            (caller 0)[3], $dirname || q{}, $offset, $dh));
+    $self->{logger}->debug(sprintf q{called %s(dirname = '%s', offset = %d, dh = %d)},
+            (caller 0)[3], $dirname || q{}, $offset, $dh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2328,16 +2353,20 @@ sub readdir { # {{{1
         }
     }
     # Request entry list from server {{{2
-    my($rc, $resp) = &{$self->{EnumFn}}($self->{afpconn},
-                    VolumeID        => $self->{volID},
-                    DirectoryID     => $dh,
-                    FileBitmap      => $bitmap,
-                    DirectoryBitmap => $bitmap,
-                    ReqCount        => $entrycount,
-                    StartIndex      => $offset - $delta + 1,
-                    MaxReplySize    => $self->{MaxReplySize},
-                    PathType        => $self->{pathType},
-                    Pathname        => q{});
+    my($rc, $resp);
+    {
+        no strict qw(refs);
+        ($rc, $resp) = &{$self->{EnumFn}}($self->{afpconn},
+                        VolumeID        => $self->{volID},
+                        DirectoryID     => $dh,
+                        FileBitmap      => $bitmap,
+                        DirectoryBitmap => $bitmap,
+                        ReqCount        => $entrycount,
+                        StartIndex      => $offset - $delta + 1,
+                        MaxReplySize    => $self->{MaxReplySize},
+                        PathType        => $self->{pathType},
+                        Pathname        => q{});
+    }
     return -EACCES()  if $rc == $kFPAccessDenied;
     return -ENOENT()  if $rc == $kFPDirNotFound;
     return -ENOTDIR() if $rc == $kFPObjectTypeErr;
@@ -2349,7 +2378,7 @@ sub readdir { # {{{1
     my $name;
     foreach my $ent (@{$resp}) {
         ($name = $ent->{$self->{pathkey}}) =~ tr{/}{:};
-        if ($self->{dotdothack}) { $name =~ s{^[.]![.][.](.)}{..$1}s; }
+        if ($self->{dotdothack}) { $name =~ s{^[.]![.][.](.)}{..$1}sm; }
         push @fileslist, [++$offset, $self->{local_encode}->encode($name)];
     }
     # }}}2
@@ -2359,8 +2388,8 @@ sub readdir { # {{{1
 
 sub releasedir { # {{{1
     my ($self, $dirname, $dh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', dh = %d)},
-            (caller 0)[3], $dirname || q{}, $dh));
+    $self->{logger}->debug(sprintf q{called %s(dirname = '%s', dh = %d)},
+            (caller 0)[3], $dirname || q{}, $dh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2371,8 +2400,8 @@ sub releasedir { # {{{1
 
 sub fsyncdir { # {{{1
     my ($self, $dirname, $flags, $dh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(dirname = '%s', flags = %x, dh = %d)},
-            (caller 0)[3], $dirname, $flags, $dh));
+    $self->{logger}->debug(sprintf q{called %s(dirname = '%s', flags = %x, dh = %d)},
+            (caller 0)[3], $dirname, $flags, $dh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2388,8 +2417,8 @@ sub fsyncdir { # {{{1
 
 sub access { # {{{1
     my ($self, $file, $mode) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %o)},
-            (caller 0)[3], $file, $mode));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %o)},
+            (caller 0)[3], $file, $mode);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2429,8 +2458,8 @@ sub access { # {{{1
 
 sub create { # {{{1
     my ($self, $file, $mode, $flags) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', mode = %o, flags = %x)},
-            (caller 0)[3], $file, $mode, $flags));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %o, flags = %x)},
+            (caller 0)[3], $file, $mode, $flags);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2486,8 +2515,8 @@ sub create { # {{{1
 
 sub ftruncate { # {{{1
     my ($self, $file, $length, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', length = %d, fh = %d)},
-            (caller 0)[3], $file || q{}, $length, ref($fh) ? -1 : $fh));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', length = %d, fh = %d)},
+            (caller 0)[3], $file || q{}, $length, ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2507,8 +2536,8 @@ sub ftruncate { # {{{1
 
 sub fgetattr { # {{{1
     my ($self, $file, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d)},
-            (caller 0)[3], $file || q{}, ref($fh) ? -1 : $fh));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', fh = %d)},
+            (caller 0)[3], $file || q{}, ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2621,9 +2650,9 @@ sub fgetattr { # {{{1
 
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %s, } .
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', cmd = %s, } .
             q{lkparms = %s, fh = %d)}, (caller 0)[3], $file || q{}, $cmd,
-            Dumper($lkparms), ref($fh) ? -1 : $fh));
+            Dumper($lkparms), ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2703,10 +2732,10 @@ sub lock { # {{{1
 
 sub utimens { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', actime = %s, modtime = %s)},
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', actime = %s, modtime = %s)},
             (caller 0)[3], $file,
             ref $actime ? sprintf('[%d, %d]', @{$actime}) : sprintf('%f', $actime),
-            ref $modtime ? sprintf('[%d, %d]', @{$modtime}) : sprintf('%f', $modtime) ));
+            ref $modtime ? sprintf('[%d, %d]', @{$modtime}) : sprintf '%f', $modtime );
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2718,8 +2747,8 @@ sub utimens { # {{{1
 
 sub bmap { # {{{1
     my ($self, $file, $blksz, $blkno) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', blksz = %d, blkno = %d)},
-            (caller 0)[3], $file, $blksz, $blkno));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', blksz = %d, blkno = %d)},
+            (caller 0)[3], $file, $blksz, $blkno);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2730,8 +2759,8 @@ sub bmap { # {{{1
 
 sub ioctl {
     my ($self, $file, $cmd, $flags, $data, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', cmd = %d, flags = %x, data = %s, fh = %d)},
-            (caller 0)[3], $file || q{}, $cmd, $flags, printable($data), ref($fh) ? -1 : $fh));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', cmd = %d, flags = %x, data = %s, fh = %d)},
+            (caller 0)[3], $file || q{}, $cmd, $flags, printable($data), ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2740,8 +2769,8 @@ sub ioctl {
 
 sub poll {
     my ($self, $file, $ph, $revents, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', ph = %d, revents = %d, fh = %d)},
-            (caller 0)[3], $file || q{}, $ph, $revents, ref($fh) ? -1 : $fh));
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', ph = %d, revents = %d, fh = %d)},
+            (caller 0)[3], $file || q{}, $ph, $revents, ref($fh) ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2751,9 +2780,9 @@ sub poll {
 sub write_buf {
     my ($self, $file, $off, $bufvec, $fh) = @_;
     $self->{logger}->debug('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', $off = %d,} .
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', $off = %d,} .
             q{ $bufvec = [...], $fh = %d)}, (caller 0)[3], $file || q{}, $off,
-            $fh));
+            $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -2779,11 +2808,15 @@ sub write_buf {
         $bufvec = $single;
     }
     my $ts_start = gettimeofday();
-    my($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
-            OForkRefNum => $fh,
-            Offset      => $off,
-            ReqCount    => length($bufvec->[0]{mem}),
-            ForkData    => \$bufvec->[0]{mem});
+    my($rc, $lastwritten);
+    {
+        no strict qw(refs);
+        ($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
+                OForkRefNum => $fh,
+                Offset      => $off,
+                ReqCount    => length($bufvec->[0]{mem}),
+                ForkData    => \$bufvec->[0]{mem});
+    }
     my $wr_time = gettimeofday() - $ts_start;
 
     $self->{metrics}->{wr_totaltime} += $wr_time;
@@ -2810,9 +2843,9 @@ sub write_buf {
 
 sub read_buf {
     my ($self, $file, $len, $off, $bufvec, $fh) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', len = %d, } .
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', len = %d, } .
             q{$off = %d, $bufvec = [...], $fh = %d)}, (caller 0)[3],
-            $file || q{}, $len, $off, ref $fh ? -1 : $fh));
+            $file || q{}, $len, $off, ref $fh ? -1 : $fh);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2830,10 +2863,13 @@ sub read_buf {
     }
 
     my $rc;
-    ($rc, $bufvec->[0]{mem}) = &{$self->{ReadFn}}($self->{afpconn},
-            OForkRefNum => $fh,
-            Offset      => $off,
-            ReqCount    => $len);
+    {
+        no strict qw(refs);
+        ($rc, $bufvec->[0]{mem}) = &{$self->{ReadFn}}($self->{afpconn},
+                OForkRefNum => $fh,
+                Offset      => $off,
+                ReqCount    => $len);
+    }
     $bufvec->[0]{size} = length $bufvec->[0]{mem};
     return $bufvec->[0]{size} if $rc == $kFPNoErr or $rc == $kFPEOFErr;
     return -EBADF()   if $rc == $kFPAccessDenied;
@@ -2844,9 +2880,9 @@ sub read_buf {
 
 sub flock {
     my ($self, $file, $fh, $owner, $op) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, } .
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', fh = %d, } .
             q{owner = %d, op = %x)}, (caller 0)[3], $file || q{}, $fh,
-            $owner, $op));
+            $owner, $op);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2883,9 +2919,9 @@ sub flock {
 
 sub fallocate {
     my ($self, $file, $fh, $mode, $off, $len) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(file = '%s', fh = %d, } .
+    $self->{logger}->debug(sprintf q{called %s(file = '%s', fh = %d, } .
             q{mode = %x, off = %d, len = %d)}, (caller 0)[3], $file || q{},
-            $fh, $mode, $off, $len));
+            $fh, $mode, $off, $len);
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2907,7 +2943,7 @@ sub generate_metrics_data { # {{{1
 
     my $callcount = $self->{callcount};
     foreach my $key (sort {$a cmp $b} keys %{$callcount}) {
-        $data .= (split m{::}s, $key)[-1] . ":\t" . $callcount->{$key} .
+        $data .= (split m{::}sm, $key)[-1] . ":\t" . $callcount->{$key} .
                 "\n";
     }
 
@@ -2941,8 +2977,8 @@ sub generate_metrics_data { # {{{1
 sub lookup_afp_entry { # {{{1
     my ($self, $filename) = @_;
 
-    $self->{logger}->debug(sprintf(q{called %s(filename = '%s')},
-            (caller 0)[3], printable($filename)));
+    $self->{logger}->debug(sprintf q{called %s(filename = '%s')},
+            (caller 0)[3], printable($filename));
 
     # Disabling this for now, as it causes errors with dangling, but
     # otherwise well-formed, symlinks.
@@ -2987,10 +3023,10 @@ sub lookup_afp_entry { # {{{1
 
 sub translate_path { # {{{1
     my ($path, $sessobj) = @_;
-    $sessobj->{logger}->debug(sprintf(q{called %s(path = '%s')},
-            (caller 0)[3], $path));
+    $sessobj->{logger}->debug(sprintf q{called %s(path = '%s')},
+            (caller 0)[3], $path);
 
-    my @pathparts = split m{/}s, $path;
+    my @pathparts = split m{/}sm, $path;
     my @afp_path = ();
     foreach my $elem (@pathparts) {
         next if $elem eq q{.};
@@ -3001,42 +3037,42 @@ sub translate_path { # {{{1
             next;
         }
         $elem =~ tr{:}{/};
-        if ($sessobj->{dotdothack}) { $elem =~ s{^[.][.](.)}{.!..$1}s; }
+        if ($sessobj->{dotdothack}) { $elem =~ s{^[.][.](.)}{.!..$1}sm; }
         push @afp_path, $elem;
     }
-    return join("\0", @afp_path);
+    return join qq{\0}, @afp_path;
 } # }}}1
 
 sub node_name { # {{{1
     my ($xlatedpath) = @_;
 
-    my @path_parts = split m{\0}s, $xlatedpath;
+    my @path_parts = split m{\0}sm, $xlatedpath;
     return pop @path_parts;
 } # }}}1
 
 sub path_parent { # {{{1
     my ($xlatedpath) = @_;
 
-    my @path_parts = split m{\0}s, $xlatedpath;
+    my @path_parts = split m{\0}sm, $xlatedpath;
     pop @path_parts;
-    return join("\0", @path_parts);
+    return join qq{\0}, @path_parts;
 } # }}}1
 
 # Helper function to convert a byte-string form ACL from the ACL update
 # client into the structured form to be sent to the server.
 sub acl_from_xattr { # {{{1
     my ($self, $raw_xattr, $acl_data) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(raw_xattr = '%s', acl_data = %s)},
-            (caller 0)[3], printable($raw_xattr), Dumper($acl_data)));
+    $self->{logger}->debug(sprintf q{called %s(raw_xattr = '%s', acl_data = %s)},
+            (caller 0)[3], printable($raw_xattr), Dumper($acl_data));
 
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server
-    my($acl_flags, @acl_parts) = unpack 'NS/(LS/aLL)', $raw_xattr;
-    my @entries;
-    while (scalar(@acl_parts) > 0) {
-        my $entry = {};
-        my $bitmap = shift @acl_parts;
-        my $utf8name = decode_utf8(shift @acl_parts);
+    my($acl_flags, @acl_parts) = unpack 'LS/(LS/aLL)', $raw_xattr;
+    my(@entries, $bitmap, $utf8name);
+    my $entry = {};
+    while (($bitmap, $utf8name, @{$entry}{qw(ace_flags ace_rights)}) =
+          splice @acl_parts, 0, 4) {
+        $utf8name = decode_utf8($utf8name);
         my($uuid, $rc);
         # do the appropriate type of name lookup based on the attributes
         # given in the bitmap field.
@@ -3083,9 +3119,8 @@ sub acl_from_xattr { # {{{1
         return -EINVAL() if $rc != $kFPNoErr;
 
         $entry->{ace_applicable}    = $uuid;
-        $entry->{ace_flags}         = shift @acl_parts;
-        $entry->{ace_rights}        = shift @acl_parts;
         push @entries, $entry;
+        $entry = {};
     }
     ${$acl_data} = {
                 acl_ace     => [ @entries ],
@@ -3098,8 +3133,8 @@ sub acl_from_xattr { # {{{1
 # by afp_acl.pl (the tool for manipulating ACLs on an AFP share).
 sub acl_to_xattr { # {{{1
     my ($self, $acldata) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(acldata = %s)},
-            (caller 0)[3], Dumper($acldata)));
+    $self->{logger}->debug(sprintf q{called %s(acldata = %s)},
+            (caller 0)[3], Dumper($acldata));
 
     my @acl_parts;
     foreach my $entry (@{$acldata->{acl_ace}}) {
@@ -3118,13 +3153,12 @@ sub acl_to_xattr { # {{{1
                     $entry->{ace_applicable}, \$name);
             return -EBADF() if $rc != $kFPNoErr;
         }
-        push(@acl_parts, pack('LS/aLL', $name->{Bitmap},
+        push @acl_parts, pack 'LS/aLL', $name->{Bitmap},
                 encode_utf8($name->{UTF8Name}),
-                @{$entry}{qw[ace_flags ace_rights]}));
+                @{$entry}{qw[ace_flags ace_rights]};
     }
-    # Pack the ACL into a single byte sequence, and push it to
-    # the client.
-    return pack('LS/(a*)', $acldata->{acl_flags}, @acl_parts);
+    # Pack the ACL into a single byte sequence, and push it to the client.
+    return pack 'LS/(a*)', $acldata->{acl_flags}, @acl_parts;
 } # }}}1
 
 # for nfs4_ace.who
@@ -3145,35 +3179,35 @@ Readonly my $NFS4_ACL_WHO_GROUP    => 2;
 Readonly my $NFS4_ACL_WHO_EVERYONE => 3;
 
 # for nfs4_ace.flag
-Readonly my $NFS4_ACE_FILE_INHERIT_ACE           => (1<<0);
-Readonly my $NFS4_ACE_DIRECTORY_INHERIT_ACE      => (1<<1);
-Readonly my $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE   => (1<<2);
-Readonly my $NFS4_ACE_INHERIT_ONLY_ACE           => (1<<3);
-Readonly my $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG => (1<<4);
-Readonly my $NFS4_ACE_FAILED_ACCESS_ACE_FLAG     => (1<<5);
-Readonly my $NFS4_ACE_IDENTIFIER_GROUP           => (1<<6);
-Readonly my $NFS4_ACE_INHERITED_ACE              => (1<<7);
+Readonly my $NFS4_ACE_FILE_INHERIT_ACE           => 1<<0;
+Readonly my $NFS4_ACE_DIRECTORY_INHERIT_ACE      => 1<<1;
+Readonly my $NFS4_ACE_NO_PROPAGATE_INHERIT_ACE   => 1<<2;
+Readonly my $NFS4_ACE_INHERIT_ONLY_ACE           => 1<<3;
+Readonly my $NFS4_ACE_SUCCESSFUL_ACCESS_ACE_FLAG => 1<<4;
+Readonly my $NFS4_ACE_FAILED_ACCESS_ACE_FLAG     => 1<<5;
+Readonly my $NFS4_ACE_IDENTIFIER_GROUP           => 1<<6;
+Readonly my $NFS4_ACE_INHERITED_ACE              => 1<<7;
 
 # for nfs4_ace.access_mask
-Readonly my $NFS4_ACE_READ_DATA         => (1<<0);
-Readonly my $NFS4_ACE_LIST_DIRECTORY    => (1<<0);
-Readonly my $NFS4_ACE_WRITE_DATA        => (1<<1);
-Readonly my $NFS4_ACE_ADD_FILE          => (1<<1);
-Readonly my $NFS4_ACE_APPEND_DATA       => (1<<2);
-Readonly my $NFS4_ACE_ADD_SUBDIRECTORY  => (1<<2);
-Readonly my $NFS4_ACE_READ_NAMED_ATTRS  => (1<<3);
-Readonly my $NFS4_ACE_WRITE_NAMED_ATTRS => (1<<4);
-Readonly my $NFS4_ACE_EXECUTE           => (1<<5);
-Readonly my $NFS4_ACE_DELETE_CHILD      => (1<<6);
-Readonly my $NFS4_ACE_READ_ATTRIBUTES   => (1<<7);
-Readonly my $NFS4_ACE_WRITE_ATTRIBUTES  => (1<<8);
-Readonly my $NFS4_ACE_WRITE_RETENTION   => (1<<9);
-Readonly my $NFS4_ACE_WRITE_RETENTION_HOLD => (1<<10);
-Readonly my $NFS4_ACE_DELETE            => (1<<16);
-Readonly my $NFS4_ACE_READ_ACL          => (1<<17);
-Readonly my $NFS4_ACE_WRITE_ACL         => (1<<18);
-Readonly my $NFS4_ACE_WRITE_OWNER       => (1<<19);
-Readonly my $NFS4_ACE_SYNCHRONIZE       => (1<<20);
+Readonly my $NFS4_ACE_READ_DATA         => 1<<0;
+Readonly my $NFS4_ACE_LIST_DIRECTORY    => 1<<0;
+Readonly my $NFS4_ACE_WRITE_DATA        => 1<<1;
+Readonly my $NFS4_ACE_ADD_FILE          => 1<<1;
+Readonly my $NFS4_ACE_APPEND_DATA       => 1<<2;
+Readonly my $NFS4_ACE_ADD_SUBDIRECTORY  => 1<<2;
+Readonly my $NFS4_ACE_READ_NAMED_ATTRS  => 1<<3;
+Readonly my $NFS4_ACE_WRITE_NAMED_ATTRS => 1<<4;
+Readonly my $NFS4_ACE_EXECUTE           => 1<<5;
+Readonly my $NFS4_ACE_DELETE_CHILD      => 1<<6;
+Readonly my $NFS4_ACE_READ_ATTRIBUTES   => 1<<7;
+Readonly my $NFS4_ACE_WRITE_ATTRIBUTES  => 1<<8;
+Readonly my $NFS4_ACE_WRITE_RETENTION   => 1<<9;
+Readonly my $NFS4_ACE_WRITE_RETENTION_HOLD => 1<<10;
+Readonly my $NFS4_ACE_DELETE            => 1<<16;
+Readonly my $NFS4_ACE_READ_ACL          => 1<<17;
+Readonly my $NFS4_ACE_WRITE_ACL         => 1<<18;
+Readonly my $NFS4_ACE_WRITE_OWNER       => 1<<19;
+Readonly my $NFS4_ACE_SYNCHRONIZE       => 1<<20;
 Readonly my $NFS4_ACE_GENERIC_READ      => 0x00120081;
 Readonly my $NFS4_ACE_GENERIC_WRITE     => 0x00160106;
 Readonly my $NFS4_ACE_GENERIC_EXECUTE   => 0x001200A0;
@@ -3298,8 +3332,8 @@ for my $item (@nfs4_def_acl_params) {
 
 sub acl_from_nfsv4_xattr { # {{{1
     my ($self, $raw_xattr, $acl_data, $filename) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(raw_xattr = '%s', acl_data = %s)},
-            (caller 0)[3], printable($raw_xattr), Dumper($acl_data)));
+    $self->{logger}->debug(sprintf q{called %s(raw_xattr = '%s', acl_data = %s)},
+            (caller 0)[3], printable($raw_xattr), Dumper($acl_data));
 
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server
@@ -3307,9 +3341,8 @@ sub acl_from_nfsv4_xattr { # {{{1
     my @entries;
     my $unix_mode = 0;
     my $afp_rights = 0;
-    while (my ($type, $flag, $access_mask, $who) = @acl_parts) {
+    while (my ($type, $flag, $access_mask, $who) = splice @acl_parts, 0, 4) {
         $who = decode_utf8($who);
-        @acl_parts = @acl_parts[4..$#acl_parts];
         my $entry = {};
         # access_mask (NFSv4) -> ace_rights (AFP)
         $entry->{ace_rights} = 0;
@@ -3352,7 +3385,7 @@ sub acl_from_nfsv4_xattr { # {{{1
         my $resp;
         my $rc = $self->{afpconn}->FPGetSrvrInfo(\$resp);
         return -EINVAL if $rc != $kFPNoErr;
-        $who =~ s{\@$resp->{UTF8ServerName}$}{};
+        $who =~ s{\@$resp->{UTF8ServerName}$}{}sm;
         if ($flag & $NFS4_ACE_IDENTIFIER_GROUP) {
             if (exists $self->{g_uuidmap}->{$who}) {
                 $uuid = $self->{g_uuidmap}->${who};
@@ -3414,8 +3447,8 @@ sub acl_from_nfsv4_xattr { # {{{1
 
 sub acl_to_nfsv4_xattr { # {{{1
     my ($self, $acldata, $filename) = @_;
-    $self->{logger}->debug(sprintf(q{called %s(acldata = %s)},
-            (caller 0)[3], Dumper($acldata)));
+    $self->{logger}->debug(sprintf q{called %s(acldata = %s)},
+            (caller 0)[3], Dumper($acldata));
 
     my @acl_parts;
     foreach my $entry (@{$acldata->{acl_ace}}) {
@@ -3457,8 +3490,8 @@ sub acl_to_nfsv4_xattr { # {{{1
                 $access_mask |= $afp_to_nfs4_access_bits{$key};
             }
         }
-        push(@acl_parts, $type, $flag, $access_mask,
-            encode_utf8($who));
+        push @acl_parts, $type, $flag, $access_mask,
+            encode_utf8($who);
     }
 
     # get UNIX access rights and form the default owner/group/everyone entries
@@ -3481,11 +3514,11 @@ sub acl_to_nfsv4_xattr { # {{{1
                 }
             }
         }
-        push(@acl_parts, $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE, $params->{flag},
-            $access_mask, encode_utf8($params->{who}));
+        push @acl_parts, $NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE, $params->{flag},
+            $access_mask, encode_utf8($params->{who});
     }
 
-    return pack('L>(L>L>L>L>/ax![L])*', scalar(@{$acldata->{acl_ace}}) + 3, @acl_parts);
+    return pack 'L>(L>L>L>L>/ax![L])*', scalar(@{$acldata->{acl_ace}}) + 3, @acl_parts;
 } # }}}1
 
 1;

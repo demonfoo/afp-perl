@@ -22,11 +22,13 @@ sub Authenticate {
     my ($session, $AFPVersion, $username, $pw_cb, $realm) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    croak('Object MUST be of type Net::AFP!')
-            unless ref($session) and $session->isa('Net::AFP');
+    if (not ref $session or not $session->isa('Net::AFP')) {
+        croak('Object MUST be of type Net::AFP!');
+    }
 
-    croak('Password callback MUST be a subroutine ref')
-            unless ref($pw_cb) eq 'CODE';
+    if (ref($pw_cb) ne 'CODE') {
+        croak('Password callback MUST be a subroutine ref');
+    }
 
     my $srvInfo;
     my $result = $session->FPGetSrvrInfo($srvInfo);
@@ -51,11 +53,11 @@ sub Authenticate {
                 GSS_C_NO_CHANNEL_BINDINGS, $challenge, undef, $outtok,
                 $outflags, undef);
 
-    $session->{logger}->debug(sprintf('state(0): %s; %s; output token sz: %d',
-                    $status->generic_message, $status->specific_message, length($outtok)));
+    $session->{logger}->debug(sprintf 'state(0): %s; %s; output token sz: %d',
+                    $status->generic_message, $status->specific_message, length $outtok);
 
     if (GSSAPI::Status::GSS_ERROR($status->major)) {
-        $session->{logger}->error("GSSAPI Error (init): " . $status);
+        $session->{logger}->error('GSSAPI Error (init): ' . $status);
         return $kFPMiscErr;
     }
 
@@ -69,17 +71,21 @@ sub Authenticate {
             $username, $kFPUTF8Name, $realm, undef, \$resp);
     $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
 
-    return $rc unless $rc == $kFPAuthContinue;
+    if ($rc != $kFPAuthContinue) {
+        return $rc;
+    }
 
     # Now send the Kerberos ticket to the AFP server to be authorized...?
-    my $message = pack('C/a*x![s]S>/a*', $username, $outtok);
+    my $message = pack 'C/a*x![s]S>/a*', $username, $outtok;
     my $sresp;
     # FIXME: I guess if we're using Kerberos v4, no ID should be passed,
     # but how would I know? Apparently OS X only supports v5...
     $rc = $session->FPLoginCont($resp->{ID}, $message, \$sresp);
     print Dumper(\$sresp);
 
-    return $rc unless $rc == $kFPNoErr;
+    if ($rc != $kFPNoErr) {
+        return $rc;
+    }
 
     # Get an encrypted Kerberos session key from the AFP server.
     my $enc_session_key;

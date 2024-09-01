@@ -155,11 +155,11 @@ _EOT_
     }
 
     if ($has_Net__Bonjour) {
-        my $discover = new Net::Bonjour('afpovertcp', 'tcp');
+        my $discover = Net::Bonjour->new('afpovertcp', 'tcp');
         $discover->discover();
 
-        push(@servers, map { q{afp://} . uri_escape($_->hostname()) . q{/} }
-                $discover->entries());
+        push @servers, map { q{afp://} . uri_escape($_->hostname()) . q{/} }
+                $discover->entries();
     }
 
     if ($has_atalk) {
@@ -241,8 +241,8 @@ if (!-d $mountpoint) {
 
 my %options;
 if ($options) {
-    foreach my $pair (split m{,}s, $options) {
-        my ($key, $val) = split m{=}s, $pair;
+    foreach my $pair (split m{,}sm, $options) {
+        my ($key, $val) = split m{=}sm, $pair;
         $options{$key} = $val;
     }
 }
@@ -275,7 +275,7 @@ if ($pid > 0) {
     # have to hang around until it's running happily.
     close(PARENT) || carp('Couldn\'t close socket to parent process');
 
-    my $poll = new IO::Poll;
+    my $poll = IO::Poll->new();
     $poll->mask(\*CHILD, POLLIN | POLLERR);
     while (1) {
         $poll->poll(1);
@@ -283,7 +283,7 @@ if ($pid > 0) {
             # process received message {{{2
             my $data = q{};
             my $len = sysread CHILD, $data, $MSGLEN;
-            last unless $len;
+            last if not $len;
             my %msg;
             @msg{@msgfields} = unpack $MSGFORMAT, $data;
             my $payload;
@@ -343,19 +343,21 @@ my $fuse;
 # than having to do it again and again.
 # hook program exit {{{1
 sub END {
-   $fuse->disconnect() if ref $fuse;
+    if (ref $fuse) {
+        $fuse->disconnect();
+    }
 } # }}}1
 
 # instantiate fuse object {{{1
 eval {
-    $fuse = new Fuse::AFP($path, sub {
+    $fuse = Fuse::AFP->new($path, sub {
             my ($username, $hostname, $password) = @_;
             if (!defined $password && defined $interactive) {
                 my $sp = pack 'S/a*S/a*', $username, $hostname;
                 syswrite PARENT, pack($MSGFORMAT, $MSG_NEEDPASSWORD,
                             length $sp) . $sp;
                 my ($data, $payload, %msg) = (q{}, q{});
-                my $poll = new IO::Poll;
+                my $poll = IO::Poll->new();
                 $poll->mask(\*PARENT, POLLIN);
                 $poll->poll(1);
                 sysread PARENT, $data, $MSGLEN;
@@ -373,20 +375,20 @@ eval {
 } or do {
     # If an exception does happen, it's probably due to an invalid URL...
     print {\*STDERR} "Error while invoking Fuse::AFP:\n", $EVAL_ERROR;
-    syswrite PARENT, pack($MSGFORMAT . 's', $MSG_STARTERR, 2, EINVAL);
+    syswrite PARENT, pack $MSGFORMAT . 's', $MSG_STARTERR, 2, EINVAL;
     exit 1;
 };
 
 if (!ref $fuse) {
     # if this happens, an error code was returned, so pass that back to
     # the parent process...
-    syswrite PARENT, pack($MSGFORMAT . 's', $MSG_STARTERR, 2, $fuse);
+    syswrite PARENT, pack $MSGFORMAT . 's', $MSG_STARTERR, 2, $fuse;
     exit 1;
 } #}}}1
 
 # Send a love note to the folks saying "wish you were here, everything's
 # fine".
-syswrite PARENT, pack($MSGFORMAT, $MSG_RUNNING, 0);
+syswrite PARENT, pack $MSGFORMAT, $MSG_RUNNING, 0;
 close(PARENT) || carp('Couldn\'t close socket to parent process');
 
 # reopen the standard FDs onto /dev/null; they have to be open, since if
@@ -414,7 +416,7 @@ if (exists $options{debug}) {
 }
 
 $mainopts{mountpoint}       = $mountpoint;
-$mainopts{mountopts}        = join(q{,}, map { $_ . (defined($options{$_}) ? q{=} . $options{$_} : q{}) } keys %options );
+$mainopts{mountopts}        = join q{,}, map { $_ . (defined($options{$_}) ? q{=} . $options{$_} : q{}) } keys %options;
 $mainopts{nullpath_ok}      = 1;
 $mainopts{nopath}           = 1;
 $mainopts{utimens_as_array} = 1;

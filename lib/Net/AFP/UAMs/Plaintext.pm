@@ -17,15 +17,17 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    croak("Object MUST be of type Net::AFP!")
-            unless ref($session) and $session->isa('Net::AFP');
-    
-    croak('Password callback MUST be a subroutine ref')
-            if ref($pw_cb) ne 'CODE';
+    if (not ref $session or not  $session->isa('Net::AFP')) {
+        croak('Object MUST be of type Net::AFP!');
+    }
 
-    my $pw_data = pack('a8', &{$pw_cb}());
+    if (ref($pw_cb) ne 'CODE') {
+        croak('Password callback MUST be a subroutine ref');
+    }
+
+    my $pw_data = pack 'a8', &{$pw_cb}();
     my $rc;
-    
+
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
             $kFPVerAtLeast)) {
         ($rc) = $session->FPLoginExt(
@@ -36,7 +38,7 @@ sub Authenticate {
         $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
     }
     else {
-        my $authinfo = substr(pack('xC/a*x![s]a8', $username, $pw_data), 1);
+        my $authinfo = substr pack('xC/a*x![s]a8', $username, $pw_data), 1;
         ($rc) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
@@ -48,15 +50,16 @@ sub ChangePassword {
     my ($session, $username, $oldPassword, $newPassword) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    croak('Object MUST be of type Net::AFP!')
-            unless ref($session) and $session->isa('Net::AFP');
+    if (not ref $session and $session->isa('Net::AFP')) {
+        croak('Object MUST be of type Net::AFP!');
+    }
 
     if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
             $kFPVerAtLeast)) {
         $username = q{};
     }
     return $session->FPChangePassword($UAMNAME, $username,
-            pack('a8', $newPassword));
+            pack 'a8', $newPassword);
 }
 
 1;

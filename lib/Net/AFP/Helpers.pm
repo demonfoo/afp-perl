@@ -47,7 +47,7 @@ my $url_rx = qr{\A
                       (?<volume>[^:/;]+)        # first path element is vol name
                       (?<subpath>/.*)?          # rest of path is local subpath
                   )?)?                          # closure of path capture
-                  \z}xs;
+                  \z}xsm;
 
 sub do_afp_connect {
     my($pw_cb, $url, $srvInfo_r, %options) = @_;
@@ -55,7 +55,7 @@ sub do_afp_connect {
     # Establish the preferred address family selection order.
     my @af_order = (AF_INET6, AF_INET);
     if ($has_atalk) {
-        push(@af_order, AF_APPLETALK);
+        push @af_order, AF_APPLETALK;
     }
 
     if (exists $options{aforder}) {
@@ -66,30 +66,32 @@ sub do_afp_connect {
     }
 
     if (not($url =~ $url_rx)) {
-        print STDERR "URL '", $url, "' was not valid, sorry\n";
-        exit(EINVAL());
+        printf {\*STDERR} qq{URL '%s' was not valid, sorry\n}, $url;
+        exit EINVAL();
     }
     my %values = %LAST_PAREN_MATCH;
 
-    foreach (keys(%values)) {
+    foreach (keys %values) {
         $values{$_} = uri_unescape($values{$_});
     }
 
     if (not defined $values{host}) {
-        print STDERR "Could not extract host from AFP URL\n";
-        exit(EINVAL());
+        print {\*STDERR} qq{Could not extract host from AFP URL\n};
+        exit EINVAL();
     }
 
     my($srvInfo, $rc, $host, $port);
     if ($values{atalk_transport}) {
-        croak "AppleTalk support libraries not available"
-                unless $has_atalk;
+        if (not $has_atalk) {
+            croak 'AppleTalk support libraries not available';
+        }
 
         my @records = NBPLookup($values{host}, q{AFPServer}, $values{port},
                 undef, 1);
-        croak('Could not resolve NBP name ' . $values{host} .
-		q{:AFPServer@} . ($values{port} ? $values{port} : q{*}))
-                unless scalar(@records);
+        if (not scalar @records) {
+            croak('Could not resolve NBP name ' . $values{host} .
+		      q{:AFPServer@} . ($values{port} ? $values{port} : q{*}));
+        }
         ($host, $port) = @{$records[0]}[0,1];
 
         $rc = Net::AFP::Atalk->GetStatus($host, $port, \$srvInfo);
@@ -98,7 +100,7 @@ sub do_afp_connect {
         $rc = Net::AFP::TCP->GetStatus(@values{qw[host port]}, \$srvInfo);
     }
     if ($rc != $kFPNoErr) {
-        print STDERR "Could not issue GetStatus on ", $values{host}, "\n";
+        printf {\*STDERR} qq{Could not issue GetStatus on %s\n}, $values{host};
         return ENODEV();
     }
 
@@ -120,7 +122,7 @@ sub do_afp_connect {
             } ];
         }
         else {
-            croak("Server supplied no NetworkAddresses, but using IP transport; server is broken");
+            croak('Server supplied no NetworkAddresses, but using IP transport; server is broken');
         }
     }
 
@@ -130,9 +132,11 @@ TRY_AFS:
     foreach my $af (@af_order) {
         my @sa_list;
         foreach (@{$srvInfo->{NetworkAddresses}}) {
-            next unless exists $_->{family};
+            if (not exists $_->{family}) {
+                next;
+            }
             if ($_->{family} == $af) {
-                push(@sa_list, $_)
+                push @sa_list, $_;
             }
         }
 
@@ -152,20 +156,21 @@ TRY_SOCKADDRS:
                 $using_atalk = 0;
             }
 
-            last TRY_AFS if ref($session) and $session->isa('Net::AFP');
+            last TRY_AFS if ref $session and $session->isa('Net::AFP');
         }
     }
 
-    if (not(ref($session) and $session->isa('Net::AFP'))) {
-        print STDERR "Failed connecting to all endpoints supplied by server?\n";
+    if (not ref $session or not $session->isa('Net::AFP')) {
+        print {\*STDERR} q{Failed connecting to all endpoints supplied } .
+          qq{by server?\n};
         return ENODEV();
     }
 
     my $cv = Net::AFP::Versions::GetPreferredVersion($srvInfo->{AFPVersions},
             $using_atalk);
     if (not $cv) {
-        print STDERR "Couldn't agree on an AFP protocol version with the " .
-                "server\n";
+        print {\*STDERR} q{Couldn't agree on an AFP protocol version with } .
+                qq{the server\n};
         $session->close();
         return ENODEV();
     }
@@ -180,7 +185,8 @@ TRY_SOCKADDRS:
                     return &{$pw_cb}(%values)
                 });
         if ($rv != $kFPNoErr) {
-            print STDERR "Incorrect username/password while trying to authenticate\n";
+            print {\*STDERR} q{Incorrect username/password while trying } .
+              qq{to authenticate\n};
             $session->close();
             return EACCES();
         }
@@ -188,13 +194,13 @@ TRY_SOCKADDRS:
     else {
         my $rv = Net::AFP::UAMs::GuestAuth($session, $cv);
         if ($rv != $kFPNoErr) {
-            print STDERR "Anonymous authentication failed\n";
+            print {\*STDERR} qq{Anonymous authentication failed\n};
             $session->close();
             return EACCES();
         }
     }
 
-    if (wantarray()) {
+    if (wantarray) {
         return($session, %values);
     }
     else {

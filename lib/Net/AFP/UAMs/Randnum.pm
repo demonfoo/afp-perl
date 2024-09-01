@@ -26,17 +26,19 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    croak('Object MUST be of type Net::AFP!')
-            unless ref($session) and $session->isa('Net::AFP');
+    if (not ref $session or not $session->isa('Net::AFP')) {
+        croak('Object MUST be of type Net::AFP!');
+    }
 
-    croak('Password callback MUST be a subroutine ref')
-            if ref($pw_cb) ne 'CODE';
+    if (ref($pw_cb) ne 'CODE') {
+        croak('Password callback MUST be a subroutine ref');
+    }
 
     # Pack just the username into a Pascal-style string, and send that to
     # the server.
     my %resp;
     my $rc;
-    
+
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
             $kFPVerAtLeast)) {
         ($rc, %resp) = $session->FPLoginExt(
@@ -46,21 +48,23 @@ sub Authenticate {
         $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
     }
     else {
-        my $authinfo = pack('C/a*', $username);
+        my $authinfo = pack 'C/a*', $username;
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
 
-    return $rc unless $rc == $kFPAuthContinue;
+    if ($rc != $kFPAuthContinue) {
+        return $rc;
+    }
 
     # The server will send us a random 8-byte number; take that, and encrypt
     # it with the password the user gave us.
-    my ($randnum) = unpack('a8', $resp{UserAuthInfo});
-    $session->{logger}->debug('$randnum is 0x', unpack('H*', $randnum));
-    my $deshash = Crypt::Cipher::DES->new(pack('a8', &{$pw_cb}()));
+    my ($randnum) = unpack 'a8', $resp{UserAuthInfo};
+    $session->{logger}->debug('$randnum is 0x' . unpack 'H*', $randnum);
+    my $deshash = Crypt::Cipher::DES->new(pack 'a8', &{$pw_cb}());
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;
-    $session->{logger}->debug('$crypted is 0x', unpack('H*', $crypted));
+    $session->{logger}->debug('$crypted is 0x' . unpack 'H*', $crypted);
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($resp{'ID'}, $crypted);
@@ -73,16 +77,17 @@ sub ChangePassword {
     my ($session, $username, $oldPassword, $newPassword) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    croak('Object MUST be of type Net::AFP!')
-            unless ref($session) and $session->isa('Net::AFP');
+    if (not ref $session or not $session->isa('Net::AFP')) {
+        croak('Object MUST be of type Net::AFP!');
+    }
 
     # Establish encryption contexts for each of the supplied passwords. Then
     # pack the old password encrypted with the new one, and the new password
     # encrypted with the old one, as directed.
-    my $oldcrypt = Crypt::Cipher::DES->new(pack('a8', $oldPassword));
-    my $newcrypt = Crypt::Cipher::DES->new(pack('a8', $newPassword));
-    my $message = pack('a[8]a[8]', $newcrypt->encrypt($oldPassword),
-            $oldcrypt->encrypt($newPassword));
+    my $oldcrypt = Crypt::Cipher::DES->new(pack 'a8', $oldPassword);
+    my $newcrypt = Crypt::Cipher::DES->new(pack 'a8', $newPassword);
+    my $message = pack 'a[8]a[8]', $newcrypt->encrypt($oldPassword),
+            $oldcrypt->encrypt($newPassword);
     undef $oldcrypt;
     undef $newcrypt;
 

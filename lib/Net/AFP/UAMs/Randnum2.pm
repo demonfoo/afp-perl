@@ -26,17 +26,19 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    croak('Object MUST be of type Net::AFP!')
-            unless ref($session) and $session->isa('Net::AFP');
+    if (not ref $session or not $session->isa('Net::AFP')) {
+        croak('Object MUST be of type Net::AFP!');
+    }
 
-    croak('Password callback MUST be a subroutine ref')
-            unless ref($pw_cb) eq 'CODE';
+    if (ref($pw_cb) ne 'CODE') {
+        croak('Password callback MUST be a subroutine ref');
+    }
 
     # Pack just the username into a Pascal-style string, and send that to
     # the server.
     my %resp;
     my $rc;
-    
+
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
             $kFPVerAtLeast)) {
         ($rc, %resp) = $session->FPLoginExt(
@@ -46,35 +48,37 @@ sub Authenticate {
         $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
     }
     else {
-        my $authinfo = pack('C/a*', $username);
+        my $authinfo = pack 'C/a*', $username;
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
 
-    return $rc unless $rc == $kFPAuthContinue;
+    if ($rc != $kFPAuthContinue) {
+        return $rc;
+    }
 
     # The server will send us a random 8-byte number; take that, and encrypt
     # it with the password the user gave us.
-    my($randnum) = unpack('a8', $resp{'UserAuthInfo'});
-    $session->{logger}->debug('$randnum is 0x', unpack('H*', $randnum));
+    my($randnum) = unpack 'a8', $resp{'UserAuthInfo'};
+    $session->{logger}->debug('$randnum is 0x' . unpack 'H*', $randnum);
     # Explode the password out into a bit string, and rotate the leftmost bit
     # to the end of the bit vector.
-    my $bin_key = unpack('B*', pack('a8', &{$pw_cb}()));
+    my $bin_key = unpack 'B*', pack 'a8', &{$pw_cb}();
     $bin_key =~ s/^([01])(.*)$/$2$1/s;
     # Pack the rotated bitstring back into binary form for use as the DES key.
-    my $key = pack('B*', $bin_key);
+    my $key = pack 'B*', $bin_key;
     undef $bin_key;
     my $deshash = Crypt::Cipher::DES->new($key);
     undef $key;
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;
-    $session->{logger}->debug('$crypted is 0x', unpack('H*', $crypted));
+    $session->{logger}->debug('$crypted is 0x' . unpack 'H*', $crypted);
 
     # Get some random bytes to send to the server. It will encrypt its copy
     # of the password, and send it back to us, to verify that it too has a
     # copy of the password, and it's not just phishing for hashes.
     my $my_randnum = random_bytes(8);
-    $session->{logger}->debug('$my_randnum is 0x', unpack('H*', $my_randnum));
+    $session->{logger}->debug('$my_randnum is 0x' . unpack 'H*', $my_randnum);
 
     # Send the response back to the server. If the server doesn't think we're
     # okay, then return the result code right away.
@@ -82,17 +86,21 @@ sub Authenticate {
     $rc = $session->FPLoginCont($resp{'ID'}, $crypted . $my_randnum, \$sresp);
     undef $crypted;
     $session->{logger}->debug('FPLoginCont() completed with result code ', $rc);
-    return $rc unless $rc == $kFPNoErr;
-    
+    if ($rc != $kFPNoErr) {
+        return $rc;
+    }
+
     # Now, verify the server's crypted copy of the password to ensure that
     # they really have it.
-    my($srv_hash) = unpack('a8', $sresp->{'UserAuthInfo'});
-    $session->{logger}->debug('$srv_hash is 0x', unpack('H*', $srv_hash));
+    my($srv_hash) = unpack 'a8', $sresp->{'UserAuthInfo'};
+    $session->{logger}->debug('$srv_hash is 0x' . unpack 'H*', $srv_hash);
     my $recrypted = $deshash->encrypt($my_randnum);
     undef $my_randnum;
-    $session->{logger}->debug('$recrypted is 0x', unpack('H*', $recrypted));
+    $session->{logger}->debug('$recrypted is 0x' . unpack 'H*', $recrypted);
     # Maybe a different result code is in order? Not sure...
-    return $kFPUserNotAuth unless $srv_hash eq $recrypted;
+    if ($srv_hash ne $recrypted) {
+        return $kFPUserNotAuth;
+    }
     undef $srv_hash;
     undef $recrypted;
 

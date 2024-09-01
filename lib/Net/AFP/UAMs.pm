@@ -5,8 +5,6 @@ use warnings;
 use diagnostics;
 use integer;
 
-no strict qw(refs);
-
 use Carp;
 use Net::AFP::TokenTypes;
 use Net::AFP::Result;
@@ -33,34 +31,34 @@ sub RegisterUAM {
         @UAMReg = (@UAMReg[0 .. ($i - 1)], $uaminfo, @UAMReg[$i .. $#UAMReg]);
         return;
     }
-    push(@UAMReg, $uaminfo);
+    push @UAMReg, $uaminfo;
     return;
 }
 
 # Where am I being included from? Use our own package name to get the
 # inclusion path where we should pull our own UAMs from.
 my $incname = __PACKAGE__;
-$incname =~ s{::}{/}gs;
+$incname =~ s{::}{/}gsm;
 $incname .= '.pm';
 # %INC contains the include paths for all currently-imported packages.
 my $incpath = $INC{$incname};
-$incpath =~ s{\.pm$}{}s;
+$incpath =~ s{[.]pm$}{}sm;
 my @uampaths;
 if (-d $incpath) {
-    opendir(UAMDIR, $incpath);
-    push(@uampaths, map { $incpath . q{/} . $_ } grep { m{\.pm$}s } readdir(UAMDIR));
-    closedir(UAMDIR);
+    opendir my($uamdir), $incpath;
+    push @uampaths, map { $incpath . q{/} . $_ } grep { m{[.]pm$}sm } readdir $uamdir;
+    closedir $uamdir;
 }
 
 # Try including each of them via eval, so that if they explode, it won't
 # impair our ability to continue on.
 foreach my $uampath (@uampaths) {
-    if ($uampath !~ m{^/}s) {
+    if ($uampath !~ m{^/}sm) {
         $uampath = q{./} . $uampath;
     }
     eval { require $uampath; };
     if ($@) {
-        carp(sprintf(qq{Couldn't include "%s":\n%s\nThis error is not fatal; other UAMs will be tried.}, $uampath, $@));
+        carp(sprintf qq{Couldn't include "%s":\n%s\nThis error is not fatal; other UAMs will be tried.}, $uampath, $@);
     }
 }
 
@@ -84,12 +82,20 @@ sub PasswordAuth {
     # the top of the list... not so great.
     my %ReqUAMs = map { lc() => 1 } @{$SupportedUAMs};
     foreach my $uaminfo (@UAMReg) {
-        next unless exists $ReqUAMs{lc($uaminfo->{name})};
-        last if $uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1;
+        if (not exists $ReqUAMs{lc($uaminfo->{name})}) {
+            next;
+        }
+        if ($uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1) {
+            last;
+        }
         my $function = $uaminfo->{class} . q{::Authenticate};
         $session->{logger}->debug('auth function is ', $function);
         $session->{username} = $UserName;
-        my $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
+        my $rc;
+        {
+            no strict qw{refs};
+            $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
+        }
         if ($rc == $kFPNoErr) {
             $session->{'AFPVersion'} = $AFPVersion;
         }
@@ -97,7 +103,7 @@ sub PasswordAuth {
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    $session->{logger}->error((caller(0))[3],
+    $session->{logger}->error((caller 0)[3],
             "(): Could not find an agreeable UAM for authenticating to server\n");
     return $kFPBadUAM;
 }
@@ -107,18 +113,27 @@ sub ChangePassword {
 
     my %ReqUAMs = map { lc() => 1 } @{$SupportedUAMs};
     foreach my $uaminfo (@UAMReg) {
-        next unless exists $ReqUAMs{lc($uaminfo->{'name'})};
-        next unless $uaminfo->{class}->can('ChangePassword');
-        last if $uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1;
+        if (not exists $ReqUAMs{lc($uaminfo->{'name'})}) {
+            next;
+        }
+        if (not $uaminfo->{class}->can('ChangePassword')) {
+            next;
+        }
+        if ($uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1) {
+            last;
+        }
         my $function = $uaminfo->{class} . q{::ChangePassword};
         $session->{logger}->debug('password changing function is ', $function);
-        #my $NewPW = &$PwCallback();
-        my $rc = &{$function}($session, $UserName, $OldPW, $NewPW);
+        my $rc;
+        {
+            no strict qw{refs};
+            $rc = &{$function}($session, $UserName, $OldPW, $NewPW);
+        }
         return $rc;
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    $session->{logger}->debug((caller(0))[3],
+    $session->{logger}->debug((caller 0)[3],
             q{(): Could not find valid password changing UAM});
     return $kFPBadUAM;
 }

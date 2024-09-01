@@ -29,7 +29,7 @@ our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
 sub new { # {{{1
     my ($class, $host, $port) = @_;
     my $obj = $class->SUPER::new($host, $port);
-    $obj->{logger}->debug('called ', (caller(0))[3], '()');
+    $obj->{logger}->debug('called ', (caller 0)[3], '()');
 
     $obj->{Session} = Net::Atalk::ASP->new($host, $port);
     my $rc = $obj->{Session}->OpenSession();
@@ -44,7 +44,7 @@ sub new { # {{{1
 
 sub close { # {{{1
     my ($self) = @_;
-    $self->{logger}->debug('called ', (caller(0))[3], '()');
+    $self->{logger}->debug('called ', (caller 0)[3], '()');
 
     $self->{Session}->CloseSession();
     $self->{Session}->close();
@@ -53,11 +53,11 @@ sub close { # {{{1
 
 sub CheckAttnQueue { # {{{1
     my ($self) = @_;
-    $self->{logger}->debug('called ', (caller(0))[3], '()');
+    $self->{logger}->debug('called ', (caller 0)[3], '()');
 
     my $attnq = $self->{Session}{Shared}{attnq};
     my $vol_update_checked;
-    while (my $msg = shift(@{$attnq})) {
+    while (my $msg = shift @{$attnq}) {
         if ($msg & 0x8_000) {    # server says it's shutting down
             $logger->info('CheckAttnQueue(): Received notification of server intent to shut down');
             $logger->info('Shutdown in ', ($msg & 0xFFF), ' minutes');
@@ -96,7 +96,7 @@ sub CheckAttnQueue { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
     my ($self, $payload, $resp_r) = @_;
-    $self->{logger}->debug('called ', (caller(0))[3], '()');
+    $self->{logger}->debug('called ', (caller 0)[3], '()');
 
     $self->CheckAttnQueue();
     return $self->{Session}->Command($payload, $resp_r);
@@ -106,7 +106,7 @@ sub SendAFPMessage { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPWrite { # {{{1
     my ($self, $payload, $data_r, $d_len, $resp_r) = @_;
-    $self->{logger}->debug('called ', (caller(0))[3], '()');
+    $self->{logger}->debug('called ', (caller 0)[3], '()');
 
     $self->CheckAttnQueue();
     return $self->{Session}->Write($payload, $data_r, $d_len, $resp_r);
@@ -114,16 +114,18 @@ sub SendAFPWrite { # {{{1
 
 sub GetStatus { # {{{1
     my ($class, $host, $port, $resp_r) = @_;
-    if (ref($class)) {
+    if (ref $class) {
         croak('GetStatus() should NEVER be called against an active object');
     }
-    $self->{logger}->debug('called ', (caller(0))[3], '()');
+    $self->{logger}->debug('called ', (caller 0)[3], '()');
 
     my $obj = Net::Atalk::ASP->new($host, $port);
     my $resp;
     my $rc = $obj->GetStatus(\$resp);
     $obj->close();
-    return $rc unless $rc == $kFPNoErr;
+    if ($rc != $kFPNoErr) {
+        return $rc;
+    }
 
     ${$resp_r} = ParseSrvrInfo($resp);
     return $rc;

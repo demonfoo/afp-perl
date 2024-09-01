@@ -3,8 +3,6 @@
 # exchange to establish a keyset that can be used for (reasonably) secure
 # password-based authentication without the need for prehashed passwords.
 # It requires CryptX for various crypto-related actions.
-# Math::BigInt::GMP is recommended for fast large-integer operations,
-# as Math::BigInt::Calc works but is quite slow.
 
 # This UAM was added as of AFP 3.0. (Later backported to Classic - AFP 2.3?)
 
@@ -31,11 +29,7 @@ use Crypt::PRNG qw(random_bytes);
 use Crypt::DH::GMP;
 # Pull in the module containing all the result code symbols.
 use Net::AFP::Result;
-# Provides large-integer mathematics features, necessary for the
-# cryptographic exchanges and derivation of the key. Fast, but the
-# non-threaded to threaded changeover hoses it, so don't create Math::BigInt
-# objects until after threads are started.
-use Math::BigInt lib => 'GMP';
+use Math::BigInt;
 use Net::AFP::Versions;
 use Log::Log4perl;
 
@@ -44,7 +38,7 @@ Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 150);
 # These are universal. This particular UAM ALWAYS uses these values - $g
 # as the base for an exponentiation, and $p as a modulus.
 my @p_bytes = (0xba, 0x28, 0x73, 0xdf, 0xb0, 0x60, 0x57, 0xd4, 0x3f, 0x20,
-               0x24, 0x74, 0x4c, 0xee, 0xe7, 0x5b);
+               0x24, 0x74, 0x4c, 0xee, 0xe7, 0x5b,);
 my @g_bytes = (0x07);
 
 sub zeropad {
@@ -52,7 +46,7 @@ sub zeropad {
         return substr $_[0], length($_[0]) - $_[1], $_[1];
     }
     else {
-        return("\0" x ($_[1] - length($_[0])) . $_[0]);
+        return("\0" x ($_[1] - length $_[0]) . $_[0]);
     }
 }
 
@@ -60,15 +54,17 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    croak(q{Object MUST be of type Net::AFP!})
-            unless ref($session) and $session->isa('Net::AFP');
+    if (not ref $session or not $session->isa('Net::AFP')) {
+        croak(q{Object MUST be of type Net::AFP!});
+    }
 
-    croak(q{Password callback MUST be a subroutine ref})
-            if ref($pw_cb) ne q{CODE};
+    if (ref($pw_cb) ne q{CODE}) {
+        croak(q{Password callback MUST be a subroutine ref});
+    }
 
     my $dh = Crypt::DH::GMP->new(
-            p => '0x' . unpack('H*', pack('C*', @p_bytes)),
-            g => '0x' . unpack('H*', pack('C*', @g_bytes)));
+            p => '0x' . unpack('H*', pack 'C*', @p_bytes),
+            g => '0x' . unpack 'H*', pack 'C*', @g_bytes);
     $dh->generate_keys();
 
     my $nonce_limit = Math::BigInt->bone();
@@ -78,7 +74,7 @@ sub Authenticate {
     # authentication process, along with the username.
     my %resp;
     my $rc;
-    
+
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
             $kFPVerAtLeast)) {
         ($rc, %resp) = $session->FPLoginExt(
@@ -89,17 +85,17 @@ sub Authenticate {
         $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
     }
     else {
-        my $ai = pack('C/a*x![s]a*', $username, zeropad(pack('B*', $dh->pub_key_twoc()), $len));
+        my $ai = pack 'C/a*x![s]a*', $username, zeropad(pack('B*', $dh->pub_key_twoc()), $len);
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $ai);
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
     return $rc if $rc != $kFPAuthContinue;
-    my $K = pack('B*', $dh->compute_key_twoc(
-                    '0x' . unpack('H' . ($len * 2), $resp{UserAuthInfo})));
-    $session->{logger}->debug('$K is ', unpack('H*', $K));
+    my $K = pack 'B*', $dh->compute_key_twoc(
+                    '0x' . unpack 'H' . ($len * 2), $resp{UserAuthInfo});
+    $session->{logger}->debug('$K is 0x' , unpack 'H*', $K);
 
-    my $message = unpack('x' . $len . 'a*', $resp{UserAuthInfo});
-    $session->{logger}->debug('$message is 0x', unpack('H*', $message));
+    my $message = unpack 'x' . $len . 'a*', $resp{UserAuthInfo};
+    $session->{logger}->debug('$message is 0x' . unpack 'H*', $message);
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
@@ -107,23 +103,23 @@ sub Authenticate {
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
     undef $K;
     my $decrypted = $ctx->decrypt($message, $session->{SessionKey}, $S2CIV);
-    $session->{logger}->debug('$decrypted is 0x', unpack('H*', $decrypted));
+    $session->{logger}->debug('$decrypted is 0x' . unpack 'H*', $decrypted);
 
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
-    my $nonce = Math::BigInt->from_bytes(unpack('a' . $nonce_len, $decrypted));
+    my $nonce = Math::BigInt->from_bytes(unpack 'a' . $nonce_len, $decrypted);
     undef $decrypted;
     $session->{logger}->debug('$nonce is ', $nonce->as_hex());
     $nonce->binc();
     $nonce = $nonce->bmod($nonce_limit);
-    $session->{logger}->debug('$nonce is ', $nonce->as_hex(), " after increment");
-    my $authdata = pack('a[' . $nonce_len . ']a[' . $pw_len . ']',
-	                zeropad($nonce->to_bytes(), $nonce_len), &{$pw_cb}());
+    $session->{logger}->debug('$nonce is ', $nonce->as_hex(), ' after increment');
+    my $authdata = pack 'a[' . $nonce_len . ']a[' . $pw_len . ']',
+	                zeropad($nonce->to_bytes(), $nonce_len), &{$pw_cb}();
     undef $nonce;
     my $ciphertext = $ctx->encrypt($authdata, $session->{SessionKey}, $C2SIV);
     undef $authdata;
-    $session->{logger}->debug('$ciphertext is 0x', unpack('H*', $ciphertext));
+    $session->{logger}->debug('$ciphertext is 0x', unpack 'H*', $ciphertext);
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($resp{ID}, $ciphertext);
@@ -136,21 +132,22 @@ sub ChangePassword {
     my($session, $username, $oldPassword, $newPassword) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    croak('Object MUST be of type Net::AFP!')
-            unless ref($session) and $session->isa('Net::AFP');
+    if (not ref $session or not $session->isa('Net::AFP')) {
+        croak('Object MUST be of type Net::AFP!');
+    }
 
     my $dh = Crypt::DH::GMP->new(
-            p => '0x' . unpack('H*', pack('C*', @p_bytes)),
-            g => '0x' . unpack('H*', pack('C*', @g_bytes)));
+            p => '0x' . unpack('H*', pack 'C*', @p_bytes),
+            g => '0x' . unpack 'H*', pack 'C*', @g_bytes);
     $dh->generate_keys();
 
     my $nonce_limit = Math::BigInt->bone();
     $nonce_limit->blsft($nonce_len * 8);
 
     # Send an ID value of 0, followed by our Ma value.
-    my $authinfo = pack('na[' . $len . ']', 0,
-            zeropad(pack('B*', $dh->pub_key_twoc()), $len));
-    $session->{logger}->debug('$authinfo is 0x', unpack('H*', $authinfo));
+    my $authinfo = pack 'na[' . $len . ']', 0,
+            zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    $session->{logger}->debug('$authinfo is 0x' . unpack 'H*', $authinfo);
     my $resp = undef;
 
     # Username is always an empty string with AFP 3.0 and up.
@@ -164,9 +161,9 @@ sub ChangePassword {
     return $rc if $rc != $kFPAuthContinue;
 
     # Unpack the server response for our perusal.
-    my $K = pack('B*', $dh->compute_key_twoc(
-                    '0x' . unpack('x2H' . ($len * 2), $resp)));
-    $session->{logger}->debug('$K is ', unpack('H*', $K));
+    my $K = pack 'B*', $dh->compute_key_twoc(
+                    '0x' . unpack 'x2H' . ($len * 2), $resp);
+    $session->{logger}->debug('$K is 0x' . unpack 'H*', $K);
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
@@ -175,28 +172,28 @@ sub ChangePassword {
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
     my $decrypted = $ctx->decrypt(unpack('x2x' . $len . 'a32', $resp), $key,
             $S2CIV);
-    $session->{logger}->debug('$decrypted is 0x', unpack('H*', $decrypted));
+    $session->{logger}->debug('$decrypted is 0x' . unpack 'H*', $decrypted);
 
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
-    my $nonce = Math::BigInt->from_bytes(unpack('a' . $nonce_len, $decrypted));
+    my $nonce = Math::BigInt->from_bytes(unpack 'a' . $nonce_len, $decrypted);
     undef $decrypted;
     $session->{logger}->debug('$nonce is ', $nonce->as_hex());
     $nonce->binc();
     $nonce = $nonce->bmod($nonce_limit);
-    $session->{logger}->debug('$nonce is ', $nonce->as_hex(), " after increment");
-    my $authdata = pack('a[' . $nonce_len . ']a[' . $pw_len . ']a[' . $pw_len . ']',
+    $session->{logger}->debug('$nonce is ', $nonce->as_hex(), ' after increment');
+    my $authdata = pack 'a[' . $nonce_len . ']a[' . $pw_len . ']a[' . $pw_len . ']',
 	                zeropad($nonce->to_bytes(), $nonce_len), $newPassword,
-                    $oldPassword);
+                    $oldPassword;
     undef $nonce;
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     undef $authdata;
-    $session->{logger}->debug('$ciphertext is 0x', unpack('H*', $ciphertext));
+    $session->{logger}->debug('$ciphertext is 0x' . unpack 'H*', $ciphertext);
 
     # Send the response back to the server, and hope we did this right.
-    my $message = pack('na*', unpack('n', $resp), $ciphertext);
-    $session->{logger}->debug('$message is 0x', unpack('H*', $message));
+    my $message = pack 'na*', unpack('n', $resp), $ciphertext;
+    $session->{logger}->debug('$message is 0x' . unpack 'H*', $message);
     undef $ciphertext;
     $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;

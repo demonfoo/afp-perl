@@ -12,29 +12,29 @@ our @EXPORT = qw($kFPAttributeBit $kFPParentDirIDBit $kFPCreateDateBit
                  $kFPAccessRightsBit $kFPProDOSInfoBit $kFPUTF8NameBit
                  $kFPUnixPrivsBit $kFPUUID);
 our %EXPORT_TAGS = (
-    'common' => [qw($kFPAttributeBit $kFPParentDirIDBit $kFPCreateDateBit
-                    $kFPModDateBit $kFPBackupDateBit $kFPFinderInfoBit
-                    $kFPLongNameBit $kFPShortNameBit $kFPNodeIDBit
-                    $kFPUTF8NameBit $kFPUnixPrivsBit)],
+    common => [qw($kFPAttributeBit $kFPParentDirIDBit $kFPCreateDateBit
+                  $kFPModDateBit $kFPBackupDateBit $kFPFinderInfoBit
+                  $kFPLongNameBit $kFPShortNameBit $kFPNodeIDBit
+                  $kFPUTF8NameBit $kFPUnixPrivsBit)],
 );
 
-Readonly our $kFPAttributeBit       => 0x00_001;
-Readonly our $kFPParentDirIDBit     => 0x00_002;
-Readonly our $kFPCreateDateBit      => 0x00_004;
-Readonly our $kFPModDateBit         => 0x00_008;
-Readonly our $kFPBackupDateBit      => 0x00_010;
-Readonly our $kFPFinderInfoBit      => 0x00_020;
-Readonly our $kFPLongNameBit        => 0x00_040;
-Readonly our $kFPShortNameBit       => 0x00_080;
-Readonly our $kFPNodeIDBit          => 0x00_100;
-Readonly our $kFPOffspringCountBit  => 0x00_200;
-Readonly our $kFPOwnerIDBit         => 0x00_400;
-Readonly our $kFPGroupIDBit         => 0x00_800;
-Readonly our $kFPAccessRightsBit    => 0x01_000;
-Readonly our $kFPProDOSInfoBit      => 0x02_000; # AFP <= 2.2
-Readonly our $kFPUTF8NameBit        => 0x02_000; # AFP >= 3.0
-Readonly our $kFPUnixPrivsBit       => 0x08_000; # AFP >= 3.0
-Readonly our $kFPUUID               => 0x10_000; # AFP >= 3.0
+Readonly our $kFPAttributeBit       => 1 << 0;
+Readonly our $kFPParentDirIDBit     => 1 << 1;
+Readonly our $kFPCreateDateBit      => 1 << 2;
+Readonly our $kFPModDateBit         => 1 << 3;
+Readonly our $kFPBackupDateBit      => 1 << 4;
+Readonly our $kFPFinderInfoBit      => 1 << 5;
+Readonly our $kFPLongNameBit        => 1 << 6;
+Readonly our $kFPShortNameBit       => 1 << 7;
+Readonly our $kFPNodeIDBit          => 1 << 8;
+Readonly our $kFPOffspringCountBit  => 1 << 9;
+Readonly our $kFPOwnerIDBit         => 1 << 10;
+Readonly our $kFPGroupIDBit         => 1 << 11;
+Readonly our $kFPAccessRightsBit    => 1 << 12;
+Readonly our $kFPProDOSInfoBit      => 1 << 13; # AFP <= 2.2
+Readonly our $kFPUTF8NameBit        => 1 << 14; # AFP >= 3.0
+Readonly our $kFPUnixPrivsBit       => 1 << 15; # AFP >= 3.0
+Readonly our $kFPUUID               => 1 << 16; # AFP >= 3.0
 
 1;
 # vim: ts=4

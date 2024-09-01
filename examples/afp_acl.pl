@@ -50,10 +50,12 @@ sub assemble_xattr { # {{{1
 
     my @acl_parts;
     foreach my $ace (@{$acl_ace}) {
-        push @acl_parts, pack('LS/aLL',
-                @{$ace}{'Bitmap', 'UTF8Name', 'ace_flags', 'ace_rights'});
+
+        push @acl_parts, pack 'LS/aLL',
+                $ace->{Bitmap}, encode_utf8($ace->{UTF8Name}),
+                @{$ace}{qw(ace_flags ace_rights)};
     }
-    return pack('NS/(a*)', $acl_flags, @acl_parts);
+    return pack 'LS/(a*)', $acl_flags, @acl_parts;
 } # }}}1
 
 # Association of the rights bits with names (and flags in case of directory
@@ -184,14 +186,15 @@ sub make_ace { # {{{1
     my ($line) = @_;
 
     my $ace         = {};
-    my @parts       = split m{\s+}s, $line;
+    my @parts       = split m{\s+}sm, $line;
     my $about       = shift @parts;
-    my @about_parts = split m{:}s, $about;
+    my @about_parts = split m{:}sm, $about;
     $ace->{Bitmap}  = 0;
-    if ($about_parts[0] eq 'user') {
+    if ($about_parts[0] eq q{user} || $about_parts[0] eq q{u}) {
         $ace->{Bitmap} = $kFileSec_UUID;
         shift @about_parts;
-    } elsif ($about_parts[0] eq 'group') {
+    }
+    elsif ($about_parts[0] eq q{group} || $about_parts[0] eq q{g}) {
         $ace->{Bitmap} = $kFileSec_GRPUUID;
         shift @about_parts;
     }
@@ -209,7 +212,7 @@ sub make_ace { # {{{1
 
     my $rights = shift @parts;
     $ace->{ace_rights} = 0;
-    foreach my $right (split m{\s*,\s*}s, $rights) {
+    foreach my $right (split m{\s*,\s*}sm, $rights) {
         if (exists $ace_rights_byname{$right}) {
             $ace->{ace_rights} |= $ace_rights_byname{$right}{value};
         }
@@ -260,7 +263,7 @@ if (defined $remove) { # {{{1
     my $offset;
     # If the value given is a number, then we can just delete by number.
     # Otherwise, assume it's a textual ACE description for us to parse.
-    if ($remove =~ /^\d+$/s) {
+    if ($remove =~ m{^\d+$}sm) {
         $offset = $remove;
     } else {
         $ace = make_ace($remove);
@@ -270,7 +273,7 @@ if (defined $remove) { # {{{1
         # Get the ACL for the file via the magic extended attribute, and if
         # one is available, go ahead and parse it.
         my $raw_acl = getfattr($file, $XATTR_NAME, { namespace => $XATTR_NS });
-        next unless defined $raw_acl;
+        next if not defined $raw_acl;
         my($acl_flags, $acl) = parse_xattr($raw_acl);
         if (defined $offset) {
             # Remove the ACE by number.
@@ -281,20 +284,20 @@ if (defined $remove) { # {{{1
             # If we find one or more ACEs that match, mask off the bits
             # for the rights to be removed.
             foreach my $entry (@{$acl}) {
-                next unless $ace->{UTF8Name} eq $entry->{UTF8Name};
+                next if $ace->{UTF8Name} ne $entry->{UTF8Name};
                 # If the Bitmap field is nonzero (this determines if the
                 # entry is about a user or group)...
                 if ($ace->{Bitmap} != 0) {
                     # Then make sure the bitmaps match, otherwise they're not
                     # *really* about the same thing.
-                    next unless $ace->{Bitmap} == $entry->{Bitmap};
+                    next if $ace->{Bitmap} != $entry->{Bitmap};
                 }
                 # Make sure the ACE we're looking at modifying indicates
                 # taking the same kind of action.
-                next unless (($ace->{ace_flags} & $KAUTH_ACE_KINDMASK) ==
+                next if (($ace->{ace_flags} & $KAUTH_ACE_KINDMASK) !=
                         ($entry->{ace_flags} & $KAUTH_ACE_KINDMASK));
 
-                next unless (($ace->{ace_flags} & $KAUTH_ACE_INHERIT_CONTROL_FLAGS) ==
+                next if (($ace->{ace_flags} & $KAUTH_ACE_INHERIT_CONTROL_FLAGS) !=
                         ($entry->{ace_flags} & $KAUTH_ACE_INHERIT_CONTROL_FLAGS));
                 # Looks good, add the additional rights we want to the mask.
                 $entry->{ace_rights} &= ~$ace->{ace_rights};
@@ -372,7 +375,7 @@ if (defined $add) { # {{{1
             if ($entry->{UTF8Name} eq $ace->{UTF8Name} &&
                     $entry->{ace_flags} == $ace->{ace_flags}) {
                 if ($ace->{Bitmap} != 0) {
-                    next unless $ace->{Bitmap} == $entry->{Bitmap};
+                    next if $ace->{Bitmap} != $entry->{Bitmap};
                 }
                 $entry_matches = $entry;
             }
@@ -554,7 +557,7 @@ foreach my $file (@ARGV) {
         my @actions = ();
         my $rights = $entry->{ace_rights};
         foreach my $rinfo (@ace_rights_info) {
-            next unless $rights & $rinfo->{value};
+            next if not $rights & $rinfo->{value};
             if (exists $rinfo->{for_dir}) {
                 my $is_dir = -d $file;
                 next if ((!$is_dir || !$rinfo->{for_dir}) &&
@@ -564,7 +567,7 @@ foreach my $file (@ARGV) {
         }
         my $flags = $entry->{ace_flags};
         foreach my $finfo (@ace_flags_info) {
-            next unless $flags & $finfo->{value};
+            next if not $flags & $finfo->{value};
             if (exists $finfo->{for_dir}) {
                 my $is_dir = -d $file;
                 next if ((!$is_dir || !$finfo->{for_dir}) &&
@@ -576,7 +579,7 @@ foreach my $file (@ARGV) {
         # Print out the entry.
         printf " \%d: \%s:\%s\%s \%s \%s\n", $i, $idtype,
                 $entry->{UTF8Name}, $is_inherited ? ' inherited' : q{},
-                $kind, join(q{,}, @actions);
+                $kind, join q{,}, @actions;
     } # }}}2
 }
 

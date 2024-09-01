@@ -102,7 +102,9 @@ Readonly our $kFPVerOlderThan   => 4;
 sub CompareByString {
     my($session, $verstring, $cmptype) = @_;
 
-    return unless exists $versionmap{$verstring};
+    if (not exists $versionmap{$verstring}) {
+        return;
+    }
     my($major, $minor) = @{$versionmap{$verstring}}{qw[MajorNumber MinorNumber]};
     return CompareByVersionNum($session, $major, $minor, $cmptype);
 }
@@ -139,7 +141,7 @@ sub CompareByVersionNum {
         return 1;
     }
 
-    croak("Invalid comparison type given");
+    croak('Invalid comparison type given');
 }
 
 sub GetPreferredVersion {
@@ -149,8 +151,12 @@ sub GetPreferredVersion {
 
     foreach my $ver (@{$ver_list}) {
         if (exists $versionmap{$ver}) {
-            next unless $versionmap{$ver}{Supported};
-            next if $using_atalk and not $versionmap{$ver}{CanDoAtalk};
+            if (not $versionmap{$ver}{Supported}) {
+                next;
+            }
+            if ($using_atalk and not $versionmap{$ver}{CanDoAtalk}) {
+                next;
+            }
             if (not defined $best_version) {
                 $best_version = $versionmap{$ver};
                 next;

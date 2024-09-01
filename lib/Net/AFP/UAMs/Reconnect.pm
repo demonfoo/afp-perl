@@ -42,9 +42,9 @@ sub GetCred {
     return $rc if $rc != $kFPNoErr;
 
     my $token = $ctx->decrypt($resp, $session->{SessionKey}, $S2CIV);
-    print "decrypted token data is: ", unpack('H*', $token), "\n";
+    printf qq{decrypted token data is: %s\n}, unpack('H*', $token);
     @{$session}{qw[cred s m exp sessionInfo]} =
-        unpack('a[' . (length($token) - 24) .  ']a[8]L>L>a[8]', $token);
+        unpack 'a[' . (length($token) - 24) .  ']a[8]L>L>a[8]', $token;
     ${$session}{t1} = $t1;
 
     return 0;
@@ -69,7 +69,7 @@ sub RefreshCred {
     my $newkey = md5($session->{SessionKey} . $session->{cred});
     my $token = $ctx->decrypt($resp, $newkey, $C2SIV);
     @{$session}{qw[cred s m exp sessionInfo]} =
-        unpack('a[' . (length($token) - 24) .  ']a[8]L>L>a[8]', $token);
+        unpack 'a[' . (length($token) - 24) .  ']a[8]L>L>a[8]', $token;
     return 0;
 }
 
@@ -92,11 +92,11 @@ sub Reconnect {
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
     my $clientNonce = random_bytes($nonce_len);
     my $ciphertext = $ctx->encrypt($clientNonce, $k, $C2SIV);
-    my $sig = pack('a[16]L>L>a[' . $nonce_len . ']a*', $hashval, $n, $t2,
-            $ciphertext, $session->{cred});
+    my $sig = pack'a[16]L>L>a[' . $nonce_len . ']a*', $hashval, $n, $t2,
+            $ciphertext, $session->{cred};
     $sig = hmac(q{MD5}, $session->{s}, $sig);
-    my $authinfo = pack('a[16]a[16]L>L>a[' . $nonce_len . ']a*', $sig,
-            $hashval, $n, $t2, $ciphertext, $session->{cred});
+    my $authinfo = pack 'a[16]a[16]L>L>a[' . $nonce_len . ']a*', $sig,
+            $hashval, $n, $t2, $ciphertext, $session->{cred};
     undef $ciphertext;
 
     # this is step 1
@@ -108,12 +108,14 @@ sub Reconnect {
 
     $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
 
-    return $rc unless $rc = $kFPAuthContinue;
+    if ($rc == $kFPAuthContinue) {
+        return $rc;
+    }
 
     # this is step 2
     my $decrypted = $ctx->decrypt($resp{UserAuthInfo}, $k, $S2CIV);
     my($serverNonce, $clientNonce_hash) =
-        unpack('a[' . $nonce_len . ']a[16]', $decrypted);
+        unpack "a[${nonce_len}]a[16]", $decrypted;
     return $kFPUserNotAuth if md5($clientNonce) ne $clientNonce_hash;
     undef $decrypted;
 
