@@ -32,7 +32,7 @@ Readonly our $kFPOwnerIDBit         => 1 << 10;
 Readonly our $kFPGroupIDBit         => 1 << 11;
 Readonly our $kFPAccessRightsBit    => 1 << 12;
 Readonly our $kFPProDOSInfoBit      => 1 << 13; # AFP <= 2.2
-Readonly our $kFPUTF8NameBit        => 1 << 14; # AFP >= 3.0
+Readonly our $kFPUTF8NameBit        => 1 << 13; # AFP >= 3.0
 Readonly our $kFPUnixPrivsBit       => 1 << 15; # AFP >= 3.0
 Readonly our $kFPUUID               => 1 << 16; # AFP >= 3.0
 
