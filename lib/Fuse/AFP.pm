@@ -5,10 +5,7 @@ use base qw(Fuse::Class);
 
 # imports {{{1
 use strict;
-#no strict qw(refs); # for looser handling of subroutine refs, since proper
-#                    # CODE refs don't work across threads
 use warnings;
-no warnings qw(redefine);
 use diagnostics;
 
 # Tell Perl we need to be run in at least v5.10.
@@ -39,7 +36,8 @@ use Fcntl qw(:mode :DEFAULT :flock);
 use Data::Dumper;               # for diagnostic output when debugging is on
 use Fuse qw(:all);              # Still need this for extended attribute
                                 # related macros.
-use POSIX;                      # Standard error codes, access() modes, etc.
+use POSIX qw(:errno_h !ENODATA :fcntl_h F_OK R_OK W_OK X_OK floor);
+                                # Standard error codes, access() modes, etc.
 use Time::HiRes qw(gettimeofday);
 use URI::Escape;
 use English qw(-no_match_vars);
