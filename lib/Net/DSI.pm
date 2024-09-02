@@ -63,17 +63,19 @@ private     shared      => my %shared;
 sub session_thread { # {{{1
     my($shared, $host, $port, %params) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug('called ', (caller(0))[3], '()');
+    $logger->debug('called ', (caller 0)[3], '()');
 
     # Set up the connection to the server. Then we need to check that we've
     # connected successfully.
     my $conn;
-    my %connect_args = ( PeerAddr   => $host,
-                         PeerPort   => $port,
-                         HostPort   => 0,
-                         Proto      => 'tcp',
-                         Type       => SOCK_STREAM,
-                         Timeout    => 5 );
+    my %connect_args = (
+        PeerAddr   => $host,
+        PeerPort   => $port,
+        HostPort   => 0,
+        Proto      => 'tcp',
+        Type       => SOCK_STREAM,
+        Timeout    => 5,
+    );
     my $handlers     = $shared->{handlers};
     my $active_timer = $params{ActiveTimer} || 60;
     my $idle_timer   = $params{IdleTimer} || 120;
@@ -104,8 +106,8 @@ sub session_thread { # {{{1
     # Tell the TCP stack that we don't want Nagle's algorithm; for our
     # purposes, all it's going to do is screw us up.
     $logger->debug('setting up socket and shared data');
-    setsockopt($conn, IPPROTO_TCP, TCP_NODELAY, 1);
-    $shared->{conn_fd}      = fileno($conn);
+    setsockopt $conn, IPPROTO_TCP, TCP_NODELAY, 1;
+    $shared->{conn_fd}      = fileno $conn;
     $shared->{running}      = 1;
     $shared->{sockaddr}     = $conn->sockaddr();
     $shared->{sockport}     = $conn->sockport();
@@ -140,7 +142,7 @@ MAINLOOP:
             # go home.
             if (($now - $handler->[3]) > $active_timer) {
                 $shared->{exit} = 1;
-                $logger->fatal((caller(0))[3], '(): Waiting request timed out, aborting');
+                $logger->fatal((caller 0)[3], '(): Waiting request timed out, aborting');
                 last MAINLOOP;
             }
         }
@@ -162,31 +164,31 @@ MAINLOOP:
                 # longer connected to the peer, so we should bail.
                 #print {\*STDERR} (caller(0))[3], "(): Received HUP on AFP server connection, terminating loop\n";
                 #last MAINLOOP;
-                $logger->warn((caller(0))[3], '(): poll returned POLLHUP, but this is indeterminate');
+                $logger->warn((caller 0)[3], '(): poll returned POLLHUP, but this is indeterminate');
             }
             # Try to get a message from the server.
             #$logger->debug('reading from socket');
             $shared->{conn_sem}->down();
             $rsz = 0;
             while ($rsz < 16) {
-                $rsz += $rlen = sysread($conn, $resp, 16 - $rsz, $rsz);
+                $rsz += $rlen = sysread $conn, $resp, 16 - $rsz, $rsz;
                 # Some kind of error occurred...
                 if (!defined $rlen) {
-                    $logger->fatal((caller(0))[3] . '(): socket read received error ' . ${ERRNO});
+                    $logger->fatal((caller 0)[3] . '(): socket read received error ' . ${ERRNO});
                     $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
                 # This means the socket read returned EOF; we should go away.
                 if ($rlen == 0) {
-                    $logger->fatal((caller(0))[3] . '(): socket read returned EOF');
+                    $logger->fatal((caller 0)[3] . '(): socket read returned EOF');
                     $shared->{conn_sem}->up();
                     last MAINLOOP;
                 }
             }
             $shared->{conn_sem}->up();
-            next MAINLOOP unless $rsz == 16;
+            next MAINLOOP if $rsz != 16;
             ($type, $cmd, $id, $errcode, $length, $reserved) =
-                    unpack('CCS>l>L>L>', $resp);
+                    unpack 'CCS>l>L>L>', $resp;
 
             $rb_ref = *bar{SCALAR};
             $sem_ref = undef;
@@ -198,7 +200,7 @@ MAINLOOP:
                 # DSICloseSession from server; this means the server is
                 # going away (i.e., it's shutting down).
                 if ($cmd == $OP_DSI_CLOSESESSION) {
-                    $logger->debug((caller(0))[3], '(): Received CloseSession from server, setting exit flag to 1');
+                    $logger->debug((caller 0)[3], '(): Received CloseSession from server, setting exit flag to 1');
                     $shared->{exit} = 1;
                 }
 
@@ -206,13 +208,13 @@ MAINLOOP:
                     $shared->{conn_sem}->down();
                     $rsz = 0;
                     while ($rsz < $length) {
-                        $rsz += $rlen = sysread($conn, $data, $length - $rsz, $rsz);
+                        $rsz += $rlen = sysread $conn, $data, $length - $rsz, $rsz;
                     }
                     $last_pkt_rcvd = gettimeofday();
                     $shared->{conn_sem}->up();
-                    ($userBytes) = unpack('n', $data);
+                    ($userBytes) = unpack 'S>', $data;
                     # Queue the notification for later processing
-                    push(@{$shared->{attnq}}, $userBytes);
+                    push @{$shared->{attnq}}, $userBytes;
                     next MAINLOOP;
                 }
 
@@ -221,7 +223,7 @@ MAINLOOP:
                 }
 
                 else {
-                    $logger->warn((caller(0))[3], "(): Unexpected packet received:\n",
+                    $logger->warn((caller 0)[3], "(): Unexpected packet received:\n",
                             Dumper( { type => $type, cmd => $cmd, id => $id,
                                             errcode => $errcode, length => $length,
                                             reserved =>$reserved } ));
@@ -243,7 +245,7 @@ MAINLOOP:
                     $sem_ref = $handler->[0];
                 }
                 else {
-                    $logger->warn((caller(0))[3], '(): Message packet received with id ',
+                    $logger->warn((caller 0)[3], '(): Message packet received with id ',
                             $id, ', but no handler block present');
                 }
             }
@@ -256,13 +258,15 @@ MAINLOOP:
             # indicated that there was a payload.
             $shared->{conn_sem}->down();
             while ($rsz < $length) {
-                $rsz += $rlen = sysread($conn, ${$rb_ref},
-                        $length - $rsz, $rsz);
+                $rsz += $rlen = sysread $conn, ${$rb_ref},
+                        $length - $rsz, $rsz;
             }
             $last_pkt_rcvd = gettimeofday();
             $shared->{conn_sem}->up();
 
-            ${$sem_ref}->up() if defined $sem_ref;
+            if (defined $sem_ref) {
+                ${$sem_ref}->up();
+            }
         }
 
         $now = gettimeofday();
@@ -270,12 +274,12 @@ MAINLOOP:
             # send a DSITickle to the server
             # Field 2: Command: DSITickle(5)
             # Manually queue the DSITickle message.
-            $msg = pack('CCS>l>L>L>', 0, $OP_DSI_TICKLE,
-                    $shared->{requestid}++ % 2**16, 0, 0, 0);
+            $msg = pack 'CCS>l>L>L>', 0, $OP_DSI_TICKLE,
+                    $shared->{requestid}++ % 2**16, 0, 0, 0;
             $shared->{conn_sem}->down();
             $wsz = 0;
-            while ($wsz < length($msg)) {
-                $wsz += syswrite($conn, $msg, length($msg) - $wsz, $wsz);
+            while ($wsz < length $msg) {
+                $wsz += syswrite $conn, $msg, length($msg) - $wsz, $wsz;
             }
             $shared->{conn_sem}->up();
             $last_tickle = $now;
@@ -284,7 +288,7 @@ MAINLOOP:
     $logger->debug('exiting main loop');
     $shared->{running} = -1;
     undef $shared->{conn_fd};
-    close($conn);
+    close $conn;
 
     # Return $kFPNoServer to any still-waiting callers. (Sort of a hack to
     # deal with netatalk shutting down the connection right away when FPLogout
@@ -305,7 +309,7 @@ sub new { # {{{1
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
     $port ||= 548;
     my $obj = bless {}, $class;
-    $logger->debug('called ', (caller(0))[3], '()');
+    $logger->debug('called ', (caller 0)[3], '()');
 
     my $shared = shared_clone({});
     %{$shared} = (
@@ -345,7 +349,7 @@ sub new { # {{{1
 sub close { # {{{1
     my ($self) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug('called ', (caller(0))[3], '()');
+    $logger->debug('called ', (caller 0)[3], '()');
     $shared{id $self}{exit} = 1;
     $dispatcher{id $self}->join();
     return;
@@ -390,14 +394,16 @@ sub SendMessage { # {{{1
     $message ||= q{};
 
     $data_r  ||= \q{};
-    $d_len   ||= length(${$data_r});
+    $d_len   ||= length ${$data_r};
 
     # Cycle the request ID that DSI uses to identify the request/reply
     # pairing. I'd like to handle that part asynchronously eventually.
     my $reqId  = $shared{id $self}{requestid}++ % 2**16;
 
     if ($shared{id $self}{running} == -1) {
-        ${$sem_r}->up() if defined $sem_r;
+        if (defined $sem_r) {
+            ${$sem_r}->up();
+        }
         return $kFPNoServer;
     }
     # Assemble the message header to be sent to the AFP over TCP server.
@@ -408,27 +414,27 @@ sub SendMessage { # {{{1
     #        data offset for DSIWrite messages
     # Arg 5: long  MsgLength
     # Arg 6: long  Reserved: 0
-    my $msg = pack('CCS>l>L>L>a*', 0, $cmd, $reqId,
+    my $msg = pack 'CCS>l>L>L>a*', 0, $cmd, $reqId,
             $d_len > 0 ? length($message) : 0,
-            length($message) + $d_len, 0, $message);
+            length($message) + $d_len, 0, $message;
 
     if (defined $sem_r) {
         my $handler = shared_clone([]);
-        @{$handler} = ( $sem_r, $resp_r, $rc_r, scalar(gettimeofday()) );
+        @{$handler} = ( $sem_r, $resp_r, $rc_r, scalar gettimeofday() );
         $shared{id $self}{handlers}{$reqId} = $handler;
     }
 
     # Send the request packet to the server.
     $shared{id $self}{conn_sem}->down();
     my $wlen = 0;
-    while ($wlen < length($msg)) {
-        $wlen += syswrite($conn{id $self}, $msg, length($msg) - $wlen, $wlen);
+    while ($wlen < length $msg) {
+        $wlen += syswrite $conn{id $self}, $msg, length($msg) - $wlen, $wlen;
     }
     if ($d_len) {
         $wlen = 0;
         while ($wlen < $d_len) {
-            $wlen += syswrite($conn{id $self}, ${$data_r}, $d_len - $wlen,
-                    $wlen);
+            $wlen += syswrite $conn{id $self}, ${$data_r}, $d_len - $wlen,
+                    $wlen;
         }
     }
     $shared{id $self}{conn_sem}->up();
@@ -440,7 +446,7 @@ sub DSICloseSession { return CloseSession(@_); }
 sub CloseSession { # {{{1
     my ($self) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug('called ', (caller(0))[3], '()');
+    $logger->debug('called ', (caller 0)[3], '()');
 
     # Issue the DSICloseSession command to the server. Apparently the
     # server doesn't have anything to say in response.
@@ -468,13 +474,13 @@ sub DSIGetStatus { return GetStatus(@_); }
 sub GetStatus { # {{{1
     my ($self, $resp_r) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug('called ', (caller(0))[3], '()');
+    $logger->debug('called ', (caller 0)[3], '()');
 
     # Require that the caller provide a ref to stuff the reply block into.
     # This command is always going to provide a reply block, and the
     # information it contains is kind of important.
-    croak('$resp_r must be a scalar ref')
-            unless ref($resp_r) eq 'SCALAR' or ref($resp_r) eq 'REF';
+    croak('resp_r must be a scalar ref')
+            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
     my $sem;
     my $rc;
     my $reqId = $self->SendMessage($OP_DSI_GETSTATUS, undef, undef, undef,
@@ -489,7 +495,7 @@ sub DSIOpenSession { return OpenSession(@_); }
 sub OpenSession { # {{{1
     my ($self, %options) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug('called ', (caller(0))[3], '()');
+    $logger->debug('called ', (caller 0)[3], '()');
 
     my $options_packed = q{};
     foreach my $key (keys %options) {
@@ -497,17 +503,17 @@ sub OpenSession { # {{{1
         my $optdata;
         if ($key eq 'RequestQuanta') {
             $opttype = $kRequestQuanta;
-            $optdata = pack('N', $options{$key});
+            $optdata = pack 'L>', $options{$key};
         } elsif ($key eq 'AttentionQuanta') {
             $opttype = $kAttentionQuanta;
-            $optdata = pack('N', $options{$key});
+            $optdata = pack 'L>', $options{$key};
         } elsif ($key eq 'ServerReplayCacheSize') {
             $opttype = $kServerReplayCacheSize;
-            $optdata = pack('N', $options{$key});
+            $optdata = pack 'L>', $options{$key};
         } else {
             croak('Unknown option key ' . $key);
         }
-        $options_packed .=  pack('CC/a*', $opttype, $optdata);
+        $options_packed .=  pack 'CC/a*', $opttype, $optdata;
     }
 
     my $sem;
@@ -520,15 +526,15 @@ sub OpenSession { # {{{1
 
     my %rcvd_opts;
     while (length($resp) > 0) {
-        my ($opttype, $optdata) = unpack('CC/a', $resp);
+        my ($opttype, $optdata) = unpack 'CC/a', $resp;
         if ($opttype == $kRequestQuanta) {
-            $rcvd_opts{RequestQuanta}           = unpack('N', $optdata);
+            $rcvd_opts{RequestQuanta}           = unpack 'L>', $optdata;
         } elsif ($opttype == $kAttentionQuanta) {
-            $rcvd_opts{AttentionQuanta}         = unpack('N', $optdata);
+            $rcvd_opts{AttentionQuanta}         = unpack 'L>', $optdata;
         } elsif ($opttype == $kServerReplayCacheSize) {
-            $rcvd_opts{ServerReplayCacheSize}   = unpack('N', $optdata);
+            $rcvd_opts{ServerReplayCacheSize}   = unpack 'L>', $optdata;
         }
-        $resp = substr($resp, 2 + length($optdata));
+        $resp = substr $resp, 2 + length $optdata;
     }
     return wantarray ? ($rc, %rcvd_opts) : $rc;
 } # }}}1
@@ -539,7 +545,7 @@ sub OpenSession { # {{{1
 sub DSITickle { # {{{1
     my ($self) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug('called ', (caller(0))[3], '()');
+    $logger->debug('called ', (caller 0)[3], '()');
 
     my $reqId = $self->SendMessage($OP_DSI_TICKLE);
     return;
@@ -550,7 +556,7 @@ sub Write { # {{{1
     # This should only be used for FPWrite and FPAddIcon
     my ($self, $message, $data_r, $d_len, $resp_r) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug('called ', (caller(0))[3], '()');
+    $logger->debug('called ', (caller 0)[3], '()');
 
     my $sem;
     my $rc;
