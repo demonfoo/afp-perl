@@ -233,8 +233,8 @@ sub new { # {{{1
     }
     elsif ($rc == $kFPObjectNotFound || $rc == $kFPParamErr) {
         # Server didn't know the volume we asked for.
-        $obj->{logger}->error('Volume "', $urlparms{volume},
-                '" does not exist on server');
+        $obj->{logger}->error(sub { sprintf q{Volume "%s" does not exist on server},
+          $urlparms{volume} });
         $obj->disconnect();
         return ENODEV;
     }
@@ -243,12 +243,12 @@ sub new { # {{{1
         # should never happen unless we pass bad flags (coding error) or some
         # non-AFP-specific condition causes a failure (which is out of our
         # hands)...
-        $obj->{logger}->error('FPOpenVol failed with error ', $rc, ' (',
-                afp_strerror($rc), ')');
+        $obj->{logger}->error(sub { sprintf q{FPOpenVol failed with error %d (%s)},
+          $rc, afp_strerror($rc) });
         $obj->disconnect();
         return ENODEV;
     }
-    $obj->{logger}->debug(Dumper($volinfo));
+    $obj->{logger}->debug(sub { Dumper($volinfo) });
 
     if ($volinfo->{Signature} == 3) {
         $obj->{logger}->error('Volume uses variable Directory IDs; not currently supported');
@@ -333,8 +333,8 @@ sub new { # {{{1
     # abort.
     # lookup node ID for subpath mount {{{2
     if (defined $urlparms{subpath}) {
-        $obj->{logger}->debug(q{Looking up directory '}, $urlparms{subpath},
-                q{' as pivot point for root node});
+        $obj->{logger}->debug(sub { sprintf q{Looking up directory "%s" as pivot } .
+          q{point for root node}, $urlparms{subpath}});
         my $realdirpath = translate_path($urlparms{subpath}, $obj);
         my $dirbitmap = $kFPNodeIDBit;
 
@@ -359,7 +359,8 @@ sub new { # {{{1
             return ENOTDIR;
         }
         $obj->{topDirID} = $resp->{NodeID};
-        $obj->{logger}->debug('Mount root node ID changed to ', $obj->{topDirID});
+        $obj->{logger}->debug(sub { sprintf q{Mount root node ID changed to %s},
+          $obj->{topDirID} });
     } # }}}2
 
     # purify URL {{{2
@@ -423,8 +424,8 @@ sub disconnect { # {{{1
 
 sub getattr { # {{{1
     my ($self, $file) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s')},
-            (caller 0)[3], $file);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s')},
+      (caller 3)[3], $file });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -612,8 +613,8 @@ sub getattr { # {{{1
 
 sub readlink { # {{{1
     my ($self, $file) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s')},
-            (caller 0)[3], $file);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s')},
+      (caller 3)[3], $file });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -692,8 +693,8 @@ sub readlink { # {{{1
 
 sub getdir { # {{{1
     my ($self, $dirname) = @_;
-    $self->{logger}->debug(sprintf q{called %s(dirname = '%s')},
-            (caller 0)[3], $dirname);
+    $self->{logger}->debug(sub { sprintf q{called %s(dirname = '%s')},
+      (caller 3)[3], $dirname });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -784,8 +785,8 @@ sub getdir { # {{{1
 
 sub mknod { # {{{1
     my ($self, $file, $mode, $devnum) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %x, devnum = %d)},
-            (caller 0)[3], $file, $mode, $devnum);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', mode = %x, } .
+      q{devnum = %d)}, (caller 3)[3], $file, $mode, $devnum });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -835,8 +836,8 @@ sub mknod { # {{{1
 
 sub mkdir { # {{{1
     my ($self, $file, $mode) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %x)},
-            (caller 0)[3], $file, $mode);
+    $self->{logger}->debug(sub {sprintf q{called %s(file = '%s', mode = %x)},
+      (caller 3)[3], $file, $mode });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -904,8 +905,8 @@ sub mkdir { # {{{1
 
 sub unlink { # {{{1
     my ($self, $file) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s')},
-            (caller 0)[3], $file);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s')},
+      (caller 3)[3], $file });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -962,8 +963,8 @@ sub rmdir { return Fuse::AFP::unlink(@_); }
 # once. good work apple. :| doesn't happen on netatalk or OS X 10.5.
 sub symlink { # {{{1
     my ($self, $target, $linkname) = @_;
-    $self->{logger}->debug(sprintf q{called %s(target = '%s', linkname = '%s')},
-            (caller 0)[3], $target, $linkname);
+    $self->{logger}->debug(sub { sprintf q{called %s(target = '%s', linkname = '%s')},
+      (caller 3)[3], $target, $linkname });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1077,8 +1078,8 @@ sub symlink { # {{{1
 
 sub rename { # {{{1
     my ($self, $oldname, $newname) = @_;
-    $self->{logger}->debug(sprintf q{called %s(oldname = '%s', newname = '%s')},
-            (caller 0)[3], $oldname, $newname);
+    $self->{logger}->debug(sub { sprintf q{called %s(oldname = '%s', newname = '%s')},
+      (caller 3)[3], $oldname, $newname });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1156,8 +1157,8 @@ sub rename { # {{{1
 
 sub link { # {{{1
     my ($self, $file, $target) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', target = %s)},
-            (caller 0)[3], $file, $target);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', target = %s)},
+      (caller 3)[3], $file, $target });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1166,8 +1167,8 @@ sub link { # {{{1
 
 sub chmod { # {{{1
     my ($self, $file, $mode) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %o)},
-            (caller 0)[3], $file, $mode);
+    $self->{logger}->debug(sub {sprintf q{called %s(file = '%s', mode = %o)},
+      (caller 3)[3], $file, $mode });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1213,8 +1214,8 @@ sub chmod { # {{{1
 
 sub chown { # {{{1
     my ($self, $file, $uid, $gid) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', uid = %d, gid = %d)},
-            (caller 0)[3], $file, $uid, $gid);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', uid = %d, } .
+      q{gid = %d)}, (caller 3)[3], $file, $uid, $gid });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1268,8 +1269,8 @@ sub chown { # {{{1
 
 sub truncate { # {{{1
     my ($self, $file, $length) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', length = %d)},
-            (caller 0)[3], $file, $length);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', length = %d)},
+      (caller 3)[3], $file, $length });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1323,8 +1324,8 @@ sub truncate { # {{{1
 
 sub utime { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', actime = %d, modtime = %d)},
-            (caller 0)[3], $file, $actime, $modtime);
+    $self->{logger}->debug(sub {sprintf q{called %s(file = '%s', actime = %d, } .
+      q{modtime = %d)}, (caller 3)[3], $file, $actime, $modtime });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1353,8 +1354,8 @@ sub utime { # {{{1
 
 sub open { # {{{1
     my ($self, $file, $mode) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %x)},
-            (caller 0)[3], $file, $mode);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', mode = %x)},
+      (caller 3)[3], $file, $mode });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1436,8 +1437,9 @@ sub open { # {{{1
 
 sub read { # {{{1
     my ($self, $file, $len, $off, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', len = %d, off = %d, fh = %d)},
-            (caller 0)[3], $file || q{}, $len, $off, ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', len = %d, } .
+      q{off = %d, fh = %d)}, (caller 3)[3], $file || q{}, $len, $off,
+      ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1470,8 +1472,9 @@ sub read { # {{{1
 sub write { # {{{1
     my ($self, $file, $offset, $fh) = @_[0,1,3,4];
     my $data_r = \$_[2];
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', data = %s, offset = %d, fh = %d)},
-            (caller 0)[3], $file || q{}, q{[data]}, $offset, ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', data = %s, } .
+      q{offset = %d, fh = %d)}, (caller 3)[3], $file || q{}, q{[data]}, $offset,
+      ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -1520,7 +1523,7 @@ sub write { # {{{1
 
 sub statfs { # {{{1
     my ($self) = @_;
-    $self->{logger}->debug(sprintf q{called %s()}, (caller 0)[3]);
+    $self->{logger}->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1566,8 +1569,8 @@ sub statfs { # {{{1
 
 sub flush { # {{{1
     my ($self, $file, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', fh = %d)},
-            (caller 0)[3], $file || q{}, ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', fh = %d)},
+      (caller 3)[3], $file || q{}, ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1581,8 +1584,8 @@ sub flush { # {{{1
 
 sub release { # {{{1
     my ($self, $file, $mode, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %x, fh = %d)},
-            (caller 0)[3], $file || q{}, $mode, ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', mode = %x, } .
+      q{fh = %d)}, (caller 3)[3], $file || q{}, $mode, ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1594,8 +1597,8 @@ sub release { # {{{1
 
 sub fsync { # {{{1
     my ($self, $file, $flags, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', flags = %x, fh = %d)},
-            (caller 0)[3], $file || q{}, $flags, ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', flags = %x, } .
+      q{fh = %d)}, (caller 3)[3], $file || q{}, $flags, ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1609,8 +1612,9 @@ sub fsync { # {{{1
 
 sub setxattr { # {{{1
     my ($self, $file, $attr, $value, $flags) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', attr = '%s', value = '%s', flags = %x)},
-            (caller 0)[3], $file, $attr, printable($value), $flags);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', attr = '%s', } .
+      q{value = '%s', flags = %x)}, (caller 3)[3], $file, $attr, printable($value),
+      $flags });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1865,8 +1869,8 @@ sub setxattr { # {{{1
 
 sub getxattr { # {{{1
     my ($self, $file, $attr) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', attr = '%s')},
-            (caller 0)[3], $file, $attr);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', attr = '%s')},
+      (caller 3)[3], $file, $attr});
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2036,8 +2040,8 @@ sub getxattr { # {{{1
 
 sub listxattr { # {{{1
     my ($self, $file) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s')},
-            (caller 0)[3], $file);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s')},
+      (caller 3)[3], $file });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2155,8 +2159,8 @@ sub listxattr { # {{{1
 
 sub removexattr { # {{{1
     my ($self, $file, $attr) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', attr = '%s')},
-            (caller 0)[3], $file, $attr);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', attr = '%s')},
+      (caller 3)[3], $file, $attr });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2286,8 +2290,8 @@ sub removexattr { # {{{1
 
 sub opendir { # {{{1
     my ($self, $dirname) = @_;
-    $self->{logger}->debug(sprintf q{called %s(dirname = '%s')},
-            (caller 0)[3], $dirname);
+    $self->{logger}->debug(sub { sprintf q{called %s(dirname = '%s')},
+      (caller 3)[3], $dirname });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2314,8 +2318,8 @@ sub opendir { # {{{1
 
 sub readdir { # {{{1
     my ($self, $dirname, $offset, $dh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(dirname = '%s', offset = %d, dh = %d)},
-            (caller 0)[3], $dirname || q{}, $offset, $dh);
+    $self->{logger}->debug(sub { sprintf q{called %s(dirname = '%s', } .
+      q{offset = %d, dh = %d)}, (caller 3)[3], $dirname || q{}, $offset, $dh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2389,8 +2393,8 @@ sub readdir { # {{{1
 
 sub releasedir { # {{{1
     my ($self, $dirname, $dh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(dirname = '%s', dh = %d)},
-            (caller 0)[3], $dirname || q{}, $dh);
+    $self->{logger}->debug(sub { sprintf q{called %s(dirname = '%s', dh = %d)},
+      (caller 3)[3], $dirname || q{}, $dh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2401,8 +2405,8 @@ sub releasedir { # {{{1
 
 sub fsyncdir { # {{{1
     my ($self, $dirname, $flags, $dh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(dirname = '%s', flags = %x, dh = %d)},
-            (caller 0)[3], $dirname, $flags, $dh);
+    $self->{logger}->debug(sub { sprintf q{called %s(dirname = '%s', } .
+      q{flags = %x, dh = %d)}, (caller 3)[3], $dirname, $flags, $dh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2418,8 +2422,8 @@ sub fsyncdir { # {{{1
 
 sub access { # {{{1
     my ($self, $file, $mode) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %o)},
-            (caller 0)[3], $file, $mode);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', mode = %o)},
+      (caller 3)[3], $file, $mode });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2459,8 +2463,8 @@ sub access { # {{{1
 
 sub create { # {{{1
     my ($self, $file, $mode, $flags) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', mode = %o, flags = %x)},
-            (caller 0)[3], $file, $mode, $flags);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', mode = %o, } .
+      q{flags = %x)}, (caller 3)[3], $file, $mode, $flags });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2516,8 +2520,9 @@ sub create { # {{{1
 
 sub ftruncate { # {{{1
     my ($self, $file, $length, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', length = %d, fh = %d)},
-            (caller 0)[3], $file || q{}, $length, ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', } .
+      q{length = %d, fh = %d)}, (caller 3)[3], $file || q{}, $length,
+      ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2537,8 +2542,8 @@ sub ftruncate { # {{{1
 
 sub fgetattr { # {{{1
     my ($self, $file, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', fh = %d)},
-            (caller 0)[3], $file || q{}, ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', fh = %d)},
+      (caller 3)[3], $file || q{}, ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2651,9 +2656,9 @@ sub fgetattr { # {{{1
 
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', cmd = %s, } .
-            q{lkparms = %s, fh = %d)}, (caller 0)[3], $file || q{}, $cmd,
-            Dumper($lkparms), ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', cmd = %s, } .
+            q{lkparms = %s, fh = %d)}, (caller 3)[3], $file || q{}, $cmd,
+            Dumper($lkparms), ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2733,10 +2738,10 @@ sub lock { # {{{1
 
 sub utimens { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', actime = %s, modtime = %s)},
-            (caller 0)[3], $file,
-            ref $actime ? sprintf('[%d, %d]', @{$actime}) : sprintf('%f', $actime),
-            ref $modtime ? sprintf('[%d, %d]', @{$modtime}) : sprintf '%f', $modtime );
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', } .
+      q{actime = %s, modtime = %s)}, (caller 3)[3], $file,
+      ref $actime ? sprintf('[%d, %d]', @{$actime}) : sprintf('%f', $actime),
+      ref $modtime ? sprintf('[%d, %d]', @{$modtime}) : sprintf '%f', $modtime });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2748,8 +2753,8 @@ sub utimens { # {{{1
 
 sub bmap { # {{{1
     my ($self, $file, $blksz, $blkno) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', blksz = %d, blkno = %d)},
-            (caller 0)[3], $file, $blksz, $blkno);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', } .
+      q{blksz = %d, blkno = %d)}, (caller 3)[3], $file, $blksz, $blkno });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2760,8 +2765,9 @@ sub bmap { # {{{1
 
 sub ioctl {
     my ($self, $file, $cmd, $flags, $data, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', cmd = %d, flags = %x, data = %s, fh = %d)},
-            (caller 0)[3], $file || q{}, $cmd, $flags, printable($data), ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', cmd = %d, } .
+      q{flags = %x, data = %s, fh = %d)}, (caller 3)[3], $file || q{}, $cmd,
+      $flags, printable($data), ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2770,8 +2776,9 @@ sub ioctl {
 
 sub poll {
     my ($self, $file, $ph, $revents, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', ph = %d, revents = %d, fh = %d)},
-            (caller 0)[3], $file || q{}, $ph, $revents, ref($fh) ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', ph = %d, } .
+      q{revents = %d, fh = %d)}, (caller 3)[3], $file || q{}, $ph, $revents,
+      ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2780,10 +2787,8 @@ sub poll {
 
 sub write_buf {
     my ($self, $file, $off, $bufvec, $fh) = @_;
-    $self->{logger}->debug('called ', (caller 0)[3], q{('}, join(q{', '}, @_), q{')});
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', off = %d,} .
-            q{ bufvec = [...], fh = %d)}, (caller 0)[3], $file || q{}, $off,
-            $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', off = %d,} .
+      q{ bufvec = [...], fh = %d)}, (caller 3)[3], $file || q{}, $off, $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -2844,9 +2849,9 @@ sub write_buf {
 
 sub read_buf {
     my ($self, $file, $len, $off, $bufvec, $fh) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', len = %d, } .
-            q{off = %d, bufvec = [...], fh = %d)}, (caller 0)[3],
-            $file || q{}, $len, $off, ref $fh ? -1 : $fh);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', len = %d, } .
+      q{off = %d, bufvec = [...], fh = %d)}, (caller 3)[3], $file || q{}, $len,
+      $off, ref $fh ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2881,9 +2886,8 @@ sub read_buf {
 
 sub flock {
     my ($self, $file, $fh, $owner, $op) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', fh = %d, } .
-            q{owner = %d, op = %x)}, (caller 0)[3], $file || q{}, $fh,
-            $owner, $op);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', fh = %d, } .
+      q{owner = %d, op = %x)}, (caller 3)[3], $file || q{}, $fh, $owner, $op });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2920,9 +2924,9 @@ sub flock {
 
 sub fallocate {
     my ($self, $file, $fh, $mode, $off, $len) = @_;
-    $self->{logger}->debug(sprintf q{called %s(file = '%s', fh = %d, } .
-            q{mode = %x, off = %d, len = %d)}, (caller 0)[3], $file || q{},
-            $fh, $mode, $off, $len);
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', fh = %d, } .
+      q{mode = %x, off = %d, len = %d)}, (caller 3)[3], $file || q{}, $fh,
+      $mode, $off, $len });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2978,8 +2982,8 @@ sub generate_metrics_data { # {{{1
 sub lookup_afp_entry { # {{{1
     my ($self, $filename) = @_;
 
-    $self->{logger}->debug(sprintf q{called %s(filename = '%s')},
-            (caller 0)[3], printable($filename));
+    $self->{logger}->debug(sub { sprintf q{called %s(filename = '%s')},
+      (caller 3)[3], printable($filename) });
 
     # Disabling this for now, as it causes errors with dangling, but
     # otherwise well-formed, symlinks.
@@ -3024,8 +3028,8 @@ sub lookup_afp_entry { # {{{1
 
 sub translate_path { # {{{1
     my ($path, $sessobj) = @_;
-    $sessobj->{logger}->debug(sprintf q{called %s(path = '%s')},
-            (caller 0)[3], $path);
+    $sessobj->{logger}->debug(sub { sprintf q{called %s(path = '%s')},
+      (caller 3)[3], $path });
 
     my @pathparts = split m{/}sm, $path;
     my @afp_path = ();
@@ -3063,8 +3067,8 @@ sub path_parent { # {{{1
 # client into the structured form to be sent to the server.
 sub acl_from_xattr { # {{{1
     my ($self, $raw_xattr, $acl_data) = @_;
-    $self->{logger}->debug(sprintf q{called %s(raw_xattr = '%s', acl_data = %s)},
-            (caller 0)[3], printable($raw_xattr), Dumper($acl_data));
+    $self->{logger}->debug(sub { sprintf q{called %s(raw_xattr = '%s', } .
+      q{acl_data = %s)}, (caller 3)[3], printable($raw_xattr), Dumper($acl_data) });
 
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server
@@ -3134,8 +3138,8 @@ sub acl_from_xattr { # {{{1
 # by afp_acl.pl (the tool for manipulating ACLs on an AFP share).
 sub acl_to_xattr { # {{{1
     my ($self, $acldata) = @_;
-    $self->{logger}->debug(sprintf q{called %s(acldata = %s)},
-            (caller 0)[3], Dumper($acldata));
+    $self->{logger}->debug(sub { sprintf q{called %s(acldata = %s)},
+      (caller 3)[3], Dumper($acldata) });
 
     my @acl_parts;
     foreach my $entry (@{$acldata->{acl_ace}}) {
@@ -3333,8 +3337,8 @@ for my $item (@nfs4_def_acl_params) {
 
 sub acl_from_nfsv4_xattr { # {{{1
     my ($self, $raw_xattr, $acl_data, $filename) = @_;
-    $self->{logger}->debug(sprintf q{called %s(raw_xattr = '%s', acl_data = %s)},
-            (caller 0)[3], printable($raw_xattr), Dumper($acl_data));
+    $self->{logger}->debug(sub { sprintf q{called %s(raw_xattr = '%s', } .
+      q{acl_data = %s)}, (caller 3)[3], printable($raw_xattr), Dumper($acl_data) });
 
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server
@@ -3448,8 +3452,8 @@ sub acl_from_nfsv4_xattr { # {{{1
 
 sub acl_to_nfsv4_xattr { # {{{1
     my ($self, $acldata, $filename) = @_;
-    $self->{logger}->debug(sprintf q{called %s(acldata = %s)},
-            (caller 0)[3], Dumper($acldata));
+    $self->{logger}->debug(sub { sprintf q{called %s(acldata = %s)},
+            (caller 3)[3], Dumper($acldata) });
 
     my @acl_parts;
     foreach my $entry (@{$acldata->{acl_ace}}) {

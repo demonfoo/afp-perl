@@ -45,8 +45,8 @@ sub globalTimeOffset {
 sub ParseVolParms { # {{{1
     my ($data, $obj) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug(sprintf 'called %s(%s)',
-                    (caller 0)[3], Dumper([unpack('H*', $data), $obj]));
+    $logger->debug(sub { sprintf 'called %s(%s)',
+      (caller 3)[3], Dumper([unpack('H*', $data), $obj]) });
 
     my $offset = 2;
     my $Bitmap = unpack 'S>', $data;
@@ -133,8 +133,8 @@ sub ParseVolParms { # {{{1
 sub ParseSrvrInfo { # {{{1
     my ($data) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug(sprintf 'called %s(%s)',
-                    (caller 0)[3], Dumper([unpack 'H*', $data]));
+    $logger->debug(sub { sprintf 'called %s(%s)',
+      (caller 3)[3], Dumper([unpack 'H*', $data]) });
 
     my $resp = {};
 
@@ -274,8 +274,8 @@ _EOT_
 sub ParseFileDirParms { # {{{1
     my ($data) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug(sprintf 'called %s(%s)',
-                    (caller 0)[3], Dumper([unpack 'H*', $data]));
+    $logger->debug(sub { sprintf 'called %s(%s)',
+      (caller 3)[3], Dumper([unpack 'H*', $data]) });
 
     my ($FileBitmap, $DirectoryBitmap, $IsFileDir, $ReqParams) =
             unpack 'S>S>Cxa*', $data;
@@ -291,8 +291,8 @@ sub ParseFileDirParms { # {{{1
 sub ParseFileParms { # {{{1
     my ($Bitmap, $data) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug(sprintf 'called %s(%s)',
-                    (caller 0)[3], Dumper([$Bitmap, unpack 'H*', $data]));
+    $logger->debug(sub { sprintf 'called %s(%s)',
+      (caller 3)[3], Dumper([$Bitmap, unpack 'H*', $data]) });
 
     my $resp = {};
     my $offset = 0;
@@ -380,8 +380,8 @@ sub ParseFileParms { # {{{1
 sub ParseDirParms { # {{{1
     my ($Bitmap, $data) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug(sprintf 'called %s(%s)',
-                    (caller 0)[3], Dumper([$Bitmap, unpack 'H*', $data]));
+    $logger->debug(sub { sprintf 'called %s(%s)',
+      (caller 3)[3], Dumper([$Bitmap, unpack 'H*', $data]) });
 
     my $resp = {};
     my $offset = 0;
