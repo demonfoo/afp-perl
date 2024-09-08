@@ -2005,7 +2005,7 @@ sub FPGetSrvrMsg { # {{{1
     }
     else { # not UTF8, just a plain pstring (?)
         ($MessageType, $MessageBitmap, $ServerMessage) =
-                unpack 'S>S>nC/a', $resp;
+                unpack 'S>S>C/a', $resp;
         $Length = length $ServerMessage;
     }
     ${$resp_r} = {
