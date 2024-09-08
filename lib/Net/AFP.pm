@@ -3234,8 +3234,9 @@ sub FPWrite { # {{{1
         },
         OForkRefNum => { type => SCALAR },
         Offset      => { type => SCALAR },
-        ForkData    => { type => SCALARREF },
+        ForkData    => { type => SCALARREF, optional => 1 },
         ReqCount    => { type => SCALAR, optional => 1 },
+        FromFH      => { type => HANDLE, optional => 1 },
     } );
     $options{ReqCount} ||= length ${$options{ForkData}};
 
@@ -3244,7 +3245,7 @@ sub FPWrite { # {{{1
 
     my $resp;
     my $rc = $self->SendAFPWrite($msg, @options{qw[ForkData ReqCount]},
-            \$resp);
+            \$resp, $options{FromFH});
     if ($rc == $kFPNoErr && wantarray) {
         return($rc, unpack 'L>', $resp);
     }
@@ -3266,8 +3267,9 @@ sub FPWriteExt { # {{{1
         },
         OForkRefNum => { type => SCALAR },
         Offset      => { type => SCALAR },
-        ForkData    => { type => SCALARREF },
+        ForkData    => { type => SCALARREF, optional => 1 },
         ReqCount    => { type => SCALAR, optional => 1 },
+        FromFH      => { type => HANDLE, optional => 1 },
     } );
     $options{ReqCount} ||= length ${$options{ForkData}};
 
@@ -3276,7 +3278,7 @@ sub FPWriteExt { # {{{1
 
     my $resp;
     my $rc = $self->SendAFPWrite($msg, @options{qw[ForkData ReqCount]},
-            \$resp);
+            \$resp, $options{FromFH});
     if ($rc == $kFPNoErr && wantarray) {
         return($rc, unpack 'Q>', $resp);
     }

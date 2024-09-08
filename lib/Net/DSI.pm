@@ -36,6 +36,71 @@ use Thread::Semaphore;
 use Socket qw(TCP_NODELAY IPPROTO_TCP);
 use Readonly;
 use Class::InsideOut qw(public readonly private register id);
+use Fcntl qw(SEEK_CUR);
+
+my $do_sendfile = undef;
+
+eval {
+    require Sys::Sendfile;
+    1;
+} and do {
+    $do_sendfile ||= sub {
+        my ($from, $sock, $len) = @_;
+        my $off = sysseek $from, 0, SEEK_CUR;
+        my $wlen = Sys::Sendfile::sendfile($sock, $from, $len, $off);
+        sysseek $from, $len, SEEK_CUR;
+        return $wlen;
+    };
+};
+
+eval {
+    require Linux::PipeMagic;
+    1;
+} and do {
+    $do_sendfile ||= sub {
+        my ($from, $sock, $len) = @_;
+        return Linux::PipeMagic::syssendfile($sock, $from,
+              $len);
+    };
+};
+
+eval {
+    require Sys::Syscall;
+    1;
+} and do {
+    if (Sys::Syscall::sendfile_defined()) {
+        $do_sendfile ||= sub {
+            my ($from, $sock, $len) = @_;
+            my $wlen = Sys::Syscall::sendfile($sock->fileno, $from->fileno, $len);
+            return $wlen == -1 ? undef : $wlen;
+        };
+    }
+};
+
+eval {
+    require IO::SendFile;
+    1;
+} and do {
+    $do_sendfile ||= sub {
+        my ($from, $sock, $len) = @_;
+        return IO::SendFile::sendfile($sock->fileno, $from->fileno,
+          my $offset = 0, $len);
+    };
+};
+
+eval {
+    require Sys::Sendfile::FreeBSD;
+    1;
+} and do {
+    $do_sendfile ||= sub {
+        my ($from, $sock, $len) = @_;
+        my $off = sysseek $from, 0, SEEK_CUR;
+        Sys::Sendfile::FreeBSD::sendfile($from->fileno,
+          $sock->fileno, $off, $len, my $wlen = 0);
+        sysseek $from, $len, SEEK_CUR;
+        return $wlen;
+    };
+};
 
 Readonly my $OP_DSI_CLOSESESSION        => 1;   # to and from server
 Readonly my $OP_DSI_COMMAND             => 2;   # to server only
@@ -365,7 +430,7 @@ sub close { # {{{1
 #               receive the return code from the callout. If no response is
 #               desired, this should be undef.
 sub SendMessage { # {{{1
-    my ($self, $cmd, $message, $data_r, $d_len, $sem, $resp_r, $rc) = @_;
+    my ($self, $cmd, $message, $data_r, $d_len, $sem, $resp_r, $rc, $from_fh) = @_;
     #my $logger = Log::Log4perl->get_logger(__PACKAGE__);
     #$logger->debug(sub { sprintf q{called %s()}, (caller(3))[3] });
 
@@ -436,6 +501,26 @@ sub SendMessage { # {{{1
         $wlen += syswrite $conn{id $self}, $msg, length($msg) - $wlen, $wlen;
     }
     if ($d_len) {
+        if (defined $from_fh) {
+            undef $wlen;
+            if (defined $do_sendfile) {
+                $wlen = &{$do_sendfile}($from_fh, $conn{id $self}, $d_len);
+
+                if (defined $wlen) {
+                    $ourshared->{conn_sem}->up();
+
+                    return $reqId;
+                }
+                # if the above doesn't happen, sendfile failed, so I guess
+                # let's not do that again.
+                undef $do_sendfile;
+            }
+
+            # uh, so there's no sendfile option available to us... so I
+            # guess we have to just read it ourselves, and write it anyway.
+            # I don't like it, but we seem to be out of options.
+            sysread $from_fh, ${$data_r}, $d_len;
+        }
         $wlen = 0;
         while ($wlen < $d_len) {
             $wlen += syswrite $conn{id $self}, ${$data_r}, $d_len - $wlen,
@@ -558,14 +643,14 @@ sub DSITickle { # {{{1
 sub DSIWrite { return Write(@_); }
 sub Write { # {{{1
     # This should only be used for FPWrite and FPAddIcon
-    my ($self, $message, $data_r, $d_len, $resp_r) = @_;
+    my ($self, $message, $data_r, $d_len, $resp_r, $from_fh) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     my $sem;
     my $rc;
     my $reqId = $self->SendMessage($OP_DSI_WRITE, $message, $data_r, $d_len,
-            $sem, $resp_r, $rc);
+            $sem, $resp_r, $rc, $from_fh);
     return $reqId if $reqId < 0;
     $sem->down();
     push @{$shared{id $self}{sems}}, $sem;
