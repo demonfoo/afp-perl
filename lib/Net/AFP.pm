@@ -340,7 +340,7 @@ sub FPAccess { # {{{1
                 'valid access flags' => sub {
                     my $mask = ($KAUTH_VNODE_GENERIC_ALL_BITS |
                             $KAUTH_VNODE_WRITE_RIGHTS);
-                    not ($_[0] & ~$mask);
+                    not $_[0] & ~$mask;
                 },
             }
         },
@@ -427,7 +427,7 @@ sub FPAddComment { # {{{1
 sub FPAddIcon { # {{{1
     my($self, @options) = @_;
 
-    $self->{logger}->debug(sub {sprintf q{called %s(%s)},
+    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper({@options}) });
     my %options = validate(@options, {
         DTRefNum    => { type => SCALAR },
@@ -455,7 +455,7 @@ sub FPByteRangeLock { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid flags' => sub { !(~0x81 & $_[0]) },
+                'valid flags' => sub { not ~0x81 & $_[0] },
             }
         },
         OForkRefNum => { type => SCALAR },
@@ -1621,7 +1621,7 @@ sub FPGetACL { # {{{1
 
     if ($rvals{Bitmap} & $kFileSec_ACL) {
         my $acl_entrycount;
-        ($acl_entrycount, $rvals{acl_flags}, $resp) = unpack 'NNa*', $resp;
+        ($acl_entrycount, $rvals{acl_flags}, $resp) = unpack 'L>L>a*', $resp;
         my @entries = unpack "(a[16]L>L>)[${acl_entrycount}]", $resp;
         my @acl_ace = ();
         for my $i (0 .. $acl_entrycount - 1) {
@@ -2437,6 +2437,9 @@ sub FPMapName { # {{{1
             croak('Module UUID was not available!');
         }
 
+        # HACK: For some reason $resp's contents aren't visible until it
+        # gets accessed?
+        if (length($resp)) { }
         UUID::unparse($resp, ${$resp_r});
     }
     else {

@@ -156,8 +156,6 @@ MAINLOOP:
             if ($ev & POLLHUP) {
                 # If this happens, the socket is (almost certainly) no
                 # longer connected to the peer, so we should bail.
-                #print {\*STDERR} (caller(0))[3], "(): Received HUP on AFP server connection, terminating loop\n";
-                #last MAINLOOP;
                 $logger->warn(sub { sprintf q{%s(): poll returned POLLHUP, but } .
                   q{this is indeterminate}, (caller 3)[3] });
             }
@@ -216,15 +214,16 @@ MAINLOOP:
                 }
 
                 elsif ($cmd == $OP_DSI_TICKLE) {
-                    #print {\*STDERR} (caller(0))[3], "(): Received tickle packet at $last_pkt_rcvd\n";
                     $sem->up();
                     next MAINLOOP;
                 }
 
                 else {
+                    $sem->up();
                     $logger->warn(sub { sprintf qq{%s(): Unexpected packet received:\n%s},
                       (caller 3)[3], Dumper({ type => $type, cmd => $cmd, id => $id,
                       errcode => $errcode, length => $length, reserved => $reserved }) });
+                    next MAINLOOP;
                 }
             } else {
                 # Check for a completion handler block for the given message ID.
