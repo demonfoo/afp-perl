@@ -3607,8 +3607,8 @@ Character for determining where the read should terminate.
 Returns:
 
 A scalar indicating the error code from the call. Upon success, a list
-containing the error code and a string containing the data read from the
-referenced fork.
+containing the error code and a reference pointing to a string containing
+the data read from the referenced fork.
 
 Error replies:
 
@@ -3670,8 +3670,8 @@ Number of bytes to read.
 Returns:
 
 A scalar indicating the error code from the call. Upon success, a list
-containing the error code and a string containing the data read from the
-referenced fork.
+containing the error code and a reference pointing to a string containing
+the data read from the referenced fork.
 
 Error replies:
 

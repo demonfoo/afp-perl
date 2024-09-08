@@ -392,9 +392,9 @@ my %commands = (
                         OForkRefNum => $resp{OForkRefNum},
                         Offset      => $pos,
                         ReqCount    => 1024);
-                print $data;
-                last if $rc != $kFPNoErr || $data eq q{};
-                $pos += length $data;
+                last if $rc != $kFPNoErr || ${$data} eq q{};
+                print ${$data};
+                $pos += length ${$data};
             }
             $rc = $session->FPCloseFork($resp{OForkRefNum});
             if ($rc != $kFPNoErr) {
@@ -513,10 +513,10 @@ _EOT_
                     Offset      => $pos,
                     ReqCount    => $rlen);
             last if $rc != $kFPNoErr and $rc != $kFPEOFErr;
-            syswrite $local_fh, $data;
+            syswrite $local_fh, ${$data};
             $pos += $rlen;
             $time = gettimeofday();
-            if (($time - $lasttime > 0.5) || $rc != $kFPNoErr) {
+            if (($time - $lasttime > 0.5) or $rc != $kFPNoErr or $pos >= $len) {
                 $delta = $time - $starttime;
                 $rate = 0;
                 $mult = q{ };
@@ -1020,7 +1020,7 @@ sub do_listentries {
                         Offset      => 0,
                         ReqCount    => 1024);
                 $rc = $session->FPCloseFork($resp{OForkRefNum});
-                print q{ -> }, $data;
+                print q{ -> }, ${$data};
             }
         }
         print "\n";

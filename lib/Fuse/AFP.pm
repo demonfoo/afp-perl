@@ -7,6 +7,7 @@ use base qw(Fuse::Class);
 use strict;
 use warnings;
 use diagnostics;
+use feature qw(refaliasing);
 
 # Tell Perl we need to be run in at least v5.10.
 use 5.010;
@@ -674,7 +675,7 @@ sub readlink { # {{{1
         }
         return -EACCES() if $rc == $kFPAccessDenied;
         return -EINVAL() if $rc != $kFPNoErr and $rc != $kFPEOFErr;
-        $linkpath .= $readtext;
+        $linkpath .= ${$readtext};
     } while ($rc != $kFPEOFErr);
     $self->{afpconn}->FPCloseFork($sresp{OForkRefNum});
     if ($self->{dotdothack}) {
@@ -1460,7 +1461,7 @@ sub read { # {{{1
                 Offset      => $off,
                 ReqCount    => $len);
     }
-    return $resp      if $rc == $kFPNoErr
+    return ${$resp}   if $rc == $kFPNoErr
             or $rc == $kFPEOFErr;
     return -EBADF()   if $rc == $kFPAccessDenied;
     return -ETXTBSY() if $rc == $kFPLockErr;
@@ -1989,7 +1990,7 @@ sub getxattr { # {{{1
 
             $self->{afpconn}->FPCloseFork($resp{OForkRefNum});
 
-            return $readtext;
+            return ${$readtext};
         }
         return -ENOTSUP() if not $self->{volAttrs} & $kSupportsExtAttrs;
 
@@ -2870,10 +2871,11 @@ sub read_buf {
     my $rc;
     {
         no strict qw(refs);
-        ($rc, $bufvec->[0]{mem}) = &{$self->{ReadFn}}($self->{afpconn},
+        ($rc, my $dref) = &{$self->{ReadFn}}($self->{afpconn},
                 OForkRefNum => $fh,
                 Offset      => $off,
                 ReqCount    => $len);
+        \$bufvec->[0]{mem} = $dref;
     }
     $bufvec->[0]{size} = length $bufvec->[0]{mem};
     return $bufvec->[0]{size} if $rc == $kFPNoErr or $rc == $kFPEOFErr;

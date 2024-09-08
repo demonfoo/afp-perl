@@ -2683,7 +2683,7 @@ sub FPRead { # {{{1
     croak('Need to accept returned list') if not wantarray;
     my $rdata;
     my $rc = $self->SendAFPMessage($msg, \$rdata);
-    return($rc, $rdata);
+    return($rc, \$rdata);
 } # }}}1
 
 sub FPReadExt { # {{{1
@@ -2703,7 +2703,7 @@ sub FPReadExt { # {{{1
     croak('Need to accept returned list') if not wantarray;
     my $rdata;
     my $rc = $self->SendAFPMessage($msg, \$rdata);
-    return($rc, $rdata);
+    return($rc, \$rdata);
 } # }}}1
 
 sub FPRemoveAPPL { # {{{1
