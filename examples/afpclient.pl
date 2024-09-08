@@ -52,7 +52,7 @@ use Fcntl qw(:mode);
 
 # Find out the character encoding for the current terminal.
 my $term_enc = langinfo(CODESET);
-my $blksize  = 262_144;
+my $blksize  = 1<<19;
 
 # If you're in Windows, you'll probably just get a codepage number.
 if ($OSNAME eq 'MSWin32' && $term_enc =~ m{^\d+$}sm) {
@@ -222,8 +222,7 @@ my $volAttrs = $volInfo->{Attribute};
 my $client_uuid;
 if ($volAttrs & $kSupportsACLs) {
     if ($has_UUID) {
-        UUID::generate($client_uuid);
-        UUID::unparse($client_uuid, $client_uuid);
+        $client_uuid = UUID::uuid();
     }
     else {
         print {*STDERR} "WARNING: Need UUID class for full ACL functionality, ACL checking disabled\n";
@@ -480,6 +479,7 @@ _EOT_
             return 1;
         }
         binmode $local_fh;
+        truncate $local_fh, 0;
 
         my $sresp = q{};
         my $bitmap = $DForkLenFlag | $RForkLenFlag;
@@ -493,52 +493,57 @@ _EOT_
         if ($sresp->{$RForkLenKey} > 0) {
             print "note that the resource fork isn't handled yet!\n";
         }
+        my $len = $sresp->{$DForkLenKey};
         STDOUT->autoflush(1);
         my $pos = 0;
-        my(%time, %lasttime, %starttime);
-        @time{'sec', 'usec'} = gettimeofday();
-        %starttime = %time;
-        my $i = 0;
+        my($time, $lasttime, $starttime, $data, $rate, $delta, $mult, $pcnt,
+          $twidth, $rlen);
+        $twidth = 80; # if we can't ascertain, go with safe default
+        $starttime = $time = gettimeofday();
+        $lasttime = 0;
+
         while (1) {
-            my $data;
+            $rlen = $blksize;
+            if ($pos + $blksize > $len) {
+                $rlen = $len - $pos;
+                last if $rlen == 0;
+            }
             ($rc, $data) = &{$ReadFn}($session,
                     OForkRefNum => $resp{OForkRefNum},
                     Offset      => $pos,
-                    ReqCount    => $blksize);
-            print {$local_fh} $data;
-            my $rate = 0;
-            my $delta = (($time{sec} - $starttime{sec}) +
-                    (($time{usec} - $starttime{usec}) / 1_000_000.0));
-            my $mult = q{ };
-            if ($delta > 0) {
-                $rate = $pos / $delta;
-                if ($rate > 1_000) {
-                    $rate /= 1_000.0;
-                    $mult = q{K};
+                    ReqCount    => $rlen);
+            last if $rc != $kFPNoErr and $rc != $kFPEOFErr;
+            syswrite $local_fh, $data;
+            $pos += $rlen;
+            $time = gettimeofday();
+            if (($time - $lasttime > 0.5) || $rc != $kFPNoErr) {
+                $delta = $time - $starttime;
+                $rate = 0;
+                $mult = q{ };
+                if ($delta > 0) {
+                    $rate = $pos / $delta;
+                    if ($rate > 1_000) {
+                        $rate /= 1_000.0;
+                        $mult = q{K};
+                    }
+                    if ($rate > 1_000) {
+                        $rate /= 1_000.0;
+                        $mult = q{M};
+                    }
+                    if ($rate > 1_000) {
+                        $rate /= 1_000.0;
+                        $mult = q{G};
+                    }
                 }
-                if ($rate > 1_000) {
-                    $rate /= 1_000.0;
-                    $mult = q{M};
-                }
-                if ($rate > 1_000) {
-                    $rate /= 1_000.0;
-                    $mult = q{G};
-                }
-            }
-            my $pcnt = ($pos + length $data) * 100 / $sresp->{$DForkLenKey};
-            if (($i % 100 == 0) || $rc != $kFPNoErr) {
-                my $twidth = 80; # if we can't ascertain, go with safe default
+                $pcnt = $pos * 100 / $len;
                 if ($has_Term__ReadKey) {
                     $twidth = (GetTerminalSize())[0];
                 }
-                printf ' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
+                printf qq{\r %3d%%  |%-25s|  %-} . ($twidth - 52) . 's  %5.2f %sB/sec', $pcnt,
                         q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult;
+                $lasttime = $time;
+                last if $rc != $kFPNoErr;
             }
-            last if $rc != $kFPNoErr;
-            $pos += length $data;
-            %lasttime = %time;
-            @time{'sec', 'usec'} = gettimeofday();
-            $i++;
         }
         print "\n";
         close($local_fh) || carp(q{Couldn't close local file});
@@ -607,15 +612,13 @@ _EOT_
         my $fileLen = (stat $srcFile)[7];
         STDOUT->autoflush(1);
         my $pos = 0;
-        my(%time, %lasttime, %starttime);
-        @time{'sec', 'usec'} = gettimeofday();
-        %starttime = %time;
-        my $total = 0;
-        my $wcount = 0;
-        my $i = 0;
+        my($time, $lasttime, $starttime, $rate, $delta, $mult, $pcnt, $twidth,
+          $wcount, $data, $rcnt);
+        $twidth = 80; # if we can't ascertain, go with safe default
+        $starttime = $time = gettimeofday();
+        $lasttime = 0;
         while (1) {
-            my $data;
-            my $rcnt = read $srcFile, $data, $blksize;
+            $rcnt = read $srcFile, $data, $blksize;
             last if $rcnt == 0;
             # try a direct write, and see how far we get; zero-copy is
             # preferred if possible.
@@ -625,58 +628,43 @@ _EOT_
                     Offset      => 0,
                     ForkData    => \$data);
 
-            while ($wcount < ($total + $rcnt) && $rc == $kFPNoErr) {
-                my $dchunk = substr $data, $wcount - $total,
-                        $total + $rcnt - $wcount;
-                ($rc, $wcount) = &{$WriteFn}($session,
-                        Flag        => $kFPStartEndFlag,
-                        OForkRefNum => $resp{OForkRefNum},
-                        Offset      => 0,
-                        ForkData    => \$dchunk);
-            }
-            $total += $rcnt;
-            my $rate = 0;
-            my $delta = (($time{sec} - $starttime{sec}) +
-                    (($time{usec} - $starttime{usec}) / 1_000_000.0));
-            my $mult = q{ };
-            if ($delta > 0) {
-                $rate = $pos / $delta;
-                if ($rate > 1_000) {
-                    $rate /= 1_000.0;
-                    $mult = q{K};
+            $rate = 0;
+            $delta = $time - $starttime;
+            $mult = q{ };
+            if (($time - $lasttime > 0.5) || $fileLen <= $wcount) {
+                if ($delta > 0) {
+                    $rate = $pos / $delta;
+                    if ($rate > 1_000) {
+                        $rate /= 1_000.0;
+                        $mult = q{K};
+                    }
+                    if ($rate > 1_000) {
+                        $rate /= 1_000.0;
+                        $mult = q{M};
+                    }
+                    if ($rate > 1_000) {
+                        $rate /= 1_000.0;
+                        $mult = q{G};
+                    }
                 }
-                if ($rate > 1_000) {
-                    $rate /= 1_000.0;
-                    $mult = q{M};
-                }
-                if ($rate > 1_000) {
-                    $rate /= 1_000.0;
-                    $mult = q{G};
-                }
-            }
-            my $pcnt = ($pos + length $data) * 100 / $fileLen;
-            if (($i % 100 == 0) || $rc != $kFPNoErr || $pcnt == 100) {
-                my $twidth = 80; # if we can't ascertain, go with safe default
+                $pcnt = $wcount * 100 / $fileLen;
                 if ($has_Term__ReadKey) {
                     $twidth = (GetTerminalSize())[0];
                 }
-                printf ' %3d%%  |%-25s|  %-' . ($twidth - 52) . 's  %5.2f %sB/sec' . "\r", $pcnt,
+                printf qq{\r %3d%%  |%-25s|  %-} . ($twidth - 52) . 's  %5.2f %sB/sec', $pcnt,
                         q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult;
+                $lasttime = $time;
             }
-            last if $rc != $kFPNoErr;
-            $pos += $rcnt;
-            %lasttime = %time;
-            @time{'sec', 'usec'} = gettimeofday();
             if ($rc != $kFPNoErr) {
                 print 'Write to file on server failed with return code ', $rc,
                         ' (', afp_strerror($rc), ")\n";
                 last;
             }
-            $i++;
+            last if $rc != $kFPNoErr or $fileLen <= $wcount;
+            $pos = $wcount;
+            $time = gettimeofday();
         }
-        #if ($hashmarks_enabled == 1) {
         print "\n";
-        #}
         close($srcFile) || carp(q{Couldn't close local file});
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != $kFPNoErr) {

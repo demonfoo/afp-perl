@@ -318,8 +318,7 @@ sub new { # {{{1
 
     if ($obj->{volAttrs} & $kSupportsACLs) {
         if ($has_UUID) {
-            UUID::generate($obj->{client_uuid});
-            UUID::unparse($obj->{client_uuid}, $obj->{client_uuid});
+            $obj->{client_uuid} = UUID::uuid();
         }
         else {
             $obj->{logger}->info(q{Need UUID class for full ACL } .
@@ -334,7 +333,7 @@ sub new { # {{{1
     # lookup node ID for subpath mount {{{2
     if (defined $urlparms{subpath}) {
         $obj->{logger}->debug(sub { sprintf q{Looking up directory "%s" as pivot } .
-          q{point for root node}, $urlparms{subpath}});
+          q{point for root node}, $urlparms{subpath} });
         my $realdirpath = translate_path($urlparms{subpath}, $obj);
         my $dirbitmap = $kFPNodeIDBit;
 
@@ -347,7 +346,7 @@ sub new { # {{{1
                 PathType        => $obj->{pathType},
                 Pathname        => $realdirpath);
 
-        if ($rc != $kFPNoErr || !exists $resp->{NodeID}) {
+        if ($rc != $kFPNoErr or not exists $resp->{NodeID}) {
             $obj->{logger}->error('Specified directory not found');
             $obj->disconnect();
             return ENOENT;
@@ -1604,7 +1603,7 @@ sub fsync { # {{{1
 
     return 0 if ref $fh;
 
-    if (!$flags) {
+    if (not $flags) {
         return $self->flush($file, $fh);
     }
     return 0;
@@ -1713,13 +1712,13 @@ sub setxattr { # {{{1
         return 0;
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ m{^user[.]}sm || $OSNAME eq 'darwin') {
+    elsif ($attr =~ m{^user[.]}sm or $OSNAME eq 'darwin') {
         if ($OSNAME ne 'darwin') {
             $attr =~ s{^user[.]}{}sm;
         }
 
-        if ($attr eq 'com.apple.FinderInfo' &&
-                !($self->{volAttrs} & $kSupportsExtAttrs)) {
+        if ($attr eq 'com.apple.FinderInfo' and
+                not ($self->{volAttrs} & $kSupportsExtAttrs)) {
             # If FinderInfo is already set to something (there's always data
             # there, but I'm interpreting "existence" to mean "data is there
             # and it's something that's not 32 bytes of 0"), apply special
@@ -1934,8 +1933,8 @@ sub getxattr { # {{{1
             $attr =~ s{^user[.]}{}sm;
         }
 
-        if ($attr eq 'com.apple.FinderInfo' &&
-                !($self->{volAttrs} & $kSupportsExtAttrs)) {
+        if ($attr eq 'com.apple.FinderInfo' and
+                not ($self->{volAttrs} & $kSupportsExtAttrs)) {
             my($rc, $resp) = $self->{afpconn}->FPGetFileDirParms(
                     VolumeID        => $self->{volID},
                     DirectoryID     => $self->{topDirID},
@@ -2097,13 +2096,13 @@ sub listxattr { # {{{1
             PathType        => $self->{pathType},
             Pathname        => $filename);
 
-    if (!($self->{volAttrs} & $kSupportsExtAttrs)
-            && exists($resp->{FinderInfo})
-            && $resp->{FinderInfo} ne "\0" x 32) {
+    if (not ($self->{volAttrs} & $kSupportsExtAttrs)
+            and exists($resp->{FinderInfo})
+            and $resp->{FinderInfo} ne "\0" x 32) {
         push @attrs, 'com.apple.FinderInfo';
     }
 
-    if (exists($resp->{$self->{RForkLenKey}}) &&
+    if (exists($resp->{$self->{RForkLenKey}}) and
             $resp->{$self->{RForkLenKey}} > 0) {
         push @attrs, 'com.apple.ResourceFork';
     }
@@ -2196,7 +2195,7 @@ sub removexattr { # {{{1
     } # }}}2
     # handle comment xattr {{{2
     # comment stuff is deprecated as of AFP 3.3...
-    elsif ($attr eq $COMMENT_XATTR && defined $self->{DTRefNum}) {
+    elsif ($attr eq $COMMENT_XATTR and defined $self->{DTRefNum}) {
         # Remove the finder comment, if one is present.
         my $rc = $self->{afpconn}->FPRemoveComment($self->{DTRefNum},
                 $self->{topDirID}, $self->{pathType}, $filename);
@@ -2207,13 +2206,13 @@ sub removexattr { # {{{1
         return 0;
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ m{^user[.]}sm || $OSNAME eq 'darwin') {
+    elsif ($attr =~ m{^user[.]}sm or $OSNAME eq 'darwin') {
         if ($OSNAME ne 'darwin') {
             $attr =~ s{^user[.]}{}sm;
         }
 
-        if ($attr eq 'com.apple.FinderInfo' &&
-                !($self->{volAttrs} & $kSupportsExtAttrs)) {
+        if ($attr eq 'com.apple.FinderInfo' and
+                not ($self->{volAttrs} & $kSupportsExtAttrs)) {
             my $rc = $self->{afpconn}->FPSetFileDirParms(
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
@@ -2331,7 +2330,7 @@ sub readdir { # {{{1
     my $entrycount = 100;
 
     # Add '.' and '..' entries {{{2
-    if (!$offset) {
+    if (not $offset) {
         # If offset is 0, this is the first request, so '.' and '..' should
         # definitely be passed
         push @fileslist, [++$offset, q{.}], [++$offset, q{..}];
@@ -2410,7 +2409,7 @@ sub fsyncdir { # {{{1
 
     $self->{callcount}{(caller 0)[3]}++;
 
-    if (!$flags) {
+    if (not $flags) {
         my $rc = $self->FPSyncDir($self->{volID}, $dh);
         return -ENOENT() if $rc == $kFPParamErr;
         return -EACCES() if $rc == $kFPAccessDenied;

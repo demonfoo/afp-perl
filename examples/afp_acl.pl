@@ -159,14 +159,8 @@ my @ace_flags_info = ( # {{{1
 ); # }}}1
 
 # Assemble the rights descriptions into a hash by name.
-my %ace_rights_byname;
-foreach (@ace_rights_info) {
-    $ace_rights_byname{$_->{name}} = $_;
-}
-my %ace_flags_byname;
-foreach (@ace_flags_info) {
-    $ace_flags_byname{$_->{name}} = $_;
-}
+my %ace_rights_byname = map { $_->{name}, $_ } @ace_rights_info;
+my %ace_flags_byname  = map { $_->{name}, $_ } @ace_flags_info;
 
 # Error strings for the errors that we might get...
 my %errors = ( # {{{1

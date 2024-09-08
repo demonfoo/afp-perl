@@ -178,10 +178,10 @@ sub PackagePath { # {{{1
     elsif ($PathType == $kFPUTF8Name) {
         my $encodedPath = encode_utf8(decompose($Pathname));
         if ($NoEncType) {
-            return pack 'Cn/a*', $PathType, $encodedPath;
+            return pack 'CS>/a*', $PathType, $encodedPath;
         }
         else {
-            return pack 'CNn/a*', $PathType, 0, $encodedPath;
+            return pack 'CL>S>/a*', $PathType, 0, $encodedPath;
         }
     }
     $logger->error(sub { sprintf q{Invalid path type %s; called from '%s', line %d},
@@ -340,7 +340,7 @@ sub FPAccess { # {{{1
                 'valid access flags' => sub {
                     my $mask = ($KAUTH_VNODE_GENERIC_ALL_BITS |
                             $KAUTH_VNODE_WRITE_RIGHTS);
-                    !($_[0] & ~$mask);
+                    not ($_[0] & ~$mask);
                 },
             }
         },
@@ -361,7 +361,7 @@ sub FPAccess { # {{{1
         croak('Module UUID was not available!');
     }
     UUID::parse($options{UUID}, $uuid);
-    my $msg = pack 'CxnNna[16]Na*', $kFPAccess,
+    my $msg = pack 'CxS>L>S>a[16]L>a*', $kFPAccess,
             @options{qw[VolumeID DirectoryID Bitmap]},
             $uuid, $options{ReqAccess},
             PackagePath(@options{qw[PathType Pathname]});
@@ -390,7 +390,7 @@ sub FPAddAPPL { # {{{1
         Pathname    => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNNNa*', $kFPAddAPPL,
+    my $msg = pack 'CxS>L>L>L>a*', $kFPAddAPPL,
             @options{qw[DTRefNum DirectoryID FileCreator ApplTag]},
             PackagePath(@options{qw[PathType Pathname]});
     return $self->SendAFPMessage($msg);
@@ -417,7 +417,7 @@ sub FPAddComment { # {{{1
         Comment     => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNa*x![s]C/a', $kFPAddComment,
+    my $msg = pack 'CxS>L>a*x![s]C/a', $kFPAddComment,
             @options{qw[DTRefNum DirectoryID]},
             PackagePath(@options{qw[PathType Pathname]}),
             $options{Comment};
@@ -439,7 +439,7 @@ sub FPAddIcon { # {{{1
         IconBitmap  => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNNCxNn', $kFPAddIcon,
+    my $msg = pack 'CxS>L>L>CxL>S>', $kFPAddIcon,
             @options{qw[DTRefNum FileCreator FileType IconType IconTag
             BitmapSize]};
     return $self->SendAFPWrite($msg, \$options{IconBitmap});
@@ -463,14 +463,14 @@ sub FPByteRangeLock { # {{{1
         Length      => { type => SCALAR },
     } );
 
-    my $msg = pack 'CCnl>l>', $kFPByteRangeLock,
+    my $msg = pack 'CCS>l>l>', $kFPByteRangeLock,
             @options{qw[Flags OForkRefNum Offset Length]};
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     return $rc if $rc != $kFPNoErr;
 
     croak('Need to accept returned list') if not wantarray;
-    return($rc, unpack 'N', $resp);
+    return($rc, unpack 'L>', $resp);
 } # }}}1
 
 sub FPByteRangeLockExt { # {{{1
@@ -483,7 +483,7 @@ sub FPByteRangeLockExt { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid flags' => sub { !(~0x81 & $_[0]) },
+                'valid flags' => sub { not ~0x81 & $_[0] },
             }
         },
         OForkRefNum => { type => SCALAR },
@@ -523,14 +523,14 @@ sub FPCatSearch {
             type            => SCALAR,
             default         => 0,
             callbacks       => {
-                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
             },
         },
         DirectoryRsltBitmap => {
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xBFFF & $_[0] },
             },
         },
         UTF8Name            => {
@@ -544,7 +544,7 @@ sub FPCatSearch {
                     my $mask = $kFPDeleteInhibitBit |
                                $kFPRenameInhibitBit |
                                $kFPWriteInhibitBit;
-                    !($_[0] & ~$mask);
+                    not $_[0] & ~$mask;
                 }
             },
             optional    => 1,
@@ -737,7 +737,7 @@ sub FPCatSearch {
             }
             elsif (ref($options{$items[0]}) eq q{}) {
                 $Specification1{$key} = $options{$items[0]};
-                if (!$not_in_spec2{$items[0]}) {
+                if (not $not_in_spec2{$items[0]}) {
                     $Specification2{$key} = $options{$items[0]};
                 }
             }
@@ -809,14 +809,14 @@ sub FPCatSearchExt {
             type            => SCALAR,
             default         => 0,
             callbacks       => {
-                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
             },
         },
         DirectoryRsltBitmap => {
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xBFFF & $_[0] },
             },
         },
         UTF8Name            => {
@@ -830,7 +830,7 @@ sub FPCatSearchExt {
                     my $mask = $kFPDeleteInhibitBit |
                                $kFPRenameInhibitBit |
                                $kFPWriteInhibitBit;
-                    !($_[0] & ~$mask);
+                    not $_[0] & ~$mask;
                 }
             },
             optional    => 1,
@@ -1023,7 +1023,7 @@ sub FPCatSearchExt {
             }
             elsif (ref($options{$items[0]}) eq q{}) {
                 $Specification1{$key} = $options{$items[0]};
-                if (!$not_in_spec2{$items[0]}) {
+                if (not $not_in_spec2{$items[0]}) {
                     $Specification2{$key} = $options{$items[0]};
                 }
             }
@@ -1097,7 +1097,7 @@ sub FPCloseDir { # {{{1
     my($VolumeID, $DirectoryID) =
             validate_pos(@options, { type => SCALAR }, { type => SCALAR });
 
-    return $self->SendAFPMessage(pack 'CxnN', $kFPCloseDir, $VolumeID,
+    return $self->SendAFPMessage(pack 'CxS>L>', $kFPCloseDir, $VolumeID,
             $DirectoryID);
 } # }}}1
 
@@ -1108,7 +1108,7 @@ sub FPCloseDT { # {{{1
 
     my($DTRefNum) = validate_pos(@options, { type => SCALAR });
 
-    return $self->SendAFPMessage(pack 'Cxn', $kFPCloseDT, $DTRefNum);
+    return $self->SendAFPMessage(pack 'CxS>', $kFPCloseDT, $DTRefNum);
 } # }}}1
 
 sub FPCloseFork { # {{{1
@@ -1118,7 +1118,7 @@ sub FPCloseFork { # {{{1
 
     my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
 
-    return $self->SendAFPMessage(pack('Cxn', $kFPCloseFork, $OForkRefNum),
+    return $self->SendAFPMessage(pack('CxS>', $kFPCloseFork, $OForkRefNum),
             undef, 1);
 } # }}}1
 
@@ -1129,7 +1129,7 @@ sub FPCloseVol { # {{{1
 
     my($VolumeID) = validate_pos(@options, { type => SCALAR });
 
-    return $self->SendAFPMessage(pack('Cxn', $kFPCloseVol, $VolumeID),
+    return $self->SendAFPMessage(pack('CxS>', $kFPCloseVol, $VolumeID),
             undef, 1);
 } # }}}1
 
@@ -1175,7 +1175,7 @@ sub FPCopyFile { # {{{1
         NewName             => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNnNa*a*a*', $kFPCopyFile,
+    my $msg = pack 'CxS>L>S>L>a*a*a*', $kFPCopyFile,
             @options{qw[SourceVolumeID SourceDirectoryID DestVolumeID
             DestDirectoryID]},
             PackagePath(@options{qw[SourcePathType SourcePathname]}),
@@ -1205,11 +1205,11 @@ sub FPCreateDir { # {{{1
     } );
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('CxnNa*', $kFPCreateDir,
+    my $rc = $self->SendAFPMessage(pack('CxS>L>a*', $kFPCreateDir,
             @options{qw[VolumeID DirectoryID]},
             PackagePath(@options{qw[PathType Pathname]})), \$resp, 1);
     if ($rc == $kFPNoErr and wantarray) {
-        return($rc, unpack 'N', $resp);
+        return($rc, unpack 'L>', $resp);
     }
     return $rc;
 } # }}}1
@@ -1235,7 +1235,7 @@ sub FPCreateFile { # {{{1
              Flag           => { type => SCALAR, default => 0 },
     } );
 
-    return $self->SendAFPMessage(pack('CCnNa*', $kFPCreateFile,
+    return $self->SendAFPMessage(pack('CCS>L>a*', $kFPCreateFile,
             @options{qw[Flag VolumeID DirectoryID]},
             PackagePath(@options{qw[PathType Pathname]})), undef, 1);
 } # }}}1
@@ -1261,7 +1261,7 @@ sub FPCreateID { # {{{1
     } );
 
     my $resp;
-    my $msg = pack 'CxnNa*', $kFPCreateID,
+    my $msg = pack 'CxS>L>a*', $kFPCreateID,
             @options{qw[VolumeID DirectoryID]},
             PackagePath(@options{qw[PathType Pathname]});
     my $rc = $self->SendAFPMessage($msg, \$resp);
@@ -1269,7 +1269,7 @@ sub FPCreateID { # {{{1
     if (not wantarray) {
         croak('Need to accept returned list');
     }
-    return($rc, unpack 'N', $resp);
+    return($rc, unpack 'L>', $resp);
 } # }}}1
 
 sub FPDelete { # {{{1
@@ -1293,7 +1293,7 @@ sub FPDelete { # {{{1
                 },
                 { type => SCALAR });
 
-    return $self->SendAFPMessage(pack('CxnNa*', $kFPDelete, $VolumeID,
+    return $self->SendAFPMessage(pack('CxS>L>a*', $kFPDelete, $VolumeID,
             $DirectoryID, PackagePath($PathType, $Pathname)), undef, 1);
 } # }}}1
 
@@ -1305,7 +1305,7 @@ sub FPDeleteID { # {{{1
     my($VolumeID, $FileID) = validate_pos(@options,
             { type => SCALAR }, { type => SCALAR });
 
-    return $self->SendAFPMessage(pack 'CxnN', $kFPDeleteID, $VolumeID,
+    return $self->SendAFPMessage(pack 'CxS>L>', $kFPDeleteID, $VolumeID,
             $FileID);
 } # }}}1
 
@@ -1317,7 +1317,7 @@ sub FPDisconnectOldSession { # {{{1
     my($Type, $Token) = validate_pos(@options,
             { type => SCALAR }, { type => SCALAR });
 
-    return $self->SendAFPMessage(pack 'CxnN/a', $kFPDisconnectOldSession,
+    return $self->SendAFPMessage(pack 'CxS>L>/a', $kFPDisconnectOldSession,
             $Type, $Token);
 } # }}}1
 
@@ -1333,14 +1333,14 @@ sub FPEnumerate { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
             },
         },
         DirectoryBitmap => {
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xBFFF & $_[0] },
             },
         },
         ReqCount        => { type => SCALAR },
@@ -1359,14 +1359,14 @@ sub FPEnumerate { # {{{1
     } );
     croak('Must accept array return') if not wantarray;
 
-    my $msg = pack 'CxnNnnnnna*', $kFPEnumerate,
+    my $msg = pack 'CxS>L>S>S>S>S>S>a*', $kFPEnumerate,
             @options{qw[VolumeID DirectoryID FileBitmap DirectoryBitmap
             ReqCount StartIndex MaxReplySize]},
             PackagePath(@options{qw[PathType Pathname]});
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return $rc if $rc != $kFPNoErr;
-    my($FileBitmap, $DirectoryBitmap) = unpack 'nn', $resp;
+    my($FileBitmap, $DirectoryBitmap) = unpack 'S>S>', $resp;
     my @results = map {
         # first byte indicates entry length, next byte contains the 
         # isFileDir bit
@@ -1379,7 +1379,7 @@ sub FPEnumerate { # {{{1
             # This child is a file
             ParseFileParms($FileBitmap, $OffspringParameters);
         }
-    } unpack 'x[n]x[n]n/(CX/a)', $resp;
+    } unpack 'x[s]x[s]S>/(CX/a)', $resp;
     return($rc, [@results]);
 } # }}}1
 
@@ -1395,14 +1395,14 @@ sub FPEnumerateExt { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
             },
         },
         DirectoryBitmap => {
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xBFFF & $_[0] },
             },
         },
         ReqCount        => { type => SCALAR },
@@ -1421,14 +1421,14 @@ sub FPEnumerateExt { # {{{1
     } );
     croak('Must accept array return') if not wantarray;
 
-    my $msg = pack 'CxnNnnnnna*', $kFPEnumerateExt,
+    my $msg = pack 'CxS>L>S>S>S>S>S>a*', $kFPEnumerateExt,
             @options{qw[VolumeID DirectoryID FileBitmap DirectoryBitmap
             ReqCount StartIndex MaxReplySize]},
             PackagePath(@options{qw[PathType Pathname]});
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return $rc if $rc != $kFPNoErr;
-    my($FileBitmap, $DirectoryBitmap) = unpack 'nn', $resp;
+    my($FileBitmap, $DirectoryBitmap) = unpack 'S>S>', $resp;
     my @results = map {
         # first 2 bytes indicate entry length, next byte contains the 
         # isFileDir bit, next byte is a pad
@@ -1439,7 +1439,7 @@ sub FPEnumerateExt { # {{{1
         else { # This child is a file
             ParseFileParms($FileBitmap, $OffspringParameters);
         }
-    } unpack 'x[n]x[n]n/(nX[n]/a)', $resp;
+    } unpack 'x[s]x[s]S>/(S>X[s]/a)', $resp;
     return($rc, [@results]);
 } # }}}1
 
@@ -1455,14 +1455,14 @@ sub FPEnumerateExt2 { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
             },
         },
         DirectoryBitmap => {
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xBFFF & $_[0] },
             },
         },
         ReqCount        => { type => SCALAR },
@@ -1481,14 +1481,14 @@ sub FPEnumerateExt2 { # {{{1
     } );
     croak('Must accept array return') if not wantarray;
 
-    my $msg = pack 'CxnNnnnNNa*', $kFPEnumerateExt2,
+    my $msg = pack 'CxS>L>S>S>S>L>L>a*', $kFPEnumerateExt2,
             @options{qw[VolumeID DirectoryID FileBitmap DirectoryBitmap
             ReqCount StartIndex MaxReplySize]},
             PackagePath(@options{qw[PathType Pathname]});
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return $rc if $rc != $kFPNoErr;
-    my($FileBitmap, $DirectoryBitmap) = unpack 'nn', $resp;
+    my($FileBitmap, $DirectoryBitmap) = unpack 'S>S>', $resp;
     my @results = map {
         # first 2 bytes indicate entry length, next byte contains the 
         # isFileDir bit, next byte is a pad
@@ -1499,7 +1499,7 @@ sub FPEnumerateExt2 { # {{{1
         else { # This child is a file
             ParseFileParms($FileBitmap, $OffspringParameters);
         }
-    } unpack 'x[n]x[n]n/(nX[n]/a)', $resp;
+    } unpack 'x[s]x[s]S>/(S>X[s]/a)', $resp;
     return($rc, [@results]);
 } # }}}1
 
@@ -1534,7 +1534,7 @@ sub FPExchangeFiles { # {{{1
         DestPathname        => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNNa*a*', $kFPExchangeFiles,
+    my $msg = pack 'CxS>L>L>a*a*', $kFPExchangeFiles,
             @options{qw[VolumeID SourceDirectoryID DestDirectoryID]},
             PackagePath(@options{qw[SourcePathType SourcePathname]}),
             PackagePath(@options{qw[DestPathType DestPathname]});
@@ -1548,7 +1548,7 @@ sub FPFlush { # {{{1
 
     my($VolumeID) = validate_pos(@options, { type => SCALAR });
 
-    return $self->SendAFPMessage(pack('Cxn', $kFPFlush, $VolumeID),
+    return $self->SendAFPMessage(pack('CxS>', $kFPFlush, $VolumeID),
             undef, 1);
 } # }}}1
 
@@ -1559,7 +1559,7 @@ sub FPFlushFork { # {{{1
 
     my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
 
-    return $self->SendAFPMessage(pack('Cxn', $kFPFlushFork, $OForkRefNum),
+    return $self->SendAFPMessage(pack('CxS>', $kFPFlushFork, $OForkRefNum),
             undef, 1);
 } # }}}1
 
@@ -1578,7 +1578,7 @@ sub FPGetACL { # {{{1
                 'valid flags' => sub {
                     my $mask = $kFileSec_UUID | $kFileSec_GRPUUID |
                             $kFileSec_ACL;
-                    !($_[0] & ~$mask);
+                    not $_[0] & ~$mask;
                 },
             }
         },
@@ -1595,7 +1595,7 @@ sub FPGetACL { # {{{1
         Pathname        => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNnNa*', $kFPGetACL,
+    my $msg = pack 'CxS>L>S>L>a*', $kFPGetACL,
             @options{qw[VolumeID DirectoryID Bitmap MaxReplySize]},
             PackagePath(@options{qw[PathType Pathname]});
     my $resp;
@@ -1603,7 +1603,7 @@ sub FPGetACL { # {{{1
     return $rc if $rc != $kFPNoErr;
     croak('Need to accept returned list') if not wantarray;
     my %rvals;
-    ($rvals{Bitmap}, $resp) = unpack 'na*', $resp;
+    ($rvals{Bitmap}, $resp) = unpack 'S>a*', $resp;
 
     if (not $has_UUID) {
         croak('Module UUID was not available!');
@@ -1622,7 +1622,7 @@ sub FPGetACL { # {{{1
     if ($rvals{Bitmap} & $kFileSec_ACL) {
         my $acl_entrycount;
         ($acl_entrycount, $rvals{acl_flags}, $resp) = unpack 'NNa*', $resp;
-        my @entries = unpack "(a[16]NN)[${acl_entrycount}]", $resp;
+        my @entries = unpack "(a[16]L>L>)[${acl_entrycount}]", $resp;
         my @acl_ace = ();
         for my $i (0 .. $acl_entrycount - 1) {
             my $uuid = shift @entries;
@@ -1651,19 +1651,19 @@ sub FPGetAPPL { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid flags' => sub { !(~0xFFFF & $_[0]) },
+                'valid flags' => sub { not ~0xFFFF & $_[0] },
             },
         },
     } );
 
-    my $msg = pack 'CxnNnn', $kFPGetAPPL,
+    my $msg = pack 'CxS>L>S>S>', $kFPGetAPPL,
             @options{qw[DTRefNum FileCreator APPLIndex Bitmap]};
 
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return($rc) if $rc != $kFPNoErr;
     croak('Need to accept returned list') if not wantarray;
-    my($Bitmap_n, $APPLTag, $data) = unpack 'nNa*', $resp;
+    my($Bitmap_n, $APPLTag, $data) = unpack 'S>L>a*', $resp;
     my $info = ParseFileParms($Bitmap_n, $data);
     my %rvals = (
                   Bitmap            => $Bitmap_n,
@@ -1730,7 +1730,7 @@ sub FPGetComment { # {{{1
         croak('Need to accept returned list');
     }
 
-    my $msg = pack 'CxnNa*', $kFPGetComment,
+    my $msg = pack 'CxS>L>a*', $kFPGetComment,
             @options{qw[DTRefNum DirectoryID]},
             PackagePath(@options{qw[PathType Pathname]});
     my $resp;
@@ -1785,7 +1785,7 @@ sub FPGetExtAttr { # {{{1
         Name            => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNnQ>Q>Na*x![s]n/a*', $kFPGetExtAttr,
+    my $msg = pack 'CxS>L>S>Q>Q>L>a*x![s]S>/a*', $kFPGetExtAttr,
             @options{qw[VolumeID DirectoryID Bitmap Offset ReqCount
             MaxReplySize]},
             PackagePath(@options{qw[PathType Pathname]}),
@@ -1796,10 +1796,10 @@ sub FPGetExtAttr { # {{{1
     croak('Need to accept returned list') if not wantarray;
     my %rvals;
     if ($options{MaxReplySize} > 0) {
-        @rvals{qw[Bitmap AttributeData]} = unpack 'nN/a*', $resp;
+        @rvals{qw[Bitmap AttributeData]} = unpack 'S>L>/a*', $resp;
     }
     else {
-        @rvals{qw[Bitmap DataLength]} = unpack 'nN', $resp;
+        @rvals{qw[Bitmap DataLength]} = unpack 'S>L>', $resp;
     }
     return($rc, %rvals);
 } # }}}1
@@ -1816,14 +1816,14 @@ sub FPGetFileDirParms { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
             },
         },
         DirectoryBitmap => {
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xBFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xBFFF & $_[0] },
             },
         },
         PathType        => {
@@ -1838,7 +1838,7 @@ sub FPGetFileDirParms { # {{{1
         Pathname        => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNnna*', $kFPGetFileDirParms,
+    my $msg = pack 'CxS>L>S>S>a*', $kFPGetFileDirParms,
             @options{qw[VolumeID DirectoryID FileBitmap DirectoryBitmap]},
             PackagePath(@options{qw[PathType Pathname]});
     my $resp;
@@ -1858,16 +1858,16 @@ sub FPGetForkParms { # {{{1
             {
                 type        => SCALAR,
                 callbacks   => {
-                    'valid bitmap' => sub { !(~0xFFFF & $_[0]) }
+                    'valid bitmap' => sub { not ~0xFFFF & $_[0] }
                 }
             },
             { type => SCALARREF });
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetForkParms,
+    my $rc = $self->SendAFPMessage(pack('CxS>S>', $kFPGetForkParms,
             $OForkRefNum, $Bitmap), \$resp);
     return $rc if $rc != $kFPNoErr;
-    ${$resp_r} = ParseFileParms(unpack 'na*', $resp);
+    ${$resp_r} = ParseFileParms(unpack 'S>a*', $resp);
     return $rc;
 } # }}}1
 
@@ -1884,7 +1884,7 @@ sub FPGetIcon { # {{{1
         Length      => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNNCxn', $kFPGetIcon,
+    my $msg = pack 'CxS>L>L>CxS>', $kFPGetIcon,
             @options{qw[DTRefNum FileCreator FileType IconType Length]};
     croak('Need to accept returned list') if not wantarray;
     my $rdata;
@@ -1905,13 +1905,13 @@ sub FPGetIconInfo { # {{{1
                 { type => SCALARREF });
 
     my $resp;
-    my $msg = pack 'CxnNn', $kFPGetIconInfo, $DTRefNum, $FileCreator,
+    my $msg = pack 'CxS>L>S>', $kFPGetIconInfo, $DTRefNum, $FileCreator,
             $IconIndex;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return($rc) if $rc != $kFPNoErr;
     ${$resp_r} = {};
     @{${$resp_r}}{qw[IconTag FileType IconType Size]} =
-            unpack 'NNCxn', $resp;
+            unpack 'L>L>CxS>', $resp;
     return $rc;
 } # }}}1
 
@@ -1951,7 +1951,7 @@ sub FPGetSessionToken { # {{{1
     my $msg = pack $pack_mask, @params;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     if ($rc == $kFPNoErr) {
-        ${$resp_r} = unpack 'N/a', $resp;
+        ${$resp_r} = unpack 'L>/a', $resp;
     }
     return $rc;
 } # }}}1
@@ -1988,24 +1988,24 @@ sub FPGetSrvrMsg { # {{{1
                 {
                     type        => SCALAR,
                     callbacks   => {
-                        'valid bitmap' => sub { !(~0x3 & $_[0]) }
+                        'valid bitmap' => sub { not ~0x3 & $_[0] }
                     }
                 },
                 { type => SCALARREF });
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetSrvrMsg, $MessageType,
+    my $rc = $self->SendAFPMessage(pack('CxS>S>', $kFPGetSrvrMsg, $MessageType,
             $MessageBitmap), \$resp);
     return $rc if $rc != $kFPNoErr;
     my ($Length, $ServerMessage);
     if ($MessageBitmap & 0x2) { # bit 1; means send message as UTF8
         ($Length, $MessageType, $MessageBitmap, $ServerMessage) =
-                unpack 'nnna*', $resp;
+                unpack 'S>S>S>a*', $resp;
         $ServerMessage = compose(decode_utf8($ServerMessage));
     }
     else { # not UTF8, just a plain pstring (?)
         ($MessageType, $MessageBitmap, $ServerMessage) =
-                unpack 'nnC/a', $resp;
+                unpack 'S>S>nC/a', $resp;
         $Length = length $ServerMessage;
     }
     ${$resp_r} = {
@@ -2067,29 +2067,29 @@ sub FPGetUserInfo { # {{{1
                 {
                     type        => SCALAR,
                     callbacks   => {
-                        'valid type' => sub { !(~0x1 & $_[0]) }
+                        'valid type' => sub { not ~0x1 & $_[0] }
                     }
                 },
                 { type => SCALAR },
                 {
                     type        => SCALAR,
                     callbacks   => {
-                        'valid bitmap' => sub { !(~0x7 & $_[0]) }
+                        'valid bitmap' => sub { not ~0x7 & $_[0] }
                     }
                 },
                 { type => SCALARREF });
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('CCNn', $kFPGetUserInfo, $Flags,
+    my $rc = $self->SendAFPMessage(pack('CCL>S>', $kFPGetUserInfo, $Flags,
             $UserID, $Bitmap), \$resp);
 
     return $rc if $rc != $kFPNoErr;
 
-    my $rbmp = unpack 'n', $resp;
+    my $rbmp = unpack 'S>', $resp;
     my $offset = 2;
     ${$resp_r} = {};
     if ($rbmp & 0x1) { # Get User ID bit
-        ${$resp_r}->{UserID} = unpack "x[${offset}]N", $resp;
+        ${$resp_r}->{UserID} = unpack "x[${offset}]L>", $resp;
         $offset += 4;
     }
     if ($rbmp & 0x2) {
@@ -2101,7 +2101,7 @@ sub FPGetUserInfo { # {{{1
         }
         else {
             ${$resp_r}->{PrimaryGroupID} =
-                    unpack "x[${offset}]N", $resp;
+                    unpack "x[${offset}]L>", $resp;
             $offset += 4;
         }
     }
@@ -2127,13 +2127,13 @@ sub FPGetVolParms { # {{{1
             {
                 type        => SCALAR,
                 callbacks   => {
-                    'valid bitmap' => sub { !(~0xFFF & $_[0]) }
+                    'valid bitmap' => sub { not ~0xFFF & $_[0] }
                 }
             },
             { type => SCALARREF });
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cxnn', $kFPGetVolParms, $VolumeID,
+    my $rc = $self->SendAFPMessage(pack('CxS>S>', $kFPGetVolParms, $VolumeID,
             $Bitmap), \$resp);
     return($rc) if $rc != $kFPNoErr;
     ${$resp_r} = ParseVolParms($resp, $self);
@@ -2176,7 +2176,7 @@ sub FPListExtAttrs { # {{{1
         Pathname        => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNnnNNa*', $kFPListExtAttrs,
+    my $msg = pack 'CxS>L>S>S>L>L>a*', $kFPListExtAttrs,
             @options{qw[VolumeID DirectoryID Bitmap ReqCount StartIndex
             MaxReplySize]},
             PackagePath(@options{qw[PathType Pathname]});
@@ -2187,12 +2187,12 @@ sub FPListExtAttrs { # {{{1
     my %rvals;
     if ($options{MaxReplySize} > 0) {
         my $names;
-        ($rvals{Bitmap}, $names) = unpack 'nN/a*', $resp;
+        ($rvals{Bitmap}, $names) = unpack 'S>L>/a*', $resp;
         $rvals{AttributeNames} =
                 [ map { compose(decode_utf8($_)) } unpack '(Z*)*', $names ];
     }
     else {
-        @rvals{qw[Bitmap DataLength]} = unpack 'nN', $resp;
+        @rvals{qw[Bitmap DataLength]} = unpack 'S>L>', $resp;
     }
     return($rc, %rvals);
 } # }}}1
@@ -2216,7 +2216,7 @@ sub FPLogin { # {{{1
 
     croak('Need to accept returned list') if not wantarray;
     if ($rc == $kFPAuthContinue and length($resp) >= 2) {
-        $rvals{ID} = unpack 'n', $resp;
+        $rvals{ID} = unpack 'S>', $resp;
         if (length($resp) > 2) {
             $rvals{UserAuthInfo} = substr $resp, 2;
         }
@@ -2241,7 +2241,7 @@ sub FPLoginCont { # {{{1
     my($resp, $rc);
     # Unlike FPLogin, the pad byte actually does need to be there.
     if (defined $ID) {
-        $rc = $self->SendAFPMessage(pack('Cxna*', $kFPLoginCont, $ID,
+        $rc = $self->SendAFPMessage(pack('CxS>a*', $kFPLoginCont, $ID,
                 $UserAuthInfo), \$resp);
     }
     else {
@@ -2254,7 +2254,7 @@ sub FPLoginCont { # {{{1
         ${$resp_r} = {};
         my $offset = 0;
         if ($rc == $kFPAuthContinue) {
-            ${$resp_r}->{ID} = unpack 'n', $resp;
+            ${$resp_r}->{ID} = unpack 'S>', $resp;
             $offset = 2;
         }
         if (length($resp) > $offset) {
@@ -2310,7 +2310,7 @@ sub FPLoginExt { # {{{1
         }
     } );
 
-    my $msg = pack 'CxnC/a*C/a*a*a*x![s]a*', $kFPLoginExt,
+    my $msg = pack 'CxS>C/a*C/a*a*a*x![s]a*', $kFPLoginExt,
             @options{qw[Flags AFPVersion UAM]},
             PackagePath(@options{qw[UserNameType UserName]}, 1),
             PackagePath(@options{qw[PathType Pathname]}, 1),
@@ -2321,7 +2321,7 @@ sub FPLoginExt { # {{{1
 
     croak('Need to accept returned list') if not wantarray;
     if ($rc == $kFPAuthContinue and length($resp) >= 2) {
-        $rvals{ID} = unpack 'n', $resp;
+        $rvals{ID} = unpack 'S>', $resp;
         if (length($resp) > 2) {
             $rvals{UserAuthInfo} = substr $resp, 2;
         }
@@ -2378,7 +2378,7 @@ sub FPMapID { # {{{1
             $Subfunction == $kGroupUUIDToUTF8Name) {
         ${$resp_r} = {};
         @{${$resp_r}}{qw[Bitmap NumericID UTF8Name]} =
-                unpack 'NNn/a', $resp;
+                unpack 'L>L>S>/a', $resp;
         ${${$resp_r}}{UTF8Name} =
                 compose(decode_utf8(${$resp_r}->{UTF8Name}));
     }
@@ -2415,7 +2415,7 @@ sub FPMapName { # {{{1
     my $pack_mask = 'CC';
     if ($Subfunction == $kUTF8NameToUserUUID ||
             $Subfunction == $kUTF8NameToGroupUUID) {
-        $pack_mask .= 'n/a*';
+        $pack_mask .= 'S>/a*';
         $Name = encode_utf8(decompose($Name));
     }
     else {
@@ -2440,7 +2440,7 @@ sub FPMapName { # {{{1
         UUID::unparse($resp, ${$resp_r});
     }
     else {
-        (${$resp_r}) = unpack 'N', $resp;
+        (${$resp_r}) = unpack 'L>', $resp;
     }
     return $rc;
 } # }}}1
@@ -2492,7 +2492,7 @@ sub FPMoveAndRename { # {{{1
         NewName             => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNNa*a*a*', $kFPMoveAndRename,
+    my $msg = pack 'CxS>L>L>a*a*a*', $kFPMoveAndRename,
             @options{qw[VolumeID SourceDirectoryID DestDirectoryID]},
             PackagePath(@options{qw[SourcePathType SourcePathname]}),
             PackagePath(@options{qw[DestPathType DestPathname]}),
@@ -2523,12 +2523,12 @@ sub FPOpenDir { # {{{1
     } );
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('CxnNa*', $kFPOpenDir,
+    my $rc = $self->SendAFPMessage(pack('CxS>L>a*', $kFPOpenDir,
             @options{qw[VolumeID DirectoryID]},
             PackagePath(@options{qw[PathType Pathname]})), \$resp);
     return $rc if $rc != $kFPNoErr;
     croak('Need to accept returned list') if not wantarray;
-    return($rc, unpack 'N', $resp);
+    return($rc, unpack 'L>', $resp);
 } # }}}1
 
 sub FPOpenDT { # {{{1
@@ -2541,10 +2541,10 @@ sub FPOpenDT { # {{{1
             { type => SCALARREF });
 
     my $resp;
-    my $rc = $self->SendAFPMessage(pack('Cxn', $kFPOpenDT, $VolumeID),
+    my $rc = $self->SendAFPMessage(pack('CxS>', $kFPOpenDT, $VolumeID),
             \$resp);
     return $rc if $rc != $kFPNoErr;
-    (${$resp_r}) = unpack 'n', $resp;
+    (${$resp_r}) = unpack 'S>', $resp;
     return $rc;
 } # }}}1
 
@@ -2558,7 +2558,7 @@ sub FPOpenFork { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid flag bits' => sub { !(~0x80 & $_[0]) },
+                'valid flag bits' => sub { not ~0x80 & $_[0] },
             },
         },
         VolumeID    => { type => SCALAR },
@@ -2567,13 +2567,13 @@ sub FPOpenFork { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid bitmap' => sub { !(~0xFFFF & $_[0]) },
+                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
             },
         },
         AccessMode  => {
             type        => SCALAR,
             callbacks   => {
-                'valid access mode' => sub { !(~0x33 & $_[0]) },
+                'valid access mode' => sub { not ~0x33 & $_[0] },
             },
         },
         PathType    => {
@@ -2588,7 +2588,7 @@ sub FPOpenFork { # {{{1
         Pathname    => { type => SCALAR },
     } );
 
-    my $msg = pack 'CCnNnna*', $kFPOpenFork,
+    my $msg = pack 'CCS>L>S>S>a*', $kFPOpenFork,
             @options{qw[Flag VolumeID DirectoryID Bitmap AccessMode]},
             PackagePath(@options{qw[PathType Pathname]});
 
@@ -2597,7 +2597,7 @@ sub FPOpenFork { # {{{1
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     croak('Need to accept returned list') if not wantarray;
     if ($rc == $kFPNoErr) {
-        my ($rBitmap, $OForkRefNum, $FileParameters) = unpack 'nna*', $resp;
+        my ($rBitmap, $OForkRefNum, $FileParameters) = unpack 'S>S>a*', $resp;
         %rvals = %{ ParseFileParms($rBitmap, $FileParameters) };
         $rvals{OForkRefNum} = $OForkRefNum;
     }
@@ -2614,7 +2614,7 @@ sub FPOpenVol { # {{{1
             {
                 type        => SCALAR,
                 callbacks   => {
-                    'valid bitmap' => sub { !(~0xFFF & $_[0]) }
+                    'valid bitmap' => sub { not ~0xFFF & $_[0] }
                 }
             },
             { type => SCALAR },
@@ -2632,7 +2632,7 @@ sub FPOpenVol { # {{{1
         $VolumeName = encode('MacRoman', $VolumeName);
     }
 
-    my $PackPattern = 'CxnCa*';
+    my $PackPattern = 'CxS>Ca*';
     my @PackArgs = ($kFPOpenVol, $Bitmap, length($VolumeName), $VolumeName);
     # Only append a password if one was provided. If not, we don't provide
     # it.
@@ -2674,7 +2674,7 @@ sub FPRead { # {{{1
         },
     } );
 
-    my $msg = pack 'CxnNNCC', $kFPRead,
+    my $msg = pack 'CxS>L>L>CC', $kFPRead,
             @options{qw[OForkRefNum Offset ReqCount NewLineMask NewLineChar]};
 
     croak('Need to accept returned list') if not wantarray;
@@ -2694,7 +2694,7 @@ sub FPReadExt { # {{{1
         ReqCount    => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnQ>Q>', $kFPReadExt,
+    my $msg = pack 'CxS>Q>Q>', $kFPReadExt,
         @options{qw[OForkRefNum Offset ReqCount]};
 
     croak('Need to accept returned list') if not wantarray;
@@ -2724,7 +2724,7 @@ sub FPRemoveAPPL { # {{{1
         Pathname    => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNNa*', $kFPRemoveAPPL,
+    my $msg = pack 'CxS>L>L>a*', $kFPRemoveAPPL,
             @options{qw[DTRefNum DirectoryID FileCreator]},
             PackagePath(@options{qw[PathType Pathname]});
     return $self->SendAFPMessage($msg);
@@ -2751,7 +2751,7 @@ sub FPRemoveComment { # {{{1
                 },
                 { type => SCALAR });
 
-    my $msg = pack 'CxnNa*', $kFPRemoveComment, $DTRefNum, $DirectoryID,
+    my $msg = pack 'CxS>L>a*', $kFPRemoveComment, $DTRefNum, $DirectoryID,
             PackagePath($PathType, $Pathname);
     return $self->SendAFPMessage($msg);
 } # }}}1
@@ -2786,7 +2786,7 @@ sub FPRemoveExtAttr { # {{{1
         Name        => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNna*x![s]n/a*', $kFPRemoveExtAttr,
+    my $msg = pack 'CxS>L>S>a*x![s]S>/a*', $kFPRemoveExtAttr,
             @options{qw[VolumeID DirectoryID Bitmap]},
             PackagePath(@options{qw[PathType Pathname]}),
             encode_utf8(decompose($options{Name}));
@@ -2823,7 +2823,7 @@ sub FPRename { # {{{1
         NewName     => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNa*a*', $kFPRename,
+    my $msg = pack 'CxS>L>a*a*', $kFPRename,
             @options{qw[VolumeID DirectoryID]},
             PackagePath(@options{qw[PathType Pathname]}),
             PackagePath(@options{qw[NewType NewName]});
@@ -2842,16 +2842,16 @@ sub FPResolveID { # {{{1
                 {
                     type        => SCALAR,
                     callbacks   => {
-                        'valid bitmap' => sub { !(~0xFFFF & $_[0]) }
+                        'valid bitmap' => sub { not ~0xFFFF & $_[0] }
                     }
                 },
                 { type => SCALARREF });
 
     my $resp;
-    my $msg = pack 'CxnNn', $kFPResolveID, $VolumeID, $FileID, $Bitmap;
+    my $msg = pack 'CxS>L>S>', $kFPResolveID, $VolumeID, $FileID, $Bitmap;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return($rc) if $rc != $kFPNoErr;
-    my($Bitmap_n, $data) = unpack 'na*', $resp;
+    my($Bitmap_n, $data) = unpack 'S>a*', $resp;
     my $info = ParseFileParms($Bitmap_n, $data);
     ${$resp_r} = {
                    Bitmap               => $Bitmap_n,
@@ -2876,7 +2876,7 @@ sub FPSetACL { # {{{1
                         my $mask = $kFileSec_UUID | $kFileSec_GRPUUID |
                                 $kFileSec_ACL | $kFileSec_REMOVEACL |
                                 $kFileSec_Inherit;
-                        !($_[0] & ~$mask);
+                        not $_[0] & ~$mask;
                     },
                 }
             },
@@ -2896,7 +2896,7 @@ sub FPSetACL { # {{{1
             acl_flags   => { type => SCALAR, optional => 1 },
     } );
 
-    my $msg = pack 'CxnNna*x![s]', $kFPSetACL,
+    my $msg = pack 'CxS>L>S>a*x![s]', $kFPSetACL,
             @options{qw[VolumeID DirectoryID Bitmap]},
             PackagePath(@options{qw[PathType Pathname]});
 
@@ -2925,10 +2925,10 @@ sub FPSetACL { # {{{1
         my @ace_list;
         foreach my $ace (@{$options{acl_ace}}) {
             UUID::parse(${$ace}{ace_applicable}, $tmp);
-            push @ace_list, pack 'a[16]NN', $tmp,
+            push @ace_list, pack 'a[16]L>L>', $tmp,
                     @{$ace}{qw[ace_flags ace_rights]};
         }
-        $msg .= pack 'NN(a*)[' . scalar(@ace_list) . ']', scalar(@ace_list),
+        $msg .= pack 'L>L>(a*)[' . scalar(@ace_list) . ']', scalar(@ace_list),
             $options{acl_flags}, @ace_list;
     }
 
@@ -2953,7 +2953,7 @@ sub FPSetDirParms { # {{{1
                             $kFPFinderInfoBit | $kFPOwnerIDBit |
                             $kFPGroupIDBit | $kFPAccessRightsBit |
                             $kFPUnixPrivsBit;
-                    !(~$mask & $_[0]);
+                    not ~$mask & $_[0];
                 },
             },
         },
@@ -2982,9 +2982,9 @@ sub FPSetDirParms { # {{{1
     } );
 
     my $ParamsBlock = PackSetParams($options{Bitmap}, 0, %options);
-    return $kFPParamErr if !defined $ParamsBlock;
+    return $kFPParamErr if not defined $ParamsBlock;
 
-    my $msg = pack 'CxnNna*x![s]a*', $kFPSetDirParms,
+    my $msg = pack 'CxS>L>S>a*x![s]a*', $kFPSetDirParms,
             @options{qw[VolumeID DirectoryID Bitmap]},
             PackagePath(@options{qw[PathType Pathname]}),
             $ParamsBlock;
@@ -3006,7 +3006,7 @@ sub FPSetExtAttr { # {{{1
                 'valid flags' => sub {
                     my $mask = $kXAttrNoFollow | $kXAttrCreate |
                                $kXAttrReplace;
-                    !(~$mask & $_[0]);
+                    not ~$mask & $_[0];
                 },
             },
         },
@@ -3031,7 +3031,7 @@ sub FPSetExtAttr { # {{{1
         AttributeData   => { type => SCALAR },
     } );
 
-    my $msg = pack 'CxnNnQ>a*x![s]n/a*N/a*', $kFPSetExtAttr,
+    my $msg = pack 'CxS>L>S>Q>a*x![s]S>/a*L>/a*', $kFPSetExtAttr,
             @options{qw[VolumeID DirectoryID Bitmap Offset]},
             PackagePath(@options{qw[PathType Pathname]}),
             encode_utf8(decompose($options{Name})),
@@ -3055,7 +3055,7 @@ sub FPSetFileDirParms { # {{{1
                     my $mask = $kFPAttributeBit | $kFPCreateDateBit |
                             $kFPModDateBit | $kFPBackupDateBit |
                             $kFPFinderInfoBit | $kFPUnixPrivsBit;
-                    !(~$mask & $_[0]);
+                    not ~$mask & $_[0];
                 },
             },
         },
@@ -3081,9 +3081,9 @@ sub FPSetFileDirParms { # {{{1
     } );
 
     my $ParamsBlock = PackSetParams($options{Bitmap}, 1, %options);
-    return $kFPParamErr if !defined $ParamsBlock;
+    return $kFPParamErr if not defined $ParamsBlock;
 
-    my $msg = pack 'CxnNna*x![s]a*', $kFPSetFileDirParms,
+    my $msg = pack 'CxS>L>S>a*x![s]a*', $kFPSetFileDirParms,
             @options{qw[VolumeID DirectoryID Bitmap]},
             PackagePath(@options{qw[PathType Pathname]}),
             $ParamsBlock;
@@ -3107,7 +3107,7 @@ sub FPSetFileParms { # {{{1
                             $kFPModDateBit | $kFPBackupDateBit |
                             $kFPFinderInfoBit | $kFPLaunchLimitBit |
                             $kFPUnixPrivsBit;
-                    !(~$mask & $_[0]);
+                    not ~$mask & $_[0];
                 },
             },
         },
@@ -3137,7 +3137,7 @@ sub FPSetFileParms { # {{{1
         return $kFPParamErr;
     }
 
-    my $msg = pack 'CxnNna*x![s]a*', $kFPSetFileParms,
+    my $msg = pack 'CxS>L>S>a*x![s]a*', $kFPSetFileParms,
             @options{qw[VolumeID DirectoryID Bitmap]},
             PackagePath(@options{qw[PathType Pathname]}),
             $ParamsBlock;
@@ -3154,7 +3154,7 @@ sub FPSetForkParms { # {{{1
             {
                 type        => SCALAR,
                 callbacks   => {
-                    'valid bitmap' => sub { !(~0x4E00 & $_[0]) }
+                    'valid bitmap' => sub { not ~0x4E00 & $_[0] }
                 }
             },
             { type => SCALAR });
@@ -3169,7 +3169,7 @@ sub FPSetForkParms { # {{{1
         $packed = pack 'Q>', $ForkLen;
     }
 
-    return $self->SendAFPMessage(pack('Cxnna*', $kFPSetForkParms,
+    return $self->SendAFPMessage(pack('CxS>S>a*', $kFPSetForkParms,
             $OForkRefNum, $Bitmap, $packed), undef, 1);
 } # }}}1
 
@@ -3184,11 +3184,11 @@ sub FPSetVolParms { # {{{1
                 {
                     type        => SCALAR,
                     callbacks   => {
-                        'valid bitmap' => sub { !(~0x0010 & $_[0]) }
+                        'valid bitmap' => sub { not ~0x0010 & $_[0] }
                     }
                 },
                 { type => SCALAR });
-    return $self->SendAFPMessage(pack('CxnnN', $kFPSetVolParms, $VolumeID,
+    return $self->SendAFPMessage(pack('CxS>S>L>', $kFPSetVolParms, $VolumeID,
             $Bitmap, $BackupDate), undef, 1);
 } # }}}1
 
@@ -3201,7 +3201,7 @@ sub FPSyncDir { # {{{1
             { type => SCALAR },
             { type => SCALAR });
 
-    return $self->SendAFPMessage(pack('CxnN', $kFPSyncDir, $VolumeID,
+    return $self->SendAFPMessage(pack('CxS>L>', $kFPSyncDir, $VolumeID,
             $DirectoryID), undef, 1);
 } # }}}1
 
@@ -3212,7 +3212,7 @@ sub FPSyncFork { # {{{1
 
     my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
 
-    return $self->SendAFPMessage(pack('Cxn', $kFPSyncFork, $OForkRefNum),
+    return $self->SendAFPMessage(pack('CxS>', $kFPSyncFork, $OForkRefNum),
             undef, 1);
 } # }}}1
 
@@ -3226,7 +3226,7 @@ sub FPWrite { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid flag bits' => sub { !(~0x80 & $_[0]) },
+                'valid flag bits' => sub { not ~0x80 & $_[0] },
             },
         },
         OForkRefNum => { type => SCALAR },
@@ -3236,14 +3236,14 @@ sub FPWrite { # {{{1
     } );
     $options{ReqCount} ||= length ${$options{ForkData}};
 
-    my $msg = pack 'CCnNN', $kFPWrite,
+    my $msg = pack 'CCS>L>L>', $kFPWrite,
             @options{qw[Flag OForkRefNum Offset ReqCount]};
 
     my $resp;
     my $rc = $self->SendAFPWrite($msg, @options{qw[ForkData ReqCount]},
             \$resp);
     if ($rc == $kFPNoErr && wantarray) {
-        return($rc, unpack 'N', $resp);
+        return($rc, unpack 'L>', $resp);
     }
     return($rc);
 } # }}}1
@@ -3258,7 +3258,7 @@ sub FPWriteExt { # {{{1
             type        => SCALAR,
             default     => 0,
             callbacks   => {
-                'valid flag bits' => sub { !(~0x80 & $_[0]) },
+                'valid flag bits' => sub { not ~0x80 & $_[0] },
             },
         },
         OForkRefNum => { type => SCALAR },
@@ -3268,7 +3268,7 @@ sub FPWriteExt { # {{{1
     } );
     $options{ReqCount} ||= length ${$options{ForkData}};
 
-    my $msg = pack 'CCnQ>Q>', $kFPWriteExt,
+    my $msg = pack 'CCS>Q>Q>', $kFPWriteExt,
             @options{qw[Flag OForkRefNum Offset ReqCount]};
 
     my $resp;
@@ -3289,13 +3289,13 @@ sub FPZzzzz { # {{{1
             {
                 type        => SCALAR,
                 callbacks   => {
-                    'valid flags' => sub { !(~0x3 & $_[0]) }
+                    'valid flags' => sub { not ~0x3 & $_[0] }
                 },
                 optional    => 1,
                 default     => 0
             });
 
-    return $self->SendAFPMessage(pack 'CxN', $kFPZzzzz, $Flags);
+    return $self->SendAFPMessage(pack 'CxL>', $kFPZzzzz, $Flags);
 } # }}}1
 
 1;

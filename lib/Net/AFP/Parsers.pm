@@ -139,7 +139,7 @@ sub ParseSrvrInfo { # {{{1
     my $resp = {};
 
     my ($machtype_off, $afpvers_off, $uams_off, $icon_off, $flags, $srvname) =
-            unpack 'nnnnnC/a*', $data;
+            unpack 'S>S>S>S>S>C/a*', $data;
 
     my($sig_off, $addrs_off, $dirserv_off, $utf8name_off);
 
@@ -414,7 +414,7 @@ sub ParseDirParms { # {{{1
         $offset += 32;
     }
     if ($Bitmap & $kFPLongNameBit) {
-        my $position = unpack "x[${offset}]n", $data;
+        my $position = unpack "x[${offset}]S>", $data;
         $resp->{LongName} = decode('MacRoman',
                 unpack "x[${position}]C/a", $data);
         $offset += 2;
