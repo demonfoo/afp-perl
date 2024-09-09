@@ -773,9 +773,9 @@ sub FPCatSearch {
         unpack 'a[16]S>S>L>/(xCXXCx/(a![s]))', $resp;
     $results->{CatalogPosition} = $catpos;
     my $op = $results->{OffspringParameters} = [];
+    my($isfiledir, $paramdata);
     while (scalar(@paramlist) > 0) {
-        my $isfiledir = shift @paramlist;
-        my $paramdata = shift @paramlist;
+        ($isfiledir, $paramdata) = splice @paramlist, 0, 2;
         if ($isfiledir & 0x80) {
             push @{$op}, ParseDirParms($dirbmp, $paramdata);
         }
@@ -1057,9 +1057,9 @@ sub FPCatSearchExt {
         unpack 'a[16]S>S>L>/(x[s]CXXXS>xx/(a![s]))', $resp;
     $results->{CatalogPosition} = $catpos;
     my $op = $results->{OffspringParameters} = [];
+    my ($isfiledir, $paramdata);
     while (scalar(@paramlist) > 0) {
-        my $isfiledir = shift @paramlist;
-        my $paramdata = shift @paramlist;
+        ($isfiledir, $paramdata) = splice @paramlist, 0, 2;
         if ($isfiledir & 0x80) {
             push @{$op}, ParseDirParms($dirbmp, $paramdata);
         }
@@ -1624,14 +1624,11 @@ sub FPGetACL { # {{{1
         ($acl_entrycount, $rvals{acl_flags}, $resp) = unpack 'L>L>a*', $resp;
         my @entries = unpack "(a[16]L>L>)[${acl_entrycount}]", $resp;
         my @acl_ace = ();
+        my $ace;
         for my $i (0 .. $acl_entrycount - 1) {
-            my $uuid = shift @entries;
-            UUID::unparse($uuid, $uuid);
-            $acl_ace[$i] = {
-                             ace_applicable => $uuid,
-                             ace_flags      => shift(@entries),
-                             ace_rights     => shift(@entries),
-                           };
+            $acl_ace[$i] = $ace = {};
+            @{$ace}{qw(ace_applicable ace_flags ace_rights)} = splice @entries, 0, 3;
+            UUID::unparse(${$ace}{ace_applicable}, ${$ace}{ace_applicable});
         }
         $rvals{acl_ace} = [ @acl_ace ];
     }
@@ -2035,9 +2032,9 @@ sub FPGetSrvrParms { # {{{1
     # 1 Jan 2000 00:00 GMT (I think GMT, anyway). Good call, Apple...
     ${$data}{ServerTime}    = $time + globalTimeOffset;
     ${$data}{Volumes}       = [];
+    my($flags, $volname);
     while (scalar(@volinfo) > 0) {
-        my $flags = shift @volinfo;
-        my $volname = shift @volinfo;
+        ($flags, $volname) = splice @volinfo, 0, 2;
         if (Net::AFP::Versions::CompareByVersionNum($self, 3, 0,
                 $kFPVerAtLeast)) {
             $volname = decode_utf8($volname);
