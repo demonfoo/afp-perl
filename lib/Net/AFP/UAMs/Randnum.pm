@@ -45,12 +45,14 @@ sub Authenticate {
                 AFPVersion  => $AFPVersion,
                 UAM         => $UAMNAME,
                 UserName    => $username);
-        $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
+        $session->{logger}->debug(sub { sprintf q{FPLoginExt() completed with } .
+          q{result code %d}, $rc });
     }
     else {
         my $authinfo = pack 'C/a*', $username;
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
-        $session->{logger}->debug('FPLogin() completed with result code ', $rc);
+        $session->{logger}->debug(sub { sprintf q{FPLogin() completed with } .
+          q{result code %d}, $rc });
     }
 
     if ($rc != $kFPAuthContinue) {
@@ -60,16 +62,19 @@ sub Authenticate {
     # The server will send us a random 8-byte number; take that, and encrypt
     # it with the password the user gave us.
     my ($randnum) = unpack 'a8', $resp{UserAuthInfo};
-    $session->{logger}->debug('$randnum is 0x' . unpack 'H*', $randnum);
+    $session->{logger}->debug(sub { sprintf q{randnum is 0x%s},
+      unpack 'H*', $randnum });
     my $deshash = Crypt::Cipher::DES->new(pack 'a8', &{$pw_cb}());
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;
-    $session->{logger}->debug('$crypted is 0x' . unpack 'H*', $crypted);
+    $session->{logger}->debug(sub { sprintf q{crypted is 0x%s},
+      unpack 'H*', $crypted });
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($resp{'ID'}, $crypted);
     undef $crypted;
-    $session->{logger}->debug('FPLoginCont() completed with result code ', $rc);
+    $session->{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+      q{result code %d}, $rc});
     return $rc;
 }
 
@@ -99,7 +104,8 @@ sub ChangePassword {
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;
-    $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
+    $session->{logger}->debug(sub { sprintf q{FPChangePassword() completed } .
+      q{with result code %d}, $rc });
     return $rc;
 }
 

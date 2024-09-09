@@ -29,7 +29,9 @@ our @EXPORT = qw(globalTimeOffset ParseVolParms
 
 # This is zero time for AFP - 1 Jan 2000 00:00 GMT.
 sub globalTimeOffset {
+    ##no critic qw(RequireInitializationForLocalVars)
     local %ENV;
+    ##no critic qw(RequireLocalizedPunctuationVars)
     $ENV{TZ} = q{GMT};
     my $time = mktime(0, 0, 0, 1, 0, 100);
     return $time;

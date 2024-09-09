@@ -47,6 +47,7 @@ sub new { # {{{1
     return $obj;
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms ProhibitAmbiguousNames)
 sub close { # {{{1
     my ($self) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
@@ -56,6 +57,7 @@ sub close { # {{{1
     return;
 } # }}}1
 
+##no critic qw(RequireFinalReturn)
 sub CheckAttnQueue { # {{{1
     my ($self) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
@@ -109,14 +111,14 @@ sub CheckAttnQueue { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
     my ($self, $payload, $resp_r, $can_cache) = @_;
-    $self->{logger}->debug(sub { sprintf 'called %s()', (caller(3))[3] });
+    $self->{logger}->debug(sub { sprintf 'called %s()', (caller 3)[3] });
 
     $self->CheckAttnQueue();
     if ($can_cache && exists $self->{ReplayCache}) {
         do {
             shift @{$self->{ReplayCache}};
-        } while ((scalar(@{$self->{ReplayCache}}) + 1) >=
-                $self->{ReplayCacheSize});
+        ##no critic qw(ProhibitPostfixControls)
+        } while (scalar(@{$self->{ReplayCache}}) > $self->{ReplayCacheSize});
         push @{$self->{ReplayCache}}, $payload;
     }
     return $self->{Session}->Command($payload, $resp_r);
@@ -126,7 +128,7 @@ sub SendAFPMessage { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPWrite { # {{{1
     my ($self, $payload, $data_r, $d_len, $resp_r, $from_fh) = @_;
-    $self->{logger}->debug(sub { sprintf 'called %s()', (caller(3))[3] });
+    $self->{logger}->debug(sub { sprintf 'called %s()', (caller 3)[3] });
 
     $self->CheckAttnQueue();
     return $self->{Session}->Write($payload, $data_r, $d_len, $resp_r, $from_fh);
@@ -138,7 +140,7 @@ sub GetStatus { # {{{1
         croak('GetStatus() should NEVER be called against an active object');
     }
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug(sub { sprintf 'called %s()', (caller(3))[3] });
+    $logger->debug(sub { sprintf 'called %s()', (caller 3)[3] });
 
     my $obj = Net::DSI->new($host, $port);
     my $resp;

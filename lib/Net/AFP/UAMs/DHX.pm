@@ -92,10 +92,11 @@ sub Authenticate {
     return $rc if $rc != $kFPAuthContinue;
     my $K = pack 'B*', $dh->compute_key_twoc(
                     '0x' . unpack 'H' . ($len * 2), $resp{UserAuthInfo});
-    $session->{logger}->debug('$K is 0x' , unpack 'H*', $K);
+    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
 
     my $message = unpack 'x' . $len . 'a*', $resp{UserAuthInfo};
-    $session->{logger}->debug('$message is 0x' . unpack 'H*', $message);
+    $session->{logger}->debug(sub { sprintf q{message is 0x%s},
+      unpack 'H*', $message });
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
@@ -103,28 +104,32 @@ sub Authenticate {
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
     undef $K;
     my $decrypted = $ctx->decrypt($message, $session->{SessionKey}, $S2CIV);
-    $session->{logger}->debug('$decrypted is 0x' . unpack 'H*', $decrypted);
+    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
+      unpack 'H*', $decrypted });
 
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
     my $nonce = Math::BigInt->from_bytes(unpack 'a' . $nonce_len, $decrypted);
     undef $decrypted;
-    $session->{logger}->debug('$nonce is ', $nonce->as_hex());
+    $session->{logger}->debug(sub { sprintf q{nonce is %s}, $nonce->as_hex() });
     $nonce->binc();
     $nonce = $nonce->bmod($nonce_limit);
-    $session->{logger}->debug('$nonce is ', $nonce->as_hex(), ' after increment');
+    $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
+      $nonce->as_hex() });
     my $authdata = pack 'a[' . $nonce_len . ']a[' . $pw_len . ']',
 	                zeropad($nonce->to_bytes(), $nonce_len), &{$pw_cb}();
     undef $nonce;
     my $ciphertext = $ctx->encrypt($authdata, $session->{SessionKey}, $C2SIV);
     undef $authdata;
-    $session->{logger}->debug('$ciphertext is 0x', unpack 'H*', $ciphertext);
+    $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
+      unpack 'H*', $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($resp{ID}, $ciphertext);
     undef $ciphertext;
-    $session->{logger}->debug('FPLoginCont() completed with result code ', $rc);
+    $session->{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+      q{result code %d}, $rc });
     return $rc;
 }
 
@@ -147,7 +152,8 @@ sub ChangePassword {
     # Send an ID value of 0, followed by our Ma value.
     my $authinfo = pack 'na[' . $len . ']', 0,
             zeropad(pack('B*', $dh->pub_key_twoc()), $len);
-    $session->{logger}->debug('$authinfo is 0x' . unpack 'H*', $authinfo);
+    $session->{logger}->debug(sub { sprintf q{authinfo is 0x%s},
+      unpack 'H*', $authinfo });
     my $resp = undef;
 
     # Username is always an empty string with AFP 3.0 and up.
@@ -163,37 +169,41 @@ sub ChangePassword {
     # Unpack the server response for our perusal.
     my $K = pack 'B*', $dh->compute_key_twoc(
                     '0x' . unpack 'x2H' . ($len * 2), $resp);
-    $session->{logger}->debug('$K is 0x' . unpack 'H*', $K);
+    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
     my $key = zeropad($K, $len);
     undef $K;
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
-    my $decrypted = $ctx->decrypt(unpack('x2x' . $len . 'a32', $resp), $key,
+    my $decrypted = $ctx->decrypt(unpack('x[2]x' . $len . 'a[32]', $resp), $key,
             $S2CIV);
-    $session->{logger}->debug('$decrypted is 0x' . unpack 'H*', $decrypted);
+    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
+      unpack 'H*', $decrypted });
 
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
     my $nonce = Math::BigInt->from_bytes(unpack 'a' . $nonce_len, $decrypted);
     undef $decrypted;
-    $session->{logger}->debug('$nonce is ', $nonce->as_hex());
+    $session->{logger}->debug(sub { sprintf q{nonce is %s}, $nonce->as_hex() });
     $nonce->binc();
     $nonce = $nonce->bmod($nonce_limit);
-    $session->{logger}->debug('$nonce is ', $nonce->as_hex(), ' after increment');
+    $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
+      $nonce->as_hex() });
     my $authdata = pack 'a[' . $nonce_len . ']a[' . $pw_len . ']a[' . $pw_len . ']',
 	                zeropad($nonce->to_bytes(), $nonce_len), $newPassword,
                     $oldPassword;
     undef $nonce;
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     undef $authdata;
-    $session->{logger}->debug('$ciphertext is 0x' . unpack 'H*', $ciphertext);
+    $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
+      unpack 'H*', $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
     my $message = pack 'na*', unpack('n', $resp), $ciphertext;
-    $session->{logger}->debug('$message is 0x' . unpack 'H*', $message);
+    $session->{logger}->debug(sub { sprintf q{message is 0x%s},
+      unpack 'H*', $message });
     undef $ciphertext;
     $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;

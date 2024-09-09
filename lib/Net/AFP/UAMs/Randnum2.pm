@@ -60,11 +60,12 @@ sub Authenticate {
     # The server will send us a random 8-byte number; take that, and encrypt
     # it with the password the user gave us.
     my($randnum) = unpack 'a8', $resp{'UserAuthInfo'};
-    $session->{logger}->debug('$randnum is 0x' . unpack 'H*', $randnum);
+    $session->{logger}->debug(sub { sprintf q{randnum is 0x%s},
+      unpack 'H*', $randnum });
     # Explode the password out into a bit string, and rotate the leftmost bit
     # to the end of the bit vector.
     my $bin_key = unpack 'B*', pack 'a8', &{$pw_cb}();
-    $bin_key =~ s/^([01])(.*)$/$2$1/s;
+    $bin_key =~ s/^([01])(.*)$/$2$1/sm;
     # Pack the rotated bitstring back into binary form for use as the DES key.
     my $key = pack 'B*', $bin_key;
     undef $bin_key;
@@ -72,20 +73,23 @@ sub Authenticate {
     undef $key;
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;
-    $session->{logger}->debug('$crypted is 0x' . unpack 'H*', $crypted);
+    $session->{logger}->debug(sub { sprintf q{crypted is 0x%s},
+      unpack 'H*', $crypted });
 
     # Get some random bytes to send to the server. It will encrypt its copy
     # of the password, and send it back to us, to verify that it too has a
     # copy of the password, and it's not just phishing for hashes.
     my $my_randnum = random_bytes(8);
-    $session->{logger}->debug('$my_randnum is 0x' . unpack 'H*', $my_randnum);
+    $session->{logger}->debug(sub { sprintf q{my_randnum is 0x%s},
+      unpack 'H*', $my_randnum });
 
     # Send the response back to the server. If the server doesn't think we're
     # okay, then return the result code right away.
     my $sresp = undef;
     $rc = $session->FPLoginCont($resp{'ID'}, $crypted . $my_randnum, \$sresp);
     undef $crypted;
-    $session->{logger}->debug('FPLoginCont() completed with result code ', $rc);
+    $session->{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+      q{result code %d}, $rc });
     if ($rc != $kFPNoErr) {
         return $rc;
     }
@@ -93,10 +97,12 @@ sub Authenticate {
     # Now, verify the server's crypted copy of the password to ensure that
     # they really have it.
     my($srv_hash) = unpack 'a8', $sresp->{'UserAuthInfo'};
-    $session->{logger}->debug('$srv_hash is 0x' . unpack 'H*', $srv_hash);
+    $session->{logger}->debug(sub { sprintf q{srv_hash is 0x%s},
+      unpack 'H*', $srv_hash });
     my $recrypted = $deshash->encrypt($my_randnum);
     undef $my_randnum;
-    $session->{logger}->debug('$recrypted is 0x' . unpack 'H*', $recrypted);
+    $session->{logger}->debug(sub { sprintf q{recrypted is 0x%s},
+      unpack 'H*', $recrypted });
     # Maybe a different result code is in order? Not sure...
     if ($srv_hash ne $recrypted) {
         return $kFPUserNotAuth;

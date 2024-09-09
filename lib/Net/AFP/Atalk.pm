@@ -42,6 +42,7 @@ sub new { # {{{1
     return $obj;
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms ProhibitAmbiguousNames)
 sub close { # {{{1
     my ($self) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
@@ -58,7 +59,6 @@ sub CheckAttnQueue { # {{{1
     my $attnq = $self->{Session}{Shared}{attnq};
     my $vol_update_checked;
     while (my $msg = shift @{$attnq}) {
-        if ($msg & 0x8_000) {    # server says it's shutting down
         if ($msg & 0x8_000) {    # server says it's shutting down
             $self->{logger}->info(sub { sprintf q{%s(): Received notification } .
               q{of server intent to shut down}, (caller 3)[3] });
@@ -127,7 +127,7 @@ sub GetStatus { # {{{1
         croak('GetStatus() should NEVER be called against an active object');
     }
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug(sub { sprintf 'called %s()', (caller(3))[3] });
+    $logger->debug(sub { sprintf 'called %s()', (caller 3)[3] });
 
     my $obj = Net::Atalk::ASP->new($host, $port);
     my $resp;

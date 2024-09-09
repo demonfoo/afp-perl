@@ -612,6 +612,7 @@ sub getattr { # {{{1
     return(@stat);
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub readlink { # {{{1
     my ($self, $file) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s')},
@@ -838,6 +839,7 @@ sub mknod { # {{{1
     return $self->chmod($file_n, S_IMODE($mode));
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub mkdir { # {{{1
     my ($self, $file, $mode) = @_;
     $self->{logger}->debug(sub {sprintf q{called %s(file = '%s', mode = %x)},
@@ -907,6 +909,7 @@ sub mkdir { # {{{1
     return -EBADF();
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub unlink { # {{{1
     my ($self, $file) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s')},
@@ -960,11 +963,13 @@ sub unlink { # {{{1
     return -EBADF();
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub rmdir { return Fuse::AFP::unlink(@_); }
 
 # seems OS X 10.4 causes the newly created symlink to be locked, so once
 # you create it, you can't remove it via AFP until you unmount the volume
 # once. good work apple. :| doesn't happen on netatalk or OS X 10.5.
+##no critic qw(ProhibitBuiltInHomonyms)
 sub symlink { # {{{1
     my ($self, $target, $linkname) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(target = '%s', linkname = '%s')},
@@ -1081,6 +1086,7 @@ sub symlink { # {{{1
     # }}}2
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub rename { # {{{1
     my ($self, $oldname, $newname) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(oldname = '%s', newname = '%s')},
@@ -1160,6 +1166,7 @@ sub rename { # {{{1
     return 0;
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub link { # {{{1
     my ($self, $file, $target) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', target = %s)},
@@ -1170,6 +1177,7 @@ sub link { # {{{1
     return -ENOTSUP();
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub chmod { # {{{1
     my ($self, $file, $mode) = @_;
     $self->{logger}->debug(sub {sprintf q{called %s(file = '%s', mode = %o)},
@@ -1217,6 +1225,7 @@ sub chmod { # {{{1
     return 0;
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub chown { # {{{1
     my ($self, $file, $uid, $gid) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', uid = %d, } .
@@ -1272,6 +1281,7 @@ sub chown { # {{{1
     return 0;
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub truncate { # {{{1
     my ($self, $file, $length) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', length = %d)},
@@ -1327,6 +1337,7 @@ sub truncate { # {{{1
     return 0;
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub utime { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
     $self->{logger}->debug(sub {sprintf q{called %s(file = '%s', actime = %d, } .
@@ -1357,6 +1368,7 @@ sub utime { # {{{1
     return -EBADF()
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub open { # {{{1
     my ($self, $file, $mode) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', mode = %x)},
@@ -1440,6 +1452,7 @@ sub open { # {{{1
     return -EBADF();
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub read { # {{{1
     my ($self, $file, $len, $off, $fh) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', len = %d, } .
@@ -1475,6 +1488,7 @@ sub read { # {{{1
     return -EBADF();
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub write { # {{{1
     my ($self, $file, $offset, $fh) = @_[0,1,3,4];
     my $data_r = \$_[2];
@@ -2297,6 +2311,7 @@ sub removexattr { # {{{1
     return -ENODATA();
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub opendir { # {{{1
     my ($self, $dirname) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(dirname = '%s')},
@@ -2325,6 +2340,7 @@ sub opendir { # {{{1
     return(0, $cdir->{NodeID});
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub readdir { # {{{1
     my ($self, $dirname, $offset, $dh) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(dirname = '%s', } .
@@ -2664,6 +2680,7 @@ sub fgetattr { # {{{1
     return(@stat)
 } # }}}1
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', cmd = %s, } .
@@ -2773,7 +2790,7 @@ sub bmap { # {{{1
     return -ENOTBLK();
 } # }}}1
 
-##no critic qw(ProhibitManyArgs)
+##no critic qw(ProhibitManyArgs ProhibitBuiltInHomonyms)
 sub ioctl {
     my ($self, $file, $cmd, $flags, $data, $fh) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', cmd = %d, } .
@@ -2899,6 +2916,7 @@ sub read_buf {
     return -EBADF();
 }
 
+##no critic qw(ProhibitBuiltInHomonyms)
 sub flock {
     my ($self, $file, $fh, $owner, $op) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', fh = %d, } .

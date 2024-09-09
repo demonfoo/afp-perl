@@ -56,8 +56,9 @@ foreach my $uampath (@uampaths) {
     if ($uampath !~ m{^/}sm) {
         $uampath = q{./} . $uampath;
     }
-    eval { require $uampath; };
-    if ($@) {
+    eval {
+        require $uampath;
+    } or do {
         carp(sprintf qq{Couldn't include "%s":\n%s\nThis error is not fatal; other UAMs will be tried.}, $uampath, $@);
     }
 }
@@ -93,6 +94,7 @@ sub PasswordAuth {
         $session->{username} = $UserName;
         my $rc;
         {
+            ##no critic qw(ProhibitNoStrict)
             no strict qw{refs};
             $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
         }
@@ -126,6 +128,7 @@ sub ChangePassword {
         $session->{logger}->debug('password changing function is ', $function);
         my $rc;
         {
+            ##no critic qw(ProhibitNoStrict)
             no strict qw{refs};
             $rc = &{$function}($session, $UserName, $OldPW, $NewPW);
         }

@@ -56,7 +56,7 @@ my $blksize  = 1<<19;
 
 # If you're in Windows, you'll probably just get a codepage number.
 if ($OSNAME eq 'MSWin32' && $term_enc =~ m{^\d+$}sm) {
-    $term_enc = 'cp-' . $term_enc;
+    $term_enc = 'cp' . $term_enc;
 }
 
 my $has_Term__ReadKey = 0;

@@ -42,7 +42,7 @@ sub GetCred {
     return $rc if $rc != $kFPNoErr;
 
     my $token = $ctx->decrypt($resp, $session->{SessionKey}, $S2CIV);
-    printf qq{decrypted token data is: %s\n}, unpack('H*', $token);
+    printf qq{decrypted token data is: %s\n}, unpack 'H*', $token;
     @{$session}{qw[cred s m exp sessionInfo]} =
         unpack 'a[' . (length($token) - 24) .  ']a[8]L>L>a[8]', $token;
     ${$session}{t1} = $t1;
