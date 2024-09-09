@@ -2331,7 +2331,7 @@ sub FPLoginExt { # {{{1
 
 sub FPLogout { # {{{1
     my ($self) = @_;
-    $self->{logger}->debug(sub { 'called ', (caller 3)[3], '()' });
+    $self->{logger}->debug(sub { sprintf 'called %s()', (caller 3)[3] });
 
     return $self->SendAFPMessage(pack 'Cx', $kFPLogout);
 } # }}}1
@@ -2439,7 +2439,7 @@ sub FPMapName { # {{{1
 
         # HACK: For some reason $resp's contents aren't visible until it
         # gets accessed?
-        if (length($resp)) { }
+        if (length $resp) { }
         UUID::unparse($resp, ${$resp_r});
     }
     else {

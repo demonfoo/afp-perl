@@ -4720,6 +4720,14 @@ A reference to a scalar containing data to be written, which is not part
 of the request block. Instead, the data is transmitted to the server in
 an intermediate exchange of DSI packets.
 
+=item FromFH
+
+Instead of supplying the fork data, supply a file handle (or filehandle
+object/blessed filehandle) for Net::DSI to read directly from; this
+allows the use of sendfile(), if a package that wraps your system's
+sendfile() implementation is available (there are several of them).
+If you do this, you must also specify C<ReqCount>; THIS MUST BE EXACT.
+
 =back
 
 Returns:
@@ -4789,6 +4797,14 @@ Number of bytes to be written.
 A reference to a scalar containing data to be written, which is not part of
 the request block. Instead, the data is transmitted to the server in an
 intermediate exchange of DSI packets.
+
+=item FromFH
+
+Instead of supplying the fork data, supply a file handle (or filehandle
+object/blessed filehandle) for Net::DSI to read directly from; this
+allows the use of sendfile(), if a package that wraps your system's
+sendfile() implementation is available (there are several of them).
+If you do this, you must also specify C<ReqCount>; THIS MUST BE EXACT.
 
 =back
 

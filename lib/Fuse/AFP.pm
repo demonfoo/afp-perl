@@ -112,6 +112,7 @@ sub new { # {{{1
 
     my($session, %urlparms);
     my $callback = sub {
+        ##no critic qw(ProhibitNoStrict)
         no strict qw(refs);
         my(%values) = @_;
         return &{$pw_cb}(@values{qw[username host password]});
@@ -667,6 +668,7 @@ sub readlink { # {{{1
     do {
         my $readtext;
         {
+            ##no critic qw(ProhibitNoStrict)
             no strict qw(refs);
             ($rc, $readtext) = &{$self->{ReadFn}}($self->{afpconn},
                     OForkRefNum => $sresp{OForkRefNum},
@@ -676,6 +678,7 @@ sub readlink { # {{{1
         return -EACCES() if $rc == $kFPAccessDenied;
         return -EINVAL() if $rc != $kFPNoErr and $rc != $kFPEOFErr;
         $linkpath .= ${$readtext};
+    ##no critic qw(ProhibitPostfixControls)
     } while ($rc != $kFPEOFErr);
     $self->{afpconn}->FPCloseFork($sresp{OForkRefNum});
     if ($self->{dotdothack}) {
@@ -743,6 +746,7 @@ sub getdir { # {{{1
     # loop reading entries {{{2
     while (1) {
         {
+            ##no critic qw(ProhibitNoStrict)
             no strict qw(refs);
             ($rc, $resp) = &{$self->{EnumFn}}($self->{afpconn}, %arglist);
         }
@@ -1039,6 +1043,7 @@ sub symlink { # {{{1
 
     my $lastwritten;
     {
+        ##no critic qw(ProhibitNoStrict)
         no strict qw(refs);
         ($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
                 OForkRefNum => $forkid,
@@ -1455,6 +1460,7 @@ sub read { # {{{1
 
     my($rc, $resp);
     {
+        ##no critic qw(ProhibitNoStrict)
         no strict qw(refs);
         ($rc, $resp) = &{$self->{ReadFn}}($self->{afpconn},
                 OForkRefNum => $fh,
@@ -1484,6 +1490,7 @@ sub write { # {{{1
     my $ts_start = gettimeofday();
     my($rc, $lastwritten);
     {
+        ##no critic qw(ProhibitNoStrict)
         no strict qw(refs);
         ($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
                 OForkRefNum => $fh,
@@ -1804,6 +1811,7 @@ sub setxattr { # {{{1
             return -EBADF()  if $rc != $kFPNoErr;
 
             {
+                ##no critic qw(ProhibitNoStrict)
                 no strict qw(refs);
                 $rc = &{$self->{WriteFn}}($self->{afpconn},
                         OForkRefNum   => $resp{OForkRefNum},
@@ -1979,6 +1987,7 @@ sub getxattr { # {{{1
 
             my $readtext;
             {
+                ##no critic qw(ProhibitNoStrict)
                 no strict qw(refs);
                 ($rc, $readtext) = &{$self->{ReadFn}}($self->{afpconn},
                         OForkRefNum => $resp{OForkRefNum},
@@ -2360,6 +2369,7 @@ sub readdir { # {{{1
     # Request entry list from server {{{2
     my($rc, $resp);
     {
+        ##no critic qw(ProhibitNoStrict)
         no strict qw(refs);
         ($rc, $resp) = &{$self->{EnumFn}}($self->{afpconn},
                         VolumeID        => $self->{volID},
@@ -2763,6 +2773,7 @@ sub bmap { # {{{1
     return -ENOTBLK();
 } # }}}1
 
+##no critic qw(ProhibitManyArgs)
 sub ioctl {
     my ($self, $file, $cmd, $flags, $data, $fh) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', cmd = %d, } .
@@ -2816,6 +2827,7 @@ sub write_buf {
     my $ts_start = gettimeofday();
     my($rc, $lastwritten);
     {
+        ##no critic qw(ProhibitNoStrict)
         no strict qw(refs);
         ($rc, $lastwritten) = &{$self->{WriteFn}}($self->{afpconn},
                 OForkRefNum => $fh,
@@ -2847,6 +2859,7 @@ sub write_buf {
     return $wr_size;
 }
 
+##no critic qw(ProhibitManyArgs)
 sub read_buf {
     my ($self, $file, $len, $off, $bufvec, $fh) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', len = %d, } .
@@ -2870,6 +2883,7 @@ sub read_buf {
 
     my $rc;
     {
+        ##no critic qw(ProhibitNoStrict)
         no strict qw(refs);
         ($rc, my $dref) = &{$self->{ReadFn}}($self->{afpconn},
                 OForkRefNum => $fh,
@@ -2923,6 +2937,7 @@ sub flock {
     return -EINVAL();
 }
 
+##no critic qw(ProhibitManyArgs)
 sub fallocate {
     my ($self, $file, $fh, $mode, $off, $len) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', fh = %d, } .

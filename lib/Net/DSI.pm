@@ -45,11 +45,10 @@ eval {
     1;
 } and do {
     $do_sendfile ||= sub {
-        my ($from, $sock, $len) = @_;
-        my $off = sysseek $from, 0, SEEK_CUR;
-        my $wlen = Sys::Sendfile::sendfile($sock, $from, $len, $off);
-        sysseek $from, $len, SEEK_CUR;
-        return $wlen;
+        $_ = Sys::Sendfile::sendfile($_[1], $_[0], $_[2],
+          sysseek $_[0], 0, SEEK_CUR);
+        sysseek $_[0], $_, SEEK_CUR;
+        return $_;
     };
 };
 
@@ -58,9 +57,7 @@ eval {
     1;
 } and do {
     $do_sendfile ||= sub {
-        my ($from, $sock, $len) = @_;
-        return Linux::PipeMagic::syssendfile($sock, $from,
-              $len);
+        return Linux::PipeMagic::syssendfile($_[1], $_[0], $_[2]);
     };
 };
 
@@ -70,9 +67,8 @@ eval {
 } and do {
     if (Sys::Syscall::sendfile_defined()) {
         $do_sendfile ||= sub {
-            my ($from, $sock, $len) = @_;
-            my $wlen = Sys::Syscall::sendfile($sock->fileno, $from->fileno, $len);
-            return $wlen == -1 ? undef : $wlen;
+            $_ = Sys::Syscall::sendfile($_[1]->fileno, $_[0]->fileno, $_[2]);
+            return $_ == -1 ? undef : $_;
         };
     }
 };
@@ -82,9 +78,8 @@ eval {
     1;
 } and do {
     $do_sendfile ||= sub {
-        my ($from, $sock, $len) = @_;
-        return IO::SendFile::sendfile($sock->fileno, $from->fileno,
-          my $offset = 0, $len);
+        return IO::SendFile::sendfile($_[1]->fileno, $_[0]->fileno, $_ = 0,
+          $_[2]);
     };
 };
 
@@ -93,12 +88,10 @@ eval {
     1;
 } and do {
     $do_sendfile ||= sub {
-        my ($from, $sock, $len) = @_;
-        my $off = sysseek $from, 0, SEEK_CUR;
-        Sys::Sendfile::FreeBSD::sendfile($from->fileno,
-          $sock->fileno, $off, $len, my $wlen = 0);
-        sysseek $from, $len, SEEK_CUR;
-        return $wlen;
+        Sys::Sendfile::FreeBSD::sendfile($_[0]->fileno, $_[1]->fileno,
+          sysseek($_[0], 0, SEEK_CUR), $_[2], $_ = 0);
+        sysseek $_[0], $_, SEEK_CUR;
+        return $_;
     };
 };
 
@@ -403,6 +396,7 @@ sub new { # {{{1
     return $obj;
 } # }}}1
 
+##no critic qw(ProhibitAmbiguousNames)
 sub close { # {{{1
     my ($self) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
@@ -466,6 +460,7 @@ sub SendMessage { # {{{1
     my $reqId;
     do {
         $reqId = $ourshared->{requestid}++ % 2**16;
+    ##no critic qw(ProhibitPostfixControls)
     } while (exists $ourshared->{handlers}{$reqId});
 
     if ($ourshared->{running} == -1) {

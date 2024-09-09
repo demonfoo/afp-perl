@@ -351,6 +351,7 @@ my %commands = (
                             push @records, @{$results};
                             $offset += scalar @{$results};
                         }
+                    ##no critic qw(ProhibitPostfixControls)
                     } while ($rc == $kFPNoErr);
                 }
                 if ($rc == $kFPNoErr || $rc == $kFPObjectNotFound) {
@@ -611,18 +612,18 @@ _EOT_
 
         my $fileLen = (stat $srcFile)[7];
         STDOUT->autoflush(1);
-        my $pos = 0;
         my($time, $lasttime, $starttime, $rate, $delta, $mult, $pcnt, $twidth,
-          $wcount, $rcnt);
+          $wcount);
         $twidth = 80; # if we can't ascertain, go with safe default
         $starttime = $time = gettimeofday();
         $lasttime = 0;
+        $wcount = 0;
         while (1) {
             # try a direct write, and see how far we get; zero-copy is
             # preferred if possible.
             my $wsize = $blksize;
-            if ($fileLen - $pos < $wsize) {
-                $wsize = $fileLen - $pos;
+            if ($fileLen - $wcount < $wsize) {
+                $wsize = $fileLen - $wcount;
             }
             ($rc, $wcount) = &{$WriteFn}($session,
                     Flag        => $kFPStartEndFlag,
@@ -631,12 +632,13 @@ _EOT_
                     FromFH      => $srcFile,
                     ReqCount    => $wsize);
 
-            $rate = 0;
-            $delta = $time - $starttime;
-            $mult = q{ };
+            $time = gettimeofday();
             if (($time - $lasttime > 0.5) || $fileLen <= $wcount) {
+                $rate = 0;
+                $delta = $time - $starttime;
+                $mult = q{ };
                 if ($delta > 0) {
-                    $rate = $pos / $delta;
+                    $rate = $wcount / $delta;
                     if ($rate > 1_000) {
                         $rate /= 1_000.0;
                         $mult = q{K};
@@ -664,8 +666,6 @@ _EOT_
                 last;
             }
             last if $rc != $kFPNoErr or $fileLen <= $wcount;
-            $pos = $wcount;
-            $time = gettimeofday();
         }
         print "\n";
         close($srcFile) || carp(q{Couldn't close local file});
@@ -893,6 +893,7 @@ if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
                 $attribs->{'completion_append_character'} = q{};
             }
             else {
+                ##no critic qw(ProhibitPackageVars)
                 $readline::rl_completer_terminator_character = q{};
             }
         } else {
@@ -900,6 +901,7 @@ if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
                 $attribs->{'completion_append_character'} = q{ };
             }
             else {
+                ##no critic qw(ProhibitPackageVars)
                 $readline::rl_completer_terminator_character = q{ };
             }
         }
