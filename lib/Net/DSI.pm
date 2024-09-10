@@ -13,6 +13,7 @@ use Log::Log4perl;
 use Data::Dumper;
 use English qw(-no_match_vars);
 use Scalar::Util ();
+use Try::Tiny;
 
 # Enables a nice call trace on warning events.
 use Carp;
@@ -92,6 +93,29 @@ eval {
           sysseek($_[0], 0, SEEK_CUR), $_[2], $_ = 0);
         sysseek $_[0], $_, SEEK_CUR;
         return $_;
+    };
+};
+
+eval {
+    require Sys::Sendfile::OSX;
+    1;
+} and do {
+    $do_sendfile ||= sub {
+        return Sys::Sendfile::OSX::sendfile($_[0], $_[1], $_[2]);
+    };
+};
+
+eval {
+    require File::Send;
+    1;
+} and do {
+    $do_sendfile ||= sub {
+        try {
+            return File::Send::sendfile($_[1], $_[0], $_[2]);
+        } catch {
+            # this one can throw an exception; if it does return nothing
+            return;
+        };
     };
 };
 
