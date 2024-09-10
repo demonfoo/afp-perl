@@ -90,7 +90,8 @@ sub PasswordAuth {
             last;
         }
         my $function = $uaminfo->{class} . q{::Authenticate};
-        $session->{logger}->debug('auth function is ', $function);
+        $session->{logger}->debug(sub { sprintf q{%s(): auth function is %s},
+          (caller 3)[3], $function);
         $session->{username} = $UserName;
         my $rc;
         {
@@ -105,8 +106,8 @@ sub PasswordAuth {
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    $session->{logger}->error((caller 0)[3],
-            "(): Could not find an agreeable UAM for authenticating to server\n");
+    $session->{logger}->error( sub { sprintf q{%s(): Could not find an agreeable } .
+      q{UAM for authenticating to server}, (caller 3)[3]});
     return $kFPBadUAM;
 }
 
@@ -125,7 +126,8 @@ sub ChangePassword {
             last;
         }
         my $function = $uaminfo->{class} . q{::ChangePassword};
-        $session->{logger}->debug('password changing function is ', $function);
+        $session->{logger}->debug(sub { sprintf q{%s(): password changing function } .
+          q{is %s}, (caller 3)[3], $function);
         my $rc;
         {
             ##no critic qw(ProhibitNoStrict)
@@ -136,8 +138,8 @@ sub ChangePassword {
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    $session->{logger}->debug((caller 0)[3],
-            q{(): Could not find valid password changing UAM});
+    $session->{logger}->debug(sub { sprintf q{%s(): Could not find valid password } .
+      q{changing UAM}, (caller 3)[3] });
     return $kFPBadUAM;
 }
 

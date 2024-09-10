@@ -2899,14 +2899,15 @@ sub read_buf {
 
     my $rc;
     {
-        ##no critic qw(ProhibitNoStrict)
+        ##no critic qw(ProhibitNoStrict ProhibitProlongedStrictureOverride)
         no strict qw(refs);
         ($rc, my $dref) = &{$self->{ReadFn}}($self->{afpconn},
                 OForkRefNum => $fh,
                 Offset      => $off,
                 ReqCount    => $len);
-        no warnings "experimental::refaliasing";
-        use feature "refaliasing";
+        ##no critic qw(ProhibitNoWarnings)
+        no warnings qw{experimental::refaliasing};
+        use feature qw{refaliasing};
         \$bufvec->[0]{mem} = $dref;
     }
     $bufvec->[0]{size} = length $bufvec->[0]{mem};
