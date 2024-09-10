@@ -91,7 +91,7 @@ sub PasswordAuth {
         }
         my $function = $uaminfo->{class} . q{::Authenticate};
         $session->{logger}->debug(sub { sprintf q{%s(): auth function is %s},
-          (caller 3)[3], $function);
+          (caller 3)[3], $function });
         $session->{username} = $UserName;
         my $rc;
         {
@@ -127,7 +127,7 @@ sub ChangePassword {
         }
         my $function = $uaminfo->{class} . q{::ChangePassword};
         $session->{logger}->debug(sub { sprintf q{%s(): password changing function } .
-          q{is %s}, (caller 3)[3], $function);
+          q{is %s}, (caller 3)[3], $function });
         my $rc;
         {
             ##no critic qw(ProhibitNoStrict)
