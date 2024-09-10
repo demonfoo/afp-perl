@@ -771,8 +771,8 @@ sub FPCatSearch {
     # this pack mask is hella wonky, but it should do what I need.
     my ($catpos, $filebmp, $dirbmp, @paramlist) =
         unpack 'a[16]S>S>L>/(xCXXCx/(a![s]))', $resp;
-    $results->{CatalogPosition} = $catpos;
-    my $op = $results->{OffspringParameters} = [];
+    ${$results}{CatalogPosition} = $catpos;
+    my $op = ${$results}{OffspringParameters} = [];
     my($isfiledir, $paramdata);
     while (scalar(@paramlist) > 0) {
         ($isfiledir, $paramdata) = splice @paramlist, 0, 2;
@@ -1055,8 +1055,8 @@ sub FPCatSearchExt {
     # this pack mask is hella wonky, but it should do what I need.
     my ($catpos, $filebmp, $dirbmp, @paramlist) =
         unpack 'a[16]S>S>L>/(x[s]CXXXS>xx/(a![s]))', $resp;
-    $results->{CatalogPosition} = $catpos;
-    my $op = $results->{OffspringParameters} = [];
+    ${$results}{CatalogPosition} = $catpos;
+    my $op = ${$results}{OffspringParameters} = [];
     my ($isfiledir, $paramdata);
     while (scalar(@paramlist) > 0) {
         ($isfiledir, $paramdata) = splice @paramlist, 0, 2;

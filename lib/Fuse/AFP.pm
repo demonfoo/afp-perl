@@ -7,7 +7,6 @@ use base qw(Fuse::Class);
 use strict;
 use warnings;
 use diagnostics;
-use feature qw(refaliasing);
 
 # Tell Perl we need to be run in at least v5.10.
 use 5.010;
@@ -128,7 +127,7 @@ sub new { # {{{1
         exit $session;
     }
 
-    $obj->{volicon} = $srvinfo->{VolumeIcon};
+    $obj->{volicon} = ${$srvinfo}{VolumeIcon};
     if (exists $opts{novolicon}) {
         $obj->{volicon} = undef;
     }
@@ -152,7 +151,7 @@ sub new { # {{{1
     # This is a bit hackish, but it seems to be the best way to make sure
     # that times are (most likely) consistent across mount sessions. Round
     # to the nearest half-hour.
-    my $delta = time() - $srvparms->{ServerTime};
+    my $delta = time() - ${$srvparms}{ServerTime};
     my $neg = $delta < 0;
     $delta = abs($delta) / 1800.0;
     $delta = ($delta - int($delta) >= 0.5) ? ceil($delta) : floor($delta);
@@ -166,8 +165,8 @@ sub new { # {{{1
     # This is sort of a hack. Seems that instead of returning '0' as the
     # user ID from the FPGetUserInfo call, the AirPort Disk AFP server
     # tells us the user ID is 1. What is this crap. But anyway.
-    if ($srvinfo->{MachineType} =~ m{\AAirPort}sm) {
-        $selfinfo->{UserID} = 0;
+    if (${$srvinfo}{MachineType} =~ m{\AAirPort}sm) {
+        ${$selfinfo}{UserID} = 0;
         $obj->{dotdothack} = 1;
     }
 
@@ -181,7 +180,7 @@ sub new { # {{{1
     if (exists $opts{uid}) {
         $mapped_uid = int $opts{uid};
     }
-    $uidmap->{$selfinfo->{UserID}} = $mapped_uid;
+    ${$uidmap}{${$selfinfo}{UserID}} = $mapped_uid;
     $obj->{uidmap} = $uidmap;
     $obj->{uidmap_r} = { reverse %{$uidmap} };
 
@@ -191,7 +190,7 @@ sub new { # {{{1
         $rc = $obj->{afpconn}->FPMapName($kUTF8NameToUserUUID,
                 $local_username, \$u_uuid);
         if ($rc == $kFPNoErr) {
-            $u_uuidmap->{$local_username} = $u_uuid;
+            ${$u_uuidmap}{$local_username} = $u_uuid;
         }
     }
     $obj->{u_uuidmap} = $u_uuidmap;
@@ -203,7 +202,7 @@ sub new { # {{{1
     if (exists $opts{gid}) {
         $mapped_gid = int $opts{gid};
     }
-    $gidmap->{$selfinfo->{UserID}} = $mapped_gid;
+    ${$gidmap}{${$selfinfo}{UserID}} = $mapped_gid;
     $obj->{gidmap} = $gidmap;
     $obj->{gidmap_r} = { reverse %{$gidmap} };
 
@@ -213,7 +212,7 @@ sub new { # {{{1
         $rc = $obj->{afpconn}->FPMapName($kUTF8NameToGroupUUID,
                 $local_grpname, \$g_uuid);
         if ($rc == $kFPNoErr) {
-            $g_uuidmap->{$local_grpname} = $g_uuid;
+            ${$g_uuidmap}{$local_grpname} = $g_uuid;
         }
     }
     $obj->{g_uuidmap} = $g_uuidmap;
@@ -252,17 +251,17 @@ sub new { # {{{1
     }
     $obj->{logger}->debug(sub { Dumper($volinfo) });
 
-    if ($volinfo->{Signature} == 3) {
+    if (${$volinfo}{Signature} == 3) {
         $obj->{logger}->error('Volume uses variable Directory IDs; not currently supported');
         $obj->disconnect();
         return EINVAL;
     }
 
-    $obj->{volID} = $volinfo->{ID};
+    $obj->{volID} = ${$volinfo}{ID};
     # Copy out the attribute value, since there are some flags we should
     # really be checking in there (you know, for UTF8 support, extended
     # attributes, ACLs, things like that)...
-    $obj->{volAttrs}    = $volinfo->{Attribute};
+    $obj->{volAttrs}    = ${$volinfo}{Attribute};
 
     $obj->{pathType}    = $kFPLongName; # AFP long names by default
     $obj->{pathFlag}    = $kFPLongNameBit;
@@ -2906,6 +2905,8 @@ sub read_buf {
                 OForkRefNum => $fh,
                 Offset      => $off,
                 ReqCount    => $len);
+        no warnings "experimental::refaliasing";
+        use feature "refaliasing";
         \$bufvec->[0]{mem} = $dref;
     }
     $bufvec->[0]{size} = length $bufvec->[0]{mem};

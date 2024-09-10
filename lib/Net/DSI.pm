@@ -639,8 +639,8 @@ sub DSIWrite { return Write(@_); }
 sub Write { # {{{1
     # This should only be used for FPWrite and FPAddIcon
     my ($self, $message, $data_r, $d_len, $resp_r, $from_fh) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
-    $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
+    #my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    #$logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     my $sem;
     my $rc;
