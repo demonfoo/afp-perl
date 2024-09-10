@@ -396,7 +396,7 @@ sub new { # {{{1
     return $obj;
 } # }}}1
 
-##no critic qw(ProhibitAmbiguousNames)
+##no critic qw(ProhibitAmbiguousNames ProhibitBuiltinHomonyms)
 sub close { # {{{1
     my ($self) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
