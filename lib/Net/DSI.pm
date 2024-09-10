@@ -13,7 +13,6 @@ use Log::Log4perl;
 use Data::Dumper;
 use English qw(-no_match_vars);
 use Scalar::Util ();
-use Try::Tiny;
 
 # Enables a nice call trace on warning events.
 use Carp;
@@ -107,8 +106,10 @@ eval {
 
 eval {
     require File::Send;
+    require Try::Tiny;
     1;
 } and do {
+    Try::Tiny->import();
     $do_sendfile ||= sub {
         try {
             return File::Send::sendfile($_[1], $_[0], $_[2]);
