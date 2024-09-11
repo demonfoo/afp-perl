@@ -112,7 +112,11 @@ eval {
     Try::Tiny->import();
     $do_sendfile ||= sub {
         try {
-            return File::Send::sendfile($_[1], $_[0], $_[2]);
+            $_ = File::Send::sendfile($_[1], $_[0], $_[2]);
+            # this sendfile() doesn't seek ahead, but does use the offset
+            # apparently, so I guess we have to do the seek.
+            sysseek $_[0], $_, SEEK_CUR;
+            return $_;
         } catch {
             # this one can throw an exception; if it does return nothing
             return;
