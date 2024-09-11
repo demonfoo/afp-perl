@@ -107,26 +107,6 @@ eval {
     };
 };
 
-eval {
-    require File::Send;
-    require Try::Tiny;
-    1;
-} and do {
-    Try::Tiny->import();
-    $do_sendfile ||= sub {
-        try {
-            $_ = File::Send::sendfile($_[1], $_[0], $_[2]);
-            # this sendfile() doesn't seek ahead, but does use the offset
-            # apparently, so I guess we have to do the seek.
-            sysseek $_[0], $_, SEEK_CUR;
-            return $_;
-        } catch {
-            # this one can throw an exception; if it does return nothing
-            return;
-        };
-    };
-};
-
 Readonly my $OP_DSI_CLOSESESSION        => 1;   # to and from server
 Readonly my $OP_DSI_COMMAND             => 2;   # to server only
 Readonly my $OP_DSI_GETSTATUS           => 3;   # to server only
