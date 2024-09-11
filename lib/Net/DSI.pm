@@ -100,7 +100,10 @@ eval {
     1;
 } and do {
     $do_sendfile ||= sub {
-        return Sys::Sendfile::OSX::sendfile($_[0], $_[1], $_[2]);
+        $_ = Sys::Sendfile::OSX::sendfile($_[0], $_[1], $_[2],
+          sysseek $_[0], 0, SEEK_CUR);
+        sysseek $_[0], $_, SEEK_CUR;
+        return $_;
     };
 };
 
