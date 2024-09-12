@@ -18,8 +18,9 @@ use Log::Log4perl;
 
 our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
                  $kFPHardCreate $kFPStartEndFlag $kFPLockUnlockFlag);
-our @ISA = qw(Exporter Net::AFP);
+use base qw(Exporter Net::AFP);
 
+##no critic qw(RequireFinalReturn RequireArgUnpacking)
 sub import {
     Net::DSI->import(@_);
     Net::AFP::TCP->export_to_level(1);

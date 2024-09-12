@@ -33,6 +33,7 @@ use Log::Log4perl;
 
 Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 200);
 
+##no critic qw(RequireArgUnpacking)
 sub zeropad {
     if (length($_[0]) > $_[1]) {
         return substr $_[0], length($_[0]) - $_[1], $_[1];

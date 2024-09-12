@@ -80,6 +80,7 @@ Readonly my $COMMENT_XATTR      => 'system.comment';
 
 # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub new { # {{{1
     my ($class, $url, $pw_cb, %opts) = @_;
 
@@ -962,7 +963,7 @@ sub unlink { # {{{1
     return -EBADF();
 } # }}}1
 
-##no critic qw(ProhibitBuiltInHomonyms)
+##no critic qw(ProhibitBuiltInHomonyms RequireArgUnpacking)
 sub rmdir { return Fuse::AFP::unlink(@_); }
 
 # seems OS X 10.4 causes the newly created symlink to be locked, so once

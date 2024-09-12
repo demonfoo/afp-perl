@@ -124,7 +124,7 @@ sub import {
 
         # Prefer the specified sendfile wrapper module, if we imported it
         # and it's available.
-        if ($param =~ m{\Asf_(lib|try|only)\z}) {
+        if ($param =~ m{\Asf_(lib|try|only)\z}sm) {
             croak qq{Library argument for import parameter ${param} is missing}
               if not  @_;
             my $libs = shift;
@@ -133,12 +133,13 @@ sub import {
 
             my @libs;
             my $overrode = 0;
-            for my $lib (split m{,}, $libs) {
-                $lib =~ s{\A\s+}{};
-                $lib =~ s{\s+\z}{};
+            for my $lib (split m{,}sm, $libs) {
+                $lib =~ s{\A\s+}{}sm;
+                $lib =~ s{\s+\z}{}sm;
                 push @libs, $lib;
 
-                if ($lib =~ /[^a-zA-Z0-9_:]/) {
+                ##no critic qw(ProhibitEnumeratedClasses)
+                if ($lib =~ m{[^a-zA-Z0-9_:]}sm) {
                     carp qq{Library name '${lib}' contains invalid characters};
                     next;
                 }
@@ -149,7 +150,6 @@ sub import {
                 }
 
                 if (not exists $sendfile_impls{$lib}) {
-                    print STDERR Dumper(\%sendfile_impls);
                     next;
                 }
 
@@ -159,13 +159,13 @@ sub import {
             }
             if ($overrode == 0) {
                 if ($param eq q{sf_only}) {
-                    croak qq{Couldn't load specified sendfile lib(s) },
-                      join(q{, }, map qq{'$_'}, @libs),
+                    croak q{Couldn't load specified sendfile lib(s) },
+                      join(q{, }, map { qq{'$_'} } @libs),
                       q{, aborting};
                 }
                 elsif ($param eq q{sf_lib}) {
-                    carp qq{Couldn't load specified sendfile lib(s) },
-                      join(q{, }, map qq{'$_'}, @libs),
+                    carp q{Couldn't load specified sendfile lib(s) },
+                      join(q{, }, map { qq{'$_'} } @libs),
                       q{, so using default};
                 }
             }
@@ -502,6 +502,7 @@ sub close { # {{{1
 #   $rc_r:      A reference to a scalar, which will be made shared and will
 #               receive the return code from the callout. If no response is
 #               desired, this should be undef.
+##no critic qw(RequireArgUnpacking)
 sub SendMessage { # {{{1
     my ($self, $cmd, $message, $data_r, $d_len, $sem, $resp_r, $rc, $from_fh) = @_;
     #my $logger = Log::Log4perl->get_logger(__PACKAGE__);
@@ -606,6 +607,7 @@ sub SendMessage { # {{{1
     return $reqId;
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub DSICloseSession { return CloseSession(@_); }
 sub CloseSession { # {{{1
     my ($self) = @_;
@@ -618,6 +620,7 @@ sub CloseSession { # {{{1
     return;
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub DSICommand { return Command(@_); }
 sub Command { # {{{1
     my ($self, $message, $resp_r) = @_;
@@ -633,6 +636,7 @@ sub Command { # {{{1
     return $reqId < 0 ? $reqId : $rc;
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub DSIGetStatus { return GetStatus(@_); }
 sub GetStatus { # {{{1
     my ($self, $resp_r) = @_;
@@ -653,6 +657,7 @@ sub GetStatus { # {{{1
     return $reqId < 0 ? $reqId : $rc;
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub DSIOpenSession { return OpenSession(@_); }
 sub OpenSession { # {{{1
     my ($self, %options) = @_;
@@ -714,6 +719,7 @@ sub DSITickle { # {{{1
     return;
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub DSIWrite { return Write(@_); }
 sub Write { # {{{1
     # This should only be used for FPWrite and FPAddIcon

@@ -12,7 +12,7 @@ use 5.010;
 
 use Exporter;
 
-our @ISA = qw(Exporter);
+use base qw(Exporter);
 our @EXPORT = qw(do_afp_connect);
 
 require Net::AFP::TCP;
@@ -22,6 +22,7 @@ use Net::AFP::UAMs;
 use Socket;
 use URI::Escape;
 
+##no critic qw(RequireFinalReturn RequireArgUnpacking)
 sub import {
     Net::AFP::TCP->import(@_);
     Net::AFP::Helpers->export_to_level(1);
