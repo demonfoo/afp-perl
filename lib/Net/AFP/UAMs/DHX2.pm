@@ -202,9 +202,14 @@ sub Authenticate {
     # message to send to the server.
     my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
             $session->{SessionKey}, $C2SIV);
-    my $message = pack 'a[' . $len . ']a*',
-            zeropad(pack('B*', $dh->pub_key_twoc()), $len), $ciphertext;
+    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    # Sometimes the result is an extra (zero) byte long; strip that off.
+    if (length($Ma) > $len) {
+        $Ma = substr $Ma, length($Ma) - $len, $len;
+    }
+    my $message = pack "a[${len}]a[${nonce_len}]", $Ma, $ciphertext;
     undef $ciphertext;
+    undef $Ma;
     $session->{logger}->debug(sub { sprintf q{message is 0x%s},
       unpack 'H*', $message });
 
@@ -228,21 +233,33 @@ sub Authenticate {
 
     # Check the client nonce, and see if it really was incremented like we
     # expect it to have been.
-    my $newClientNonce = Math::BigInt->from_bytes(unpack 'a' . $nonce_len, $decrypted);
+    my $newClientNonce = Math::BigInt->from_bytes(unpack "a[${nonce_len}]",
+      $decrypted);
     $session->{logger}->debug(sub { sprintf q{newClientNonce is %s},
       $newClientNonce->as_hex() });
     $clientNonce->binc();
     $clientNonce = $clientNonce->bmod($nonce_limit);
     if ($clientNonce->bne($newClientNonce)) {
-        croak('encryption error - nonce check failed; ' .
-          $clientNonce->as_hex() . ' != ' . $newClientNonce->as_hex());
+        # HACK: This is a netatalk bug. If the client nonce is less than the
+        # full nonce length, it doesn't check to make sure the value fills
+        # the entire target buffer, so garbage bytes get left behind after it,
+        # gumming up the works. It's fixed in their current git.
+        # https://github.com/Netatalk/netatalk/issues/1456
+        # In the meantime, I'll just... work around it.
+        $newClientNonce = Math::BigInt->from_bytes(unpack 'a[' .
+          length($clientNonce->to_bytes()) . ']', $decrypted);
+
+        if ($clientNonce->bne($newClientNonce)) {
+            croak('encryption error - nonce check failed; ' .
+              $clientNonce->as_hex() . ' != ' . $newClientNonce->as_hex());
+        }
     }
     undef $clientNonce;
     undef $newClientNonce;
 
     # Increment the nonce value the server sent to us, to be returned as part
     # of the encrypted response.
-    my $serverNonce = Math::BigInt->from_bytes(unpack 'x' . $nonce_len . 'a' . $nonce_len,
+    my $serverNonce = Math::BigInt->from_bytes(unpack "x[${nonce_len}]a[${nonce_len}]",
                                                       $decrypted);
     undef $decrypted;
     $session->{logger}->debug(sub { sprintf q{serverNonce is %s},
@@ -327,9 +344,14 @@ sub ChangePassword {
     # message to send to the server.
     my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
             $key, $C2SIV);
-    my $message = pack 'na[' . $len . ']a*', $ID,
-            zeropad(pack('B*', $dh->pub_key_twoc()), $len), $ciphertext;
+    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    # Sometimes the result is an extra (zero) byte long; strip that off.
+    if (length($Ma) > $len) {
+        $Ma = substr $Ma, length($Ma) - $len, $len;
+    }
+    my $message = pack "na[${len}]a*", $ID, $Ma, $ciphertext;
     undef $ciphertext;
+    undef $Ma;
     $session->{logger}->debug(sub { sprintf q{message is 0x%s},
       unpack 'H*', $message });
 
@@ -354,21 +376,32 @@ sub ChangePassword {
 
     # Check the client nonce, and see if it really was incremented like we
     # expect it to have been.
-    my $newClientNonce = Math::BigInt->from_bytes(unpack 'a' . $nonce_len, $decrypted);
+    my $newClientNonce = Math::BigInt->from_bytes(unpack "a[${nonce_len}]", $decrypted);
     $session->{logger}->debug(sub { sprintf q{newClientNonce is %s},
       $newClientNonce->as_hex() });
     $clientNonce->binc();
     $clientNonce = $clientNonce->bmod($nonce_limit);
     if ($clientNonce->bne($newClientNonce)) {
-        croak('encryption error - nonce check failed; ' . $clientNonce->as_hex() .
-          ' != ' . $newClientNonce->as_hex());
+        # HACK: This is a netatalk bug. If the client nonce is less than the
+        # full nonce length, it doesn't check to make sure the value fills
+        # the entire target buffer, so garbage bytes get left behind after it,
+        # gumming up the works. It's fixed in their current git.
+        # https://github.com/Netatalk/netatalk/issues/1456
+        # In the meantime, I'll just... work around it.
+        $newClientNonce = Math::BigInt->from_bytes(unpack 'a[' .
+          length($clientNonce->to_bytes()) . ']', $decrypted);
+
+        if ($clientNonce->bne($newClientNonce)) {
+            croak('encryption error - nonce check failed; ' .
+              $clientNonce->as_hex() . ' != ' . $newClientNonce->as_hex());
+        }
     }
     undef $clientNonce;
     undef $newClientNonce;
 
     # Increment the nonce value the server sent to us, to be returned as part
     # of the encrypted response.
-    my $serverNonce = Math::BigInt->from_bytes(unpack 'x' . $nonce_len . 'a' . $nonce_len,
+    my $serverNonce = Math::BigInt->from_bytes(unpack "x[${nonce_len}]a[${nonce_len}]",
 		                                      $decrypted);
     undef $decrypted;
     $session->{logger}->debug(sub { sprintf q{serverNonce is %s},
