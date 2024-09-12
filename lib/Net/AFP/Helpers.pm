@@ -10,16 +10,22 @@ use English qw(-no_match_vars);
 # We need at least Perl 5.8 to make this all go...
 use 5.010;
 
-use Exporter qw(import);
+use Exporter;
 
+our @ISA = qw(Exporter);
 our @EXPORT = qw(do_afp_connect);
 
-use Net::AFP::TCP;
+require Net::AFP::TCP;
 use Net::AFP::Result;
 use Net::AFP::Versions;
 use Net::AFP::UAMs;
 use Socket;
 use URI::Escape;
+
+sub import {
+    Net::AFP::TCP->import(@_);
+    Net::AFP::Helpers->export_to_level(1);
+}
 
 my $has_atalk = 0;
 eval {

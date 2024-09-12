@@ -11,13 +11,19 @@ use Carp;
 use Net::AFP;
 use Net::AFP::Parsers;
 use Net::AFP::Result;
-use Net::DSI;
-use Exporter qw(import);
+# only do 'require', the 'import' part will be done during _our_ 'import'.
+require Net::DSI;
+use Exporter;
 use Log::Log4perl;
 
-use base qw(Net::AFP);
 our @EXPORT = qw($kFPShortName $kFPLongName $kFPUTF8Name $kFPSoftCreate
                  $kFPHardCreate $kFPStartEndFlag $kFPLockUnlockFlag);
+our @ISA = qw(Exporter Net::AFP);
+
+sub import {
+    Net::DSI->import(@_);
+    Net::AFP::TCP->export_to_level(1);
+}
 
 # Arguments:
 #   $class: The class (Net::AFP::TCP) to create an instance of. This

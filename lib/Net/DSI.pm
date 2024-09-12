@@ -39,26 +39,29 @@ use Class::InsideOut qw(public readonly private register id);
 use Fcntl qw(SEEK_CUR);
 
 my $do_sendfile = undef;
+my %sendfile_impls = ();
 
 eval {
     require Sys::Sendfile;
     1;
 } and do {
-    $do_sendfile ||= sub {
+    $sendfile_impls{q{Sys::Sendfile}} = sub {
         $_ = Sys::Sendfile::sendfile($_[1], $_[0], $_[2],
           sysseek $_[0], 0, SEEK_CUR);
         sysseek $_[0], $_, SEEK_CUR;
         return $_;
     };
+    $do_sendfile ||= $sendfile_impls{q{Sys::Sendfile}};
 };
 
 eval {
     require Linux::PipeMagic;
     1;
 } and do {
-    $do_sendfile ||= sub {
+    $sendfile_impls{q{Linux::PipeMagic}} = sub {
         return Linux::PipeMagic::syssendfile($_[1], $_[0], $_[2]);
     };
+    $do_sendfile ||= $sendfile_impls{q{Linux::PipeMagic}};
 };
 
 eval {
@@ -66,10 +69,11 @@ eval {
     1;
 } and do {
     if (Sys::Syscall::sendfile_defined()) {
-        $do_sendfile ||= sub {
+        $sendfile_impls{q{Sys::Syscall}} = sub {
             $_ = Sys::Syscall::sendfile($_[1]->fileno, $_[0]->fileno, $_[2]);
             return $_ == -1 ? undef : $_;
         };
+        $do_sendfile ||= $sendfile_impls{q{Sys::Syscall}};
     }
 };
 
@@ -77,35 +81,98 @@ eval {
     require IO::SendFile;
     1;
 } and do {
-    $do_sendfile ||= sub {
+    $sendfile_impls{q{IO::SendFile}} = sub {
         return IO::SendFile::sendfile($_[1]->fileno, $_[0]->fileno, $_ = 0,
           $_[2]);
     };
+    $do_sendfile ||= $sendfile_impls{q{IO::SendFile}};
 };
 
 eval {
     require Sys::Sendfile::FreeBSD;
     1;
 } and do {
-    $do_sendfile ||= sub {
+    $sendfile_impls{q{Sys::Sendfile::FreeBSD}} = sub {
         Sys::Sendfile::FreeBSD::sendfile($_[0]->fileno, $_[1]->fileno,
           sysseek($_[0], 0, SEEK_CUR), $_[2], $_ = 0);
         sysseek $_[0], $_, SEEK_CUR;
         return $_;
     };
+    $do_sendfile ||= $sendfile_impls{q{Sys::Sendfile::FreeBSD}};
 };
 
 eval {
     require Sys::Sendfile::OSX;
     1;
 } and do {
-    $do_sendfile ||= sub {
+    $sendfile_impls{q{Sys::Sendfile::OSX}} = sub {
         $_ = Sys::Sendfile::OSX::sendfile($_[0], $_[1], $_[2],
           sysseek $_[0], 0, SEEK_CUR);
         sysseek $_[0], $_, SEEK_CUR;
         return $_;
     };
+    $do_sendfile ||= $sendfile_impls{q{Sys::Sendfile::OSX}};
 };
+
+sub import {
+    my $class = shift;
+
+    my @a;
+
+    while (@_) {
+        my $param = shift;
+
+        # Prefer the specified sendfile wrapper module, if we imported it
+        # and it's available.
+        if ($param =~ m{\Asf_(lib|try|only)\z}) {
+            croak qq{Library argument for import parameter ${param} is missing}
+              if not  @_;
+            my $libs = shift;
+            croak qq{Library argument for import parameter ${param} is undefined}
+              if not defined $libs;
+
+            my @libs;
+            my $overrode = 0;
+            for my $lib (split m{,}, $libs) {
+                $lib =~ s{\A\s+}{};
+                $lib =~ s{\s+\z}{};
+                push @libs, $lib;
+
+                if ($lib =~ /[^a-zA-Z0-9_:]/) {
+                    carp qq{Library name '${lib}' contains invalid characters};
+                    next;
+                }
+
+                if (not CORE::length $lib) {
+                    carp q{Library name is empty};
+                    next;
+                }
+
+                if (not exists $sendfile_impls{$lib}) {
+                    print STDERR Dumper(\%sendfile_impls);
+                    next;
+                }
+
+                $do_sendfile = $sendfile_impls{$lib};
+                $overrode = 1;
+                last;
+            }
+            if ($overrode == 0) {
+                if ($param eq q{sf_only}) {
+                    croak qq{Couldn't load specified sendfile lib(s) },
+                      join(q{, }, map qq{'$_'}, @libs),
+                      q{, aborting};
+                }
+                elsif ($param eq q{sf_lib}) {
+                    carp qq{Couldn't load specified sendfile lib(s) },
+                      join(q{, }, map qq{'$_'}, @libs),
+                      q{, so using default};
+                }
+            }
+        }
+        push @a, $param;
+    }
+}
 
 Readonly my $OP_DSI_CLOSESESSION        => 1;   # to and from server
 Readonly my $OP_DSI_COMMAND             => 2;   # to server only
