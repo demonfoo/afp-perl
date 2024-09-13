@@ -76,17 +76,21 @@ sub Authenticate {
     my %resp;
     my $rc;
 
+    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    if (length($Ma) > $len) {
+        $Ma = substr $Ma, length($Ma) - $len, $len;
+    }
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
             $kFPVerAtLeast)) {
         ($rc, %resp) = $session->FPLoginExt(
                 AFPVersion   => $AFPVersion,
                 UAM          => $UAMNAME,
                 UserName     => $username,
-                UserAuthInfo => zeropad(pack('B*', $dh->pub_key_twoc()), $len));
+                UserAuthInfo => $Ma);
         $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
     }
     else {
-        my $ai = pack 'C/a*x![s]a*', $username, zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+        my $ai = pack 'C/a*x![s]a*', $username, $Ma;
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $ai);
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
@@ -95,7 +99,7 @@ sub Authenticate {
                     '0x' . unpack 'H' . ($len * 2), $resp{UserAuthInfo});
     $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
 
-    my $message = unpack 'x' . $len . 'a*', $resp{UserAuthInfo};
+    my $message = unpack "x[${len}]a*", $resp{UserAuthInfo};
     $session->{logger}->debug(sub { sprintf q{message is 0x%s},
       unpack 'H*', $message });
 
@@ -111,14 +115,18 @@ sub Authenticate {
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
-    my $nonce = Math::BigInt->from_bytes(unpack 'a' . $nonce_len, $decrypted);
+    my($nonce, $sig) = unpack "a[${nonce_len}]a[16]", $decrypted;
+    $nonce = Math::BigInt->from_bytes($nonce);
+    if ($sig ne qq{\0} x 16) {
+        croak('encryption error - signature was not what was expected?');
+    }
     undef $decrypted;
     $session->{logger}->debug(sub { sprintf q{nonce is %s}, $nonce->as_hex() });
     $nonce->binc();
     $nonce = $nonce->bmod($nonce_limit);
     $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
       $nonce->as_hex() });
-    my $authdata = pack 'a[' . $nonce_len . ']a[' . $pw_len . ']',
+    my $authdata = pack "a[${nonce_len}]a[${pw_len}]",
 	                zeropad($nonce->to_bytes(), $nonce_len), &{$pw_cb}();
     undef $nonce;
     my $ciphertext = $ctx->encrypt($authdata, $session->{SessionKey}, $C2SIV);
@@ -151,8 +159,12 @@ sub ChangePassword {
     $nonce_limit->blsft($nonce_len * 8);
 
     # Send an ID value of 0, followed by our Ma value.
-    my $authinfo = pack 'na[' . $len . ']', 0,
-            zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    if (length($Ma) > $len) {
+        $Ma = substr $Ma, length($Ma) - $len, $len;
+    }
+    my $authinfo = pack "na[${len}]", 0, $Ma;
+    undef $Ma;
     $session->{logger}->debug(sub { sprintf q{authinfo is 0x%s},
       unpack 'H*', $authinfo });
     my $resp = undef;
@@ -185,14 +197,15 @@ sub ChangePassword {
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
-    my $nonce = Math::BigInt->from_bytes(unpack 'a' . $nonce_len, $decrypted);
+    my($nonce, $sig) = unpack "a[${nonce_len}]a[16]", $decrypted;
+    $nonce = Math::BigInt->from_bytes($nonce);
     undef $decrypted;
     $session->{logger}->debug(sub { sprintf q{nonce is %s}, $nonce->as_hex() });
     $nonce->binc();
     $nonce = $nonce->bmod($nonce_limit);
     $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
       $nonce->as_hex() });
-    my $authdata = pack 'a[' . $nonce_len . ']a[' . $pw_len . ']a[' . $pw_len . ']',
+    my $authdata = pack "a[${nonce_len}]a[${pw_len}]a[${pw_len}]",
 	                zeropad($nonce->to_bytes(), $nonce_len), $newPassword,
                     $oldPassword;
     undef $nonce;

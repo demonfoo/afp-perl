@@ -273,7 +273,7 @@ sub Authenticate {
     # Assemble the final message to send back to the server with the
     # incremented server nonce, and the user's password, then encrypt the
     # message.
-    my $authdata = pack 'a[' . $nonce_len . ']a[' . $pw_len . ']',
+    my $authdata = pack "a[${nonce_len}]a[${pw_len}]",
 	                zeropad($serverNonce->to_bytes(), $nonce_len), &{$pw_cb}();
     undef $serverNonce;
     $ciphertext = $ctx->encrypt($authdata, $session->{SessionKey}, $C2SIV);
@@ -415,7 +415,7 @@ sub ChangePassword {
     # Assemble the final message to send back to the server with the
     # incremented server nonce, the user's current password, and the
     # desired new password, then encrypt the message.
-    my $authdata = pack 'a[' . $nonce_len . ']a[' . $pw_len . ']a[' . $pw_len . ']',
+    my $authdata = pack "a[${nonce_len}]a[${pw_len}]a[${pw_len}",
 	                zeropad($serverNonce->to_bytes(), $nonce_len),
 	                $newPassword, $oldPassword;
     undef $serverNonce;
