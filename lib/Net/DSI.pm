@@ -124,7 +124,7 @@ sub import {
 
         # Prefer the specified sendfile wrapper module, if we imported it
         # and it's available.
-        if ($param =~ m{\Asf_(lib|try|only)\z}sm) {
+        if ($param =~ m{\Asendfile_(lib|try|only)\z}sm) {
             croak qq{Library argument for import parameter ${param} is missing}
               if not  @_;
             my $libs = shift;
@@ -147,6 +147,12 @@ sub import {
                 if (not CORE::length $lib) {
                     carp q{Library name is empty};
                     next;
+                }
+
+                if ($lib eq 'none') {
+                    undef $do_sendfile;
+                    $overrode = 1;
+                    last;
                 }
 
                 if (not exists $sendfile_impls{$lib}) {
