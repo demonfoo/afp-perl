@@ -57,8 +57,8 @@ sub auth_common1 {
     my($session) = @_;
 
     my $dh = Crypt::DH::GMP->new(
-            p => '0x' . unpack('H*', pack 'C*', @p_bytes),
-            g => '0x' . unpack 'H*', pack 'C*', @g_bytes);
+            p => '0x' . unpack(q{H*}, pack q{C*}, @p_bytes),
+            g => '0x' . unpack q{H*}, pack q{C*}, @g_bytes);
     $dh->generate_keys();
 
     my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
@@ -69,19 +69,18 @@ sub auth_common1 {
     return($dh, $Ma);
 }
 
-##no critic qw(ProhibitManyArgs)
 sub auth_common2 {
-    my($session, $maskprefix, $message, $len, $store_sesskey, $dh) = @_;
+    my($session, $message, $len, $store_sesskey, $dh) = @_;
 
     my $nonce_limit = Math::BigInt->bone();
     $nonce_limit->blsft($nonce_len * 8);
 
-    my($Mb, $encrypted) = unpack $maskprefix . "a[${len}]a*", $message;
-    my $K = pack 'B*', $dh->compute_key_twoc('0x' . unpack'H*', $Mb);
-    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
+    my($Mb, $encrypted) = unpack "a[${len}]a*", $message;
+    my $K = pack q{B*}, $dh->compute_key_twoc('0x' . unpack'H*', $Mb);
+    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack q{H*}, $K });
 
     $session->{logger}->debug(sub { sprintf q{encrypted is 0x%s},
-      unpack 'H*', $encrypted });
+      unpack q{H*}, $encrypted });
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
@@ -93,7 +92,7 @@ sub auth_common2 {
     my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
     my $decrypted = $ctx->decrypt($encrypted, $key, $S2CIV);
     $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
-      unpack 'H*', $decrypted });
+      unpack q{H*}, $decrypted });
 
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
@@ -144,13 +143,14 @@ sub Authenticate {
         $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
     }
     else {
-        my $ai = pack 'C/a*x![s]a*', $username, $Ma;
+        my $ai = pack q{C/a*x![s]a*}, $username, $Ma;
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $ai);
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
     return $rc if $rc != $kFPAuthContinue;
 
-    my($nonce, $key, $ctx) = auth_common2($session, q{}, $resp{UserAuthInfo}, $len, 1, $dh);
+    my($nonce, $key, $ctx) =
+      auth_common2($session, $resp{UserAuthInfo}, $len, 1, $dh);
 
     my $authdata = pack "a[${nonce_len}]a[${pw_len}]",
 	                zeropad($nonce->to_bytes(), $nonce_len), &{$pw_cb}();
@@ -158,7 +158,7 @@ sub Authenticate {
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     undef $authdata;
     $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
-      unpack 'H*', $ciphertext });
+      unpack q{H*}, $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($resp{ID}, $ciphertext);
@@ -182,7 +182,7 @@ sub ChangePassword {
     my $authinfo = pack "na[${len}]", 0, $Ma;
     undef $Ma;
     $session->{logger}->debug(sub { sprintf q{authinfo is 0x%s},
-      unpack 'H*', $authinfo });
+      unpack q{H*}, $authinfo });
     my $resp = undef;
 
     # Username is always an empty string with AFP 3.0 and up.
@@ -195,7 +195,9 @@ sub ChangePassword {
     $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
     return $rc if $rc != $kFPAuthContinue;
 
-    my($nonce, $key, $ctx) = auth_common2($session, q{x[2]}, $resp, $len, 0, $dh);
+    my($ID, $message) = unpack q{S>a*}, $resp;
+    my($nonce, $key, $ctx) =
+      auth_common2($session, $message, $len, 0, $dh);
 
     my $authdata = pack "a[${nonce_len}]a[${pw_len}]a[${pw_len}]",
 	                zeropad($nonce->to_bytes(), $nonce_len), $newPassword,
@@ -204,12 +206,12 @@ sub ChangePassword {
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     undef $authdata;
     $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
-      unpack 'H*', $ciphertext });
+      unpack q{H*}, $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
-    my $message = pack 'na*', unpack('n', $resp), $ciphertext;
+    $message = pack q{S>a*}, $ID, $ciphertext;
     $session->{logger}->debug(sub { sprintf q{message is 0x%s},
-      unpack 'H*', $message });
+      unpack q{H*}, $message });
     undef $ciphertext;
     $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;

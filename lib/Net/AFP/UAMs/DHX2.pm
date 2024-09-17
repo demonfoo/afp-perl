@@ -47,26 +47,26 @@ sub zeropad {
 # since these parts are the same between authentication and password changing,
 # let's not write the whole thing twice, eh?
 sub auth_common1 {
-    my($session, $maskprefix, $message, $store_sesskey) = @_;
+    my($session, $message, $store_sesskey) = @_;
 
     # Get the value for g, and the length value for assorted things (p, Ma,
     # Mb, Ra, Rb).
-    my ($g, $len, $p, $Mb) = unpack "${maskprefix}L>S>X[s]S>/aa*", $message;
+    my ($g, $len, $p, $Mb) = unpack q{L>S>X[s]S>/aa*}, $message;
 
     $session->{logger}->debug(sub { sprintf q{g is %d}, $g });
     $session->{logger}->debug(sub { sprintf q{len is %d}, $len });
 
     # Pull p and Mb out of the data the server sent back, based on the length
     # value extracted above.
-    $p = '0x' . unpack 'H*', $p;
+    $p = '0x' . unpack q{H*}, $p;
     $session->{logger}->debug(sub { sprintf q{p is %s}, $p });
 
     my $dh = Crypt::DH::GMP->new(p => $p, g => $g);
 
     $dh->generate_keys();
-    my $K = pack 'B*', $dh->compute_key_twoc('0x' . unpack 'H*', $Mb);
+    my $K = pack q{B*}, $dh->compute_key_twoc('0x' . unpack q{H*}, $Mb);
     undef $Mb;
-    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
+    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack q{H*}, $K });
 
     # Get our nonce, which we'll send to the server in the ciphertext.
     my $clientNonce = Math::BigInt->from_bytes(random_bytes($nonce_len));
@@ -86,7 +86,7 @@ sub auth_common1 {
     # message to send to the server.
     my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
             $key, $C2SIV);
-    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    my $Ma = zeropad(pack(q{B*}, $dh->pub_key_twoc()), $len);
     # Sometimes the result is an extra (zero) byte long; strip that off.
     if (length($Ma) > $len) {
         $Ma = substr $Ma, length($Ma) - $len, $len;
@@ -105,11 +105,11 @@ sub auth_common2 {
     # incremented nonce value from us, and the server's nonce value.
     my $decrypted = $ctx->decrypt($message, $key, $S2CIV);
     $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
-      unpack 'H*', $decrypted });
+      unpack q{H*}, $decrypted });
 
     # Check the client nonce, and see if it really was incremented like we
     # expect it to have been.
-    my $newClientNonce = Math::BigInt->from_bytes(unpack "a[${nonce_len}]",
+    my $newClientNonce = Math::BigInt->from_bytes(unpack qq{a[${nonce_len}]},
       $decrypted);
     $session->{logger}->debug(sub { sprintf q{newClientNonce is %s},
       $newClientNonce->as_hex() });
@@ -135,7 +135,7 @@ sub auth_common2 {
 
     # Increment the nonce value the server sent to us, to be returned as part
     # of the encrypted response.
-    my $serverNonce = Math::BigInt->from_bytes(unpack "x[${nonce_len}]a[${nonce_len}]",
+    my $serverNonce = Math::BigInt->from_bytes(unpack qq{x[${nonce_len}]a[${nonce_len}]},
                                                       $decrypted);
     undef $decrypted;
     $session->{logger}->debug(sub { sprintf q{serverNonce is %s},
@@ -261,22 +261,20 @@ sub Authenticate {
     }
     else {
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME,
-                pack 'C/a*x![s]', $username);
+                pack q{C/a*x![s]}, $username);
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
-    if ($rc != $kFPAuthContinue) {
-        return $rc;
-    }
-
-    my($Ma, $len, $clientNonce, $ctx, $ciphertext, $key) =
-      auth_common1($session, q{}, $resp{UserAuthInfo}, 1);
+    return $rc if $rc != $kFPAuthContinue;
 
     # Received message 2, parsing below.
-    my $message = pack "a[${len}]a[${nonce_len}]", $Ma, $ciphertext;
+    my($Ma, $len, $clientNonce, $ctx, $ciphertext, $key) =
+      auth_common1($session, $resp{UserAuthInfo}, 1);
+
+    my $message = pack qq{a[${len}]a[${nonce_len}]}, $Ma, $ciphertext;
     undef $ciphertext;
     undef $Ma;
     $session->{logger}->debug(sub { sprintf q{message is 0x%s},
-      unpack 'H*', $message });
+      unpack q{H*}, $message });
 
     # Send the message to the server containing Ma (our "public key"), and
     # the encrypted nonce value.
@@ -294,12 +292,12 @@ sub Authenticate {
     # Assemble the final message to send back to the server with the
     # incremented server nonce, and the user's password, then encrypt the
     # message.
-    my $authdata = pack "a[${nonce_len}]a[${pw_len}]",
+    my $authdata = pack qq{a[${nonce_len}]a[${pw_len}]},
 	                zeropad($serverNonce->to_bytes(), $nonce_len), &{$pw_cb}();
     undef $serverNonce;
     $ciphertext = $ctx->encrypt($authdata, $session->{SessionKey}, $C2SIV);
     $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
-      unpack 'H*', $ciphertext });
+      unpack q{H*}, $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($sresp->{ID}, $ciphertext);
@@ -327,47 +325,44 @@ sub ChangePassword {
     $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
     return $rc if $rc != $kFPAuthContinue;
 
-    my ($ID) = unpack 'S>', $resp;
+    my ($ID, $message) = unpack q{S>a*}, $resp;
     my($Ma, $len, $clientNonce, $ctx, $ciphertext, $key) =
-      auth_common1($session, q{x[s]}, $resp, 0);
+      auth_common1($session, $message, 0);
 
-    my $message = pack "na[${len}]a*", $ID, $Ma, $ciphertext;
+    $message = pack qq{na[${len}]a[${nonce_len}]}, $ID, $Ma, $ciphertext;
     undef $ciphertext;
     undef $Ma;
     $session->{logger}->debug(sub { sprintf q{message is 0x%s},
-      unpack 'H*', $message });
+      unpack q{H*}, $message });
 
     # Send the message to the server containing Ma (our "public key"), and
     # the encrypted nonce value.
     my $sresp = q{};
     $rc = $session->FPChangePassword($UAMNAME, $username, $message, \$sresp);
+    undef $message;
     $session->{logger}->debug(sub { sprintf q{FPChangePassword() completed } .
       q{with result code %d}, $rc });
     return $rc if $rc != $kFPAuthContinue;
-    undef $message;
 
     # Unpack the server response for our perusal.
-    ($ID, $message) = unpack 'na*', $sresp;
+    ($ID, $message) = unpack q{na*}, $sresp;
 
     my($serverNonce) = auth_common2($session, $key, $message, $clientNonce, $ctx);
 
     # Assemble the final message to send back to the server with the
     # incremented server nonce, the user's current password, and the
     # desired new password, then encrypt the message.
-    my $authdata = pack "a[${nonce_len}]a[${pw_len}]a[${pw_len}",
+    my $authdata = pack qq{a[${nonce_len}]a[${pw_len}]a[${pw_len}},
 	                zeropad($serverNonce->to_bytes(), $nonce_len),
 	                $newPassword, $oldPassword;
     undef $serverNonce;
     $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
-      unpack 'H*', $ciphertext });
-
-    $message = pack 'na*', $ID, $ciphertext;
-    undef $ciphertext;
+      unpack q{H*}, $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
-    $rc = $session->FPChangePassword($UAMNAME, $username, $message);
-    undef $message;
+    $rc = $session->FPChangePassword($UAMNAME, $username, pack q{na*}, $ID, $ciphertext);
+    undef $ciphertext;
     $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
     return $rc;
 }
