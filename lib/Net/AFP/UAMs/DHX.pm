@@ -69,6 +69,7 @@ sub auth_common1 {
     return($dh, $Ma);
 }
 
+##no critic qw(ProhibitManyArgs)
 sub auth_common2 {
     my($session, $maskprefix, $message, $len, $store_sesskey, $dh) = @_;
 
