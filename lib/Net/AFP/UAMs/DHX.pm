@@ -70,10 +70,9 @@ sub auth_common1 {
 }
 
 sub auth_common2 {
-    my($session, $message, $len, $store_sesskey, $dh) = @_;
+    my($session, $message, $store_sesskey, $dh) = @_;
 
-    my $nonce_limit = Math::BigInt->bone();
-    $nonce_limit->blsft($nonce_len * 8);
+    (my $nonce_limit = Math::BigInt->bone())->blsft($nonce_len * 8);
 
     my($Mb, $encrypted) = unpack "a[${len}]a*", $message;
     my $K = pack q{B*}, $dh->compute_key_twoc('0x' . unpack'H*', $Mb);
@@ -150,7 +149,7 @@ sub Authenticate {
     return $rc if $rc != $kFPAuthContinue;
 
     my($nonce, $key, $ctx) =
-      auth_common2($session, $resp{UserAuthInfo}, $len, 1, $dh);
+      auth_common2($session, $resp{UserAuthInfo}, 1, $dh);
 
     my $authdata = pack "a[${nonce_len}]a[${pw_len}]",
 	                zeropad($nonce->to_bytes(), $nonce_len), &{$pw_cb}();
@@ -197,7 +196,7 @@ sub ChangePassword {
 
     my($ID, $message) = unpack q{S>a*}, $resp;
     my($nonce, $key, $ctx) =
-      auth_common2($session, $message, $len, 0, $dh);
+      auth_common2($session, $message, 0, $dh);
 
     my $authdata = pack "a[${nonce_len}]a[${pw_len}]a[${pw_len}]",
 	                zeropad($nonce->to_bytes(), $nonce_len), $newPassword,
