@@ -44,6 +44,8 @@ sub zeropad {
     }
 }
 
+# since these parts are the same between authentication and password changing,
+# let's not write the whole thing twice, eh?
 sub auth_common1 {
     my($session, $maskprefix, $message, $store_sesskey) = @_;
 
