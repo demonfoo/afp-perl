@@ -51,6 +51,69 @@ sub zeropad {
     }
 }
 
+# since these parts are the same between authentication and password changing,
+# let's not write the whole thing twice, eh?
+sub auth_common1 {
+    my($session) = @_;
+
+    my $dh = Crypt::DH::GMP->new(
+            p => '0x' . unpack('H*', pack 'C*', @p_bytes),
+            g => '0x' . unpack 'H*', pack 'C*', @g_bytes);
+    $dh->generate_keys();
+
+    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    if (length($Ma) > $len) {
+        $Ma = substr $Ma, length($Ma) - $len, $len;
+    }
+
+    return($dh, $Ma);
+}
+
+sub auth_common2 {
+    my($session, $maskprefix, $message, $len, $store_sesskey, $dh) = @_;
+
+    my $nonce_limit = Math::BigInt->bone();
+    $nonce_limit->blsft($nonce_len * 8);
+
+    my($Mb, $encrypted) = unpack $maskprefix . "a[${len}]a*", $message;
+    my $K = pack 'B*', $dh->compute_key_twoc('0x' . unpack'H*', $Mb);
+    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
+
+    $session->{logger}->debug(sub { sprintf q{encrypted is 0x%s},
+      unpack 'H*', $encrypted });
+
+    # Set up an encryption context with the key we derived, and decrypt the
+    # ciphertext that the server sent back to us.
+    my $key = zeropad($K, $len);
+    if ($store_sesskey) {
+        $session->{SessionKey} = $key;
+    }
+    undef $K;
+    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
+    my $decrypted = $ctx->decrypt($encrypted, $key, $S2CIV);
+    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
+      unpack 'H*', $decrypted });
+
+    # The nonce is a random value that the server sends as a check; we add
+    # one to it, and send it back to the server to prove we understand what
+    # it's saying.
+    my($nonce, $sig) = unpack "a[${nonce_len}]a[16]", $decrypted;
+    $nonce = Math::BigInt->from_bytes($nonce);
+    # signature should be 16 bytes of null; if it's not something has gone
+    # very wrong.
+    if ($sig ne qq{\0} x 16) {
+        croak('encryption error - signature was not what was expected?');
+    }
+    undef $decrypted;
+    $session->{logger}->debug(sub { sprintf q{nonce is %s}, $nonce->as_hex() });
+    $nonce->binc();
+    $nonce = $nonce->bmod($nonce_limit);
+    $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
+      $nonce->as_hex() });
+
+    return($nonce, $key, $ctx);
+}
+
 sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
@@ -63,23 +126,13 @@ sub Authenticate {
         croak(q{Password callback MUST be a subroutine ref});
     }
 
-    my $dh = Crypt::DH::GMP->new(
-            p => '0x' . unpack('H*', pack 'C*', @p_bytes),
-            g => '0x' . unpack 'H*', pack 'C*', @g_bytes);
-    $dh->generate_keys();
-
-    my $nonce_limit = Math::BigInt->bone();
-    $nonce_limit->blsft($nonce_len * 8);
+    my($dh, $Ma) = auth_common1($session);
 
     # Send the "random number" to the server as the first stage of the
     # authentication process, along with the username.
     my %resp;
     my $rc;
 
-    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
-    if (length($Ma) > $len) {
-        $Ma = substr $Ma, length($Ma) - $len, $len;
-    }
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
             $kFPVerAtLeast)) {
         ($rc, %resp) = $session->FPLoginExt(
@@ -95,41 +148,13 @@ sub Authenticate {
         $session->{logger}->debug('FPLogin() completed with result code ', $rc);
     }
     return $rc if $rc != $kFPAuthContinue;
-    my $K = pack 'B*', $dh->compute_key_twoc(
-                    '0x' . unpack 'H' . ($len * 2), $resp{UserAuthInfo});
-    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
 
-    my $message = unpack "x[${len}]a*", $resp{UserAuthInfo};
-    $session->{logger}->debug(sub { sprintf q{message is 0x%s},
-      unpack 'H*', $message });
+    my($nonce, $key, $ctx) = auth_common2($session, q{}, $resp{UserAuthInfo}, $len, 1, $dh);
 
-    # Set up an encryption context with the key we derived, and decrypt the
-    # ciphertext that the server sent back to us.
-    $session->{SessionKey} = zeropad($K, $len);
-    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
-    undef $K;
-    my $decrypted = $ctx->decrypt($message, $session->{SessionKey}, $S2CIV);
-    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
-      unpack 'H*', $decrypted });
-
-    # The nonce is a random value that the server sends as a check; we add
-    # one to it, and send it back to the server to prove we understand what
-    # it's saying.
-    my($nonce, $sig) = unpack "a[${nonce_len}]a[16]", $decrypted;
-    $nonce = Math::BigInt->from_bytes($nonce);
-    if ($sig ne qq{\0} x 16) {
-        croak('encryption error - signature was not what was expected?');
-    }
-    undef $decrypted;
-    $session->{logger}->debug(sub { sprintf q{nonce is %s}, $nonce->as_hex() });
-    $nonce->binc();
-    $nonce = $nonce->bmod($nonce_limit);
-    $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
-      $nonce->as_hex() });
     my $authdata = pack "a[${nonce_len}]a[${pw_len}]",
 	                zeropad($nonce->to_bytes(), $nonce_len), &{$pw_cb}();
     undef $nonce;
-    my $ciphertext = $ctx->encrypt($authdata, $session->{SessionKey}, $C2SIV);
+    my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     undef $authdata;
     $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
       unpack 'H*', $ciphertext });
@@ -150,19 +175,9 @@ sub ChangePassword {
         croak('Object MUST be of type Net::AFP!');
     }
 
-    my $dh = Crypt::DH::GMP->new(
-            p => '0x' . unpack('H*', pack 'C*', @p_bytes),
-            g => '0x' . unpack 'H*', pack 'C*', @g_bytes);
-    $dh->generate_keys();
-
-    my $nonce_limit = Math::BigInt->bone();
-    $nonce_limit->blsft($nonce_len * 8);
+    my($dh, $Ma) = auth_common1($session);
 
     # Send an ID value of 0, followed by our Ma value.
-    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
-    if (length($Ma) > $len) {
-        $Ma = substr $Ma, length($Ma) - $len, $len;
-    }
     my $authinfo = pack "na[${len}]", 0, $Ma;
     undef $Ma;
     $session->{logger}->debug(sub { sprintf q{authinfo is 0x%s},
@@ -179,32 +194,8 @@ sub ChangePassword {
     $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
     return $rc if $rc != $kFPAuthContinue;
 
-    # Unpack the server response for our perusal.
-    my $K = pack 'B*', $dh->compute_key_twoc(
-                    '0x' . unpack 'x2H' . ($len * 2), $resp);
-    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
+    my($nonce, $key, $ctx) = auth_common2($session, q{x[2]}, $resp, $len, 0, $dh);
 
-    # Set up an encryption context with the key we derived, and decrypt the
-    # ciphertext that the server sent back to us.
-    my $key = zeropad($K, $len);
-    undef $K;
-    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
-    my $decrypted = $ctx->decrypt(unpack('x[2]x' . $len . 'a[32]', $resp), $key,
-            $S2CIV);
-    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
-      unpack 'H*', $decrypted });
-
-    # The nonce is a random value that the server sends as a check; we add
-    # one to it, and send it back to the server to prove we understand what
-    # it's saying.
-    my($nonce, $sig) = unpack "a[${nonce_len}]a[16]", $decrypted;
-    $nonce = Math::BigInt->from_bytes($nonce);
-    undef $decrypted;
-    $session->{logger}->debug(sub { sprintf q{nonce is %s}, $nonce->as_hex() });
-    $nonce->binc();
-    $nonce = $nonce->bmod($nonce_limit);
-    $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
-      $nonce->as_hex() });
     my $authdata = pack "a[${nonce_len}]a[${pw_len}]a[${pw_len}]",
 	                zeropad($nonce->to_bytes(), $nonce_len), $newPassword,
                     $oldPassword;

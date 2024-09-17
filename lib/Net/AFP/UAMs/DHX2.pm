@@ -9,6 +9,7 @@ use Modern::Perl '2021';
 use diagnostics;
 use integer;
 use Carp;
+use Data::Dumper;
 
 use Readonly;
 Readonly my $UAMNAME => 'DHX2';
@@ -41,6 +42,108 @@ sub zeropad {
     else {
         return "\0" x ($_[1] - length $_[0]) . $_[0];
     }
+}
+
+sub auth_common1 {
+    my($session, $maskprefix, $message, $store_sesskey) = @_;
+
+    # Get the value for g, and the length value for assorted things (p, Ma,
+    # Mb, Ra, Rb).
+    my ($g, $len, $p, $Mb) = unpack "${maskprefix}L>S>X[s]S>/aa*", $message;
+
+    $session->{logger}->debug(sub { sprintf q{g is %d}, $g });
+    $session->{logger}->debug(sub { sprintf q{len is %d}, $len });
+
+    # Pull p and Mb out of the data the server sent back, based on the length
+    # value extracted above.
+    $p = '0x' . unpack 'H*', $p;
+    $session->{logger}->debug(sub { sprintf q{p is %s}, $p });
+
+    my $dh = Crypt::DH::GMP->new(p => $p, g => $g);
+
+    $dh->generate_keys();
+    my $K = pack 'B*', $dh->compute_key_twoc('0x' . unpack 'H*', $Mb);
+    undef $Mb;
+    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
+
+    # Get our nonce, which we'll send to the server in the ciphertext.
+    my $clientNonce = Math::BigInt->from_bytes(random_bytes($nonce_len));
+    $session->{logger}->debug(sub { sprintf q{clientNonce is %s},
+      $clientNonce->as_hex() });
+
+    # Set up an encryption context with the key we derived, for encrypting
+    # and decrypting stuff to talk to the server.
+    my $key = md5(zeropad($K, $len));
+    if ($store_sesskey) {
+        $session->{SessionKey} = $key;
+    }
+    undef $K;
+    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
+
+    # Encrypt the random nonce value we fetched above, then assemble the
+    # message to send to the server.
+    my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
+            $key, $C2SIV);
+    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    # Sometimes the result is an extra (zero) byte long; strip that off.
+    if (length($Ma) > $len) {
+        $Ma = substr $Ma, length($Ma) - $len, $len;
+    }
+
+    return($Ma, $len, $clientNonce, $ctx, $ciphertext, $key);
+}
+
+sub auth_common2 {
+    my($session, $key, $message, $clientNonce, $ctx) = @_;
+
+    my $nonce_limit = Math::BigInt->bone();
+    $nonce_limit->blsft($nonce_len * 8);
+
+    # Decrypt the message from the server, and separate the (hopefully)
+    # incremented nonce value from us, and the server's nonce value.
+    my $decrypted = $ctx->decrypt($message, $key, $S2CIV);
+    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
+      unpack 'H*', $decrypted });
+
+    # Check the client nonce, and see if it really was incremented like we
+    # expect it to have been.
+    my $newClientNonce = Math::BigInt->from_bytes(unpack "a[${nonce_len}]",
+      $decrypted);
+    $session->{logger}->debug(sub { sprintf q{newClientNonce is %s},
+      $newClientNonce->as_hex() });
+    $clientNonce->binc();
+    $clientNonce = $clientNonce->bmod($nonce_limit);
+    if ($clientNonce->bne($newClientNonce)) {
+        # HACK: This is a netatalk bug. If the client nonce is less than the
+        # full nonce length, it doesn't check to make sure the value fills
+        # the entire target buffer, so garbage bytes get left behind after it,
+        # gumming up the works. It's fixed in their current git.
+        # https://github.com/Netatalk/netatalk/issues/1456
+        # In the meantime, I'll just... work around it.
+        $newClientNonce = Math::BigInt->from_bytes(unpack 'a[' .
+          length($clientNonce->to_bytes()) . ']', $decrypted);
+
+        if ($clientNonce->bne($newClientNonce)) {
+            croak('encryption error - nonce check failed; ' .
+              $clientNonce->as_hex() . ' != ' . $newClientNonce->as_hex());
+        }
+    }
+    undef $clientNonce;
+    undef $newClientNonce;
+
+    # Increment the nonce value the server sent to us, to be returned as part
+    # of the encrypted response.
+    my $serverNonce = Math::BigInt->from_bytes(unpack "x[${nonce_len}]a[${nonce_len}]",
+                                                      $decrypted);
+    undef $decrypted;
+    $session->{logger}->debug(sub { sprintf q{serverNonce is %s},
+      $serverNonce->as_hex() });
+    $serverNonce->binc();
+    $serverNonce = $serverNonce->bmod($nonce_limit);
+    $session->{logger}->debug(sub { sprintf q{serverNonce is %s after increment},
+      $serverNonce->as_hex() });
+
+    return($serverNonce);
 }
 
 # Variables used by the DHX2 UAM
@@ -135,9 +238,6 @@ sub Authenticate {
         croak('Object MUST be of type Net::AFP!');
     }
 
-    my $nonce_limit = Math::BigInt->bone();
-    $nonce_limit->blsft($nonce_len * 8);
-
     if (ref($pw_cb) ne 'CODE') {
         croak('Password callback MUST be a subroutine ref');
     }
@@ -166,48 +266,10 @@ sub Authenticate {
         return $rc;
     }
 
+    my($Ma, $len, $clientNonce, $ctx, $ciphertext, $key) =
+      auth_common1($session, q{}, $resp{UserAuthInfo}, 1);
+
     # Received message 2, parsing below.
-    # Get the value for g, and the length value for assorted things (p, Ma,
-    # Mb, Ra, Rb).
-    my ($g, $len, $p, $Mb) = unpack 'L>S>X[s]S>/aa*', $resp{UserAuthInfo};
-
-    $session->{logger}->debug(sub { sprintf q{g is %d}, $g });
-    $session->{logger}->debug(sub { sprintf q{len is %d}, $len });
-
-    # Pull p and Mb out of the data the server sent back, based on the length
-    # value extracted above.
-    $p = '0x' . unpack 'H*', $p;
-    $session->{logger}->debug(sub { sprintf q{p is %s}, $p });
-
-    my $dh = Crypt::DH::GMP->new(p => $p, g => $g);
-    undef $p;
-    undef $g;
-    $dh->generate_keys();
-
-    my $K = pack 'B*', $dh->compute_key_twoc('0x' . unpack 'H*', $Mb);
-    undef $Mb;
-    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
-
-    # Get our nonce, which we'll send to the server in the ciphertext.
-    my $clientNonce = Math::BigInt->from_bytes(random_bytes($nonce_len));
-    $session->{logger}->debug(sub { sprintf q{clientNonce is %s},
-      $clientNonce->as_hex() });
-
-    # Set up an encryption context with the key we derived, for encrypting
-    # and decrypting stuff to talk to the server.
-    $session->{SessionKey} = md5(zeropad($K, $len));
-    undef $K;
-    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
-
-    # Encrypt the random nonce value we fetched above, then assemble the
-    # message to send to the server.
-    my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
-            $session->{SessionKey}, $C2SIV);
-    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
-    # Sometimes the result is an extra (zero) byte long; strip that off.
-    if (length($Ma) > $len) {
-        $Ma = substr $Ma, length($Ma) - $len, $len;
-    }
     my $message = pack "a[${len}]a[${nonce_len}]", $Ma, $ciphertext;
     undef $ciphertext;
     undef $Ma;
@@ -225,50 +287,7 @@ sub Authenticate {
     return $rc if $rc != $kFPAuthContinue;
 
     # Decrypting message 4.
-    # Decrypt the message from the server, and separate the (hopefully)
-    # incremented nonce value from us, and the server's nonce value.
-    my $decrypted = $ctx->decrypt($sresp->{UserAuthInfo},
-            $session->{SessionKey}, $S2CIV);
-    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
-      unpack 'H*', $decrypted });
-
-    # Check the client nonce, and see if it really was incremented like we
-    # expect it to have been.
-    my $newClientNonce = Math::BigInt->from_bytes(unpack "a[${nonce_len}]",
-      $decrypted);
-    $session->{logger}->debug(sub { sprintf q{newClientNonce is %s},
-      $newClientNonce->as_hex() });
-    $clientNonce->binc();
-    $clientNonce = $clientNonce->bmod($nonce_limit);
-    if ($clientNonce->bne($newClientNonce)) {
-        # HACK: This is a netatalk bug. If the client nonce is less than the
-        # full nonce length, it doesn't check to make sure the value fills
-        # the entire target buffer, so garbage bytes get left behind after it,
-        # gumming up the works. It's fixed in their current git.
-        # https://github.com/Netatalk/netatalk/issues/1456
-        # In the meantime, I'll just... work around it.
-        $newClientNonce = Math::BigInt->from_bytes(unpack 'a[' .
-          length($clientNonce->to_bytes()) . ']', $decrypted);
-
-        if ($clientNonce->bne($newClientNonce)) {
-            croak('encryption error - nonce check failed; ' .
-              $clientNonce->as_hex() . ' != ' . $newClientNonce->as_hex());
-        }
-    }
-    undef $clientNonce;
-    undef $newClientNonce;
-
-    # Increment the nonce value the server sent to us, to be returned as part
-    # of the encrypted response.
-    my $serverNonce = Math::BigInt->from_bytes(unpack "x[${nonce_len}]a[${nonce_len}]",
-                                                      $decrypted);
-    undef $decrypted;
-    $session->{logger}->debug(sub { sprintf q{serverNonce is %s},
-      $serverNonce->as_hex() });
-    $serverNonce->binc();
-    $serverNonce = $serverNonce->bmod($nonce_limit);
-    $session->{logger}->debug(sub { sprintf q{serverNonce is %s after increment},
-      $serverNonce->as_hex() });
+    my($serverNonce) = auth_common2($session, $key, $sresp->{UserAuthInfo}, $clientNonce, $ctx);
 
     # Assemble the final message to send back to the server with the
     # incremented server nonce, and the user's password, then encrypt the
@@ -296,9 +315,6 @@ sub ChangePassword {
         croak('Object MUST be of type Net::AFP!');
     }
 
-    my $nonce_limit = Math::BigInt->bone();
-    $nonce_limit->blsft($nonce_len * 8);
-
     my $resp = undef;
 
     if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
@@ -309,47 +325,10 @@ sub ChangePassword {
     $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
     return $rc if $rc != $kFPAuthContinue;
 
-    # Get the value for g, and the length value for assorted things (p, Ma,
-    # Mb, Ra, Rb).
-    my ($ID, $g, $len, $p, $Mb) = unpack 'S>L>S>X[s]S>/aa*', $resp;
+    my ($ID) = unpack 'S>', $resp;
+    my($Ma, $len, $clientNonce, $ctx, $ciphertext, $key) =
+      auth_common1($session, q{x[s]}, $resp, 0);
 
-    $session->{logger}->debug(sub { sprintf q{g is %d}, $g });
-    $session->{logger}->debug(sub { sprintf q{len is %d}, $len });
-
-    # Pull p and Mb out of the data the server sent back, based on the length
-    # value extracted above.
-    $p = '0x' . unpack 'H*', $p;
-    $session->{logger}->debug(sub { sprintf q{p is %s}, $p });
-
-    my $dh = Crypt::DH::GMP->new(p => $p, g => $g);
-    undef $p;
-    undef $g;
-    $dh->generate_keys();
-
-    my $K = pack 'B*', $dh->compute_key_twoc('0x' . unpack 'H*', $Mb);
-    undef $Mb;
-    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack 'H*', $K });
-
-    # Get our nonce, which we'll send to the server in the ciphertext.
-    my $clientNonce = Math::BigInt->from_bytes(random_bytes($nonce_len));
-    $session->{logger}->debug(sub { sprintf q{clientNonce is %s},
-      $clientNonce->as_hex() });
-
-    # Set up an encryption context with the key we derived, for encrypting
-    # and decrypting stuff to talk to the server.
-    my $key = md5(zeropad($K, $len));
-    undef $K;
-    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
-
-    # Encrypt the random nonce value we fetched above, then assemble the
-    # message to send to the server.
-    my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
-            $key, $C2SIV);
-    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
-    # Sometimes the result is an extra (zero) byte long; strip that off.
-    if (length($Ma) > $len) {
-        $Ma = substr $Ma, length($Ma) - $len, $len;
-    }
     my $message = pack "na[${len}]a*", $ID, $Ma, $ciphertext;
     undef $ciphertext;
     undef $Ma;
@@ -368,49 +347,7 @@ sub ChangePassword {
     # Unpack the server response for our perusal.
     ($ID, $message) = unpack 'na*', $sresp;
 
-    # Decrypt the message from the server, and separate the (hopefully)
-    # incremented nonce value from us, and the server's nonce value.
-    my $decrypted = $ctx->decrypt($message, $key, $S2CIV);
-    undef $message;
-    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
-      unpack 'H*', $decrypted });
-
-    # Check the client nonce, and see if it really was incremented like we
-    # expect it to have been.
-    my $newClientNonce = Math::BigInt->from_bytes(unpack "a[${nonce_len}]", $decrypted);
-    $session->{logger}->debug(sub { sprintf q{newClientNonce is %s},
-      $newClientNonce->as_hex() });
-    $clientNonce->binc();
-    $clientNonce = $clientNonce->bmod($nonce_limit);
-    if ($clientNonce->bne($newClientNonce)) {
-        # HACK: This is a netatalk bug. If the client nonce is less than the
-        # full nonce length, it doesn't check to make sure the value fills
-        # the entire target buffer, so garbage bytes get left behind after it,
-        # gumming up the works. It's fixed in their current git.
-        # https://github.com/Netatalk/netatalk/issues/1456
-        # In the meantime, I'll just... work around it.
-        $newClientNonce = Math::BigInt->from_bytes(unpack 'a[' .
-          length($clientNonce->to_bytes()) . ']', $decrypted);
-
-        if ($clientNonce->bne($newClientNonce)) {
-            croak('encryption error - nonce check failed; ' .
-              $clientNonce->as_hex() . ' != ' . $newClientNonce->as_hex());
-        }
-    }
-    undef $clientNonce;
-    undef $newClientNonce;
-
-    # Increment the nonce value the server sent to us, to be returned as part
-    # of the encrypted response.
-    my $serverNonce = Math::BigInt->from_bytes(unpack "x[${nonce_len}]a[${nonce_len}]",
-		                                      $decrypted);
-    undef $decrypted;
-    $session->{logger}->debug(sub { sprintf q{serverNonce is %s},
-      $serverNonce->as_hex() });
-    $serverNonce->binc();
-    $serverNonce = $serverNonce->bmod($nonce_limit);
-    $session->{logger}->debug(sub { sprintf q{serverNonce is %s after increment},
-      $serverNonce->as_hex() });
+    my($serverNonce) = auth_common2($session, $key, $message, $clientNonce, $ctx);
 
     # Assemble the final message to send back to the server with the
     # incremented server nonce, the user's current password, and the
