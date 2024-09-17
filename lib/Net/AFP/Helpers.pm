@@ -192,8 +192,7 @@ TRY_SOCKADDRS:
                     return &{$pw_cb}(%values)
                 });
         if ($rv != $kFPNoErr) {
-            print {\*STDERR} q{Incorrect username/password while trying } .
-              qq{to authenticate\n};
+            printf {\*STDERR} qq{Error occurred during login: %s\n}, afp_strerror($rv);
             $session->close();
             return EACCES();
         }
@@ -201,7 +200,7 @@ TRY_SOCKADDRS:
     else {
         my $rv = Net::AFP::UAMs::GuestAuth($session, $cv);
         if ($rv != $kFPNoErr) {
-            print {\*STDERR} qq{Anonymous authentication failed\n};
+            printf {\*STDERR} qq{Error occurred during login: %s\n}, afp_strerror($rv);
             $session->close();
             return EACCES();
         }
