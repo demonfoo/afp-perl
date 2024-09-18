@@ -164,12 +164,12 @@ sub import {
                 last;
             }
             if ($overrode == 0) {
-                if ($param eq q{sf_only}) {
+                if ($param =~ m{_only\z}sm) {
                     croak q{Couldn't load specified sendfile lib(s) },
                       join(q{, }, map { qq{'$_'} } @libs),
                       q{, aborting};
                 }
-                elsif ($param eq q{sf_lib}) {
+                elsif ($param =~ m{_lib\z}sm) {
                     carp q{Couldn't load specified sendfile lib(s) },
                       join(q{, }, map { qq{'$_'} } @libs),
                       q{, so using default};
