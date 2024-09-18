@@ -704,20 +704,20 @@ sub FPCatSearch {
 
     my(%Specification1, %Specification2);
     my @items = (
-        [ 'Attributes',     $kFPAttributeBit,      1, 1, 'Attribute' ],
-        [ 'ParentDirID',    $kFPParentDirIDBit,    1, 1 ],
-        [ 'CreateDate',     $kFPCreateDateBit,     1, 1 ],
-        [ 'ModDate',        $kFPModDateBit,        1, 1 ],
-        [ 'BackupDate',     $kFPBackupDateBit,     1, 1 ],
-        [ 'FinderInfo',     $kFPFinderInfoBit,     1, 1 ],
-        [ 'LongName',       $kFPLongNameBit,       1, 1 ],
-        [ 'OffspringCount', $kFPOffspringCountBit, 0, 1 ],
-        [ 'DataForkLen',    $kFPDataForkLenBit,    1, 0 ],
-        [ 'RsrcForkLen',    $kFPRsrcForkLenBit,    1, 0 ],
-        [ 'ExtDataForkLen', $kFPExtDataForkLenBit, 1, 0 ],
-        [ 'ExtRsrcForkLen', $kFPExtRsrcForkLenBit, 1, 0 ],
-        [ 'UTF8Name',       $kFPUTF8NameBit,       1, 1 ],
-        [ 'MatchPartialNames', 1 << 31,         1, 1 ],
+        [ 'Attributes',         $kFPAttributeBit,      1, 1, 'Attribute' ],
+        [ 'ParentDirID',        $kFPParentDirIDBit,    1, 1 ],
+        [ 'CreateDate',         $kFPCreateDateBit,     1, 1 ],
+        [ 'ModDate',            $kFPModDateBit,        1, 1 ],
+        [ 'BackupDate',         $kFPBackupDateBit,     1, 1 ],
+        [ 'FinderInfo',         $kFPFinderInfoBit,     1, 1 ],
+        [ 'LongName',           $kFPLongNameBit,       1, 1 ],
+        [ 'OffspringCount',     $kFPOffspringCountBit, 0, 1 ],
+        [ 'DataForkLen',        $kFPDataForkLenBit,    1, 0 ],
+        [ 'RsrcForkLen',        $kFPRsrcForkLenBit,    1, 0 ],
+        [ 'ExtDataForkLen',     $kFPExtDataForkLenBit, 1, 0 ],
+        [ 'ExtRsrcForkLen',     $kFPExtRsrcForkLenBit, 1, 0 ],
+        [ 'UTF8Name',           $kFPUTF8NameBit,       1, 1 ],
+        [ 'MatchPartialNames',  1 << 31,               1, 1 ],
     );
 
     my %not_in_spec2 = ( 'LongName' => 1, 'UTF8Name' => 1 );
@@ -725,20 +725,20 @@ sub FPCatSearch {
     my $is_range = 0;
     my $Bitmap = 0;
     for my $item (@items) {
-        if (exists $options{$items[0]}) {
-            my $key = $items[0];
-            if (defined $items[4]) {
-                $key = $items[4];
+        if (exists $options{${$item}[0]}) {
+            my $key = ${$item}[0];
+            if (defined ${$item}[4]) {
+                $key = ${$item}[4];
             }
-            if (ref($options{$items[0]}) eq q{ARRAY}) {
-                $Specification1{$key} = $options{$items[0]}->[0];
-                $Specification2{$key} = $options{$items[0]}->[1];
+            if (ref($options{${$item}[0]}) eq q{ARRAY}) {
+                $Specification1{$key} = $options{${$item}[0]}->[0];
+                $Specification2{$key} = $options{${$item}[0]}->[1];
                 $is_range = 1;
             }
-            elsif (ref($options{$items[0]}) eq q{}) {
-                $Specification1{$key} = $options{$items[0]};
-                if (not $not_in_spec2{$items[0]}) {
-                    $Specification2{$key} = $options{$items[0]};
+            elsif (ref($options{${$item}[0]}) eq q{}) {
+                $Specification1{$key} = $options{${$item}[0]};
+                if (not exists $not_in_spec2{${$item}[0]}) {
+                    $Specification2{$key} = $options{${$item}[0]};
                 }
             }
             $Bitmap |= $items[1];
@@ -990,20 +990,20 @@ sub FPCatSearchExt {
 
     my(%Specification1, %Specification2);
     my @items = (
-        [ 'Attributes',     $kFPAttributeBit,      1, 1, 'Attribute' ],
-        [ 'ParentDirID',    $kFPParentDirIDBit,    1, 1 ],
-        [ 'CreateDate',     $kFPCreateDateBit,     1, 1 ],
-        [ 'ModDate',        $kFPModDateBit,        1, 1 ],
-        [ 'BackupDate',     $kFPBackupDateBit,     1, 1 ],
-        [ 'FinderInfo',     $kFPFinderInfoBit,     1, 1 ],
-        [ 'LongName',       $kFPLongNameBit,       1, 1 ],
-        [ 'OffspringCount', $kFPOffspringCountBit, 0, 1 ],
-        [ 'DataForkLen',    $kFPDataForkLenBit,    1, 0 ],
-        [ 'RsrcForkLen',    $kFPRsrcForkLenBit,    1, 0 ],
-        [ 'ExtDataForkLen', $kFPExtDataForkLenBit, 1, 0 ],
-        [ 'ExtRsrcForkLen', $kFPExtRsrcForkLenBit, 1, 0 ],
-        [ 'UTF8Name',       $kFPUTF8NameBit,       1, 1 ],
-        [ 'MatchPartialNames', 1 << 31,         1, 1 ],
+        [ 'Attributes',         $kFPAttributeBit,      1, 1, 'Attribute' ],
+        [ 'ParentDirID',        $kFPParentDirIDBit,    1, 1 ],
+        [ 'CreateDate',         $kFPCreateDateBit,     1, 1 ],
+        [ 'ModDate',            $kFPModDateBit,        1, 1 ],
+        [ 'BackupDate',         $kFPBackupDateBit,     1, 1 ],
+        [ 'FinderInfo',         $kFPFinderInfoBit,     1, 1 ],
+        [ 'LongName',           $kFPLongNameBit,       1, 1 ],
+        [ 'OffspringCount',     $kFPOffspringCountBit, 0, 1 ],
+        [ 'DataForkLen',        $kFPDataForkLenBit,    1, 0 ],
+        [ 'RsrcForkLen',        $kFPRsrcForkLenBit,    1, 0 ],
+        [ 'ExtDataForkLen',     $kFPExtDataForkLenBit, 1, 0 ],
+        [ 'ExtRsrcForkLen',     $kFPExtRsrcForkLenBit, 1, 0 ],
+        [ 'UTF8Name',           $kFPUTF8NameBit,       1, 1 ],
+        [ 'MatchPartialNames',  1 << 31,               1, 1 ],
     );
 
     my %not_in_spec2 = ( 'LongName' => 1, 'UTF8Name' => 1 );
@@ -1011,23 +1011,23 @@ sub FPCatSearchExt {
     my $is_range = 0;
     my $Bitmap = 0;
     for my $item (@items) {
-        if (exists $options{$items[0]}) {
-            my $key = $items[0];
-            if (defined $items[4]) {
-                $key = $items[4];
+        if (exists $options{${$item}[0]}) {
+            my $key = ${$item}[0];
+            if (defined ${$item}[4]) {
+                $key = ${$item}[4];
             }
-            if (ref($options{$items[0]}) eq q{ARRAY}) {
-                $Specification1{$key} = $options{$items[0]}->[0];
-                $Specification2{$key} = $options{$items[0]}->[1];
+            if (ref($options{${$item}[0]}) eq q{ARRAY}) {
+                $Specification1{$key} = $options{${$item}[0]}->[0];
+                $Specification2{$key} = $options{${$item}[0]}->[1];
                 $is_range = 1;
             }
-            elsif (ref($options{$items[0]}) eq q{}) {
-                $Specification1{$key} = $options{$items[0]};
-                if (not $not_in_spec2{$items[0]}) {
-                    $Specification2{$key} = $options{$items[0]};
+            elsif (ref($options{${$item}[0]}) eq q{}) {
+                $Specification1{$key} = $options{${$item}[0]};
+                if (not exists $not_in_spec2{${$item}[0]}) {
+                    $Specification2{$key} = $options{${$item}[0]};
                 }
             }
-            $Bitmap |= $items[1];
+            $Bitmap |= ${$item}[1];
         }
     }
 
