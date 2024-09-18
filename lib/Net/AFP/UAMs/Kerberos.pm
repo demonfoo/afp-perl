@@ -67,8 +67,11 @@ sub Authenticate {
 
     # Assuming that succeeded, now we do the first stage of the login process.
     my $resp = q{};
-    my $rc = $session->FPLoginExt(0, $AFPVersion, $UAMNAME, $kFPUTF8Name,
-            $username, $kFPUTF8Name, $realm, undef, \$resp);
+    my($rc, %resp) = $session->FPLoginExt(
+        AFPVersion   => $AFPVersion,
+        UAM          => $UAMNAME,
+        UserName     => $username,
+        PathName     => $realm);
     $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
 
     if ($rc != $kFPAuthContinue) {
@@ -80,7 +83,7 @@ sub Authenticate {
     my $sresp;
     # FIXME: I guess if we're using Kerberos v4, no ID should be passed,
     # but how would I know? Apparently OS X only supports v5...
-    $rc = $session->FPLoginCont($resp->{ID}, $message, \$sresp);
+    $rc = $session->FPLoginCont($resp{ID}, $message, \$sresp);
     print Dumper(\$sresp);
 
     if ($rc != $kFPNoErr) {
