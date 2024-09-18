@@ -1625,10 +1625,7 @@ sub fsync { # {{{1
 
     return 0 if ref $fh;
 
-    if (not $flags) {
-        return $self->flush($file, $fh);
-    }
-    return 0;
+    return $self->{afpconn}->FPSyncFork($fh);
 } # }}}1
 
 sub setxattr { # {{{1
