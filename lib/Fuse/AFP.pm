@@ -2890,7 +2890,8 @@ sub read_buf {
         if ($off + $len > length ${$fh}) {
             $len = length(${$fh}) - $off;
         }
-        $bufvec->[0]{mem} = substr ${$fh}, $off, $len;
+        # for some reason this prevents glibc corruption... :|
+        $bufvec->[0]{mem} = substr(${$fh}, $off, $len) . q{};
         $bufvec->[0]{size} = length $bufvec->[0]{mem};
         return $bufvec->[0]{size};
     }
