@@ -13,6 +13,21 @@ use Net::AFP::Result;
 use Net::AFP::SrvParms;
 use Term::ReadPassword;
 use English qw(-no_match_vars);
+use Log::Log4perl;
+
+my $logconf = <<'_EOT_';
+log4perl.appender.AppLogging = Log::Log4perl::Appender::Screen
+log4perl.appender.AppLogging.layout = PatternLayout
+log4perl.appender.AppLogging.layout.ConversionPattern = [%P] %F line: %L %c - %m%n
+log4perl.appender.AppLogging.Threshold = INFO
+
+log4perl.appender.Console = Log::Log4perl::Appender::ScreenColoredLevels
+log4perl.appender.Console.layout = SimpleLayout
+
+log4perl.logger = INFO, AppLogging
+_EOT_
+
+Log::Log4perl->init(\$logconf);
 
 my($url) = @ARGV;
 
@@ -23,8 +38,7 @@ if (not $url) {
 my $old_pass;
 my $pw_cb =  sub {
     my(%values) = @_;
-    my $prompt = 'Password for ' . $values{username} .
-            ' at ' . $values{host} . ': ';
+    my $prompt = sprintf q{Password for %s at %s: }, @values{qw(username host)};
     if (not $values{password}) {
         $values{password} = read_password($prompt);
     }
@@ -44,7 +58,7 @@ if (not($si->{Flags} & $kSupportsChgPwd)) {
     exit 2;
 }
 
-my $new_pass = read_password('Enter your new password: ');
+my $new_pass   = read_password('Enter your new password: ');
 my $check_pass = read_password('Reenter your password: ');
 
 my $rv = 0;
@@ -57,7 +71,7 @@ if ($new_pass eq $check_pass) {
     my $rc = Net::AFP::UAMs::ChangePassword($session, $si->{UAMs},
             $values{username}, $old_pass, $new_pass);
     if ($rc != $kFPNoErr) {
-        print 'ERROR: Server responded: ', afp_strerror($rc), ' (', $rc, ")\n";
+        printf qq{ERROR: Server responded: %s (%d)\n}, afp_strerror($rc), $rc;
         $rv = 2;
     }
     else {
