@@ -36,7 +36,7 @@ use Thread::Semaphore;
 use Socket qw(TCP_NODELAY IPPROTO_TCP);
 use Readonly;
 use Class::InsideOut qw(public readonly private register id);
-use Fcntl qw(SEEK_CUR);
+use Fcntl qw(SEEK_CUR SEEK_SET);
 
 my $do_sendfile = undef;
 my %sendfile_impls = ();
@@ -47,8 +47,8 @@ eval {
 } and do {
     $sendfile_impls{q{Sys::Sendfile}} = sub {
         $_ = Sys::Sendfile::sendfile($_[1], $_[0], $_[2],
-          sysseek $_[0], 0, SEEK_CUR);
-        sysseek $_[0], $_, SEEK_CUR;
+          my $off = sysseek $_[0], 0, SEEK_CUR);
+        sysseek $_[0], $off + $_, SEEK_SET;
         return $_;
     };
     $do_sendfile ||= $sendfile_impls{q{Sys::Sendfile}};
