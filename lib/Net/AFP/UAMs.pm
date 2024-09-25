@@ -9,6 +9,7 @@ use Carp;
 use Net::AFP::TokenTypes;
 use Net::AFP::Result;
 use Log::Log4perl;
+use English qw(-no_match_vars);
 
 # Try to import classes for the password based auth methods. If they can't
 # be imported, it probably means they have dependencies that can't be
@@ -53,7 +54,8 @@ if (-d $incpath) {
 # Try including each of them via eval, so that if they explode, it won't
 # impair our ability to continue on.
 foreach my $uampath (@uampaths) {
-    if ($uampath !~ m{^/}sm) {
+    if (($OSNAME ne 'MSWin32' and $uampath !~ m{^/}sm) or
+      ($OSNAME eq 'MSWin32' and $uampath !~ m{[A-Z]:[/\\]}sm)) {
         $uampath = q{./} . $uampath;
     }
     eval {
