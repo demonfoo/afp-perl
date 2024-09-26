@@ -1321,10 +1321,13 @@ sub FPDisconnectOldSession { # {{{1
             $Type, $Token);
 } # }}}1
 
-sub FPEnumerate { # {{{1
-    my($self, @options) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
+# since all 3 enumerate calls are... pretty similar, let's wrap all 3 in a
+# common subroutine, to eliminate duplication
+##no critic qw(ProhibitManyArgs)
+sub _enum_common { # {{{1
+    my ($self, $sl_type, $fd_pad, $si_type, $mr_type, $cmd, @options) = @_;
+    $self->{logger}->debug(sub { sprintf q{called %s(sl_type = "%s", fd_pad = "%s", si_type = "%s", mr_type = "%s", cmd = %d, %s)},
+      (caller 3)[3], $sl_type, $fd_pad, $si_type, $mr_type, $cmd, Dumper({@options}) });
 
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
@@ -1359,7 +1362,7 @@ sub FPEnumerate { # {{{1
     } );
     croak('Must accept array return') if not wantarray;
 
-    my $msg = pack 'CxS>L>S>S>S>S>S>a*', $kFPEnumerate,
+    my $msg = pack "CxS>L>S>S>S>${si_type}${mr_type}a*", $cmd,
             @options{qw[VolumeID DirectoryID FileBitmap DirectoryBitmap
             ReqCount StartIndex MaxReplySize]},
             PackagePath(@options{qw[PathType Pathname]});
@@ -1370,7 +1373,7 @@ sub FPEnumerate { # {{{1
     my @results = map {
         # first byte indicates entry length, next byte contains the 
         # isFileDir bit
-        my ($IsFileDir, $OffspringParameters) = unpack 'xCa*', $_;
+        my ($IsFileDir, $OffspringParameters) = unpack "${fd_pad}a*", $_;
         if ($IsFileDir == 0x80) {
             # This child is a directory
             ParseDirParms($DirectoryBitmap, $OffspringParameters);
@@ -1379,8 +1382,17 @@ sub FPEnumerate { # {{{1
             # This child is a file
             ParseFileParms($FileBitmap, $OffspringParameters);
         }
-    } unpack 'x[s]x[s]S>/(CX/a)', $resp;
+    } unpack "x[s]x[s]S>/(${sl_type}/a)", $resp;
     return($rc, [@results]);
+} # }}}1
+
+sub FPEnumerate { # {{{1
+    my($self, @options) = @_;
+    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
+      (caller 3)[3], Dumper({@options}) });
+
+    croak('Must accept array return') if not wantarray;
+    return(_enum_common($self, q{CX}, q{xC}, q{S>}, q{S>}, $kFPEnumerate, @options));
 } # }}}1
 
 sub FPEnumerateExt { # {{{1
@@ -1388,59 +1400,8 @@ sub FPEnumerateExt { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper({@options}) });
 
-    my %options = validate(@options, {
-        VolumeID        => { type => SCALAR },
-        DirectoryID     => { type => SCALAR },
-        FileBitmap      => {
-            type        => SCALAR,
-            default     => 0,
-            callbacks   => {
-                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
-            },
-        },
-        DirectoryBitmap => {
-            type        => SCALAR,
-            default     => 0,
-            callbacks   => {
-                'valid bitmap' => sub { not ~0xBFFF & $_[0] },
-            },
-        },
-        ReqCount        => { type => SCALAR },
-        StartIndex      => { type => SCALAR },
-        MaxReplySize    => { type => SCALAR },
-        PathType        => {
-            type        => SCALAR,
-            callbacks   => {
-                'valid path type' => sub {
-                    $_[0] == $kFPShortName || $_[0] == $kFPLongName ||
-                    $_[0] == $kFPUTF8Name
-                }
-            },
-        },
-        Pathname        => { type => SCALAR },
-    } );
     croak('Must accept array return') if not wantarray;
-
-    my $msg = pack 'CxS>L>S>S>S>S>S>a*', $kFPEnumerateExt,
-            @options{qw[VolumeID DirectoryID FileBitmap DirectoryBitmap
-            ReqCount StartIndex MaxReplySize]},
-            PackagePath(@options{qw[PathType Pathname]});
-    my $resp;
-    my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc if $rc != $kFPNoErr;
-    my($FileBitmap, $DirectoryBitmap) = unpack 'S>S>', $resp;
-    my @results = map {
-        # first 2 bytes indicate entry length, next byte contains the 
-        # isFileDir bit, next byte is a pad
-        my ($IsFileDir, $OffspringParameters) = unpack 'x[2]Cxa*', $_;
-        if ($IsFileDir == 0x80) { # This child is a directory
-            ParseDirParms($DirectoryBitmap, $OffspringParameters);
-        }
-        else { # This child is a file
-            ParseFileParms($FileBitmap, $OffspringParameters);
-        }
-    } unpack 'x[s]x[s]S>/(S>X[s]/a)', $resp;
-    return($rc, [@results]);
+    return(_enum_common($self, q{S>X[s]}, q{x[2]Cx}, q{S>}, q{S>}, $kFPEnumerateExt, @options));
 } # }}}1
 
 sub FPEnumerateExt2 { # {{{1
@@ -1448,59 +1409,8 @@ sub FPEnumerateExt2 { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper({@options}) });
 
-    my %options = validate(@options, {
-        VolumeID        => { type => SCALAR },
-        DirectoryID     => { type => SCALAR },
-        FileBitmap      => {
-            type        => SCALAR,
-            default     => 0,
-            callbacks   => {
-                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
-            },
-        },
-        DirectoryBitmap => {
-            type        => SCALAR,
-            default     => 0,
-            callbacks   => {
-                'valid bitmap' => sub { not ~0xBFFF & $_[0] },
-            },
-        },
-        ReqCount        => { type => SCALAR },
-        StartIndex      => { type => SCALAR },
-        MaxReplySize    => { type => SCALAR },
-        PathType        => {
-            type        => SCALAR,
-            callbacks   => {
-                'valid path type' => sub {
-                    $_[0] == $kFPShortName || $_[0] == $kFPLongName ||
-                    $_[0] == $kFPUTF8Name
-                }
-            },
-        },
-        Pathname        => { type => SCALAR },
-    } );
     croak('Must accept array return') if not wantarray;
-
-    my $msg = pack 'CxS>L>S>S>S>L>L>a*', $kFPEnumerateExt2,
-            @options{qw[VolumeID DirectoryID FileBitmap DirectoryBitmap
-            ReqCount StartIndex MaxReplySize]},
-            PackagePath(@options{qw[PathType Pathname]});
-    my $resp;
-    my $rc = $self->SendAFPMessage($msg, \$resp);
-    return $rc if $rc != $kFPNoErr;
-    my($FileBitmap, $DirectoryBitmap) = unpack 'S>S>', $resp;
-    my @results = map {
-        # first 2 bytes indicate entry length, next byte contains the 
-        # isFileDir bit, next byte is a pad
-        my ($IsFileDir, $OffspringParameters) = unpack 'x[2]Cxa*', $_;
-        if ($IsFileDir == 0x80) { # This child is a directory
-            ParseDirParms($DirectoryBitmap, $OffspringParameters);
-        }
-        else { # This child is a file
-            ParseFileParms($FileBitmap, $OffspringParameters);
-        }
-    } unpack 'x[s]x[s]S>/(S>X[s]/a)', $resp;
-    return($rc, [@results]);
+    return(_enum_common($self, q{S>X[s]}, q{x[2]Cx}, q{L>}, q{L>}, $kFPEnumerateExt2, @options));
 } # }}}1
 
 sub FPExchangeFiles { # {{{1
