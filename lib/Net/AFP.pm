@@ -448,7 +448,7 @@ sub FPAddIcon { # {{{1
 sub _brlock_common { # {{{1
     my($self, $lf_mask, $rs_mask, $cmd, @options) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
+      (caller 4)[3], Dumper({@options}) });
     my %options = validate(@options, {
         Flags       => {
             type        => SCALAR,
