@@ -445,65 +445,48 @@ sub FPAddIcon { # {{{1
     return $self->SendAFPWrite($msg, \$options{IconBitmap});
 } # }}}1
 
+sub _brlock_common { # {{{1
+    my($self, $lf_mask, $rs_mask, $cmd, @options) = @_;
+    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
+      (caller 3)[3], Dumper({@options}) });
+    my %options = validate(@options, {
+        Flags       => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'valid flags' => sub { not ~0x81 & $_[0] },
+            }
+        },
+        OForkRefNum => { type => SCALAR },
+        Offset      => { type => SCALAR },
+        Length      => { type => SCALAR },
+    } );
+
+    my $msg = pack "CCS${lf_mask}${lf_mask}", $cmd,
+            @options{qw[Flags OForkRefNum Offset Length]};
+    my $resp;
+    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
+    return $rc if $rc != $kFPNoErr;
+
+    return($rc, unpack $rs_mask, $resp);
+} # }}}1
+
+##no critic qw(RequireArgUnpacking)
 sub FPByteRangeLock { # {{{1
-    my($self, @options) = @_;
-
-    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
-    my %options = validate(@options, {
-        Flags       => {
-            type        => SCALAR,
-            default     => 0,
-            callbacks   => {
-                'valid flags' => sub { not ~0x81 & $_[0] },
-            }
-        },
-        OForkRefNum => { type => SCALAR },
-        Offset      => { type => SCALAR },
-        Length      => { type => SCALAR },
-    } );
-
-    my $msg = pack 'CCS>l>l>', $kFPByteRangeLock,
-            @options{qw[Flags OForkRefNum Offset Length]};
-    my $resp;
-    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
-    return $rc if $rc != $kFPNoErr;
-
     croak('Need to accept returned list') if not wantarray;
-    return($rc, unpack 'L>', $resp);
+    return(_brlock_common($_[0], q{l>}, q{L>}, $kFPByteRangeLock, $_[1 .. $#_]));
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub FPByteRangeLockExt { # {{{1
-    my($self, @options) = @_;
-
-    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
-    my %options = validate(@options, {
-        Flags       => {
-            type        => SCALAR,
-            default     => 0,
-            callbacks   => {
-                'valid flags' => sub { not ~0x81 & $_[0] },
-            }
-        },
-        OForkRefNum => { type => SCALAR },
-        Offset      => { type => SCALAR },
-        Length      => { type => SCALAR },
-    } );
-
-    my $msg = pack 'CCS>Q>Q>', $kFPByteRangeLockExt,
-            @options{qw[Flags OForkRefNum Offset Length]};
-    my $resp;
-    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
-    return $rc if $rc != $kFPNoErr;
     croak('Need to accept returned list') if not wantarray;
-    return($rc, unpack 'Q>', $resp);
+    return(_brlock_common($_[0], q{q>}, q{Q>}, $kFPByteRangeLockExt, $_[1 .. $#_]));
 } # }}}1
 
-sub FPCatSearch {
-    my ($self, @options) = @_;
+sub _catsrch_common { # {{{1
+    my ($self, $sl_pad, $sl_mask, $cmd, @options) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
+      (caller 4)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
         VolumeID            => { type => SCALAR },
@@ -752,11 +735,11 @@ sub FPCatSearch {
     elsif ($options{FileRsltBitmap} == 0) {
         $is_file = 0;
     }
-    my $msg = pack 'CxS>L>x[4]a[16]S>S>L>', $kFPCatSearch,
+    my $msg = pack 'CxS>L>x[4]a[16]S>S>L>', $cmd,
             @options{qw[VolumeID ReqMatches CatalogPosition FileRsltBitmap
             DirectoryRsltBitmap]}, $Bitmap;
     my $params = PackSetParams($Bitmap, $is_file, %Specification1);
-    $msg .= pack 'Cx/a', length($params), $params;
+    $msg .= pack "C${sl_pad}/a", length($params), $params;
     if ($is_range == 1) {
         $params = PackSetParams($Bitmap, $is_file, %Specification2);
         $msg .= pack 'Cx/a', length($params), $params;
@@ -770,7 +753,7 @@ sub FPCatSearch {
     my $results = {};
     # this pack mask is hella wonky, but it should do what I need.
     my ($catpos, $filebmp, $dirbmp, @paramlist) =
-        unpack 'a[16]S>S>L>/(xCXXCx/(a![s]))', $resp;
+        unpack "a[16]S>S>L>/(${sl_mask}}/(a![s]))", $resp;
     ${$results}{CatalogPosition} = $catpos;
     my $op = ${$results}{OffspringParameters} = [];
     my($isfiledir, $paramdata);
@@ -784,291 +767,22 @@ sub FPCatSearch {
         }
     }
     return($rc, $results);
-}
 
-sub FPCatSearchExt {
-    my ($self, @options) = @_;
 
-    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
-    my %options = validate(@options, {
-        VolumeID            => { type => SCALAR },
-        ReqMatches          => {
-            type            => SCALAR,
-        },
-        CatalogPosition     => {
-            type            => SCALAR,
-            default         => "\0" x 16,
-            callbacks       => {
-                'valid position val' => sub {
-                    length($_[0]) == 16
-                },
-            },
-        },
-        FileRsltBitmap      => {
-            type            => SCALAR,
-            default         => 0,
-            callbacks       => {
-                'valid bitmap' => sub { not ~0xFFFF & $_[0] },
-            },
-        },
-        DirectoryRsltBitmap => {
-            type        => SCALAR,
-            default     => 0,
-            callbacks   => {
-                'valid bitmap' => sub { not ~0xBFFF & $_[0] },
-            },
-        },
-        UTF8Name            => {
-            type        => SCALAR,
-            optional    => 1,
-        },
-        Attributes          => {
-            type        => SCALAR,
-            callbacks   => {
-                'valid bitmap' => sub {
-                    my $mask = $kFPDeleteInhibitBit |
-                               $kFPRenameInhibitBit |
-                               $kFPWriteInhibitBit;
-                    not $_[0] & ~$mask;
-                }
-            },
-            optional    => 1,
-        },
-        ParentDirID         => {
-            type        => SCALAR,
-            optional    => 1,
-        },
-        CreateDate          => {
-            type        => SCALAR | ARRAYREF,
-            callbacks   => {
-                'value check' => sub {
-                    if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
-                    }
-                    else {
-                        return 1 if not looks_like_number($_[0]);
-                    }
-                },
-            },
-            optional    => 1,
-        },
-        ModDate             => {
-            type        => SCALAR | ARRAYREF,
-            callbacks   => {
-                'value check' => sub {
-                    if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
-                    }
-                    else {
-                        return 1 if not looks_like_number($_[0]);
-                    }
-                },
-            },
-            optional    => 1,
-        },
-        BackupDate          => {
-            type        => SCALAR | ARRAYREF,
-            callbacks   => {
-                'value check' => sub {
-                    if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
-                    }
-                    else {
-                        return 1 if not looks_like_number($_[0]);
-                    }
-                },
-            },
-            optional    => 1,
-        },
-        FinderInfo          => {
-            type        => SCALAR,
-            callbacks   => {
-                'value check' => sub {
-                    return 1 if length($_[0]) != 32;
-                },
-            },
-            optional    => 1,
-        },
-        LongName            => {
-            type        => SCALAR,
-            optional    => 1,
-        },
-        DataForkLen         => {
-            type        => SCALAR | ARRAYREF,
-            callbacks   => {
-                'value check' => sub {
-                    if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
-                    }
-                    else {
-                        return 1 if not looks_like_number($_[0]);
-                    }
-                },
-            },
-            optional    => 1,
-        },
-        RsrcForkLen         => {
-            type        => SCALAR | ARRAYREF,
-            callbacks   => {
-                'value check' => sub {
-                    if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
-                    }
-                    else {
-                        return 1 if not looks_like_number($_[0]);
-                    }
-                },
-            },
-            optional    => 1,
-        },
-        ExtDataForkLen      => {
-            type        => SCALAR | ARRAYREF,
-            callbacks   => {
-                'value check' => sub {
-                    if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
-                    }
-                    else {
-                        return 1 if not looks_like_number($_[0]);
-                    }
-                },
-            },
-            optional    => 1,
-        },
-        ExtRsrcForkLen      => {
-            type        => SCALAR | ARRAYREF,
-            callbacks   => {
-                'value check' => sub {
-                    if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
-                    }
-                    else {
-                        return 1 if not looks_like_number($_[0]);
-                    }
-                },
-            },
-            optional    => 1,
-        },
-        OffspringCount      => {
-            type        => SCALAR | ARRAYREF,
-            callbacks   => {
-                'value check' => sub {
-                    if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
-                    }
-                    else {
-                        return 1 if not looks_like_number($_[0]);
-                    }
-                },
-            },
-            optional    => 1,
-        },
-        MatchPartialNames   => {
-            type        => SCALAR,
-            optional    => 1,
-        },
-    });
-    croak('VolumeID must be provided')
-            if not exists $options{VolumeID};
+} # }}}1
 
-    my(%Specification1, %Specification2);
-    my @items = (
-        [ 'Attributes',         $kFPAttributeBit,      1, 1, 'Attribute' ],
-        [ 'ParentDirID',        $kFPParentDirIDBit,    1, 1 ],
-        [ 'CreateDate',         $kFPCreateDateBit,     1, 1 ],
-        [ 'ModDate',            $kFPModDateBit,        1, 1 ],
-        [ 'BackupDate',         $kFPBackupDateBit,     1, 1 ],
-        [ 'FinderInfo',         $kFPFinderInfoBit,     1, 1 ],
-        [ 'LongName',           $kFPLongNameBit,       1, 1 ],
-        [ 'OffspringCount',     $kFPOffspringCountBit, 0, 1 ],
-        [ 'DataForkLen',        $kFPDataForkLenBit,    1, 0 ],
-        [ 'RsrcForkLen',        $kFPRsrcForkLenBit,    1, 0 ],
-        [ 'ExtDataForkLen',     $kFPExtDataForkLenBit, 1, 0 ],
-        [ 'ExtRsrcForkLen',     $kFPExtRsrcForkLenBit, 1, 0 ],
-        [ 'UTF8Name',           $kFPUTF8NameBit,       1, 1 ],
-        [ 'MatchPartialNames',  1 << 31,               1, 1 ],
-    );
-
-    my %not_in_spec2 = ( 'LongName' => 1, 'UTF8Name' => 1 );
-
-    my $is_range = 0;
-    my $Bitmap = 0;
-    for my $item (@items) {
-        if (exists $options{${$item}[0]}) {
-            my $key = ${$item}[0];
-            if (defined ${$item}[4]) {
-                $key = ${$item}[4];
-            }
-            if (ref($options{${$item}[0]}) eq q{ARRAY}) {
-                $Specification1{$key} = $options{${$item}[0]}->[0];
-                $Specification2{$key} = $options{${$item}[0]}->[1];
-                $is_range = 1;
-            }
-            elsif (ref($options{${$item}[0]}) eq q{}) {
-                $Specification1{$key} = $options{${$item}[0]};
-                if (not exists $not_in_spec2{${$item}[0]}) {
-                    $Specification2{$key} = $options{${$item}[0]};
-                }
-            }
-            $Bitmap |= ${$item}[1];
-        }
-    }
-
-    my $is_file = 2;
-    if ($options{DirectoryRsltBitmap} == 0) {
-        $is_file = 1;
-    }
-    elsif ($options{FileRsltBitmap} == 0) {
-        $is_file = 0;
-    }
-    my $msg = pack 'CxS>L>x[4]a[16]S>S>L>', $kFPCatSearchExt,
-            @options{qw[VolumeID ReqMatches CatalogPosition FileRsltBitmap
-            DirectoryRsltBitmap]}, $Bitmap;
-    $msg .= pack 'c/a*', PackSetParams($Bitmap, $is_file, %Specification1);
-    if ($is_range == 1) {
-        $msg .= pack 'c/a*', PackSetParams($Bitmap, $is_file, %Specification2);
-    }
-
-    my $resp;
-    my $rc = $self->SendAFPMessage($msg, \$resp, 1);
-    return $rc if $rc != $kFPNoErr;
+##no critic qw(RequireArgUnpacking)
+sub FPCatSearch { # {{{1
     croak('Need to accept returned list') if not wantarray;
+    return(_catsrch_common($_[0], q{x}, q{xCXXCx}, $kFPCatSearch, @_[1 .. $#_]));
+} # }}}1
 
-    my $results = {};
-    # this pack mask is hella wonky, but it should do what I need.
-    my ($catpos, $filebmp, $dirbmp, @paramlist) =
-        unpack 'a[16]S>S>L>/(x[s]CXXXS>xx/(a![s]))', $resp;
-    ${$results}{CatalogPosition} = $catpos;
-    my $op = ${$results}{OffspringParameters} = [];
-    my ($isfiledir, $paramdata);
-    while (scalar(@paramlist) > 0) {
-        ($isfiledir, $paramdata) = splice @paramlist, 0, 2;
-        if ($isfiledir & 0x80) {
-            push @{$op}, ParseDirParms($dirbmp, $paramdata);
-        }
-        else {
-            push @{$op}, ParseFileParms($filebmp, $paramdata);
-        }
-    }
-    return($rc, $results);
-}
+##no critic qw(RequireArgUnpacking)
+sub FPCatSearchExt { # {{{1
+    croak('Need to accept returned list') if not wantarray;
+    return(_catsrch_common($_[0], q{}, q{x[s]CXXXS>xx}, $kFPCatSearchExt,
+      @_[1 .. $#_]));
+}  # }}}1
 
 sub FPChangePassword { # {{{1
     my ($self, @options) = @_;
@@ -1325,9 +1039,9 @@ sub FPDisconnectOldSession { # {{{1
 # common subroutine, to eliminate duplication
 ##no critic qw(ProhibitManyArgs)
 sub _enum_common { # {{{1
-    my ($self, $sl_type, $fd_pad, $si_type, $mr_type, $cmd, @options) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(sl_type = "%s", fd_pad = "%s", si_type = "%s", mr_type = "%s", cmd = %d, %s)},
-      (caller 3)[3], $sl_type, $fd_pad, $si_type, $mr_type, $cmd, Dumper({@options}) });
+    my($self, $sl_type, $fd_pad, $si_type, $mr_type, $cmd, @options) = @_;
+    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
+      (caller 4)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
         VolumeID        => { type => SCALAR },
@@ -1386,31 +1100,25 @@ sub _enum_common { # {{{1
     return($rc, [@results]);
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub FPEnumerate { # {{{1
-    my($self, @options) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
-
     croak('Must accept array return') if not wantarray;
-    return(_enum_common($self, q{CX}, q{xC}, q{S>}, q{S>}, $kFPEnumerate, @options));
+    return(_enum_common($_[0], q{CX}, q{xC}, q{S>}, q{S>}, $kFPEnumerate,
+      @_[1 .. $#_]));
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub FPEnumerateExt { # {{{1
-    my($self, @options) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
-
     croak('Must accept array return') if not wantarray;
-    return(_enum_common($self, q{S>X[s]}, q{x[2]Cx}, q{S>}, q{S>}, $kFPEnumerateExt, @options));
+    return(_enum_common($_[0], q{S>X[s]}, q{x[2]Cx}, q{S>}, q{S>},
+      $kFPEnumerateExt, @_[1 .. $#_]));
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub FPEnumerateExt2 { # {{{1
-    my($self, @options) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
-
     croak('Must accept array return') if not wantarray;
-    return(_enum_common($self, q{S>X[s]}, q{x[2]Cx}, q{L>}, q{L>}, $kFPEnumerateExt2, @options));
+    return(_enum_common($_[0], q{S>X[s]}, q{x[2]Cx}, q{L>}, q{L>},
+      $kFPEnumerateExt2, @_[1 .. $#_]));
 } # }}}1
 
 sub FPExchangeFiles { # {{{1
@@ -3126,10 +2834,10 @@ sub FPSyncFork { # {{{1
             undef, 1);
 } # }}}1
 
-sub FPWrite { # {{{1
-    my($self, @options) = @_;
+sub _write_common { # {{{1
+    my($self, $lf_mask, $lw_mask, $cmd, $wa, @options) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
+      (caller 4)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
         Flag        => {
@@ -3147,49 +2855,26 @@ sub FPWrite { # {{{1
     } );
     $options{ReqCount} ||= length ${$options{ForkData}};
 
-    my $msg = pack 'CCS>L>L>', $kFPWrite,
+    my $msg = pack "CCS>${lf_mask}${lf_mask}", $cmd,
             @options{qw[Flag OForkRefNum Offset ReqCount]};
 
     my $resp;
     my $rc = $self->SendAFPWrite($msg, @options{qw[ForkData ReqCount]},
             \$resp, $options{FromFH});
-    if ($rc == $kFPNoErr && wantarray) {
-        return($rc, unpack 'L>', $resp);
+    if ($rc == $kFPNoErr && $wa) {
+        return($rc, unpack $lw_mask, $resp);
     }
     return($rc);
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
+sub FPWrite { # {{{1
+    return(_write_common($_[0], q{l>}, q{L>}, $kFPWrite, wantarray, @_[1 .. $#_]));
+} # }}}1
+
+##no critic qw(RequireArgUnpacking)
 sub FPWriteExt { # {{{1
-    my($self, @options) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
-
-    my %options = validate(@options, {
-        Flag        => {
-            type        => SCALAR,
-            default     => 0,
-            callbacks   => {
-                'valid flag bits' => sub { not ~0x80 & $_[0] },
-            },
-        },
-        OForkRefNum => { type => SCALAR },
-        Offset      => { type => SCALAR },
-        ForkData    => { type => SCALARREF, optional => 1 },
-        ReqCount    => { type => SCALAR, optional => 1 },
-        FromFH      => { type => HANDLE, optional => 1 },
-    } );
-    $options{ReqCount} ||= length ${$options{ForkData}};
-
-    my $msg = pack 'CCS>Q>Q>', $kFPWriteExt,
-            @options{qw[Flag OForkRefNum Offset ReqCount]};
-
-    my $resp;
-    my $rc = $self->SendAFPWrite($msg, @options{qw[ForkData ReqCount]},
-            \$resp, $options{FromFH});
-    if ($rc == $kFPNoErr && wantarray) {
-        return($rc, unpack 'Q>', $resp);
-    }
-    return $rc;
+    return(_write_common($_[0], q{q>}, q{Q>}, $kFPWriteExt, wantarray, @_[1 .. $#_]));
 } # }}}1
 
 sub FPZzzzz { # {{{1
