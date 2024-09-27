@@ -753,7 +753,7 @@ sub _catsrch_common { # {{{1
     my $results = {};
     # this pack mask is hella wonky, but it should do what I need.
     my ($catpos, $filebmp, $dirbmp, @paramlist) =
-        unpack "a[16]S>S>L>/(${sl_mask}}/(a![s]))", $resp;
+        unpack "a[16]S>S>L>/(${sl_mask}/(a![s]))", $resp;
     ${$results}{CatalogPosition} = $catpos;
     my $op = ${$results}{OffspringParameters} = [];
     my($isfiledir, $paramdata);
