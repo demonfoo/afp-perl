@@ -117,7 +117,7 @@ sub CheckAttnQueue { # {{{1
 # This is a virtual method which is not for public consumption. Only
 # Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
-    my ($self, $payload, $resp_r, $can_cache) = @_;
+    my ($self, $payload, $resp_r, $can_cache, $r_off) = @_;
     $self->{logger}->debug(sub { sprintf 'called %s()', (caller 3)[3] });
 
     $self->CheckAttnQueue();
@@ -128,7 +128,7 @@ sub SendAFPMessage { # {{{1
         } while (scalar(@{$self->{ReplayCache}}) > $self->{ReplayCacheSize});
         push @{$self->{ReplayCache}}, $payload;
     }
-    return $self->{Session}->Command($payload, $resp_r);
+    return $self->{Session}->Command($payload, $resp_r, $r_off);
 } # }}}1
 
 # This is a virtual method which is not for public consumption. Only

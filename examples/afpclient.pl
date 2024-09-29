@@ -25,6 +25,7 @@ use Net::AFP::FileParms qw(:DEFAULT !:common);
 use Net::AFP::DirParms;
 use Socket;
 use Log::Log4perl;
+use threads::shared;
 
 use Term::ReadLine;     # for reading input from user
 
@@ -49,6 +50,14 @@ use Encode;
 use I18N::Langinfo qw(langinfo CODESET);
 use Cwd();
 use Fcntl qw(:mode);
+
+my $has_File__Map = 0;
+eval {
+    require File::Map;
+} and do {
+    File::Map->import(qw(map_handle unmap sys_map :constants));
+    $has_File__Map = 1;
+};
 
 # Find out the character encoding for the current terminal.
 my $term_enc = langinfo(CODESET);
@@ -473,7 +482,7 @@ _EOT_
             return 1;
         }
 
-        my $local_fh = IO::File->new($targetFile, 'w');
+        my $local_fh = IO::File->new($targetFile, 'w+');
         if (not defined $local_fh) {
             print "Couldn't open local file for writing!\n";
             $session->FPCloseFork($resp{OForkRefNum});
@@ -498,10 +507,19 @@ _EOT_
         STDOUT->autoflush(1);
         my $pos = 0;
         my($time, $lasttime, $starttime, $data, $rate, $delta, $mult, $pcnt,
-          $twidth, $rlen);
+          $twidth, %opts, $rlen);
         $twidth = 80; # if we can't ascertain, go with safe default
         $starttime = $time = gettimeofday();
         $lasttime = 0;
+
+        my $filemap;
+        if ($has_File__Map) {
+            # set file length to origin file length
+            truncate $local_fh, $len;
+            share($filemap);
+            #map_handle($filemap, $local_fh, '+>', 0, $len);
+            sys_map($filemap, $len, &PROT_WRITE() | &PROT_READ(), &MAP_SHARED(), $local_fh, 0);
+        }
 
         while (1) {
             $rlen = $blksize;
@@ -509,12 +527,20 @@ _EOT_
                 $rlen = $len - $pos;
                 last if $rlen == 0;
             }
-            ($rc, $data) = &{$ReadFn}($session,
-                    OForkRefNum => $resp{OForkRefNum},
-                    Offset      => $pos,
-                    ReqCount    => $rlen);
+            %opts = (
+                OForkRefNum => $resp{OForkRefNum},
+                Offset      => $pos,
+                ReqCount    => $blksize,
+            );
+            if ($has_File__Map) {
+                printf {\*STDERR} "in put handler; filemap ref is %s\n", \$filemap;
+                @opts{qw(ReplyBuffer ReplyOffset)} = (\$filemap, $pos);
+            }
+            ($rc, $data) = &{$ReadFn}($session, %opts);
             last if $rc != $kFPNoErr and $rc != $kFPEOFErr;
-            syswrite $local_fh, ${$data};
+            if (not $has_File__Map) {
+                syswrite $local_fh, ${$data};
+            }
             $pos += $rlen;
             $time = gettimeofday();
             if (($time - $lasttime > 0.5) or $rc != $kFPNoErr or $pos >= $len) {
@@ -547,6 +573,9 @@ _EOT_
             }
         }
         print "\n";
+        if ($has_File__Map) {
+            unmap($filemap);
+        }
         close($local_fh) || carp(q{Couldn't close local file});
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != $kFPNoErr) {

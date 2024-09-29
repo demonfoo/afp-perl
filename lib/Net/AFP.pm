@@ -2348,6 +2348,8 @@ sub _read_common { # {{{1
         OForkRefNum => { type => SCALAR },
         Offset      => { type => SCALAR },
         ReqCount    => { type => SCALAR },
+        ReplyBuffer => { type => SCALARREF, optional => 1 },
+        ReplyOffset => { type => SCALAR, optional => 1 },
         (defined $extraopts and ref($extraopts) eq 'HASH') ? %{$extraopts} : (),
     } );
 
@@ -2357,8 +2359,10 @@ sub _read_common { # {{{1
 
     croak('Need to accept returned list') if not wantarray;
     my $rdata;
-    my $rc = $self->SendAFPMessage($msg, \$rdata);
-    return($rc, \$rdata);
+    my $rc = $self->SendAFPMessage($msg,
+      defined $options{ReplyBuffer} ? $options{ReplyBuffer} : \$rdata, 0,
+      defined $options{ReplyBuffer} ? $options{ReplyOffset} : undef);
+    return($rc, defined $options{ReplyBuffer} ? $options{ReplyBuffer} : \$rdata);
 } # }}}1
 
 sub FPRead { # {{{1

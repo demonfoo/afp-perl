@@ -272,7 +272,7 @@ sub session_thread { # {{{1
     $poll->mask($conn, POLLIN | POLLHUP);
     my ($data, $resp, $type, $cmd, $id, $errcode, $length,
             $reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref, $msg,
-            $wsz, $handler, $rlen);
+            $wsz, $handler, $rlen, $offset);
     my $last_tickle     = gettimeofday();
     $logger->debug('starting DSI thread main loop');
 MAINLOOP:
@@ -386,9 +386,17 @@ MAINLOOP:
             }
 
             $rsz = 0;
-            # Perl 5.18 gets bitchy if sysread() is passed a variable
-            # containing undef.
-            ${$rb_ref} = q{};
+            # if this item is passed, we're using an mmap()'d buffer, and we
+            # should sysread straight into that.
+            if (defined $handler->[4]) {
+                $offset = $handler->[4];
+            }
+            else {
+                # Perl 5.18 gets bitchy if sysread() is passed a variable
+                # containing undef.
+                ${$rb_ref} = q{};
+                $offset = 0;
+            }
             # Get any additional data from the server, if the message
             # indicated that there was a payload.
             while ($rsz < $length) {
@@ -510,7 +518,7 @@ sub close { # {{{1
 #               desired, this should be undef.
 ##no critic qw(RequireArgUnpacking)
 sub SendMessage { # {{{1
-    my ($self, $cmd, $message, $data_r, $d_len, $sem, $resp_r, $rc, $from_fh) = @_;
+    my ($self, $cmd, $message, $data_r, $d_len, $sem, $resp_r, $rc, $from_fh, $r_off) = @_;
     #my $logger = Log::Log4perl->get_logger(__PACKAGE__);
     #$logger->debug(sub { sprintf q{called %s()}, (caller(3))[3] });
 
@@ -527,7 +535,9 @@ sub SendMessage { # {{{1
     }
 
     $resp_r  ||= *foo{SCALAR};
-    share($resp_r);
+    #if (not defined $r_off) {
+        share($resp_r);
+    #}
 
     if (not Scalar::Util::readonly($_[7])) {
         share($_[7]);
@@ -571,7 +581,7 @@ sub SendMessage { # {{{1
         # shared_clone() is slower, because it tries to walk it.
         my $handler = [];
         share(@{$handler});
-        @{$handler} = ( \$_[5], $resp_r, \$_[7], scalar gettimeofday() );
+        @{$handler} = ( \$_[5], $resp_r, \$_[7], scalar gettimeofday(), $r_off );
         $ourshared->{handlers}{$reqId} = $handler;
     }
 
@@ -629,14 +639,14 @@ sub CloseSession { # {{{1
 ##no critic qw(RequireArgUnpacking)
 sub DSICommand { return Command(@_); }
 sub Command { # {{{1
-    my ($self, $message, $resp_r) = @_;
+    my ($self, $message, $resp_r, $r_off) = @_;
 
     # Require that the caller includes a reference to stuff a reply block
     # into - issuing a DSICommand generally gets one.
     my $sem;
     my $rc;
     my $reqId = $self->SendMessage($OP_DSI_COMMAND, $message, undef, undef,
-            $sem, $resp_r, $rc);
+            $sem, $resp_r, $rc, undef, $r_off);
     $sem->down();
     push @{$shared{id $self}{sems}}, $sem;
     return $reqId < 0 ? $reqId : $rc;
