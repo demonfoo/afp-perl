@@ -2267,15 +2267,31 @@ sub FPOpenVol { # {{{1
     return $rc;
 } # }}}1
 
-sub FPRead { # {{{1
-    my($self, @options) = @_;
+sub _read_common { # {{{1
+    my($self, $extraopts, $optnames, $mask, $cmd, @options) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
+      (caller 4)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
         OForkRefNum => { type => SCALAR },
         Offset      => { type => SCALAR },
         ReqCount    => { type => SCALAR },
+        (defined $extraopts and ref($extraopts) eq 'HASH') ? %{$extraopts} : (),
+    } );
+
+    my $msg = pack "CxS>${mask}", $cmd,
+            @options{qw[OForkRefNum Offset ReqCount]},
+            (defined $optnames and ref($optnames) eq 'ARRAY') ? @options{@{$optnames}} : ();
+
+    croak('Need to accept returned list') if not wantarray;
+    my $rdata;
+    my $rc = $self->SendAFPMessage($msg, \$rdata);
+    return($rc, \$rdata);
+} # }}}1
+
+sub FPRead { # {{{1
+    croak('Need to accept returned list') if not wantarray;
+    return(_read_common($_[0], {
         NewLineMask => {
             type        => SCALAR,
             default     => 0,
@@ -2290,35 +2306,12 @@ sub FPRead { # {{{1
                 'valid char values' => sub { $_[0] >= 0 && $_[0] <= 0xFF },
             },
         },
-    } );
-
-    my $msg = pack 'CxS>L>L>CC', $kFPRead,
-            @options{qw[OForkRefNum Offset ReqCount NewLineMask NewLineChar]};
-
-    croak('Need to accept returned list') if not wantarray;
-    my $rdata;
-    my $rc = $self->SendAFPMessage($msg, \$rdata);
-    return($rc, \$rdata);
+    }, [qw(NewLineMask NewLineChar)], 'L>L>CC', $kFPRead, @_[1 .. $#_]));
 } # }}}1
 
 sub FPReadExt { # {{{1
-    my($self, @options) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(%s)},
-      (caller 3)[3], Dumper({@options}) });
-
-    my %options = validate(@options, {
-        OForkRefNum => { type => SCALAR },
-        Offset      => { type => SCALAR },
-        ReqCount    => { type => SCALAR },
-    } );
-
-    my $msg = pack 'CxS>Q>Q>', $kFPReadExt,
-        @options{qw[OForkRefNum Offset ReqCount]};
-
     croak('Need to accept returned list') if not wantarray;
-    my $rdata;
-    my $rc = $self->SendAFPMessage($msg, \$rdata);
-    return($rc, \$rdata);
+    return(_read_common($_[0], undef, undef, 'Q>Q>', $kFPReadExt, @_[1 .. $#_]));
 } # }}}1
 
 sub FPRemoveAPPL { # {{{1
