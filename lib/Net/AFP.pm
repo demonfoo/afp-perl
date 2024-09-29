@@ -307,7 +307,7 @@ sub PackSetParams { # {{{1
         if ($Bitmap & ${$Param}{FlagBit}) {
             next if $is_file == 1 && exists ${$Param}{MustBeDir} && ${$Param}{MustBeDir} == 1;
             next if $is_file == 0 && exists ${$Param}{MustBeFile} && ${$Param}{MustBeFile} == 1;
-            for my $optnam (@{${$Param}{OptionNames}}) {
+            foreach my $optnam (@{${$Param}{OptionNames}}) {
                 return if not exists $options{$optnam};
             }
             my @values = @options{@{${$Param}{OptionNames}}};
@@ -707,7 +707,7 @@ sub _catsrch_common { # {{{1
 
     my $is_range = 0;
     my $Bitmap = 0;
-    for my $item (@items) {
+    foreach my $item (@items) {
         if (exists $options{${$item}[0]}) {
             my $key = ${$item}[0];
             if (defined ${$item}[4]) {
@@ -757,8 +757,7 @@ sub _catsrch_common { # {{{1
     ${$results}{CatalogPosition} = $catpos;
     my $op = ${$results}{OffspringParameters} = [];
     my($isfiledir, $paramdata);
-    while (scalar(@paramlist) > 0) {
-        ($isfiledir, $paramdata) = splice @paramlist, 0, 2;
+    while (($isfiledir, $paramdata) = splice @paramlist, 0, 2) {
         if ($isfiledir & 0x80) {
             push @{$op}, ParseDirParms($dirbmp, $paramdata);
         }
@@ -1238,15 +1237,12 @@ sub FPGetACL { # {{{1
     }
 
     if ($rvals{Bitmap} & $kFileSec_ACL) {
-        my $acl_entrycount;
-        ($acl_entrycount, $rvals{acl_flags}, $resp) = unpack 'L>L>a*', $resp;
-        my @entries = unpack "(a[16]L>L>)[${acl_entrycount}]", $resp;
-        my @acl_ace = ();
-        my $ace;
-        for my $i (0 .. $acl_entrycount - 1) {
-            $acl_ace[$i] = $ace = {};
-            @{$ace}{qw(ace_applicable ace_flags ace_rights)} = splice @entries, 0, 3;
+        ($rvals{acl_flags}, my @entries) = unpack 'x[l]L>X[ll]L>x[l]/(a[16]L>L>)', $resp;
+        my(@acl_ace, $ace);
+        while (@{$ace = {}}{qw(ace_applicable ace_flags ace_rights)} =
+          splice @entries, 0, 3) {
             UUID::unparse(${$ace}{ace_applicable}, ${$ace}{ace_applicable});
+            push @acl_ace, $ace;
         }
         $rvals{acl_ace} = [ @acl_ace ];
     }
@@ -1651,8 +1647,7 @@ sub FPGetSrvrParms { # {{{1
     ${$data}{ServerTime}    = $time + globalTimeOffset;
     ${$data}{Volumes}       = [];
     my($flags, $volname);
-    while (scalar(@volinfo) > 0) {
-        ($flags, $volname) = splice @volinfo, 0, 2;
+    while (($flags, $volname) = splice @volinfo, 0, 2) {
         if (Net::AFP::Versions::CompareByVersionNum($self, 3, 0,
                 $kFPVerAtLeast)) {
             $volname = decode_utf8($volname);
@@ -2533,12 +2528,11 @@ sub FPSetACL { # {{{1
                 if not exists $options{acl_ace};
         croak('acl_flags must be provided')
                 if not exists $options{acl_flags};
-        my @ace_list;
-        foreach my $ace (@{$options{acl_ace}}) {
-            UUID::parse(${$ace}{ace_applicable}, $tmp);
-            push @ace_list, pack 'a[16]L>L>', $tmp,
-                    @{$ace}{qw[ace_flags ace_rights]};
-        }
+        my @ace_list = map {
+            UUID::parse(${$_}{ace_applicable}, $tmp);
+            pack 'a[16]L>L>', $tmp,
+                    @{$_}{qw[ace_flags ace_rights]};
+        } @{$options{acl_ace}};
         $msg .= pack 'L>L>(a*)[' . scalar(@ace_list) . ']', scalar(@ace_list),
             $options{acl_flags}, @ace_list;
     }
