@@ -687,44 +687,123 @@ sub _catsrch_common { # {{{1
 
     my(%Specification1, %Specification2);
     my @items = (
-        [ 'Attributes',         $kFPAttributeBit,      1, 1, 'Attribute' ],
-        [ 'ParentDirID',        $kFPParentDirIDBit,    1, 1 ],
-        [ 'CreateDate',         $kFPCreateDateBit,     1, 1 ],
-        [ 'ModDate',            $kFPModDateBit,        1, 1 ],
-        [ 'BackupDate',         $kFPBackupDateBit,     1, 1 ],
-        [ 'FinderInfo',         $kFPFinderInfoBit,     1, 1 ],
-        [ 'LongName',           $kFPLongNameBit,       1, 1 ],
-        [ 'OffspringCount',     $kFPOffspringCountBit, 0, 1 ],
-        [ 'DataForkLen',        $kFPDataForkLenBit,    1, 0 ],
-        [ 'RsrcForkLen',        $kFPRsrcForkLenBit,    1, 0 ],
-        [ 'ExtDataForkLen',     $kFPExtDataForkLenBit, 1, 0 ],
-        [ 'ExtRsrcForkLen',     $kFPExtRsrcForkLenBit, 1, 0 ],
-        [ 'UTF8Name',           $kFPUTF8NameBit,       1, 1 ],
-        [ 'MatchPartialNames',  1 << 31,               1, 1 ],
+        {
+            name   => 'Attributes',
+            bitval => $kFPAttributeBit,
+            file   => 1,
+            dir    => 1,
+            both   => 1,
+            altname => 'Attribute' },
+        {
+            name   => 'ParentDirID',
+            bitval => $kFPParentDirIDBit,
+            file   => 1,
+            dir    => 1,
+            both   => 1 },
+        {
+            name   => 'CreateDate',
+            bitval => $kFPCreateDateBit,
+            file   => 1,
+            dir    => 1,
+            both   => 1 },
+        {
+            name   => 'ModDate',
+            bitval => $kFPModDateBit,
+            file   => 1,
+            dir    => 1,
+            both   => 1 },
+        {
+            name   => 'BackupDate',
+            bitval => $kFPBackupDateBit,
+            file   => 1,
+            dir    => 1,
+            both   => 1 },
+        {
+            name   => 'FinderInfo',
+            bitval => $kFPFinderInfoBit,
+            file   => 1,
+            dir    => 1,
+            both   => 1 },
+        {
+            name   => 'LongName',
+            bitval => $kFPLongNameBit,
+            file   => 1,
+            dir    => 1,
+            both   => 0 },
+        {
+            name   => 'OffspringCount',
+            bitval => $kFPOffspringCountBit,
+            file   => 0,
+            dir    => 1,
+            both   => 1 },
+        {
+            name   => 'DataForkLen',
+            bitval => $kFPDataForkLenBit,
+            file   => 1,
+            dir    => 0,
+            both   => 1 },
+        {
+            name   => 'RsrcForkLen',
+            bitval => $kFPRsrcForkLenBit,
+            file   => 1,
+            dir    => 0,
+            both   => 1 },
+        {
+            name   => 'ExtDataForkLen',
+            bitval => $kFPExtDataForkLenBit,
+            file   => 1,
+            dir    => 0,
+            both   => 1 },
+        {
+            name   => 'ExtRsrcForkLen',
+            bitval => $kFPExtRsrcForkLenBit,
+            file   => 1,
+            dir    => 0,
+            both   => 1 },
+        {
+            name   => 'UTF8Name',
+            bitval => $kFPUTF8NameBit,
+            file   => 1,
+            dir    => 1,
+            both   => 0 },
+        {
+            name   => 'MatchPartialNames',
+            bitval => 1 << 31,
+            file   => 1,
+            dir    => 1,
+            both   => 0 },
     );
-
-    my %not_in_spec2 = ( 'LongName' => 1, 'UTF8Name' => 1 );
 
     my $is_range = 0;
     my $Bitmap = 0;
     foreach my $item (@items) {
-        if (exists $options{${$item}[0]}) {
-            my $key = ${$item}[0];
-            if (defined ${$item}[4]) {
-                $key = ${$item}[4];
+        if (exists $options{${$item}{name}}) {
+            my $key = ${$item}{name};
+            if ($options{FileRsltBitmap} == 0 and ${$item}{file}) {
+                croak('Attempted to include file flag with no file bits set?');
             }
-            if (ref($options{${$item}[0]}) eq q{ARRAY}) {
-                $Specification1{$key} = $options{${$item}[0]}->[0];
-                $Specification2{$key} = $options{${$item}[0]}->[1];
+            if ($options{DirectoryRsltBitmap} == 0 and ${$item}{dir}) {
+                croak('Attempted to include dir flag with no dir bits set?');
+            }
+            if (exists ${$item}{altname}) {
+                $key = ${$item}{altname};
+            }
+            if (ref($options{${$item}{name}}) eq q{ARRAY}) {
+                if (not ${$item}{both}) {
+                    carp(sprintf(q{Option "%s" can't be in both search specs},
+                      ${$item}{name}));
+                }
+                $Specification1{$key} = $options{${$item}{name}}->[0];
+                $Specification2{$key} = $options{${$item}{name}}->[1];
                 $is_range = 1;
             }
-            elsif (ref($options{${$item}[0]}) eq q{}) {
-                $Specification1{$key} = $options{${$item}[0]};
-                if (not exists $not_in_spec2{${$item}[0]}) {
-                    $Specification2{$key} = $options{${$item}[0]};
+            elsif (ref($options{${$item}{name}}) eq q{}) {
+                $Specification1{$key} = $options{${$item}{name}};
+                if (not ${$item}{both}) {
+                    $Specification2{$key} = $options{${$item}{name}};
                 }
             }
-            $Bitmap |= $items[1];
+            $Bitmap |= ${$item}{bitval};
         }
     }
 
@@ -766,8 +845,6 @@ sub _catsrch_common { # {{{1
         }
     }
     return($rc, $results);
-
-
 } # }}}1
 
 ##no critic qw(RequireArgUnpacking)
