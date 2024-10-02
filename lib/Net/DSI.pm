@@ -178,6 +178,7 @@ sub import {
         }
         push @a, $param;
     }
+    return;
 }
 
 Readonly my $OP_DSI_CLOSESESSION        => 1;   # to and from server
@@ -508,7 +509,7 @@ sub close { # {{{1
 #   $rc_r:      A reference to a scalar, which will be made shared and will
 #               receive the return code from the callout. If no response is
 #               desired, this should be undef.
-##no critic qw(RequireArgUnpacking)
+##no critic qw(ProhibitManyArgs RequireArgUnpacking)
 sub SendMessage { # {{{1
     my ($self, $cmd, $message, $data_r, $d_len, $sem, $resp_r, $rc, $from_fh) = @_;
     #my $logger = Log::Log4perl->get_logger(__PACKAGE__);
@@ -613,8 +614,6 @@ sub SendMessage { # {{{1
     return $reqId;
 } # }}}1
 
-##no critic qw(RequireArgUnpacking)
-sub DSICloseSession { return CloseSession(@_); }
 sub CloseSession { # {{{1
     my ($self) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
@@ -626,8 +625,6 @@ sub CloseSession { # {{{1
     return;
 } # }}}1
 
-##no critic qw(RequireArgUnpacking)
-sub DSICommand { return Command(@_); }
 sub Command { # {{{1
     my ($self, $message, $resp_r) = @_;
 
@@ -642,8 +639,6 @@ sub Command { # {{{1
     return $reqId < 0 ? $reqId : $rc;
 } # }}}1
 
-##no critic qw(RequireArgUnpacking)
-sub DSIGetStatus { return GetStatus(@_); }
 sub GetStatus { # {{{1
     my ($self, $resp_r) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
@@ -663,8 +658,6 @@ sub GetStatus { # {{{1
     return $reqId < 0 ? $reqId : $rc;
 } # }}}1
 
-##no critic qw(RequireArgUnpacking)
-sub DSIOpenSession { return OpenSession(@_); }
 sub OpenSession { # {{{1
     my ($self, %options) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
@@ -716,7 +709,7 @@ sub OpenSession { # {{{1
 # This issues a keep-alive message to the server. This really needs to be
 # done on a regular basis - hence why I want to have a separate thread to
 # do dispatch duty, so it can handle things like that.
-sub DSITickle { # {{{1
+sub Tickle { # {{{1
     my ($self) = @_;
     my $logger = Log::Log4perl->get_logger(__PACKAGE__);
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
@@ -725,8 +718,6 @@ sub DSITickle { # {{{1
     return;
 } # }}}1
 
-##no critic qw(RequireArgUnpacking)
-sub DSIWrite { return Write(@_); }
 sub Write { # {{{1
     # This should only be used for FPWrite and FPAddIcon
     my ($self, $message, $data_r, $d_len, $resp_r, $from_fh) = @_;
