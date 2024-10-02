@@ -193,7 +193,7 @@ my @ParamsList = (
                    {
                      FlagBit       => $kFPAttributeBit,
                      PackTemplate  => 'S>',
-                     OptionNames   => ['Attribute'],
+                     OptionNames   => ['Attributes'],
                    },
                    {
                      FlagBit       => $kFPCreateDateBit,
@@ -692,8 +692,7 @@ sub _catsrch_common { # {{{1
             bitval => $kFPAttributeBit,
             file   => 1,
             dir    => 1,
-            both   => 1,
-            altname => 'Attribute' },
+            both   => 1 },
         {
             name   => 'ParentDirID',
             bitval => $kFPParentDirIDBit,
@@ -784,9 +783,6 @@ sub _catsrch_common { # {{{1
             }
             if ($options{DirectoryRsltBitmap} == 0 and ${$item}{dir}) {
                 croak('Attempted to include dir flag with no dir bits set?');
-            }
-            if (exists ${$item}{altname}) {
-                $key = ${$item}{altname};
             }
             if (ref($options{${$item}{name}}) eq q{ARRAY}) {
                 if (not ${$item}{both}) {
@@ -2649,7 +2645,7 @@ sub FPSetDirParms { # {{{1
             },
         },
         Pathname            => { type => SCALAR },
-        Attribute           => { type => SCALAR, optional => 1 },
+        Attributes          => { type => SCALAR, optional => 1 },
         CreateDate          => { type => SCALAR, optional => 1 },
         ModDate             => { type => SCALAR, optional => 1 },
         BackupDate          => { type => SCALAR, optional => 1 },
@@ -2751,7 +2747,7 @@ sub FPSetFileDirParms { # {{{1
             },
         },
         Pathname            => { type => SCALAR },
-        Attribute           => { type => SCALAR, optional => 1 },
+        Attributes          => { type => SCALAR, optional => 1 },
         CreateDate          => { type => SCALAR, optional => 1 },
         ModDate             => { type => SCALAR, optional => 1 },
         BackupDate          => { type => SCALAR, optional => 1 },
@@ -2803,7 +2799,7 @@ sub FPSetFileParms { # {{{1
             },
         },
         Pathname            => { type => SCALAR },
-        Attribute           => { type => SCALAR, optional => 1 },
+        Attributes          => { type => SCALAR, optional => 1 },
         CreateDate          => { type => SCALAR, optional => 1 },
         ModDate             => { type => SCALAR, optional => 1 },
         BackupDate          => { type => SCALAR, optional => 1 },
