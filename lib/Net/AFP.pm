@@ -786,8 +786,8 @@ sub _catsrch_common { # {{{1
             }
             if (ref($options{${$item}{name}}) eq q{ARRAY}) {
                 if (not ${$item}{both}) {
-                    carp(sprintf(q{Option "%s" can't be in both search specs},
-                      ${$item}{name}));
+                    carp(sprintf q{Option "%s" can't be in both search specs},
+                      ${$item}{name});
                 }
                 $Specification1{$key} = $options{${$item}{name}}->[0];
                 $Specification2{$key} = $options{${$item}{name}}->[1];
