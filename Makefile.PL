@@ -25,7 +25,6 @@ WriteMakefile(
             runtime => {
                 recommends => {
                     'CryptX'                => 0,
-		    'Crypt::DH::GMP'        => 0,
                     'Math::BigInt::GMP'     => 0,
 		    'UUID'                  => 0,
                     'PerlIO::buffersize'    => 0,

@@ -24,7 +24,7 @@ buildarch: noarch
 prefix:    %(echo %{_prefix})
 source:    Net-AFP-%{version}.tar.gz
 autoreq:   0
-requires:  perl >= 5.10.0, perl(Log::Log4perl), perl(Math::BigInt::GMP), perl(Data::UUID), perl(CryptX), perl(Crypt::DH::GMP), perl(Log::Dispatch), perl(Fuse), perl(Fuse::Class)
+requires:  perl >= 5.10.0, perl(Log::Log4perl), perl(Math::BigInt::GMP), perl(Data::UUID), perl(CryptX), perl(Log::Dispatch), perl(Fuse), perl(Fuse::Class)
 #suggests: perl(Net::Atalk), perl(IO::Socket::IP), nss-mdns
 
 %description
