@@ -26,7 +26,7 @@ Readonly my $pw_len    => 64;
 # CryptX modules for crypto-related functionality.
 use Crypt::Mode::CBC;
 use Crypt::PRNG qw(random_bytes);
-use Crypt::DH::GMP;
+use Crypt::PK::DH;
 # Pull in the module containing all the result code symbols.
 use Net::AFP::Result;
 use Math::BigInt;
@@ -56,12 +56,11 @@ sub zeropad {
 sub auth_common1 {
     my($session) = @_;
 
-    my $dh = Crypt::DH::GMP->new(
-            p => '0x' . unpack(q{H*}, pack q{C*}, @p_bytes),
-            g => '0x' . unpack q{H*}, pack q{C*}, @g_bytes);
-    $dh->generate_keys();
+    my $dh = Crypt::PK::DH->new();
+    $dh->generate_key({ p => '0x' . unpack(q{H*}, pack q{C*}, @p_bytes),
+                        g => '0x' . unpack q{H*}, pack q{C*}, @g_bytes });
 
-    my $Ma = zeropad(pack('B*', $dh->pub_key_twoc()), $len);
+    my $Ma = zeropad($dh->export_key_raw('public'), $len);
     if (length($Ma) > $len) {
         $Ma = substr $Ma, length($Ma) - $len, $len;
     }
@@ -75,7 +74,9 @@ sub auth_common2 {
     (my $nonce_limit = Math::BigInt->bone())->blsft($nonce_len * 8);
 
     my($Mb, $encrypted) = unpack "a[${len}]a*", $message;
-    my $K = pack q{B*}, $dh->compute_key_twoc('0x' . unpack'H*', $Mb);
+    my $K = $dh->shared_secret(Crypt::PK::DH->new()->import_key_raw($Mb, 'public',
+      { p => '0x' . unpack(q{H*}, pack q{C*}, @p_bytes),
+        g => '0x' . unpack q{H*}, pack q{C*}, @g_bytes }));
     $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack q{H*}, $K });
 
     $session->{logger}->debug(sub { sprintf q{encrypted is 0x%s},

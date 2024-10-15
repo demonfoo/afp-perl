@@ -25,7 +25,7 @@ Readonly my $pw_len    => 256;
 use Crypt::Mode::CBC;
 use Crypt::PRNG qw(random_bytes);
 use Crypt::Digest::MD5 qw(md5);
-use Crypt::DH::GMP;
+use Crypt::PK::DH;
 # Pull in the module containing all the result code symbols.
 use Net::AFP::Result;
 use Math::BigInt;
@@ -61,10 +61,11 @@ sub auth_common1 {
     $p = '0x' . unpack q{H*}, $p;
     $session->{logger}->debug(sub { sprintf q{p is %s}, $p });
 
-    my $dh = Crypt::DH::GMP->new(p => $p, g => $g);
+    my $dh = Crypt::PK::DH->new();
+    $dh->generate_key({p => $p, g => $g});
 
-    $dh->generate_keys();
-    my $K = pack q{B*}, $dh->compute_key_twoc('0x' . unpack q{H*}, $Mb);
+    my $K = $dh->shared_secret(Crypt::PK::DH->new()->import_key_raw($Mb, 'public',
+      {p => $p, g => $g}));
     undef $Mb;
     $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack q{H*}, $K });
 
@@ -86,7 +87,7 @@ sub auth_common1 {
     # message to send to the server.
     my $ciphertext = $ctx->encrypt(zeropad($clientNonce->to_bytes(), $nonce_len),
             $key, $C2SIV);
-    my $Ma = zeropad(pack(q{B*}, $dh->pub_key_twoc()), $len);
+    my $Ma = $dh->export_key_raw('public');
     # Sometimes the result is an extra (zero) byte long; strip that off.
     if (length($Ma) > $len) {
         $Ma = substr $Ma, length($Ma) - $len, $len;
