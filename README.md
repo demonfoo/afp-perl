@@ -39,25 +39,25 @@ make install
 
 This module requires or encourages use of these other modules and libraries:
 
-* Log::Log4perl is used for some message logging
-* Log::Dispatch::Syslog is used for routing log messages to syslog
-* Fuse::Class is used as the superclass for Fuse::AFP
-* Fuse is depended upon by Fuse::Class, need version 0.10\_1 or later
-* UUID is recommended, used internally for access checking
-* CryptX is strongly recommended; all UAMs other than plaintext need it
-* Crypt::DH::GMP is recommended, for DHX UAMs
-* Math::BigInt::GMP is recommended, speeds up DHX UAMs
-* IO::Socket::IP is suggested, adds v6 socket support
-* Net::Atalk is suggested, adds AppleTalk socket support
-* Net::Bonjour is suggested, adds mDNS/Bonjour service discovery
-* Term::ReadPassword is recommended
-* Readonly is required
-* Params::Validate is required
-* Term::Readline is required for *afpclient.pl*; Term::ReadLine::Gnu or
-  Term::ReadLine::Perl5 is recommended
-* PerlIO::buffersize is recommended
-* URI::Escape is required
-* Class::InsideOut is required
+* [Log::Log4perl](https://metacpan.org/pod/Log::Log4perl) is used for some message logging
+* [Log::Dispatch::Syslog](https://metacpan.org/pod/Log::Dispatch::Syslog) is used for routing log messages to syslog
+* [Fuse::Class](https://metacpan.org/pod/Fuse::Class) is used as the superclass for Fuse::AFP
+* [Fuse](https://metacpan.org/pod/Fuse) is depended upon by Fuse::Class, need version 0.10\_1 or later
+* [String::Escape](https://metacpan.org/pod/String::Escape) is required for Fuse::AFP and *afpmount.pl*
+* [UUID](https://metacpan.org/pod/UUID) is recommended, used internally for access checking
+* [CryptX](https://metacpan.org/pod/CryptX) is strongly recommended; all UAMs other than plaintext need it
+* [IO::Socket::IP](https://metacpan.org/pod/IO::Socket::IP) is recommended, adds v6 socket support
+* [Net::Atalk](https://github.com/demonfoo/atalk-perl) is suggested, adds AppleTalk socket support
+* [Net::Bonjour](https://metacpan.org/pod/Net::Bonjour) is suggested, adds mDNS/Bonjour service discovery
+* [Term::ReadPassword](https://metacpan.org/pod/Term::ReadPassword) is recommended
+* [Readonly](https://metacpan.org/pod/Readonly) is required
+* [Params::Validate](https://metacpan.org/pod/Params::Validate) is required
+* [Term::ReadLine](https://metacpan.org/pod/Term::ReadLine) is required for *afpclient.pl*; [Term::ReadLine::Gnu](https://metacpan.org/pod/Term::ReadLine::Gnu) or
+  [Term::ReadLine::Perl5](https://metacpan.org/pod/Term::ReadLine::Perl5) is recommended
+* [PerlIO::buffersize](https://metacpan.org/pod/PerlIO::buffersize) is recommended for *afpmount.pl*
+* [URI::Escape](https://metacpan.org/pod/URI::Escape) is required for Fuse::AFP and *afpmount.pl*
+* [Class::InsideOut](https://metacpan.org/pod/Class::InsideOut) is required
+* [Text::Glob](https://metacpan.org/pod/Text::Glob) is required for *afpclient.pl*
 
 
 #### FREQUENTLY ASKED QUESTIONS
