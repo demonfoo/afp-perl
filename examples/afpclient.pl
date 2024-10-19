@@ -498,10 +498,12 @@ _EOT_
         STDOUT->autoflush(1);
         my $pos = 0;
         my($time, $lasttime, $starttime, $data, $rate, $delta, $mult, $pcnt,
-          $twidth, $rlen);
+          $twidth, $rlen, $lastpos);
         $twidth = 80; # if we can't ascertain, go with safe default
         $starttime = $time = gettimeofday();
         $lasttime = 0;
+        $lastpos = 0;
+        $pcnt = 0;
 
         while (1) {
             $rlen = $blksize;
@@ -518,11 +520,22 @@ _EOT_
             $pos += $rlen;
             $time = gettimeofday();
             if (($time - $lasttime > 0.5) or $rc != $kFPNoErr or $pos >= $len) {
-                $delta = $time - $starttime;
+                $pcnt = $pos * 100 / $len;
+                if ($pcnt == 100) {
+                    $delta = $time - $starttime;
+                }
+                else {
+                    $delta = $time - $lasttime;
+                }
                 $rate = 0;
                 $mult = q{ };
                 if ($delta > 0) {
-                    $rate = $pos / $delta;
+                    if ($pcnt == 100) {
+                        $rate = $pos / $delta;
+                    }
+                    else {
+                        $rate = ($pos - $lastpos) / $delta;
+                    }
                     if ($rate > 1_000) {
                         $rate /= 1_000.0;
                         $mult = q{K};
@@ -536,17 +549,18 @@ _EOT_
                         $mult = q{G};
                     }
                 }
-                $pcnt = $pos * 100 / $len;
                 if ($has_Term__ReadKey) {
                     $twidth = (GetTerminalSize())[0];
                 }
                 printf qq{\r %3d%%  |%-25s|  %-} . ($twidth - 52) . 's  %5.2f %sB/sec', $pcnt,
                         q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult;
                 $lasttime = $time;
+                $lastpos = $pos;
                 last if $rc != $kFPNoErr;
             }
         }
-        print "\n";
+        printf "\nTransferred %d bytes in %dh%dm%.2fs\n", $pos, $delta / 3600,
+          $delta / 60 % 60, $delta - (int(int($delta) / 60) * 60);
         close($local_fh) || carp(q{Couldn't close local file});
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != $kFPNoErr) {
@@ -613,11 +627,13 @@ _EOT_
         my $fileLen = (stat $srcFile)[7];
         STDOUT->autoflush(1);
         my($time, $lasttime, $starttime, $rate, $delta, $mult, $pcnt, $twidth,
-          $wcount);
+          $wcount, $lastpos);
         $twidth = 80; # if we can't ascertain, go with safe default
         $starttime = $time = gettimeofday();
         $lasttime = 0;
         $wcount = 0;
+        $lastpos = 0;
+        $pcnt = 0;
         while (1) {
             # try a direct write, and see how far we get; zero-copy is
             # preferred if possible.
@@ -634,11 +650,22 @@ _EOT_
 
             $time = gettimeofday();
             if (($time - $lasttime > 0.5) || $fileLen <= $wcount) {
+                $pcnt = $wcount * 100 / $fileLen;
+                if ($pcnt == 100) {
+                    $delta = $time - $starttime;
+                }
+                else {
+                    $delta = $time - $lasttime;
+                }
                 $rate = 0;
-                $delta = $time - $starttime;
                 $mult = q{ };
                 if ($delta > 0) {
-                    $rate = $wcount / $delta;
+                    if ($pcnt == 100) {
+                        $rate = $wcount / $delta;
+                    }
+                    else {
+                        $rate = ($wcount - $lastpos) / $delta;
+                    }
                     if ($rate > 1_000) {
                         $rate /= 1_000.0;
                         $mult = q{K};
@@ -652,13 +679,13 @@ _EOT_
                         $mult = q{G};
                     }
                 }
-                $pcnt = $wcount * 100 / $fileLen;
                 if ($has_Term__ReadKey) {
                     $twidth = (GetTerminalSize())[0];
                 }
                 printf qq{\r %3d%%  |%-25s|  %-} . ($twidth - 52) . 's  %5.2f %sB/sec', $pcnt,
                         q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult;
                 $lasttime = $time;
+                $lastpos = $wcount;
             }
             if ($rc != $kFPNoErr) {
                 print 'Write to file on server failed with return code ', $rc,
@@ -667,7 +694,8 @@ _EOT_
             }
             last if $rc != $kFPNoErr or $fileLen <= $wcount;
         }
-        print "\n";
+        printf "\nTransferred %d bytes in %dh%dm%.2fs\n", $wcount, $delta / 3600,
+          $delta / 60 % 60, $delta - (int(int($delta) / 60) * 60);
         close($srcFile) || carp(q{Couldn't close local file});
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != $kFPNoErr) {
