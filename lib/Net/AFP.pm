@@ -820,18 +820,15 @@ sub _catsrch_common { # {{{1
         $msg .= pack 'Cx/a', length($params), $params;
     }
 
-    my $resp;
+    my($resp, $isfiledir, $paramdata, $results);
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
     return $rc if $rc != $kFPNoErr;
     croak('Need to accept returned list') if not wantarray;
 
-    my $results = {};
     # this pack mask is hella wonky, but it should do what I need.
-    my ($catpos, $filebmp, $dirbmp, @paramlist) =
+    (${$results = {}}{CatalogPosition}, my $filebmp, my $dirbmp, my @paramlist) =
         unpack "a[16]S>S>L>/(${sl_mask}/(a![s]))", $resp;
-    ${$results}{CatalogPosition} = $catpos;
     my $op = ${$results}{OffspringParameters} = [];
-    my($isfiledir, $paramdata);
     while (($isfiledir, $paramdata) = splice @paramlist, 0, 2) {
         if ($isfiledir & 0x80) {
             push @{$op}, ParseDirParms($dirbmp, $paramdata);
@@ -1593,8 +1590,7 @@ sub FPGetIconInfo { # {{{1
             $IconIndex;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return($rc) if $rc != $kFPNoErr;
-    ${$resp_r} = {};
-    @{${$resp_r}}{qw[IconTag FileType IconType Size]} =
+    @{${$resp_r} = {}}{qw[IconTag FileType IconType Size]} =
             unpack 'L>L>CxS>', $resp;
     return $rc;
 } # }}}1
@@ -1708,17 +1704,16 @@ sub FPGetSrvrParms { # {{{1
 
     my($resp_r) = validate_pos(@options, { type => SCALARREF });
 
-    my $resp;
+    my($resp, $data);
     my $rc = $self->SendAFPMessage(pack('Cx', $kFPGetSrvrParms), \$resp);
     # If the response was not $kFPNoErr, the info block will not be present.
     return $rc if $rc != $kFPNoErr;
 
-    my $data = {};
     my ($time, @volinfo) = unpack 'l>C/(CC/a)', $resp;
     # AFP does not express times since 1 Jan 1970 00:00 GMT, but since 
     # 1 Jan 2000 00:00 GMT (I think GMT, anyway). Good call, Apple...
-    ${$data}{ServerTime}    = $time + globalTimeOffset;
-    ${$data}{Volumes}       = [];
+    @{$data = {}}{qw(ServerTime Volumes)} =
+      ($time + globalTimeOffset, []);
     my($flags, $volname);
     while (($flags, $volname) = splice @volinfo, 0, 2) {
         if (Net::AFP::Versions::CompareByVersionNum($self, 3, 0,
@@ -2059,8 +2054,7 @@ sub FPMapID { # {{{1
     return $rc if $rc != $kFPNoErr;
     if ($Subfunction == $kUserUUIDToUTF8Name ||
             $Subfunction == $kGroupUUIDToUTF8Name) {
-        ${$resp_r} = {};
-        @{${$resp_r}}{qw[Bitmap NumericID UTF8Name]} =
+        @{${$resp_r} = {}}{qw[Bitmap NumericID UTF8Name]} =
                 unpack 'L>L>S>/a', $resp;
         ${${$resp_r}}{UTF8Name} =
                 compose(decode_utf8(${$resp_r}->{UTF8Name}));

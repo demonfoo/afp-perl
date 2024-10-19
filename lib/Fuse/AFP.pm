@@ -3108,9 +3108,8 @@ sub acl_from_xattr { # {{{1
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server
     my($acl_flags, @acl_parts) = unpack 'LS/(LS/aLL)', $raw_xattr;
-    my(@entries, $bitmap, $utf8name);
-    my $entry = {};
-    while (($bitmap, $utf8name, @{$entry}{qw(ace_flags ace_rights)}) =
+    my(@entries, $bitmap, $utf8name, $entry);
+    while (($bitmap, $utf8name, @{$entry = {}}{qw(ace_flags ace_rights)}) =
           splice @acl_parts, 0, 4) {
         $utf8name = decode_utf8($utf8name);
         my($uuid, $rc);
@@ -3160,7 +3159,6 @@ sub acl_from_xattr { # {{{1
 
         ${$entry}{ace_applicable} = $uuid;
         push @entries, $entry;
-        $entry = {};
     }
     ${$acl_data} = {
                 acl_ace     => [ @entries ],
