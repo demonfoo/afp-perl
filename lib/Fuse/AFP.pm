@@ -3158,7 +3158,7 @@ sub acl_from_xattr { # {{{1
         # that we can't proceed.
         return -EINVAL() if $rc != $kFPNoErr;
 
-        $entry->{ace_applicable}    = $uuid;
+        ${$entry}{ace_applicable} = $uuid;
         push @entries, $entry;
         $entry = {};
     }
@@ -3177,7 +3177,7 @@ sub acl_to_xattr { # {{{1
       (caller 3)[3], Dumper($acldata) });
 
     my @acl_parts;
-    foreach my $entry (@{$acldata->{acl_ace}}) {
+    foreach my $entry (@{${$acldata}{acl_ace}}) {
         my $name;
         # map the UUID (this actually works for both user and group
         # UUIDs, the FPMapID docs are useless) to a corresponding
@@ -3190,15 +3190,15 @@ sub acl_to_xattr { # {{{1
         }
         else {
             my $rc = $self->{afpconn}->FPMapID($kUserUUIDToUTF8Name,
-                    $entry->{ace_applicable}, \$name);
+                    ${$entry}{ace_applicable}, \$name);
             return -EBADF() if $rc != $kFPNoErr;
         }
-        push @acl_parts, pack 'LS/aLL', $name->{Bitmap},
-                encode_utf8($name->{UTF8Name}),
+        push @acl_parts, pack 'LS/aLL', ${$name}{Bitmap},
+                encode_utf8(${$name}{UTF8Name}),
                 @{$entry}{qw[ace_flags ace_rights]};
     }
     # Pack the ACL into a single byte sequence, and push it to the client.
-    return pack 'LS/(a*)', $acldata->{acl_flags}, @acl_parts;
+    return pack 'LS/(a*)', ${$acldata}{acl_flags}, @acl_parts;
 } # }}}1
 
 # for nfs4_ace.who
@@ -3385,23 +3385,23 @@ sub acl_from_nfsv4_xattr { # {{{1
         $who = decode_utf8($who);
         my $entry = {};
         # access_mask (NFSv4) -> ace_rights (AFP)
-        $entry->{ace_rights} = 0;
+        ${$entry}{ace_rights} = 0;
         for my $key (keys %afp_to_nfs4_access_bits) {
             if (($access_mask & $afp_to_nfs4_access_bits{$key}) ==
               $afp_to_nfs4_access_bits{$key}) {
-                $entry->{ace_rights} |= $key;
+                ${$entry}{ace_rights} |= $key;
             }
         }
 
         # flag, type (NFSv4) -> ace_flags (AFP)
-        $entry->{ace_flags} = 0;
+        ${$entry}{ace_flags} = 0;
         for my $key (keys %afp_ace_flags_to_nfs4_flag_bits) {
             if (($flag & $afp_ace_flags_to_nfs4_flag_bits{$key}) ==
               $afp_ace_flags_to_nfs4_flag_bits{$key}) {
-                $entry->{ace_flags} |= $key;
+                ${$entry}{ace_flags} |= $key;
             }
         }
-        $entry->{ace_flags} |= $nfs4_type_to_afp_ace_type_values{$type};
+        ${$entry}{ace_flags} |= $nfs4_type_to_afp_ace_type_values{$type};
 
         # who, flag (NFSv4) -> ace_applicable (AFP)
         my $uuid;
@@ -3409,12 +3409,12 @@ sub acl_from_nfsv4_xattr { # {{{1
         if (exists $nfs4_reserved_who_names{$who}) {
             my $params = $nfs4_reserved_who_names{$who};
             if ($access_mask == $NFS4_ACE_MASK_ALL) {
-                $unix_mode  |= $params->{unix_mode};
-                $afp_rights |= $params->{access_rights};
+                $unix_mode  |= ${$params}{unix_mode};
+                $afp_rights |= ${$params}{access_rights};
                 next;
             }
 
-            for my $ent (@{$params->{access_flags}}) {
+            for my $ent (@{${$params}{access_flags}}) {
                 if (($access_mask & $ent->{acl_mask}) == $ent->{acl_mask}) {
                     $unix_mode  |= $ent->{unix_mode};
                     $afp_rights |= $ent->{access_rights};
