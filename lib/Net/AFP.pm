@@ -540,7 +540,7 @@ sub _brlock_common { # {{{1
         },
     } );
 
-    my $msg = pack qq{CCS${lf_mask}${lf_mask}}, $cmd,
+    my $msg = pack sprintf(q{CCS%s%s}, $lf_mask, $lf_mask), $cmd,
             @options{qw[Flags OForkRefNum Offset Length]};
     my $resp;
     my $rc = $self->SendAFPMessage($msg, \$resp, 1);
@@ -909,7 +909,7 @@ sub _catsrch_common { # {{{1
             @options{qw[VolumeID ReqMatches CatalogPosition FileRsltBitmap
             DirectoryRsltBitmap]}, $Bitmap;
     my $params = PackSetParams($Bitmap, $is_file, %Specification1);
-    $msg .= pack qq{C${sl_pad}/a}, length($params), $params;
+    $msg .= pack sprintf(q{C%s/a}, $sl_pad), length($params), $params;
     if ($is_range == 1) {
         $params = PackSetParams($Bitmap, $is_file, %Specification2);
         $msg .= pack q{Cx/a}, length($params), $params;
@@ -922,7 +922,7 @@ sub _catsrch_common { # {{{1
 
     # this pack mask is hella wonky, but it should do what I need.
     (${$results = {}}{CatalogPosition}, my $filebmp, my $dirbmp, my @paramlist) =
-        unpack qq{a[16]S>S>L>/(${sl_mask}/(a![s]))}, $resp;
+        unpack sprintf(q{a[16]S>S>L>/(%s/(a![s]))}, $sl_mask), $resp;
     my $op = ${$results}{OffspringParameters} = [];
     while (($isfiledir, $paramdata) = splice @paramlist, 0, 2) {
         if ($isfiledir & 0x80) {
@@ -1433,7 +1433,7 @@ sub _enum_common { # {{{1
     } );
     croak('Must accept array return') if not wantarray;
 
-    my $msg = pack qq{CxS>L>S>S>S>${si_type}${mr_type}a*}, $cmd,
+    my $msg = pack sprintf(q{CxS>L>S>S>S>%s%sa*}, $si_type, $mr_type), $cmd,
             @options{qw[VolumeID DirectoryID FileBitmap DirectoryBitmap
             ReqCount StartIndex MaxReplySize]},
             PackagePath(@options{qw[PathType Pathname]});
@@ -1444,7 +1444,7 @@ sub _enum_common { # {{{1
     my @results = map {
         # first byte indicates entry length, next byte contains the 
         # isFileDir bit
-        my ($IsFileDir, $OffspringParameters) = unpack qq{${fd_pad}a*}, $_;
+        my ($IsFileDir, $OffspringParameters) = unpack sprintf(q{%sa*}, $fd_pad), $_;
         if ($IsFileDir == 0x80) {
             # This child is a directory
             ParseDirParms($DirectoryBitmap, $OffspringParameters);
@@ -1453,7 +1453,7 @@ sub _enum_common { # {{{1
             # This child is a file
             ParseFileParms($FileBitmap, $OffspringParameters);
         }
-    } unpack qq{x[s]x[s]S>/(${sl_type}/a)}, $resp;
+    } unpack sprintf(q{x[s]x[s]S>/(%s/a)}, $sl_type), $resp;
     return($rc, [@results]);
 } # }}}1
 
@@ -2210,7 +2210,7 @@ sub FPGetUserInfo { # {{{1
     my $offset = 2;
     ${$resp_r} = {};
     if ($rbmp & 0x1) { # Get User ID bit
-        ${$resp_r}->{UserID} = unpack qq{x[${offset}]L>}, $resp;
+        ${$resp_r}->{UserID} = unpack sprintf(q{x[%d]L>}, $offset), $resp;
         $offset += 4;
     }
     if ($rbmp & 0x2) {
@@ -2222,7 +2222,7 @@ sub FPGetUserInfo { # {{{1
         }
         else {
             ${$resp_r}->{PrimaryGroupID} =
-                    unpack qq{x[${offset}]L>}, $resp;
+                    unpack sprintf(q{x[%d]L>}, $offset), $resp;
             $offset += 4;
         }
     }
@@ -2231,7 +2231,8 @@ sub FPGetUserInfo { # {{{1
             croak('Module UUID was not available!');
         }
 
-        UUID::unparse(unpack(qq{x[${offset}]a[16]}, $resp), ${$resp_r}->{UUID});
+        UUID::unparse(unpack(sprintf(q{x[%d]a[16]}, $offset), $resp),
+          ${$resp_r}->{UUID});
         $offset += 16;
     }
 
@@ -2901,7 +2902,7 @@ sub _read_common { # {{{1
         (defined $extraopts and ref($extraopts) eq 'HASH') ? %{$extraopts} : (),
     } );
 
-    my $msg = pack qq{CxS>${mask}}, $cmd,
+    my $msg = pack sprintf(q{CxS>%s}, $mask), $cmd,
             @options{qw[OForkRefNum Offset ReqCount]},
             (defined $optnames and ref($optnames) eq 'ARRAY') ? @options{@{$optnames}} : ();
 
@@ -3245,7 +3246,7 @@ sub FPSetACL { # {{{1
             pack q{a[16]L>L>}, $tmp,
                     @{$_}{qw[ace_flags ace_rights]};
         } @{$options{acl_ace}};
-        $msg .= pack q{L>L>(a*)[} . scalar(@ace_list) . q{]}, scalar(@ace_list),
+        $msg .= pack sprintf(q{L>L>(a*)[%d]}, scalar(@ace_list)), scalar(@ace_list),
             $options{acl_flags}, @ace_list;
     }
 
@@ -3752,7 +3753,7 @@ sub _write_common { # {{{1
     } );
     $options{ReqCount} ||= length ${$options{ForkData}};
 
-    my $msg = pack qq{CCS>${lf_mask}${lf_mask}}, $cmd,
+    my $msg = pack sprintf(q{CCS>%s%s}, $lf_mask, $lf_mask), $cmd,
             @options{qw[Flag OForkRefNum Offset ReqCount]};
 
     my $resp;

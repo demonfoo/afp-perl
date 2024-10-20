@@ -55,53 +55,53 @@ sub ParseVolParms { # {{{1
     my $resp = {};
 
     if ($Bitmap & $kFPVolAttributeBit) {
-        $resp->{Attribute} = unpack qq{x[${offset}]S>}, $data;
+        $resp->{Attribute} = unpack sprintf(q{x[%d]S>}, $offset), $data;
         $offset += 2;
     }
 
     if ($Bitmap & $kFPVolSignatureBit) {
-        $resp->{Signature} = unpack qq{x[${offset}]S>}, $data;
+        $resp->{Signature} = unpack sprintf(q{x[%d]S>}, $offset), $data;
         $offset += 2;
     }
 
     if ($Bitmap & $kFPVolCreateDateBit) {
-        $resp->{CreateDate} = unpack(qq{x[${offset}]l>}, $data) +
+        $resp->{CreateDate} = unpack(sprintf(q{x[%d]l>}, $offset), $data) +
                 globalTimeOffset;
         $offset += 4;
     }
 
     if ($Bitmap & $kFPVolModDateBit) {
-        $resp->{ModDate} = unpack(qq{x[${offset}]l>}, $data) +
+        $resp->{ModDate} = unpack(sprintf(q{x[%d]l>}, $offset), $data) +
                 globalTimeOffset;
         $offset += 4;
     }
 
     if ($Bitmap & $kFPVolBackupDateBit) {
-        $resp->{BackupDate} = unpack(qq{x[${offset}]l>}, $data) +
+        $resp->{BackupDate} = unpack(sprintf(q{x[%d]l>}, $offset), $data) +
                 globalTimeOffset;
         $offset += 4;
     }
 
     if ($Bitmap & $kFPVolIDBit) {
-        $resp->{ID} = unpack qq{x[${offset}]S>}, $data;
+        $resp->{ID} = unpack sprintf(q{x[%d]S>}, $offset), $data;
         $offset += 2;
     }
 
     if ($Bitmap & $kFPVolBytesFreeBit) {
-        $resp->{BytesFree} = unpack qq{x[${offset}]L>}, $data;
+        $resp->{BytesFree} = unpack sprintf(q{x[%d]L>}, $offset), $data;
         $offset += 4;
     }
 
     if ($Bitmap & $kFPVolBytesTotalBit) {
-        $resp->{BytesTotal} = unpack qq{x[${offset}]L>}, $data;
+        $resp->{BytesTotal} = unpack sprintf(q{x[%d]L>}, $offset), $data;
         $offset += 4;
     }
 
     if ($Bitmap & $kFPVolNameBit) {
-        my $name_off = unpack qq{x[${offset}]S>}, $data;
+        my $name_off = unpack sprintf(q{x[%d]S>}, $offset), $data;
         $offset += 2;
 
-        $resp->{Name} = unpack q{x[} . ($name_off + 2) . q{]C/a}, $data;
+        $resp->{Name} = unpack sprintf(q{x[%d]C/a}, $name_off + 2), $data;
         if (Net::AFP::Versions::CompareByVersionNum($obj, 3, 0,
                 $kFPVerAtLeast)) {
             $resp->{Name} = compose(decode_utf8($resp->{Name}));
@@ -109,21 +109,20 @@ sub ParseVolParms { # {{{1
         else {
             $resp->{Name} = decode(q{MacRoman}, $resp->{Name});
         }
-
     }
 
     if ($Bitmap & $kFPVolExtBytesFreeBit) {
-        $resp->{ExtBytesFree} = unpack qq{x[${offset}]Q>}, $data;
+        $resp->{ExtBytesFree} = unpack sprintf(q{x[%d]Q>}, $offset), $data;
         $offset += 8;
     }
 
     if ($Bitmap & $kFPVolExtBytesTotalBit) {
-        $resp->{ExtBytesTotal} = unpack qq{x[${offset}]Q>}, $data;
+        $resp->{ExtBytesTotal} = unpack sprintf(q{x[%d]Q>}, $offset), $data;
         $offset += 8;
     }
 
     if ($Bitmap & $kFPVolBlockSizeBit) {
-        $resp->{BlockSize} = unpack qq{x[${offset}]L>}, $data;
+        $resp->{BlockSize} = unpack sprintf(q{x[%d]L>}, $offset), $data;
         $offset += 4;
     }
 
@@ -163,13 +162,10 @@ sub ParseSrvrInfo { # {{{1
         }
     }
 
-    $resp->{ServerName}  = $srvname;
-    $resp->{Flags}       = $flags;
-
-    $resp->{MachineType} = unpack qq{x[${machtype_off}]C/a}, $data;
-    $resp->{AFPVersions} =
-            [unpack qq{x[${afpvers_off}]C/(C/a)}, $data];
-    $resp->{UAMs}        = [unpack qq{x[${uams_off}]C/(C/a)}, $data];
+    @{$resp}{qw[ServerName Flags MachineType AFPVersions UAMs]}  =
+      ($srvname, $flags, unpack(sprintf(q{x[%d]C/a}, $machtype_off), $data),
+      [unpack sprintf(q{x[%d]C/(C/a)}, $afpvers_off), $data],
+      [unpack sprintf(q{x[%d]C/(C/a)}, $uams_off), $data]);
 
     # The server icon is deprecated as of AFP 3.0.
     if ($icon_off) {
@@ -187,9 +183,9 @@ static char *volicon_xpm[] = {
 "X c #000000",
 _EOT_
         my @data = map { [ split m{}sm ] }
-                unpack qq{x[${icon_off}](B[32])[32]}, $data;
+                unpack sprintf(q{x[%d](B[32])[32]}, $icon_off), $data;
         my @mask = map { [ split m{}sm ] }
-                unpack q{x[} . ($icon_off + 128) . q{](B[32])[32]}, $data;
+                unpack sprintf(q{x[%d](B[32])[32]}, $icon_off + 128), $data;
         my @xpm_rows = ();
 
         for my $i (0 .. 31) {
@@ -211,8 +207,8 @@ _EOT_
 
     if ($flags & $kSupportsUTF8SrvrName) {
         $resp->{UTF8ServerName} =
-                compose(decode_utf8(unpack qq{x[${utf8name_off}]S>/a},
-                    $data));
+          compose(decode_utf8(unpack sprintf(q{x[%d]S>/a}, $utf8name_off),
+          $data));
     }
 
     if (($flags & $kSupportsTCP) && $addrs_off) {
@@ -233,7 +229,7 @@ _EOT_
             if ($entryType == 3) { # Packed DDP (AppleTalk) address
                 $addrEnt->{family}  = AF_APPLETALK;
                 $addrEnt->{address} = sprintf '%u.%u', unpack q{S>Cx}, $packed;
-                $addrEnt->{port}    = sprintf '%u', unpack q{x[3]C}, $packed;
+                $addrEnt->{port}    = unpack q{x[3]C}, $packed;
             }
             if ($entryType == 4) { # Just the DNS name
                 $addrEnt->{hostname} = $packed;
@@ -262,12 +258,12 @@ _EOT_
                 next;
             }
             $addrEnt;
-        } unpack qq{x[${addrs_off}]C/(CX/a)}, $data ];
+        } unpack sprintf(q{x[%d]C/(CX/a)}, $addrs_off), $data ];
     }
 
     if ($flags & $kSupportsDirServices) {
         $resp->{DirectoryNames} =
-                [unpack q{x[} . $dirserv_off . q{]C/(C/a)}, $data];
+          [unpack sprintf(q{x[%d]C/(C/a)}, $dirserv_off), $data];
     }
 
     return $resp;
