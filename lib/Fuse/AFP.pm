@@ -3107,7 +3107,7 @@ sub acl_from_xattr { # {{{1
 
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server
-    my($acl_flags, @acl_parts) = unpack 'LS/(LS/aLL)', $raw_xattr;
+    my($acl_flags, @acl_parts) = unpack q{LS/(LS/aLL)}, $raw_xattr;
     my(@entries, $bitmap, $utf8name, $entry);
     while (($bitmap, $utf8name, @{$entry = {}}{qw(ace_flags ace_rights)}) =
           splice @acl_parts, 0, 4) {
@@ -3191,12 +3191,12 @@ sub acl_to_xattr { # {{{1
                     ${$entry}{ace_applicable}, \$name);
             return -EBADF() if $rc != $kFPNoErr;
         }
-        push @acl_parts, pack 'LS/aLL', ${$name}{Bitmap},
+        push @acl_parts, pack q{LS/aLL}, ${$name}{Bitmap},
                 encode_utf8(${$name}{UTF8Name}),
                 @{$entry}{qw[ace_flags ace_rights]};
     }
     # Pack the ACL into a single byte sequence, and push it to the client.
-    return pack 'LS/(a*)', ${$acldata}{acl_flags}, @acl_parts;
+    return pack q{LS/(a*)}, ${$acldata}{acl_flags}, @acl_parts;
 } # }}}1
 
 # for nfs4_ace.who
@@ -3375,7 +3375,7 @@ sub acl_from_nfsv4_xattr { # {{{1
 
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server
-    my @acl_parts = unpack 'L>/(L>L>L>L>/ax![L])', $raw_xattr;
+    my @acl_parts = unpack q{L>/(L>L>L>L>/ax![L])}, $raw_xattr;
     my @entries;
     my $unix_mode = 0;
     my $afp_rights = 0;
@@ -3556,7 +3556,7 @@ sub acl_to_nfsv4_xattr { # {{{1
             $access_mask, encode_utf8($params->{who});
     }
 
-    return pack 'L>(L>L>L>L>/ax![L])*', scalar(@{$acldata->{acl_ace}}) + 3, @acl_parts;
+    return pack q{L>(L>L>L>L>/ax![L])*}, scalar(@{$acldata->{acl_ace}}) + 3, @acl_parts;
 } # }}}1
 
 1;
