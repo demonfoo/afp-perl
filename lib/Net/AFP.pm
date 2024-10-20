@@ -2121,9 +2121,10 @@ sub FPGetSrvrMsg { # {{{1
             $MessageBitmap), \$resp);
     return $rc if $rc != $kFPNoErr;
     my ($Length, $ServerMessage);
+    # FIXME: Not sure if this is quite right...
     if ($MessageBitmap & 0x2) { # bit 1; means send message as UTF8
         ($Length, $MessageType, $MessageBitmap, $ServerMessage) =
-                unpack q{S>S>S>a*}, $resp;
+                unpack q{S>S>S>S>/a}, $resp;
         $ServerMessage = compose(decode_utf8($ServerMessage));
     }
     else { # not UTF8, just a plain pstring (?)
@@ -3243,8 +3244,7 @@ sub FPSetACL { # {{{1
                 if not exists $options{acl_flags};
         my @ace_list = map {
             UUID::parse(${$_}{ace_applicable}, $tmp);
-            pack q{a[16]L>L>}, $tmp,
-                    @{$_}{qw[ace_flags ace_rights]};
+            pack q{a[16]L>L>}, $tmp, @{$_}{qw[ace_flags ace_rights]};
         } @{$options{acl_ace}};
         $msg .= pack sprintf(q{L>L>(a*)[%d]}, scalar(@ace_list)), scalar(@ace_list),
             $options{acl_flags}, @ace_list;

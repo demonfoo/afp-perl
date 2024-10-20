@@ -33,8 +33,7 @@ sub globalTimeOffset {
     local %ENV;
     ##no critic qw(RequireLocalizedPunctuationVars)
     $ENV{TZ} = q{GMT};
-    my $time = mktime(0, 0, 0, 1, 0, 100);
-    return $time;
+    return mktime(0, 0, 0, 1, 0, 100);
 }
 
 # Parsers for assorted reply types will be placed here. This isn't really
