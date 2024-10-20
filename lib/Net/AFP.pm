@@ -327,9 +327,31 @@ sub FPAccess { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper({@options}) });
     my %options = validate(@options, {
-        VolumeID    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
-        Bitmap      => { type => SCALAR, default => 0 },
+        VolumeID    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        Bitmap      => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    $_[0] == 0
+                },
+            },
+            default   => 0
+        },
         UUID        => {
             type    => SCALAR,
             regex   => qr{\A[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}\z}ism,
@@ -374,8 +396,22 @@ sub FPAddAPPL { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper({@options}) });
     my %options = validate(@options, {
-        DTRefNum    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        DTRefNum    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FileCreator => { type => SCALAR },
         ApplTag     => { type => SCALAR },
         PathType    => {
@@ -402,8 +438,22 @@ sub FPAddComment { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper({@options}) });
     my %options = validate(@options, {
-        DTRefNum    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        DTRefNum    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType    => {
             type        => SCALAR,
             callbacks   => {
@@ -430,7 +480,14 @@ sub FPAddIcon { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper({@options}) });
     my %options = validate(@options, {
-        DTRefNum    => { type => SCALAR },
+        DTRefNum    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FileCreator => { type => SCALAR },
         FileType    => { type => SCALAR },
         IconType    => { type => SCALAR },
@@ -457,9 +514,30 @@ sub _brlock_common { # {{{1
                 'valid flags' => sub { not ~0x81 & $_[0] },
             }
         },
-        OForkRefNum => { type => SCALAR },
-        Offset      => { type => SCALAR },
-        Length      => { type => SCALAR },
+        OForkRefNum => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        Offset      => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        Length      => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
     } );
 
     my $msg = pack qq{CCS${lf_mask}${lf_mask}}, $cmd,
@@ -489,9 +567,21 @@ sub _catsrch_common { # {{{1
       (caller 4)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID            => { type => SCALAR },
+        VolumeID            => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         ReqMatches          => {
-            type            => SCALAR,
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
         },
         CatalogPosition     => {
             type            => SCALAR,
@@ -533,20 +623,25 @@ sub _catsrch_common { # {{{1
             optional    => 1,
         },
         ParentDirID         => {
-            type        => SCALAR,
-            optional    => 1,
+            type      => SCALAR,
+            optional  => 1,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                }
+            },
         },
         CreateDate          => {
             type        => SCALAR | ARRAYREF,
             callbacks   => {
                 'value check' => sub {
                     if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
+                        return 0 if scalar(@{$_[0]}) != 2;
+                        return 0 if not looks_like_number($_[0]->[0]);
+                        looks_like_number($_[0]->[1]);
                     }
                     else {
-                        return 1 if not looks_like_number($_[0]);
+                        looks_like_number($_[0]);
                     }
                 },
             },
@@ -557,12 +652,12 @@ sub _catsrch_common { # {{{1
             callbacks   => {
                 'value check' => sub {
                     if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
+                        return 0 if scalar(@{$_[0]}) != 2;
+                        return 0 if not looks_like_number($_[0]->[0]);
+                        looks_like_number($_[0]->[1]);
                     }
                     else {
-                        return 1 if not looks_like_number($_[0]);
+                        looks_like_number($_[0]);
                     }
                 },
             },
@@ -573,12 +668,12 @@ sub _catsrch_common { # {{{1
             callbacks   => {
                 'value check' => sub {
                     if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
+                        return 9 if scalar(@{$_[0]}) != 2;
+                        return 0 if not looks_like_number($_[0]->[0]);
+                        looks_like_number($_[0]->[1]);
                     }
                     else {
-                        return 1 if not looks_like_number($_[0]);
+                        looks_like_number($_[0]);
                     }
                 },
             },
@@ -602,12 +697,12 @@ sub _catsrch_common { # {{{1
             callbacks   => {
                 'value check' => sub {
                     if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
+                        return 0 if scalar(@{$_[0]}) != 2;
+                        return 0 if not looks_like_number($_[0]->[0]);
+                        looks_like_number($_[0]->[1]);
                     }
                     else {
-                        return 1 if not looks_like_number($_[0]);
+                        looks_like_number($_[0]);
                     }
                 },
             },
@@ -618,12 +713,12 @@ sub _catsrch_common { # {{{1
             callbacks   => {
                 'value check' => sub {
                     if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
+                        return 0 if scalar(@{$_[0]}) != 2;
+                        return 0 if not looks_like_number($_[0]->[0]);
+                        looks_like_number($_[0]->[1]);
                     }
                     else {
-                        return 1 if not looks_like_number($_[0]);
+                        looks_like_number($_[0]);
                     }
                 },
             },
@@ -634,12 +729,12 @@ sub _catsrch_common { # {{{1
             callbacks   => {
                 'value check' => sub {
                     if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
+                        return 0 if scalar(@{$_[0]}) != 2;
+                        return 0 if not looks_like_number($_[0]->[0]);
+                        looks_like_number($_[0]->[1]);
                     }
                     else {
-                        return 1 if not looks_like_number($_[0]);
+                        looks_like_number($_[0]);
                     }
                 },
             },
@@ -650,12 +745,12 @@ sub _catsrch_common { # {{{1
             callbacks   => {
                 'value check' => sub {
                     if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
+                        return 0 if scalar(@{$_[0]}) != 2;
+                        return 0 if not looks_like_number($_[0]->[0]);
+                        looks_like_number($_[0]->[1]);
                     }
                     else {
-                        return 1 if not looks_like_number($_[0]);
+                        looks_like_number($_[0]);
                     }
                 },
             },
@@ -666,12 +761,12 @@ sub _catsrch_common { # {{{1
             callbacks   => {
                 'value check' => sub {
                     if (ref($_[0]) eq q{ARRAY}) {
-                        return 1 if scalar(@{$_[0]}) != 2;
-                        return 1 if not looks_like_number($_[0]->[0]);
-                        return 1 if not looks_like_number($_[0]->[1]);
+                        return 0 if scalar(@{$_[0]}) != 2;
+                        return 0 if not looks_like_number($_[0]->[0]);
+                        looks_like_number($_[0]->[1]);
                     }
                     else {
-                        return 1 if not looks_like_number($_[0]);
+                        looks_like_number($_[0]);
                     }
                 },
             },
@@ -859,13 +954,16 @@ sub FPChangePassword { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($UAM, $UserName, $UserAuthInfo, $resp_r) =
-            validate_pos(@options,
-                { type => SCALAR },
-                { type => SCALAR },
-                { type => SCALAR, optional => 1, default => q{} },
-                { type      => SCALARREF,
-                  optional  => 1,
-                  default   => *bar{SCALAR} });
+      validate_pos(@options,
+        { type => SCALAR },
+        { type => SCALAR },
+        { type => SCALAR, optional => 1, default => q{} },
+        {
+            type      => SCALARREF,
+            optional  => 1,
+            default   => *bar{SCALAR}
+        },
+    );
 
     my $msg = pack q{CxC/a*x![s]C/a*x![s]a*}, $kFPChangePassword, $UAM,
             $UserName, $UserAuthInfo;
@@ -877,8 +975,24 @@ sub FPCloseDir { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($VolumeID, $DirectoryID) =
-            validate_pos(@options, { type => SCALAR }, { type => SCALAR });
+    my($VolumeID, $DirectoryID) = validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     return $self->SendAFPMessage(pack q{CxS>L>}, $kFPCloseDir, $VolumeID,
             $DirectoryID);
@@ -889,7 +1003,16 @@ sub FPCloseDT { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($DTRefNum) = validate_pos(@options, { type => SCALAR });
+    my($DTRefNum) = validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     return $self->SendAFPMessage(pack q{CxS>}, $kFPCloseDT, $DTRefNum);
 } # }}}1
@@ -899,7 +1022,16 @@ sub FPCloseFork { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
+    my($OForkRefNum) = validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     return $self->SendAFPMessage(pack(q{CxS>}, $kFPCloseFork, $OForkRefNum),
             undef, 1);
@@ -910,7 +1042,16 @@ sub FPCloseVol { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($VolumeID) = validate_pos(@options, { type => SCALAR });
+    my($VolumeID) = validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     return $self->SendAFPMessage(pack(q{CxS>}, $kFPCloseVol, $VolumeID),
             undef, 1);
@@ -922,10 +1063,38 @@ sub FPCopyFile { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        SourceVolumeID      => { type => SCALAR },
-        SourceDirectoryID   => { type => SCALAR },
-        DestVolumeID        => { type => SCALAR },
-        DestDirectoryID     => { type => SCALAR },
+        SourceVolumeID      => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        SourceDirectoryID   => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DestVolumeID        => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DestDirectoryID     => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         SourcePathType      => {
             type        => SCALAR,
             callbacks   => {
@@ -973,11 +1142,25 @@ sub FPCreateDir { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        VolumeID    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType    => {
-            type        => SCALAR,
-            callbacks   => {
+            type      => SCALAR,
+            callbacks => {
                 'valid path type' => sub {
                     $_[0] == $kFPShortName || $_[0] == $kFPLongName ||
                     $_[0] == $kFPUTF8Name
@@ -1003,19 +1186,41 @@ sub FPCreateFile { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-             VolumeID       => { type => SCALAR },
-             DirectoryID    => { type => SCALAR },
-             PathType       => {
-                 type       => SCALAR,
-                 callbacks  => {
-                     'valid path type' => sub {
-                         $_[0] == $kFPShortName || $_[0] == $kFPLongName ||
-                         $_[0] == $kFPUTF8Name
-                     }
-                 }
-             },
-             Pathname       => { type => SCALAR },
-             Flag           => { type => SCALAR, default => 0 },
+        VolumeID       => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        PathType       => {
+            type       => SCALAR,
+            callbacks  => {
+                'valid path type' => sub {
+                    $_[0] == $kFPShortName || $_[0] == $kFPLongName ||
+                    $_[0] == $kFPUTF8Name
+                }
+            }
+        },
+        Pathname       => { type => SCALAR },
+        Flag           => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    not ~0x80 & $_[0]
+                },
+            },
+            default   => 0,
+        },
     } );
 
     return $self->SendAFPMessage(pack(q{CCS>L>a*}, $kFPCreateFile,
@@ -1029,8 +1234,22 @@ sub FPCreateID { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        VolumeID    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType    => {
             type        => SCALAR,
             callbacks   => {
@@ -1061,20 +1280,35 @@ sub FPDelete { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($VolumeID, $DirectoryID, $PathType, $Pathname) =
-            validate_pos(@options,
-                { type => SCALAR },
-                { type => SCALAR },
-                {
-                    type => SCALAR,
-                    callbacks  => {
-                        'valid path type' => sub {
-                            $_[0] == $kFPShortName ||
-                            $_[0] == $kFPLongName ||
-                            $_[0] == $kFPUTF8Name
-                        }
-                    }
+      validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
                 },
-                { type => SCALAR });
+            },
+        },
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            }
+        },
+        {
+            type       => SCALAR,
+            callbacks  => {
+                'valid path type' => sub {
+                    $_[0] == $kFPShortName ||
+                    $_[0] == $kFPLongName ||
+                    $_[0] == $kFPUTF8Name
+                }
+            }
+        },
+        { type => SCALAR },
+    );
 
     return $self->SendAFPMessage(pack(q{CxS>L>a*}, $kFPDelete, $VolumeID,
             $DirectoryID, PackagePath($PathType, $Pathname)), undef, 1);
@@ -1086,7 +1320,23 @@ sub FPDeleteID { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($VolumeID, $FileID) = validate_pos(@options,
-            { type => SCALAR }, { type => SCALAR });
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     return $self->SendAFPMessage(pack q{CxS>L>}, $kFPDeleteID, $VolumeID,
             $FileID);
@@ -1097,8 +1347,11 @@ sub FPDisconnectOldSession { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
+    # FIXME: Maybe validate these better?
     my($Type, $Token) = validate_pos(@options,
-            { type => SCALAR }, { type => SCALAR });
+        { type => SCALAR },
+        { type => SCALAR },
+    );
 
     return $self->SendAFPMessage(pack q{CxS>L>/a}, $kFPDisconnectOldSession,
             $Type, $Token);
@@ -1113,8 +1366,22 @@ sub _enum_common { # {{{1
       (caller 4)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID        => { type => SCALAR },
-        DirectoryID     => { type => SCALAR },
+        VolumeID        => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID     => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FileBitmap      => {
             type        => SCALAR,
             default     => 0,
@@ -1129,9 +1396,30 @@ sub _enum_common { # {{{1
                 'valid bitmap' => sub { not ~0xBFFF & $_[0] },
             },
         },
-        ReqCount        => { type => SCALAR },
-        StartIndex      => { type => SCALAR },
-        MaxReplySize    => { type => SCALAR },
+        ReqCount        => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        StartIndex      => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        MaxReplySize    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType        => {
             type        => SCALAR,
             callbacks   => {
@@ -1196,9 +1484,30 @@ sub FPExchangeFiles { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID            => { type => SCALAR },
-        SourceDirectoryID   => { type => SCALAR },
-        DestDirectoryID     => { type => SCALAR },
+        VolumeID            => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        SourceDirectoryID   => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DestDirectoryID     => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         SourcePathType      => {
             type        => SCALAR,
             callbacks   => {
@@ -1233,7 +1542,16 @@ sub FPFlush { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($VolumeID) = validate_pos(@options, { type => SCALAR });
+    my($VolumeID) = validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     return $self->SendAFPMessage(pack(q{CxS>}, $kFPFlush, $VolumeID),
             undef, 1);
@@ -1244,7 +1562,16 @@ sub FPFlushFork { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
+    my($OForkRefNum) = validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     return $self->SendAFPMessage(pack(q{CxS>}, $kFPFlushFork, $OForkRefNum),
             undef, 1);
@@ -1256,8 +1583,22 @@ sub FPGetACL { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID        => { type => SCALAR },
-        DirectoryID     => { type => SCALAR },
+        VolumeID        => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID     => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         Bitmap          => {
             type        => SCALAR,
             default     => $kFileSec_ACL,
@@ -1269,7 +1610,15 @@ sub FPGetACL { # {{{1
                 },
             }
         },
-        MaxReplySize    => { type => SCALAR, default => 0 },
+        MaxReplySize    => {
+            type      => SCALAR,
+            default   => 0,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType        => {
             type        => SCALAR,
             callbacks   => {
@@ -1325,7 +1674,14 @@ sub FPGetAPPL { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        DTRefNum    => { type => SCALAR },
+        DTRefNum    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FileCreator => { type => SCALAR },
         APPLIndex   => { type => SCALAR },
         Bitmap      => {
@@ -1360,23 +1716,25 @@ sub FPGetAuthMethods { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($Flags, $PathType, $Pathname, $resp_r) = validate_pos(@options,
-            {
-                type        => SCALAR,
-                callbacks   => {
-                    'valid flags' => sub { $_[0] == 0 }
+        {
+            type        => SCALAR,
+            callbacks   => {
+                # FIXME: Can we validate this better?
+                'valid flags' => sub { $_[0] == 0 }
+            }
+        },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == $kFPShortName || $_[0] == $kFPLongName ||
+                    $_[0] == $kFPUTF8Name
                 }
-            },
-            {
-                type        => SCALAR,
-                callbacks   => {
-                    'valid path type' => sub {
-                        $_[0] == $kFPShortName || $_[0] == $kFPLongName ||
-                        $_[0] == $kFPUTF8Name
-                    }
-                }
-            },
-            { type => SCALAR },
-            { type => SCALARREF });
+            }
+        },
+        { type => SCALAR },
+        { type => SCALARREF },
+    );
 
     my $msg = pack q{CxCa*}, $kFPGetAuthMethods, $Flags,
             PackagePath($PathType, $Pathname);
@@ -1394,8 +1752,22 @@ sub FPGetComment { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        DTRefNum    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        DTRefNum    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType    => {
             type        => SCALAR,
             callbacks   => {
@@ -1427,8 +1799,22 @@ sub FPGetExtAttr { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID        => { type => SCALAR },
-        DirectoryID     => { type => SCALAR },
+        VolumeID        => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID     => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         Bitmap          => {
             type        => SCALAR,
             default     => 0,
@@ -1452,7 +1838,15 @@ sub FPGetExtAttr { # {{{1
                 'valid count' => sub { $_[0] == -1 },
             },
         },
-        MaxReplySize    => { type => SCALAR, default => 0 },
+        MaxReplySize    => {
+            type      => SCALAR,
+            default   => 0,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType        => {
             type        => SCALAR,
             callbacks   => {
@@ -1491,8 +1885,22 @@ sub FPGetFileDirParms { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID        => { type => SCALAR },
-        DirectoryID     => { type => SCALAR },
+        VolumeID        => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID     => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FileBitmap      => {
             type        => SCALAR,
             default     => 0,
@@ -1535,14 +1943,24 @@ sub FPGetForkParms { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($OForkRefNum, $Bitmap, $resp_r) = validate_pos(@options,
-            { type => SCALAR },
-            {
-                type        => SCALAR,
-                callbacks   => {
-                    'valid bitmap' => sub { not ~0xFFFF & $_[0] }
-                }
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
             },
-            { type => SCALARREF });
+        },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub {
+                    not ~0xFFFF & $_[0]
+                }
+            }
+        },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack(q{CxS>S>}, $kFPGetForkParms,
@@ -1558,7 +1976,14 @@ sub FPGetIcon { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        DTRefNum    => { type => SCALAR },
+        DTRefNum    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FileCreator => { type => SCALAR },
         FileType    => { type => SCALAR },
         IconType    => { type => SCALAR },
@@ -1579,11 +2004,19 @@ sub FPGetIconInfo { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($DTRefNum, $FileCreator, $IconIndex, $resp_r) =
-            validate_pos(@options,
-                { type => SCALAR },
-                { type => SCALAR },
-                { type => SCALAR },
-                { type => SCALARREF });
+      validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        { type => SCALAR },
+        { type => SCALAR },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $msg = pack q{CxS>L>S>}, $kFPGetIconInfo, $DTRefNum, $FileCreator,
@@ -1601,18 +2034,27 @@ sub FPGetSessionToken { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($Type, $timeStamp, $ID, $resp_r) = validate_pos(@options,
-            {
-                type        => SCALAR,
-                callbacks   => {
-                    'valid type' => sub {
-                        $_[0] >= $kLoginWithoutID &&
-                            $_[0] <= $kGetKerberosSessionKey
-                    }
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid type' => sub {
+                    $_[0] >= $kLoginWithoutID &&
+                        $_[0] <= $kGetKerberosSessionKey
                 }
+            }
+        },
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
             },
-            { type => SCALAR, optional => 1 },
-            { type => SCALAR, optional => 1, default => q{} },
-            { type => SCALARREF });
+            optional  => 1,
+        },
+        { type => SCALAR, optional => 1, default => q{} },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $pack_mask = q{CxS>L>};
@@ -1658,20 +2100,21 @@ sub FPGetSrvrMsg { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($MessageType, $MessageBitmap, $resp_r) =
-            validate_pos(@options,
-                {
-                    type        => SCALAR,
-                    callbacks   => {
-                        'valid type' => sub { $_[0] == 0 || $_[0] == 1 }
-                    }
-                },
-                {
-                    type        => SCALAR,
-                    callbacks   => {
-                        'valid bitmap' => sub { not ~0x3 & $_[0] }
-                    }
-                },
-                { type => SCALARREF });
+      validate_pos(@options,
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid type' => sub { $_[0] == 0 || $_[0] == 1 }
+            }
+        },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub { not ~0x3 & $_[0] }
+            }
+        },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack(q{CxS>S>}, $kFPGetSrvrMsg, $MessageType,
@@ -1740,22 +2183,22 @@ sub FPGetUserInfo { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($Flags, $UserID, $Bitmap, $resp_r) =
-            validate_pos(@options,
-                {
-                    type        => SCALAR,
-                    callbacks   => {
-                        'valid type' => sub { not ~0x1 & $_[0] }
-                    }
-                },
-                { type => SCALAR },
-                {
-                    type        => SCALAR,
-                    callbacks   => {
-                        'valid bitmap' => sub { not ~0x7 & $_[0] }
-                    }
-                },
-                { type => SCALARREF });
+    my($Flags, $UserID, $Bitmap, $resp_r) = validate_pos(@options,
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid type' => sub { not ~0x1 & $_[0] }
+            }
+        },
+        { type => SCALAR },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub { not ~0x7 & $_[0] }
+            }
+        },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack(q{CCL>S>}, $kFPGetUserInfo, $Flags,
@@ -1801,14 +2244,22 @@ sub FPGetVolParms { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($VolumeID, $Bitmap, $resp_r) = validate_pos(@options,
-            { type => SCALAR },
-            {
-                type        => SCALAR,
-                callbacks   => {
-                    'valid bitmap' => sub { not ~0xFFF & $_[0] }
-                }
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
             },
-            { type => SCALARREF });
+        },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub { not ~0xFFF & $_[0] }
+            }
+        },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack(q{CxS>S>}, $kFPGetVolParms, $VolumeID,
@@ -1824,8 +2275,22 @@ sub FPListExtAttrs { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID        => { type => SCALAR },
-        DirectoryID     => { type => SCALAR },
+        VolumeID        => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID     => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         Bitmap          => {
             type        => SCALAR,
             default     => 0,
@@ -1833,15 +2298,31 @@ sub FPListExtAttrs { # {{{1
                 'valid flags' => sub { $_[0] == $kXAttrNoFollow },
             }
         },
-        ReqCount        => { type => SCALAR, default => 0 },
+        ReqCount        => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         StartIndex      => {
             type        => SCALAR,
             default     => 0,
             callbacks   => {
                 'valid index' => sub { $_[0] == 0 },
-            }
+            },
         },
-        MaxReplySize    => { type => SCALAR, default => 0 },
+        MaxReplySize    => {
+            type        => SCALAR,
+            default     => 0,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType        => {
             type        => SCALAR,
             callbacks   => {
@@ -1880,11 +2361,11 @@ sub FPLogin { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($AFPVersion, $UAM, $UserAuthInfo) =
-            validate_pos(@options,
-                { type => SCALAR },
-                { type => SCALAR },
-                { type => SCALAR, optional => 1, default => q{} });
+    my($AFPVersion, $UAM, $UserAuthInfo) = validate_pos(@options,
+        { type => SCALAR },
+        { type => SCALAR },
+        { type => SCALAR, optional => 1, default => q{} }
+    );
 
     my $msg = pack q{CC/a*C/a*a*}, $kFPLogin, $AFPVersion, $UAM,
             $UserAuthInfo;
@@ -1905,14 +2386,15 @@ sub FPLogin { # {{{1
 sub FPLoginCont { # {{{1
     my ($self, @options) = @_;
 
-    my($ID, $UserAuthInfo, $resp_r) =
-            validate_pos(@options,
-                { type => SCALAR, optional => 1 },
-                { type => SCALAR, optional => 1, default => q{} },
-                { type      => SCALARREF,
-                  optional  => 1,
-                  default   => *foo{SCALAR}
-                });
+    my($ID, $UserAuthInfo, $resp_r) = validate_pos(@options,
+        { type => SCALAR, optional => 1 },
+        { type => SCALAR, optional => 1, default => q{} },
+        {
+            type      => SCALARREF,
+            optional  => 1,
+            default   => *foo{SCALAR},
+        }
+    );
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([$ID, unpack(q{H*}, $UserAuthInfo), $resp_r]) });
 
@@ -2019,19 +2501,19 @@ sub FPMapID { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($Subfunction, $ID, $resp_r) =
-            validate_pos(@options,
-                {
-                    type        => SCALAR,
-                    callbacks   => {
-                        'valid subfunction' => sub {
-                            $_[0] >= $kUserIDToName &&
-                                    $_[0] <= $kGroupUUIDToUTF8Name
-                        }
-                    }
-                },
-                { type => SCALAR },
-                { type => SCALARREF });
+    my($Subfunction, $ID, $resp_r) = validate_pos(@options,
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid subfunction' => sub {
+                    $_[0] >= $kUserIDToName &&
+                      $_[0] <= $kGroupUUIDToUTF8Name
+                }
+            }
+        },
+        { type => SCALAR },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $pack_mask = q{CC};
@@ -2074,19 +2556,19 @@ sub FPMapName { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($Subfunction, $Name, $resp_r) =
-            validate_pos(@options,
-                {
-                    type        => SCALAR,
-                    callbacks   => {
-                        'valid subfunction' => sub {
-                            $_[0] >= $kNameToUserID &&
-                                    $_[0] <= $kUTF8NameToGroupUUID
-                        }
-                    }
-                },
-                { type => SCALAR },
-                { type => SCALARREF });
+    my($Subfunction, $Name, $resp_r) = validate_pos(@options,
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid subfunction' => sub {
+                    $_[0] >= $kNameToUserID &&
+                            $_[0] <= $kUTF8NameToGroupUUID
+                }
+            }
+        },
+        { type => SCALAR },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $pack_mask = q{CC};
@@ -2137,9 +2619,30 @@ sub FPMoveAndRename { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID            => { type => SCALAR },
-        SourceDirectoryID   => { type => SCALAR },
-        DestDirectoryID     => { type => SCALAR },
+        VolumeID            => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        SourceDirectoryID   => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DestDirectoryID     => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         SourcePathType      => {
             type        => SCALAR,
             callbacks   => {
@@ -2188,8 +2691,22 @@ sub FPOpenDir { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        VolumeID    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType    => {
             type        => SCALAR,
             callbacks   => {
@@ -2217,8 +2734,16 @@ sub FPOpenDT { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($VolumeID, $resp_r) = validate_pos(@options,
-            { type => SCALAR },
-            { type => SCALARREF });
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $rc = $self->SendAFPMessage(pack(q{CxS>}, $kFPOpenDT, $VolumeID),
@@ -2241,8 +2766,22 @@ sub FPOpenFork { # {{{1
                 'valid flag bits' => sub { not ~0x80 & $_[0] },
             },
         },
-        VolumeID    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        VolumeID    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         Bitmap      => {
             type        => SCALAR,
             default     => 0,
@@ -2289,17 +2828,17 @@ sub FPOpenVol { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($Bitmap, $VolumeName, $Password, $resp_r) =
-            validate_pos(@options,
-            {
-                type        => SCALAR,
-                callbacks   => {
-                    'valid bitmap' => sub { not ~0xFFF & $_[0] }
-                }
-            },
-            { type => SCALAR },
-            { type => SCALAR | UNDEF, optional => 1, default => q{} },
-            { type => SCALARREF });
+    my($Bitmap, $VolumeName, $Password, $resp_r) = validate_pos(@options,
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub { not ~0xFFF & $_[0] }
+            }
+        },
+        { type => SCALAR },
+        { type => SCALAR | UNDEF, optional => 1, default => q{} },
+        { type => SCALARREF },
+    );
 
     # Make sure the VolID bit is set, because it's kind of necessary.
     $Bitmap |= $kFPVolIDBit;
@@ -2335,9 +2874,30 @@ sub _read_common { # {{{1
       (caller 4)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        OForkRefNum => { type => SCALAR },
-        Offset      => { type => SCALAR },
-        ReqCount    => { type => SCALAR },
+        OForkRefNum => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        Offset      => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        ReqCount    => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         (defined $extraopts and ref($extraopts) eq 'HASH') ? %{$extraopts} : (),
     } );
 
@@ -2382,8 +2942,22 @@ sub FPRemoveAPPL { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        DTRefNum    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        DTRefNum    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FileCreator => { type => SCALAR },
         PathType    => {
             type        => SCALAR,
@@ -2409,20 +2983,35 @@ sub FPRemoveComment { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($DTRefNum, $DirectoryID, $PathType, $Pathname) =
-            validate_pos(@options,
-                { type => SCALAR },
-                { type => SCALAR },
-                {
-                    type        => SCALAR,
-                    callbacks   => {
-                        'valid path type' => sub {
-                            $_[0] == $kFPShortName ||
-                            $_[0] == $kFPLongName ||
-                            $_[0] == $kFPUTF8Name
-                        }
-                    }
+      validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
                 },
-                { type => SCALAR });
+            },
+        },
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                    $_[0] == $kFPShortName ||
+                    $_[0] == $kFPLongName ||
+                    $_[0] == $kFPUTF8Name
+                }
+            }
+        },
+        { type => SCALAR }
+    );
 
     my $msg = pack q{CxS>L>a*}, $kFPRemoveComment, $DTRefNum, $DirectoryID,
             PackagePath($PathType, $Pathname);
@@ -2435,8 +3024,22 @@ sub FPRemoveExtAttr { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        VolumeID    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         Bitmap      => {
             type        => SCALAR,
             default     => 0,
@@ -2472,8 +3075,22 @@ sub FPRename { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID    => { type => SCALAR },
-        DirectoryID => { type => SCALAR },
+        VolumeID    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         PathType    => {
             type        => SCALAR,
             callbacks   => {
@@ -2508,27 +3125,33 @@ sub FPResolveID { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($VolumeID, $FileID, $Bitmap, $resp_r) =
-            validate_pos(@options,
-                { type => SCALAR },
-                { type => SCALAR },
-                {
-                    type        => SCALAR,
-                    callbacks   => {
-                        'valid bitmap' => sub { not ~0xFFFF & $_[0] }
-                    }
+    my($VolumeID, $FileID, $Bitmap, $resp_r) = validate_pos(@options,
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
                 },
-                { type => SCALARREF });
+            },
+        },
+        { type => SCALAR },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub { not ~0xFFFF & $_[0] }
+            }
+        },
+        { type => SCALARREF },
+    );
 
     my $resp;
     my $msg = pack q{CxS>L>S>}, $kFPResolveID, $VolumeID, $FileID, $Bitmap;
     my $rc = $self->SendAFPMessage($msg, \$resp);
     return($rc) if $rc != $kFPNoErr;
     my($Bitmap_n, $data) = unpack q{S>a*}, $resp;
-    my $info = ParseFileParms($Bitmap_n, $data);
     ${$resp_r} = {
                    Bitmap               => $Bitmap_n,
-                   RequestedParameters  => $info,
+                   RequestedParameters  => ParseFileParms($Bitmap_n, $data),
                  };
     return $rc;
 } # }}}1
@@ -2539,34 +3162,56 @@ sub FPSetACL { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-            VolumeID    => { type => SCALAR },
-            DirectoryID => { type => SCALAR },
-            Bitmap      => {
-                type        => SCALAR,
-                default     => $kFileSec_ACL,
-                callbacks   => {
-                    'valid flags' => sub {
-                        my $mask = $kFileSec_UUID | $kFileSec_GRPUUID |
-                                $kFileSec_ACL | $kFileSec_REMOVEACL |
-                                $kFileSec_Inherit;
-                        not $_[0] & ~$mask;
-                    },
-                }
+        VolumeID    => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
             },
-            PathType    => {
-                type        => SCALAR,
-                callbacks   => {
-                    'valid path type' => sub {
-                         $_[0] == $kFPShortName || $_[0] == $kFPLongName ||
-                         $_[0] == $kFPUTF8Name
-                    }
-                }
+        },
+        DirectoryID => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
             },
-            Pathname    => { type => SCALAR },
-            UUID        => { type => SCALAR, optional => 1 },
-            GRPUUID     => { type => SCALAR, optional => 1 },
-            acl_ace     => { type => ARRAYREF, optional => 1 },
-            acl_flags   => { type => SCALAR, optional => 1 },
+        },
+        Bitmap      => {
+            type        => SCALAR,
+            default     => $kFileSec_ACL,
+            callbacks   => {
+                'valid flags' => sub {
+                    my $mask = $kFileSec_UUID | $kFileSec_GRPUUID |
+                            $kFileSec_ACL | $kFileSec_REMOVEACL |
+                            $kFileSec_Inherit;
+                    not $_[0] & ~$mask;
+                },
+            }
+        },
+        PathType    => {
+            type        => SCALAR,
+            callbacks   => {
+                'valid path type' => sub {
+                     $_[0] == $kFPShortName || $_[0] == $kFPLongName ||
+                     $_[0] == $kFPUTF8Name
+                }
+            }
+        },
+        Pathname    => { type => SCALAR },
+        UUID        => {
+            type     => SCALAR,
+            regex    => qr{\A[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}\z}ism,
+            optional => 1,
+        },
+        GRPUUID     => {
+            type     => SCALAR,
+            regex    => qr{\A[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}\z}ism,
+            optional => 1,
+        },
+        acl_ace     => { type => ARRAYREF, optional => 1 },
+        acl_flags   => { type => SCALAR, optional => 1 },
     } );
 
     my $msg = pack q{CxS>L>S>a*x![s]}, $kFPSetACL,
@@ -2613,8 +3258,22 @@ sub FPSetDirParms { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID            => { type => SCALAR },
-        DirectoryID         => { type => SCALAR },
+        VolumeID            => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID         => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         Bitmap              => {
             type            => SCALAR,
             default         => 0,
@@ -2640,9 +3299,30 @@ sub FPSetDirParms { # {{{1
         },
         Pathname            => { type => SCALAR },
         Attributes          => { type => SCALAR, optional => 1 },
-        CreateDate          => { type => SCALAR, optional => 1 },
-        ModDate             => { type => SCALAR, optional => 1 },
-        BackupDate          => { type => SCALAR, optional => 1 },
+        CreateDate          => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        ModDate             => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        BackupDate          => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FinderInfo          => { type => SCALAR, optional => 1 },
         OwnerID             => { type => SCALAR, optional => 1 },
         GroupID             => { type => SCALAR, optional => 1 },
@@ -2669,8 +3349,22 @@ sub FPSetExtAttr { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID        => { type => SCALAR },
-        DirectoryID     => { type => SCALAR },
+        VolumeID        => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID     => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         Bitmap          => {
             type        => SCALAR,
             default     => 0,
@@ -2717,8 +3411,22 @@ sub FPSetFileDirParms { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID            => { type => SCALAR },
-        DirectoryID         => { type => SCALAR },
+        VolumeID            => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID         => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         Bitmap              => {
             type            => SCALAR,
             default         => 0,
@@ -2742,9 +3450,30 @@ sub FPSetFileDirParms { # {{{1
         },
         Pathname            => { type => SCALAR },
         Attributes          => { type => SCALAR, optional => 1 },
-        CreateDate          => { type => SCALAR, optional => 1 },
-        ModDate             => { type => SCALAR, optional => 1 },
-        BackupDate          => { type => SCALAR, optional => 1 },
+        CreateDate          => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        ModDate             => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        BackupDate          => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FinderInfo          => { type => SCALAR, optional => 1 },
         UnixUID             => { type => SCALAR, optional => 1 },
         UnixGID             => { type => SCALAR, optional => 1 },
@@ -2768,8 +3497,22 @@ sub FPSetFileParms { # {{{1
       (caller 3)[3], Dumper({@options}) });
 
     my %options = validate(@options, {
-        VolumeID            => { type => SCALAR },
-        DirectoryID         => { type => SCALAR },
+        VolumeID            => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        DirectoryID         => {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         Bitmap              => {
             type            => SCALAR,
             default         => 0,
@@ -2794,9 +3537,30 @@ sub FPSetFileParms { # {{{1
         },
         Pathname            => { type => SCALAR },
         Attributes          => { type => SCALAR, optional => 1 },
-        CreateDate          => { type => SCALAR, optional => 1 },
-        ModDate             => { type => SCALAR, optional => 1 },
-        BackupDate          => { type => SCALAR, optional => 1 },
+        CreateDate          => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        ModDate             => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        BackupDate          => {
+            type            => SCALAR,
+            callbacks       => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         FinderInfo          => { type => SCALAR, optional => 1 },
         UnixUID             => { type => SCALAR, optional => 1 },
         UnixGID             => { type => SCALAR, optional => 1 },
@@ -2822,14 +3586,31 @@ sub FPSetForkParms { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($OForkRefNum, $Bitmap, $ForkLen) = validate_pos(@options,
-            { type => SCALAR },
-            {
-                type        => SCALAR,
-                callbacks   => {
-                    'valid bitmap' => sub { not ~0x4E00 & $_[0] }
-                }
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
             },
-            { type => SCALAR });
+        },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub {
+                    not ~0x4E00 & $_[0]
+                }
+            }
+        },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     my $packed = undef;
     if (($Bitmap & $kFPDataForkLenBit) or
@@ -2850,16 +3631,32 @@ sub FPSetVolParms { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($VolumeID, $Bitmap, $BackupDate) =
-            validate_pos(@options,
-                { type => SCALAR },
-                {
-                    type        => SCALAR,
-                    callbacks   => {
-                        'valid bitmap' => sub { not ~0x0010 & $_[0] }
-                    }
+    my($VolumeID, $Bitmap, $BackupDate) = validate_pos(@options,
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
                 },
-                { type => SCALAR });
+            },
+        },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid bitmap' => sub {
+                    not ~0x0010 & $_[0]
+                }
+            }
+        },
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
     return $self->SendAFPMessage(pack(q{CxS>S>L>}, $kFPSetVolParms, $VolumeID,
             $Bitmap, $BackupDate), undef, 1);
 } # }}}1
@@ -2870,8 +3667,23 @@ sub FPSyncDir { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($VolumeID, $DirectoryID) = validate_pos(@options,
-            { type => SCALAR },
-            { type => SCALAR });
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        {
+            type      => SCALAR,
+            callbacks => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     return $self->SendAFPMessage(pack(q{CxS>L>}, $kFPSyncDir, $VolumeID,
             $DirectoryID), undef, 1);
@@ -2882,7 +3694,16 @@ sub FPSyncFork { # {{{1
     $self->{logger}->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([@options]) });
 
-    my($OForkRefNum) = validate_pos(@options, { type => SCALAR });
+    my($OForkRefNum) = validate_pos(@options,
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+    );
 
     return $self->SendAFPMessage(pack(q{CxS>}, $kFPSyncFork, $OForkRefNum),
             undef, 1);
@@ -2901,10 +3722,32 @@ sub _write_common { # {{{1
                 'valid flag bits' => sub { not ~0x80 & $_[0] },
             },
         },
-        OForkRefNum => { type => SCALAR },
-        Offset      => { type => SCALAR },
+        OForkRefNum => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
+        Offset      => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+        },
         ForkData    => { type => SCALARREF, optional => 1 },
-        ReqCount    => { type => SCALAR, optional => 1 },
+        ReqCount    => {
+            type        => SCALAR,
+            callbacks   => {
+                'value check' => sub {
+                    looks_like_number($_[0]);
+                },
+            },
+            optional    => 1,
+        },
         FromFH      => { type => HANDLE, optional => 1 },
     } );
     $options{ReqCount} ||= length ${$options{ForkData}};
@@ -2937,14 +3780,15 @@ sub FPZzzzz { # {{{1
       (caller 3)[3], Dumper([@options]) });
 
     my($Flags) = validate_pos(@options,
-            {
-                type        => SCALAR,
-                callbacks   => {
-                    'valid flags' => sub { not ~0x3 & $_[0] }
-                },
-                optional    => 1,
-                default     => 0
-            });
+        {
+            type        => SCALAR,
+            callbacks   => {
+                'valid flags' => sub { not ~0x3 & $_[0] }
+            },
+            optional    => 1,
+            default     => 0
+        },
+    );
 
     return $self->SendAFPMessage(pack q{CxL>}, $kFPZzzzz, $Flags);
 } # }}}1
