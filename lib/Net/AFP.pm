@@ -189,138 +189,6 @@ sub PackagePath { # {{{1
     croak;
 } # }}}1
 
-my @ParamsList = (
-                   {
-                     FlagBit       => $kFPAttributeBit,
-                     PackTemplate  => 'S>',
-                     OptionNames   => ['Attributes'],
-                   },
-                   {
-                     FlagBit       => $kFPCreateDateBit,
-                     FixupFunction => sub { return $_[0] - globalTimeOffset },
-                     PackTemplate  => 'l>',
-                     OptionNames   => ['CreateDate'],
-                   },
-                   {
-                     FlagBit       => $kFPModDateBit,
-                     FixupFunction => sub { return $_[0] - globalTimeOffset },
-                     PackTemplate  => 'l>',
-                     OptionNames   => ['ModDate'],
-                   },
-                   {
-                     FlagBit       => $kFPBackupDateBit,
-                     FixupFunction => sub { return $_[0] - globalTimeOffset },
-                     PackTemplate  => 'l>',
-                     OptionNames   => ['BackupDate'],
-                   },
-                   {
-                     FlagBit       => $kFPFinderInfoBit,
-                     PackTemplate  => 'a[32]',
-                     OptionNames   => ['FinderInfo'],
-                   },
-                   {
-                     FlagBit       => $kFPLongNameBit,
-                     PackTemplate  => 'C/a*',
-                     OptionNames   => ['LongName'],
-                     FixupFunction => sub { encode('MacRoman', $_[0]) },
-                   },
-                   {
-                     FlagBit       => $kFPShortNameBit,
-                     PackTemplate  => 'C/a*',
-                     OptionNames   => ['ShortName'],
-                     FixupFunction => sub { encode('MacRoman', $_[0]) },
-                   },
-                   {
-                     FlagBit       => $kFPDataForkLenBit,
-                     PackTemplate  => 'L>',
-                     OptionNames   => ['DataForkLen'],
-                     MustBeFile    => 1,
-                   },
-                   {
-                     FlagBit       => $kFPOffspringCountBit,
-                     PackTemplate  => 'L>',
-                     OptionNames   => ['OffspringCount'],
-                     MustBeDir     => 1,
-                   },
-                   {
-                     FlagBit       => $kFPRsrcForkLenBit,
-                     PackTemplate  => 'L>',
-                     OptionNames   => ['RsrcForkLen'],
-                     MustBeFile    => 1,
-                   },
-                   {
-                     FlagBit       => $kFPOwnerIDBit,
-                     PackTemplate  => 'L>',
-                     OptionNames   => ['OwnerID'],
-                     MustBeDir     => 1,
-                   },
-                   {
-                     FlagBit       => $kFPExtDataForkLenBit,
-                     PackTemplate  => 'Q>',
-                     OptionNames   => ['ExtDataForkLen'],
-                     MustBeFile    => 1,
-                   },
-                   {
-                     FlagBit       => $kFPGroupIDBit,
-                     PackTemplate  => 'L>',
-                     OptionNames   => ['GroupID'],
-                     MustBeDir     => 1,
-                   },
-                   # $kFPLaunchLimitBit? what it do? can has knows?
-                   {
-                     FlagBit       => $kFPLaunchLimitBit,
-                     PackTemplate  => 'L>',
-                     OptionNames   => ['LaunchLimit'],
-                     MustBeFile    => 1,
-                   },
-                   {
-                     FlagBit       => $kFPAccessRightsBit,
-                     PackTemplate  => 'L>',
-                     OptionNames   => ['AccessRights'],
-                     MustBeDir     => 1,
-                   },
-                   {
-                     FlagBit       => $kFPUTF8NameBit,
-                     PackTemplate  => 'S>/a*',
-                     OptionNames   => ['UTF8Name'],
-                     FixupFunction => sub { encode_utf8(decompose($_[0])) },
-                   },
-                   {
-                     FlagBit       => $kFPExtRsrcForkLenBit,
-                     PackTemplate  => 'Q>',
-                     OptionNames   => ['ExtRsrcForkLen'],
-                     MustBeFile    => 1,
-                   },
-                   {
-                     FlagBit       => $kFPUnixPrivsBit,
-                     PackTemplate  => 'L>L>L>L>',
-                     OptionNames   => [qw{UnixUID UnixGID UnixPerms UnixAccessRights}],
-                   },
-                 );
-
-sub PackSetParams { # {{{1
-    my ($Bitmap, $is_file, %options) = @_;
-
-    my $ParamsBlock = q{};
-
-    foreach my $Param (@ParamsList) {
-        if ($Bitmap & ${$Param}{FlagBit}) {
-            next if $is_file == 1 && exists ${$Param}{MustBeDir} && ${$Param}{MustBeDir} == 1;
-            next if $is_file == 0 && exists ${$Param}{MustBeFile} && ${$Param}{MustBeFile} == 1;
-            foreach my $optnam (@{${$Param}{OptionNames}}) {
-                return if not exists $options{$optnam};
-            }
-            my @values = @options{@{${$Param}{OptionNames}}};
-            if (exists ${$Param}{FixupFunction}) {
-                @values = &{${$Param}{FixupFunction}}(@values);
-            }
-            $ParamsBlock .= pack ${$Param}{PackTemplate}, @values;
-        }
-    }
-
-    return $ParamsBlock;
-} # }}}1
-
 sub FPAccess { # {{{1
     my($self, @options) = @_;
 
@@ -898,20 +766,20 @@ sub _catsrch_common { # {{{1
         }
     }
 
-    my $is_file = 2;
+    my $is_dir = undef;
     if ($options{DirectoryRsltBitmap} == 0) {
-        $is_file = 1;
+        $is_dir = 0;
     }
     elsif ($options{FileRsltBitmap} == 0) {
-        $is_file = 0;
+        $is_dir = 1;
     }
     my $msg = pack q{CxS>L>x[4]a[16]S>S>L>}, $cmd,
             @options{qw[VolumeID ReqMatches CatalogPosition FileRsltBitmap
             DirectoryRsltBitmap]}, $Bitmap;
-    my $params = PackSetParams($Bitmap, $is_file, %Specification1);
+    my $params = PackSetParams($Bitmap, $is_dir, %Specification1);
     $msg .= pack sprintf(q{C%s/a}, $sl_pad), length($params), $params;
     if ($is_range == 1) {
-        $params = PackSetParams($Bitmap, $is_file, %Specification2);
+        $params = PackSetParams($Bitmap, $is_dir, %Specification2);
         $msg .= pack q{Cx/a}, length($params), $params;
     }
 
@@ -3334,7 +3202,7 @@ sub FPSetDirParms { # {{{1
         UnixAccessRights    => { type => SCALAR, optional => 1 },
     } );
 
-    my $ParamsBlock = PackSetParams($options{Bitmap}, 0, %options);
+    my $ParamsBlock = PackSetParams($options{Bitmap}, 1, %options);
     return $kFPParamErr if not defined $ParamsBlock;
 
     my $msg = pack q{CxS>L>S>a*x![s]a*}, $kFPSetDirParms,
@@ -3482,7 +3350,7 @@ sub FPSetFileDirParms { # {{{1
         UnixAccessRights    => { type => SCALAR, optional => 1 },
     } );
 
-    my $ParamsBlock = PackSetParams($options{Bitmap}, 1, %options);
+    my $ParamsBlock = PackSetParams($options{Bitmap}, 0, %options);
     return $kFPParamErr if not defined $ParamsBlock;
 
     my $msg = pack q{CxS>L>S>a*x![s]a*}, $kFPSetFileDirParms,
@@ -3569,7 +3437,7 @@ sub FPSetFileParms { # {{{1
         UnixAccessRights    => { type => SCALAR, optional => 1 },
     } );
 
-    my $ParamsBlock = PackSetParams($options{Bitmap}, 1, %options);
+    my $ParamsBlock = PackSetParams($options{Bitmap}, 0, %options);
     if (not defined $ParamsBlock) {
         return $kFPParamErr;
     }
