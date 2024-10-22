@@ -44,6 +44,96 @@ sub globalTimeOffset {
 # Net::AFP package and its inheritors. Not that anyone else would
 # really know what to do with them anyway.
 
+my @VolParmFlags = (
+    {
+        bitval      => $kFPVolAttributeBit,
+        fields      => ['Attribute'],
+        mask        => q{S>},
+        len         => 2,
+    },
+    {
+        bitval      => $kFPVolSignatureBit,
+        fields      => ['Signature'],
+        mask        => q{S>},
+        len         => 2,
+    },
+    {
+        bitval      => $kFPVolCreateDateBit,
+        fields      => ['CreateDate'],
+        mask        => q{l>},
+        len         => 4,
+        parse_fixup => sub { $_[1] += globalTimeOffset; },
+    },
+    {
+        bitval      => $kFPVolModDateBit,
+        fields      => ['ModDate'],
+        mask        => q{l>},
+        len         => 4,
+        parse_fixup => sub { $_[1] += globalTimeOffset; },
+    },
+    {
+        bitval      => $kFPVolBackupDateBit,
+        fields      => ['BackupDate'],
+        mask        => q{l>},
+        len         => 4,
+        parse_fixup => sub { $_[1] += globalTimeOffset; },
+    },
+    {
+        bitval      => $kFPVolIDBit,
+        fields      => ['ID'],
+        mask        => q{S>},
+        len         => 2,
+    },
+    {
+        bitval      => $kFPVolBytesFreeBit,
+        fields      => ['BytesFree'],
+        mask        => q{L>},
+        len         => 4,
+    },
+    {
+        bitval      => $kFPVolBytesTotalBit,
+        fields      => ['BytesTotal'],
+        mask        => q{L>},
+        len         => 4,
+    },
+    {
+        bitval      => $kFPVolNameBit,
+        fields      => ['Name'],
+        stroff      => q{S>},
+        len         => 2,
+        mask        => q{C/a},
+        parse_fixup => sub {
+            # if we're using AFP 3.0 or later, these are UTF8.
+            if (Net::AFP::Versions::CompareByVersionNum($_[0], 3, 0,
+                    $kFPVerAtLeast)) {
+                $_[1] = compose(decode_utf8($_[1]));
+            }
+            else {
+                $_[1] = decode(q{MacRoman}, $_[1]);
+            }
+        },
+    },
+    {
+        bitval      => $kFPVolExtBytesFreeBit,
+        fields      => ['ExtBytesFree'],
+        mask        => q{Q>},
+        len         => 8,
+    },
+    {
+        bitval      => $kFPVolExtBytesTotalBit,
+        fields      => ['ExtBytesTotal'],
+        mask        => q{Q>},
+        len         => 8,
+    },
+    {
+        bitval      => $kFPVolBlockSizeBit,
+        fields      => ['BlockSize'],
+        mask        => q{L>},
+        len         => 4,
+    },
+
+);
+
 # FPGetVolParms and FPOpenVol will both need this to parse volume
 # parameter info from the server.
 sub ParseVolParms { # {{{1
@@ -52,80 +142,29 @@ sub ParseVolParms { # {{{1
     $logger->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([unpack(q{H*}, $data), $obj]) });
 
-    my $offset = 2;
-    my $Bitmap = unpack q{S>}, $data;
-    my $resp = {};
+    (my $Bitmap, $data) = unpack q{S>a*}, $data;
+    my $offset = 0;
+    my $resp   = {};
 
-    if ($Bitmap & $kFPVolAttributeBit) {
-        $resp->{Attribute} = unpack sprintf(q{x[%d]S>}, $offset), $data;
-        $offset += 2;
-    }
-
-    if ($Bitmap & $kFPVolSignatureBit) {
-        $resp->{Signature} = unpack sprintf(q{x[%d]S>}, $offset), $data;
-        $offset += 2;
-    }
-
-    if ($Bitmap & $kFPVolCreateDateBit) {
-        $resp->{CreateDate} = unpack(sprintf(q{x[%d]l>}, $offset), $data) +
-                globalTimeOffset;
-        $offset += 4;
-    }
-
-    if ($Bitmap & $kFPVolModDateBit) {
-        $resp->{ModDate} = unpack(sprintf(q{x[%d]l>}, $offset), $data) +
-                globalTimeOffset;
-        $offset += 4;
-    }
-
-    if ($Bitmap & $kFPVolBackupDateBit) {
-        $resp->{BackupDate} = unpack(sprintf(q{x[%d]l>}, $offset), $data) +
-                globalTimeOffset;
-        $offset += 4;
-    }
-
-    if ($Bitmap & $kFPVolIDBit) {
-        $resp->{ID} = unpack sprintf(q{x[%d]S>}, $offset), $data;
-        $offset += 2;
-    }
-
-    if ($Bitmap & $kFPVolBytesFreeBit) {
-        $resp->{BytesFree} = unpack sprintf(q{x[%d]L>}, $offset), $data;
-        $offset += 4;
-    }
-
-    if ($Bitmap & $kFPVolBytesTotalBit) {
-        $resp->{BytesTotal} = unpack sprintf(q{x[%d]L>}, $offset), $data;
-        $offset += 4;
-    }
-
-    if ($Bitmap & $kFPVolNameBit) {
-        my $name_off = unpack sprintf(q{x[%d]S>}, $offset), $data;
-        $offset += 2;
-
-        $resp->{Name} = unpack sprintf(q{x[%d]C/a}, $name_off + 2), $data;
-        if (Net::AFP::Versions::CompareByVersionNum($obj, 3, 0,
-                $kFPVerAtLeast)) {
-            $resp->{Name} = compose(decode_utf8($resp->{Name}));
+    my(@values, $pos);
+    # rather than having the function spell each one out, let's structure
+    # the flag handlers and use a loop.
+    foreach my $item (@VolParmFlags) {
+        if ($Bitmap & ${$item}{bitval}) {
+            if (exists ${$item}{stroff}) { # it's a string offset
+                $pos = unpack sprintf(q{x[%d]%s}, $offset, ${$item}{stroff}), $data;
+                $offset += exists ${$item}{len} ? ${$item}{len} : 2;
+                @values = unpack sprintf(q{x[%d]%s}, $pos, ${$item}{mask}), $data;
+            }
+            else {
+                @values = unpack sprintf(q{x[%d]%s}, $offset, ${$item}{mask}), $data;
+                $offset += ${$item}{len};
+            }
+            if (exists ${$item}{parse_fixup}) {
+                &{${$item}{parse_fixup}}($obj, @values);
+            }
+            @{$resp}{@{${$item}{fields}}} = @values;
         }
-        else {
-            $resp->{Name} = decode(q{MacRoman}, $resp->{Name});
-        }
-    }
-
-    if ($Bitmap & $kFPVolExtBytesFreeBit) {
-        $resp->{ExtBytesFree} = unpack sprintf(q{x[%d]Q>}, $offset), $data;
-        $offset += 8;
-    }
-
-    if ($Bitmap & $kFPVolExtBytesTotalBit) {
-        $resp->{ExtBytesTotal} = unpack sprintf(q{x[%d]Q>}, $offset), $data;
-        $offset += 8;
-    }
-
-    if ($Bitmap & $kFPVolBlockSizeBit) {
-        $resp->{BlockSize} = unpack sprintf(q{x[%d]L>}, $offset), $data;
-        $offset += 4;
     }
 
     return $resp;
