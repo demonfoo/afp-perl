@@ -507,8 +507,8 @@ sub _parse_common { # {{{1
                 @values = unpack sprintf(q{x[%d]%s}, $offset, ${$item}{mask}), $data;
                 $offset += ${$item}{len};
             }
-            if (exists ${$item}{fixup}) {
-                &{${$item}{fixup}}(@values);
+            if (exists ${$item}{parse_fixup}) {
+                &{${$item}{parse_fixup}}(@values);
             }
             @{$resp}{@{${$item}{fields}}} = @values;
         }
