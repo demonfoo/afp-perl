@@ -2029,7 +2029,7 @@ sub FPGetSrvrParms { # {{{1
     # 1 Jan 2000 00:00 GMT (I think GMT, anyway). Good call, Apple...
     @{$data = {}}{qw(ServerTime Volumes)} =
       ($time + globalTimeOffset, []);
-    my($flags, $volname);
+    my($flags, $volname, $volinfo);
     while (($flags, $volname) = splice @volinfo, 0, 2) {
         if (Net::AFP::Versions::CompareByVersionNum($self, 3, 0,
                 $kFPVerAtLeast)) {
@@ -2042,9 +2042,22 @@ sub FPGetSrvrParms { # {{{1
         # bit; ethereal seems to think it's the second bit, not the high
         # bit. I'll have to see how to turn that on somewhere to find out.
         # Also, looks like the HasUNIXPrivs bit is gone as of AFP 3.2...
-        push @{${$data}{Volumes}}, { HasPassword    => $flags & 0x80,
-                                     HasConfigInfo  => $flags & 0x01,
-                                     VolName        => $volname };
+        $volinfo = { HasPassword    => $flags & 0x80,
+                     HasConfigInfo  => $flags & 0x01,
+                     VolName        => $volname };
+        if (Net::AFP::Versions::CompareByVersionNum($self, 3, 2,
+          $kFPVerAtLeast)) {
+            ${$volinfo}{HasUNIXPrivs} = 1;
+        }
+        # I _think_ that was the right bit...
+        elsif ($flags & 0x02) {
+            ${$volinfo}{HasUNIXPrivs} = 1;
+        }
+        else {
+            ${$volinfo}{HasUNIXPrivs} = 0;
+        }
+
+        push @{${$data}{Volumes}}, $volinfo;
     }
     ${$resp_r} = $data;
     return $rc;
