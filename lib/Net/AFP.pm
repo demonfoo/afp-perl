@@ -748,6 +748,8 @@ sub _catsrch_common { # {{{1
                 croak('Attempted to include dir flag with no dir bits set?');
             }
             if (ref($options{${$item}{name}}) eq q{ARRAY}) {
+                # if both is 0, it can only be in Specification1, i.e. it
+                # can't be ranged
                 if (not ${$item}{both}) {
                     carp(sprintf q{Option "%s" can't be in both search specs},
                       ${$item}{name});
@@ -758,6 +760,7 @@ sub _catsrch_common { # {{{1
             }
             elsif (ref($options{${$item}{name}}) eq q{}) {
                 $Specification1{$key} = $options{${$item}{name}};
+                # only set it in Specification1, that's okay
                 if (not ${$item}{both}) {
                     $Specification2{$key} = $options{${$item}{name}};
                 }
@@ -3114,7 +3117,7 @@ sub FPSetACL { # {{{1
             UUID::parse(${$_}{ace_applicable}, $tmp);
             pack q{a[16]L>L>}, $tmp, @{$_}{qw[ace_flags ace_rights]};
         } @{$options{acl_ace}};
-        $msg .= pack sprintf(q{L>L>(a*)[%d]}, scalar(@ace_list)), scalar(@ace_list),
+        $msg .= pack sprintf(q{L>L>(a*)[%d]}, scalar @ace_list), scalar(@ace_list),
             $options{acl_flags}, @ace_list;
     }
 

@@ -203,10 +203,10 @@ sub ParseSrvrInfo { # {{{1
         }
     }
 
-    @{$resp}{qw[ServerName Flags MachineType AFPVersions UAMs]}  =
+    @{$resp}{qw[ServerName Flags MachineType AFPVersions UAMs]} =
       ($srvname, $flags, unpack(sprintf(q{x[%d]C/a}, $machtype_off), $data),
       [unpack sprintf(q{x[%d]C/(C/a)}, $afpvers_off), $data],
-      [unpack sprintf(q{x[%d]C/(C/a)}, $uams_off), $data]);
+      [unpack sprintf(q{x[%d]C/(C/a)}, $uams_off), $data],);
 
     # The server icon is deprecated as of AFP 3.0.
     if ($icon_off) {
@@ -319,6 +319,7 @@ sub ParseFileDirParms { # {{{1
     my ($FileBitmap, $DirectoryBitmap, $IsFileDir, $ReqParams) =
             unpack q{S>S>Cxa*}, $data;
 
+    #return(_parse_common(($IsFileDir & 0x80) ? $DirectoryBitmap : $FileBitmap, $ReqParams, ($IsFileDir & 0x80) ? q{dir} : q{file}, ($IsFileDir & 0x80) ? 1 : 0));
     if ($IsFileDir & 0x80) { # This is a directory
         return ParseDirParms($DirectoryBitmap, $ReqParams);
     }
@@ -535,7 +536,7 @@ sub _parse_common { # {{{1
 
     my(@values, $pos);
     foreach my $item (@FileDirParmFlags) {
-        next unless ${$item}{$typekey} == 1;
+        next if ${$item}{$typekey} != 1;
         if ($Bitmap & ${$item}{bitval}) {
             if (exists ${$item}{stroff}) { # it's a string offset
                 $pos = unpack sprintf(q{x[%d]%s}, $offset, ${$item}{stroff}), $data;
@@ -557,10 +558,12 @@ sub _parse_common { # {{{1
     return $resp;
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub ParseFileParms { # {{{1
     return(_parse_common(@_[0, 1], q{file}, 0));
 } # }}}1
 
+##no critic qw(RequireArgUnpacking)
 sub ParseDirParms { # {{{1
     return(_parse_common(@_[0, 1], q{dir}, 1));
 } # }}}1
