@@ -54,6 +54,7 @@ if (-d $incpath) {
 # Try including each of them via eval, so that if they explode, it won't
 # impair our ability to continue on.
 foreach my $uampath (@uampaths) {
+    ## no critic qw(ProhibitEnumeratedClasses)
     if (($OSNAME ne 'MSWin32' and $uampath !~ m{^/}sm) or
       ($OSNAME eq 'MSWin32' and $uampath !~ m{[A-Z]:[/\\]}sm)) {
         $uampath = q{./} . $uampath;
@@ -61,7 +62,7 @@ foreach my $uampath (@uampaths) {
     eval {
         require $uampath;
     } or do {
-        carp(sprintf qq{Couldn't include "%s":\n%s\nThis error is not fatal; other UAMs will be tried.}, $uampath, $@);
+        carp(sprintf qq{Couldn't include "%s":\n%s\nThis error is not fatal; other UAMs will be tried.}, $uampath, $EVAL_ERROR);
     }
 }
 
