@@ -239,41 +239,41 @@ _EOT_
             push @xpm_rows, $line;
         }
         $icon_text .= join(",\n", @xpm_rows) . "};\n";
-        $resp->{VolumeIcon} = $icon_text;
+        ${$resp}{VolumeIcon} = $icon_text;
     }
 
     if ($flags & $kSrvrSig) {
-        $resp->{ServerSignature} = substr $data, $sig_off, 16;
+        ${$resp}{ServerSignature} = substr $data, $sig_off, 16;
     }
 
     if ($flags & $kSupportsUTF8SrvrName) {
-        $resp->{UTF8ServerName} =
+        ${$resp}{UTF8ServerName} =
           compose(decode_utf8(unpack sprintf(q{x[%d]S>/a}, $utf8name_off),
           $data));
     }
 
     if (($flags & $kSupportsTCP) && $addrs_off) {
-        $resp->{NetworkAddresses} = [ map {
+        ${$resp}{NetworkAddresses} = [ map {
             my($entryType, $packed) = unpack q{xCa*}, $_;
             my $addrEnt = {};
 
             if ($entryType == 1) { # Packed IP address
-                $addrEnt->{family}  = AF_INET;
-                $addrEnt->{address} = inet_ntop(AF_INET, $packed);
+                ${$addrEnt}{family}  = AF_INET;
+                ${$addrEnt}{address} = inet_ntop(AF_INET, $packed);
             }
             if ($entryType == 2) { # Packed IP address + port
                 my($addr, $port) = unpack q{a[4]S>}, $packed;
-                $addrEnt->{family}  = AF_INET;
-                $addrEnt->{address} = inet_ntop(AF_INET, $addr);
-                $addrEnt->{port}    = $port;
+                ${$addrEnt}{family}  = AF_INET;
+                ${$addrEnt}{address} = inet_ntop(AF_INET, $addr);
+                ${$addrEnt}{port}    = $port;
             }
             if ($entryType == 3) { # Packed DDP (AppleTalk) address
-                $addrEnt->{family}  = AF_APPLETALK;
-                $addrEnt->{address} = sprintf '%u.%u', unpack q{S>Cx}, $packed;
-                $addrEnt->{port}    = unpack q{x[3]C}, $packed;
+                ${$addrEnt}{family}  = AF_APPLETALK;
+                ${$addrEnt}{address} = sprintf '%u.%u', unpack q{S>Cx}, $packed;
+                ${$addrEnt}{port}    = unpack q{x[3]C}, $packed;
             }
             if ($entryType == 4) { # Just the DNS name
-                $addrEnt->{hostname} = $packed;
+                ${$addrEnt}{hostname} = $packed;
             }
             if ($entryType == 5) { # IPv4 using SSH tunnel
                 # Apple's docs say this is a packed IP and port; the netatalk
@@ -281,18 +281,18 @@ _EOT_
                 # hostname. Wouldn't be the first time Apple's docs lied.
                 # This type is deprecated.
                 #print "SSH tunnel type - not sure what needs to be added to handle this right\n";
-                $addrEnt->{hostname}   = $packed;
-                $addrEnt->{ssh_tunnel} = 1;
+                ${$addrEnt}{hostname}   = $packed;
+                ${$addrEnt}{ssh_tunnel} = 1;
             }
             if ($entryType == 6) { # Packed IPv6 address
-                $addrEnt->{family}  = AF_INET6;
-                $addrEnt->{address} = inet_ntop(AF_INET6, $packed);
+                ${$addrEnt}{family}  = AF_INET6;
+                ${$addrEnt}{address} = inet_ntop(AF_INET6, $packed);
             }
             if ($entryType == 7) { # Packed IPv6 address + port
                 my($addr, $port) = unpack q{a[16]S>}, $packed;
-                $addrEnt->{family}  = AF_INET6;
-                $addrEnt->{address} = inet_ntop(AF_INET6, $addr);
-                $addrEnt->{port}    = $port;
+                ${$addrEnt}{family}  = AF_INET6;
+                ${$addrEnt}{address} = inet_ntop(AF_INET6, $addr);
+                ${$addrEnt}{port}    = $port;
             }
             if ($entryType < 1 || $entryType > 7) { # unknown value?
                 $logger->info('unknown address type ', $entryType, ', skipping');
@@ -303,7 +303,7 @@ _EOT_
     }
 
     if ($flags & $kSupportsDirServices) {
-        $resp->{DirectoryNames} =
+        ${$resp}{DirectoryNames} =
           [unpack sprintf(q{x[%d]C/(C/a)}, $dirserv_off), $data];
     }
 
@@ -554,7 +554,7 @@ sub _parse_common { # {{{1
         }
     }
 
-    $resp->{FileIsDir} = $is_dir;
+    ${$resp}{FileIsDir} = $is_dir;
     return $resp;
 } # }}}1
 
