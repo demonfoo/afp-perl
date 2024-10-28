@@ -27,9 +27,9 @@ Readonly my $pw_len    => 64;
 use Crypt::Mode::CBC;
 use Crypt::PRNG qw(random_bytes);
 use Crypt::PK::DH;
+use Crypt::Misc qw(increment_octets_be);
 # Pull in the module containing all the result code symbols.
 use Net::AFP::Result;
-use Math::BigInt;
 use Net::AFP::Versions;
 use Log::Log4perl;
 
@@ -71,8 +71,6 @@ sub auth_common1 {
 sub auth_common2 {
     my($session, $message, $store_sesskey, $dh) = @_;
 
-    (my $nonce_limit = Math::BigInt->bone())->blsft($nonce_len * 8);
-
     my($Mb, $encrypted) = unpack "a[${len}]a*", $message;
     my $K = $dh->shared_secret(Crypt::PK::DH->new()->import_key_raw($Mb, 'public',
       { p => '0x' . unpack(q{H*}, pack q{C*}, @p_bytes),
@@ -98,18 +96,17 @@ sub auth_common2 {
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
     my($nonce, $sig) = unpack "a[${nonce_len}]a[16]", $decrypted;
-    $nonce = Math::BigInt->from_bytes($nonce);
     # signature should be 16 bytes of null; if it's not something has gone
     # very wrong.
     if ($sig ne qq{\0} x 16) {
         croak('encryption error - signature was not what was expected?');
     }
     undef $decrypted;
-    $session->{logger}->debug(sub { sprintf q{nonce is %s}, $nonce->as_hex() });
-    $nonce->binc();
-    $nonce = $nonce->bmod($nonce_limit);
+    $session->{logger}->debug(sub { sprintf q{nonce is %s}, unpack q{H*}, $nonce });
+    # If all bits are 1, this will throw a fatal error.
+    $nonce = increment_octets_be($nonce);
     $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
-      $nonce->as_hex() });
+      unpack q{H*}, $nonce });
 
     return($nonce, $key, $ctx);
 }
@@ -153,7 +150,7 @@ sub Authenticate {
       auth_common2($session, $resp{UserAuthInfo}, 1, $dh);
 
     my $authdata = pack "a[${nonce_len}]a[${pw_len}]",
-	                zeropad($nonce->to_bytes(), $nonce_len), &{$pw_cb}();
+	                zeropad($nonce, $nonce_len), &{$pw_cb}();
     undef $nonce;
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     undef $authdata;
@@ -200,7 +197,7 @@ sub ChangePassword {
       auth_common2($session, $message, 0, $dh);
 
     my $authdata = pack "a[${nonce_len}]a[${pw_len}]a[${pw_len}]",
-	                zeropad($nonce->to_bytes(), $nonce_len), $newPassword,
+	                zeropad($nonce, $nonce_len), $newPassword,
                     $oldPassword;
     undef $nonce;
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
