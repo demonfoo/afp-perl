@@ -137,7 +137,7 @@ Readonly our $kFPResourceDataFlag   => 0x80;
 # talk over, so we want this to be as generic as possible.
 sub new { # {{{1
     my ($class, $host, $port) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf q{called %s(host = '%s', port = '%s')},
       (caller 3)[3], $host, $port });
 
@@ -153,14 +153,14 @@ sub new { # {{{1
 # Outside callers should be using the methods implemented for the AFP
 # operations.
 sub SendAFPMessage { # {{{1
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->error(sub { sprintf q{called %s() at line %d %s}, (caller 3)[3, 2],
       ((caller 3)[1] eq q/-/ ? 'on stdin' : 'in file ' . (caller 3)[1]) });
     croak('Do not call the base class SendAFPMessage method');
 } # }}}1
 
 sub SendAFPWrite { # {{{1
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->error(sub { sprintf q{called %s() at line %d %s}, (caller 3)[3, 2],
       ((caller 3)[1] eq q/-/ ? 'on stdin' : 'in file ' . (caller 3)[1]) });
     croak('Do not call the base class SendAFPWrite method');
@@ -168,7 +168,7 @@ sub SendAFPWrite { # {{{1
 
 sub PackagePath { # {{{1
     my ($PathType, $Pathname, $NoEncType) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
 
     $Pathname ||= q//;
 

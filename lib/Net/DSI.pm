@@ -207,7 +207,7 @@ private     shared      => my %shared;
 # allow potential callers to know if the thread is in play or not.
 sub session_thread { # {{{1
     my($shared, $host, $port, %params) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     # Set up the connection to the server. Then we need to check that we've
@@ -441,7 +441,7 @@ MAINLOOP:
 
 sub new { # {{{1
     my ($class, $host, $port, %params) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $port ||= 548;
     my $obj = bless {}, $class;
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
@@ -485,7 +485,7 @@ sub new { # {{{1
 ##no critic qw(ProhibitAmbiguousNames ProhibitBuiltinHomonyms)
 sub close { # {{{1
     my ($self) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
     $shared{id $self}{exit} = 1;
     $dispatcher{id $self}->join();
@@ -512,7 +512,7 @@ sub close { # {{{1
 ##no critic qw(ProhibitManyArgs RequireArgUnpacking)
 sub SendMessage { # {{{1
     my ($self, $cmd, $message, $data_r, $d_len, $sem, $resp_r, $rc, $from_fh) = @_;
-    #my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    #my $logger = Log::Log4perl->get_logger();
     #$logger->debug(sub { sprintf q{called %s()}, (caller(3))[3] });
 
     my $ourshared = $shared{id $self};
@@ -613,7 +613,7 @@ FINISHED:
 
 sub CloseSession { # {{{1
     my ($self) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     # Issue the DSICloseSession command to the server. Apparently the
@@ -638,7 +638,7 @@ sub Command { # {{{1
 
 sub GetStatus { # {{{1
     my ($self, $resp_r) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     # Require that the caller provide a ref to stuff the reply block into.
@@ -657,7 +657,7 @@ sub GetStatus { # {{{1
 
 sub OpenSession { # {{{1
     my ($self, %options) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     my $options_packed = q{};
@@ -708,7 +708,7 @@ sub OpenSession { # {{{1
 # do dispatch duty, so it can handle things like that.
 sub Tickle { # {{{1
     my ($self) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     my $reqId = $self->SendMessage($OP_DSI_TICKLE);
@@ -718,7 +718,7 @@ sub Tickle { # {{{1
 sub Write { # {{{1
     # This should only be used for FPWrite and FPAddIcon
     my ($self, $message, $data_r, $d_len, $resp_r, $from_fh) = @_;
-    #my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    #my $logger = Log::Log4perl->get_logger();
     #$logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     my $sem;

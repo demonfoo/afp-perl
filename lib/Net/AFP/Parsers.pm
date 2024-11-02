@@ -138,7 +138,7 @@ my @VolParmFlags = (
 # parameter info from the server.
 sub ParseVolParms { # {{{1
     my ($data, $obj) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf q{called %s(%s)},
       (caller 3)[3], Dumper([unpack(q{H*}, $data), $obj]) });
 
@@ -174,7 +174,7 @@ sub ParseVolParms { # {{{1
 # FPGetSrvrInfo call.
 sub ParseSrvrInfo { # {{{1
     my ($data) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf 'called %s(%s)',
       (caller 3)[3], Dumper([unpack q{H*}, $data]) });
 
@@ -312,7 +312,7 @@ _EOT_
 
 sub ParseFileDirParms { # {{{1
     my ($data) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf 'called %s(%s)',
       (caller 3)[3], Dumper([unpack q{H*}, $data]) });
 
@@ -527,7 +527,7 @@ my @FileDirParmFlags = (
 
 sub _parse_common { # {{{1
     my($Bitmap, $data, $typekey, $is_dir) = @_;
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf 'called %s(%s)',
       (caller 4)[3], Dumper([$Bitmap, unpack q{H*}, $data]) });
 

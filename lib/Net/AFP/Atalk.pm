@@ -126,7 +126,7 @@ sub GetStatus { # {{{1
     if (ref $class) {
         croak('GetStatus() should NEVER be called against an active object');
     }
-    my $logger = Log::Log4perl->get_logger(__PACKAGE__);
+    my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf 'called %s()', (caller 3)[3] });
 
     my $obj = Net::Atalk::ASP->new($host, $port);

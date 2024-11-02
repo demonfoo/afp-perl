@@ -99,7 +99,7 @@ sub new { # {{{1
     $obj->{afpconn}         = undef;
     $obj->{volicon}         = undef;
     $obj->{_getattr_cache}  = {};
-    $obj->{logger}          = Log::Log4perl->get_logger(__PACKAGE__);
+    $obj->{logger}          = Log::Log4perl->get_logger();
 
     if (exists $opts{encoding}) {
         $encoding = $opts{encoding};
