@@ -41,7 +41,13 @@ sub new { # {{{1
     $obj->{logger}->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     $obj->{Session} = Net::DSI->new($host, $port);
-    my($rc, %opts) = $obj->{Session}->OpenSession();
+    # We need to be pushing at least the first option, and if the server
+    # speaks AFP 3.3 or later, we should ask for a replay cache, because
+    # apparently it's up to us?
+    my($rc, %opts) = $obj->{Session}->OpenSession(
+        RequestQuanta         => 1048576,
+        ServerReplayCacheSize => 128,
+    );
     $obj->{RequestQuanta} = $opts{RequestQuanta};
     if (exists $opts{ServerReplayCacheSize}) {
         $obj->{ReplayCacheSize} = $opts{ServerReplayCacheSize};
