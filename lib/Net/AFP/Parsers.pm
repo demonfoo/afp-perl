@@ -319,7 +319,6 @@ sub ParseFileDirParms { # {{{1
     my ($FileBitmap, $DirectoryBitmap, $IsFileDir, $ReqParams) =
             unpack q{S>S>Cxa*}, $data;
 
-    #return(_parse_common(($IsFileDir & 0x80) ? $DirectoryBitmap : $FileBitmap, $ReqParams, ($IsFileDir & 0x80) ? q{dir} : q{file}, ($IsFileDir & 0x80) ? 1 : 0));
     if ($IsFileDir & 0x80) { # This is a directory
         return ParseDirParms($DirectoryBitmap, $ReqParams);
     }

@@ -302,6 +302,7 @@ MAINLOOP:
                 # longer connected to the peer, so we should bail.
                 $logger->warn(sub { sprintf q{%s(): poll returned POLLHUP, but } .
                   q{this is indeterminate}, (caller 3)[3] });
+                next MAINLOOP if not $ev & ~POLLHUP;
             }
             $rb_ref = *bar{SCALAR};
             $sem_ref = undef;
@@ -644,8 +645,8 @@ sub GetStatus { # {{{1
     # Require that the caller provide a ref to stuff the reply block into.
     # This command is always going to provide a reply block, and the
     # information it contains is kind of important.
-    $logger->logcroak('resp_r must be a scalar ref')
-            if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
+    $logger->logcroak(q{resp_r must be a scalar ref})
+            if ref($resp_r) ne q{SCALAR} and ref($resp_r) ne q{REF};
     my $sem;
     my $rc;
     my $reqId = $self->SendMessage($OP_DSI_GETSTATUS, undef, undef, undef,
@@ -732,4 +733,4 @@ sub Write { # {{{1
 } # }}}1
 
 1;
-# vim: ts=4 fdm=marker ai et
+# vim: ts=4 fdm=marker ai et sw=4

@@ -133,6 +133,7 @@ sub SendAFPMessage { # {{{1
 
 # This is a virtual method which is not for public consumption. Only
 # Net::AFP methods should ever call this.
+##no critic qw(ProhibitManyArgs)
 sub SendAFPWrite { # {{{1
     my ($self, $payload, $data_r, $d_len, $resp_r, $from_fh) = @_;
     $self->{logger}->debug(sub { sprintf 'called %s()', (caller 3)[3] });
