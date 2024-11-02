@@ -442,13 +442,13 @@ MAINLOOP:
 
 sub new { # {{{1
     my ($class, $host, $port, %params) = @_;
-    my $logger = Log::Log4perl->get_logger();
-    $port ||= 548;
+    my $logger          = Log::Log4perl->get_logger();
+    $port             ||= 548;
     my $obj = bless {}, $class;
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
-    my $shared = shared_clone({});
-    %{$shared} = (
+    my $shared           = shared_clone({});
+    %{$shared}           = (
         # 0 means starting, 1 means running, -1 means stopped
         running     => 0,
         # set to 1 to stop the main loop
@@ -470,7 +470,7 @@ sub new { # {{{1
     $shared{id $obj}     = $shared;
     $logger->debug('starting session_thread');
     my $thread           = threads->create(\&session_thread, $shared, $host,
-                                             $port);
+                                             $port, %params);
     $dispatcher{id $obj} = $thread;
     ${$shared}{conn_sem}->down();
     $conn{id $obj}       = IO::Handle->new();
