@@ -281,7 +281,7 @@ MAINLOOP:
         $now = gettimeofday();
         # Scan the handlers list to see if there are any callouts that
         # haven't been responded to.
-        #$logger->debug('checking for unanswered handlers');
+        $logger->trace('checking for unanswered handlers');
         keys %{$handlers};
         while (($id, $handler) = each %{$handlers}) {
             # If we find that a transaction hasn't been responded to in at
@@ -418,16 +418,16 @@ MAINLOOP:
             $last_tickle = $now;
         }
     }
-    $logger->debug('exiting main loop');
+    $logger->trace('exiting main loop');
     ${$shared}{running} = -1;
     undef ${$shared}{conn_fd};
-    close $conn or croak q{Couldn't close the connection?};
+    close $conn or $logger->logcroak(q{Couldn't close the connection?});
 
     # Return $kFPNoServer to any still-waiting callers. (Sort of a hack to
     # deal with netatalk shutting down the connection right away when FPLogout
     # is received, instead of waiting for the client to send DSICloseSession.
     # Thanks again, netatalk. :| )
-    $logger->debug('cleaning up any pending handlers');
+    $logger->trace('cleaning up any pending handlers');
     keys %{$handlers};
     while (($id, $handler) = each %{$handlers}) {
         $handler = ${$handlers}{$id};
@@ -644,7 +644,7 @@ sub GetStatus { # {{{1
     # Require that the caller provide a ref to stuff the reply block into.
     # This command is always going to provide a reply block, and the
     # information it contains is kind of important.
-    croak('resp_r must be a scalar ref')
+    $logger->logcroak('resp_r must be a scalar ref')
             if ref($resp_r) ne 'SCALAR' and ref($resp_r) ne 'REF';
     my $sem;
     my $rc;

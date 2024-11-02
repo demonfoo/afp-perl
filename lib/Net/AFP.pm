@@ -751,8 +751,8 @@ sub _catsrch_common { # {{{1
                 # if both is 0, it can only be in Specification1, i.e. it
                 # can't be ranged
                 if (not ${$item}{both}) {
-                    carp(sprintf q{Option "%s" can't be in both search specs},
-                      ${$item}{name});
+                    $self->{logger}->logcarp(sprintf q{Option "%s" can't be } .
+                      q{in both search specs}, ${$item}{name});
                 }
                 $Specification1{$key} = $options{${$item}{name}}->[0];
                 $Specification2{$key} = $options{${$item}{name}}->[1];
