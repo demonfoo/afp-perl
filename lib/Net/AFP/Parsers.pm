@@ -103,7 +103,7 @@ my @VolParmFlags = (
         len         => 2,
         mask        => q{C/a},
         parse_fixup => sub {
-            # if we're using AFP 3.0 or later, these are UTF8.
+            # if we're using AFP 3.0 or later, this is UTF8.
             if (Net::AFP::Versions::CompareByVersionNum($_[0], 3, 0,
                     $kFPVerAtLeast)) {
                 $_[1] = compose(decode_utf8($_[1]));
