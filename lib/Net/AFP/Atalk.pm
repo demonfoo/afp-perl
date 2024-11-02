@@ -114,10 +114,18 @@ sub SendAFPMessage { # {{{1
 # This is a virtual method which is not for public consumption. Only
 # Net::AFP methods should ever call this.
 sub SendAFPWrite { # {{{1
-    my ($self, $payload, $data_r, $d_len, $resp_r) = @_;
+    my ($self, $payload, $data_r, $d_len, $resp_r, $from_fh) = @_;
     #$self->{logger}->debug(sub { sprintf 'called %s()', (caller(3))[3] });
 
     $self->CheckAttnQueue();
+    # sendfile() isn't an option for AppleTalk based sockets anyway, so
+    # the best thing to do is just to do the read ourselves if needed and
+    # pass that on...
+    if (defined $from_fh) {
+        $data_r = *quux{SCALAR};
+        ${$data_r} = q{};
+        sysread $from_fh, ${$data_r}, $d_len;
+    }
     return $self->{Session}->Write($payload, $data_r, $d_len, $resp_r);
 } # }}}1
 
