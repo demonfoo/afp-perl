@@ -170,6 +170,67 @@ sub ParseVolParms { # {{{1
     return $resp;
 } # }}}1
 
+my @AddrFields = (
+    { # packed IPv4 address
+        type        => 1,
+        parse_field => sub {
+            {
+                family  => AF_INET,
+                address => inet_ntop(AF_INET, $_[0]),
+            };
+        },
+    },
+    { # packed IPv4 address + port
+        type        => 2,
+        parse_field => sub {
+            {
+                family  => AF_INET,
+                address => inet_ntop(AF_INET, unpack q{a[4]x[s]}, $_[0]),
+                port    => unpack(q{x[4]S>}, $_[0]),
+            };
+        },
+    },
+    { # packed DDP (appletalk) address
+        type        => 3,
+        parse_field => sub {
+            {
+                family  => AF_APPLETALK,
+                address => sprintf(q{%u.%u}, unpack q{S>Cx}, $_[0]),
+                port    => unpack q{x[3]C}, $_[0],
+            };
+        },
+    },
+    { # just a DNS name
+        type        => 4,
+        parse_field => sub { { hostname => $_[0], } },
+    },
+    { # IPv4 via SSH tunnel
+        type        => 5,
+        parse_field => sub { { hostname => $_[0], ssh_tunnel => 1, } },
+    },
+    { # packed IPv6 address
+        type        => 6,
+        parse_field => sub {
+            {
+                family  => AF_INET6,
+                address => inet_ntop(AF_INET6, $_[0]),
+            };
+        },
+    },
+    { # packed IPv6 address + port
+        type        => 7,
+        parse_field => sub {
+            {
+                family  => AF_INET6,
+                address => inet_ntop(AF_INET6, unpack q{a[16]x[s]}, $_[0]),
+                port    => unpack(q{x[16]S>}, $_[0]),
+            };
+        },
+    },
+);
+
+my %AddrFieldsByType = map { ${$_}{type}, $_ } @AddrFields;
+
 # The inheriting classes will need this to parse the response to the
 # FPGetSrvrInfo call.
 sub ParseSrvrInfo { # {{{1
@@ -180,31 +241,13 @@ sub ParseSrvrInfo { # {{{1
 
     my $resp = {};
 
-    my ($machtype_off, $afpvers_off, $uams_off, $icon_off, $flags, $srvname) =
-            unpack q{S>S>S>S>S>C/a*}, $data;
+    my $machtype_off = unpack q{S>}, $data;
+    (my $afpvers_off, my $uams_off, my $icon_off,
+      @{$resp}{qw[Flags ServerName]}, my $extra) =
+            unpack q{x[s]S>S>S>S>C/a*x![s]a*}, substr $data, 0, $machtype_off;
 
-    my($sig_off, $addrs_off, $dirserv_off, $utf8name_off);
-
-    # ERRATA: On some pre-AFP-2.2 (maybe all?) implementations, there would
-    # be a bunch of space characters between the end of the ServerName
-    # field, and the start of the MachineType field.
-    my $extra_off = 11 + length $srvname;
-    if ($extra_off % 2) { $extra_off++; }
-    my $extra = substr $data, $extra_off, $machtype_off - $extra_off;
-    # If the slack space after the basic items is just spaces, ignore it.
-    if ($extra ne q{ } x length $extra) {
-        if ($machtype_off > (12 + length $srvname)) {
-            ($sig_off, $addrs_off) = unpack q{x[10]C/xx![s]S>S>}, $data;
-        }
-        # Enough room for the AFP 3.0-specific fields.
-        if ($machtype_off > (16 + length $srvname)) {
-            ($dirserv_off, $utf8name_off) = unpack q{x[10]C/xx![s]x[4]S>S>},
-                    $data;
-        }
-    }
-
-    @{$resp}{qw[ServerName Flags MachineType AFPVersions UAMs]} =
-      ($srvname, $flags, unpack(sprintf(q{x[%d]C/a}, $machtype_off), $data),
+    @{$resp}{qw[MachineType AFPVersions UAMs]} =
+      (unpack(sprintf(q{x[%d]C/a}, $machtype_off), $data),
       [unpack sprintf(q{x[%d]C/(C/a)}, $afpvers_off), $data],
       [unpack sprintf(q{x[%d]C/(C/a)}, $uams_off), $data],);
 
@@ -242,69 +285,38 @@ _EOT_
         ${$resp}{VolumeIcon} = $icon_text;
     }
 
-    if ($flags & $kSrvrSig) {
+    if (${$resp}{Flags} & $kSrvrSig) {
+        my $sig_off = unpack q{S>}, $extra;
         ${$resp}{ServerSignature} = substr $data, $sig_off, 16;
     }
 
-    if ($flags & $kSupportsUTF8SrvrName) {
+    if (${$resp}{Flags} & $kSupportsTCP) {
+        my $addrs_off = unpack q{x[s]S>}, $extra;
+        if ($addrs_off) {
+            ${$resp}{NetworkAddresses} = [ map {
+                my($entryType, $packed) = unpack q{xCa*}, $_;
+
+                if (not exists $AddrFieldsByType{$entryType}) { # unknown value?
+                    $logger->info('unknown address type ', $entryType, ', skipping');
+                    next;
+                }
+
+                &{${$AddrFieldsByType{$entryType}}{parse_field}}($packed);
+            } unpack sprintf(q{x[%d]C/(CX/a)}, $addrs_off), $data ];
+        }
+    }
+
+    if (${$resp}{Flags} & $kSupportsDirServices) {
+        my $dirserv_off = unpack q{x[ss]S>}, $extra;
+        ${$resp}{DirectoryNames} =
+          [unpack sprintf(q{x[%d]C/(C/a)}, $dirserv_off), $data];
+    }
+
+    if (${$resp}{Flags} & $kSupportsUTF8SrvrName) {
+        my $utf8name_off = unpack q{x[sss]S>}, $extra;
         ${$resp}{UTF8ServerName} =
           compose(decode_utf8(unpack sprintf(q{x[%d]S>/a}, $utf8name_off),
           $data));
-    }
-
-    if (($flags & $kSupportsTCP) && $addrs_off) {
-        ${$resp}{NetworkAddresses} = [ map {
-            my($entryType, $packed) = unpack q{xCa*}, $_;
-            my $addrEnt = {};
-
-            if ($entryType == 1) { # Packed IP address
-                ${$addrEnt}{family}  = AF_INET;
-                ${$addrEnt}{address} = inet_ntop(AF_INET, $packed);
-            }
-            if ($entryType == 2) { # Packed IP address + port
-                my($addr, $port) = unpack q{a[4]S>}, $packed;
-                ${$addrEnt}{family}  = AF_INET;
-                ${$addrEnt}{address} = inet_ntop(AF_INET, $addr);
-                ${$addrEnt}{port}    = $port;
-            }
-            if ($entryType == 3) { # Packed DDP (AppleTalk) address
-                ${$addrEnt}{family}  = AF_APPLETALK;
-                ${$addrEnt}{address} = sprintf '%u.%u', unpack q{S>Cx}, $packed;
-                ${$addrEnt}{port}    = unpack q{x[3]C}, $packed;
-            }
-            if ($entryType == 4) { # Just the DNS name
-                ${$addrEnt}{hostname} = $packed;
-            }
-            if ($entryType == 5) { # IPv4 using SSH tunnel
-                # Apple's docs say this is a packed IP and port; the netatalk
-                # docs, however, indicate this is a string containing an FQDN
-                # hostname. Wouldn't be the first time Apple's docs lied.
-                # This type is deprecated.
-                #print "SSH tunnel type - not sure what needs to be added to handle this right\n";
-                ${$addrEnt}{hostname}   = $packed;
-                ${$addrEnt}{ssh_tunnel} = 1;
-            }
-            if ($entryType == 6) { # Packed IPv6 address
-                ${$addrEnt}{family}  = AF_INET6;
-                ${$addrEnt}{address} = inet_ntop(AF_INET6, $packed);
-            }
-            if ($entryType == 7) { # Packed IPv6 address + port
-                my($addr, $port) = unpack q{a[16]S>}, $packed;
-                ${$addrEnt}{family}  = AF_INET6;
-                ${$addrEnt}{address} = inet_ntop(AF_INET6, $addr);
-                ${$addrEnt}{port}    = $port;
-            }
-            if ($entryType < 1 || $entryType > 7) { # unknown value?
-                $logger->info('unknown address type ', $entryType, ', skipping');
-                next;
-            }
-            $addrEnt;
-        } unpack sprintf(q{x[%d]C/(CX/a)}, $addrs_off), $data ];
-    }
-
-    if ($flags & $kSupportsDirServices) {
-        ${$resp}{DirectoryNames} =
-          [unpack sprintf(q{x[%d]C/(C/a)}, $dirserv_off), $data];
     }
 
     return $resp;

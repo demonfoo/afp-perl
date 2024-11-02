@@ -656,50 +656,63 @@ sub GetStatus { # {{{1
     return $reqId < 0 ? $reqId : $rc;
 } # }}}1
 
+my @OpenSessionOpts = (
+    {
+        value  => $kRequestQuanta,
+        fields => ['RequestQuanta'],
+        mask   => q{L>},
+        len    => 4,
+    },
+    {
+        value  => $kAttentionQuanta,
+        fields => ['AttentionQuanta'],
+        mask   => q{L>},
+        len    => 4,
+    },
+    {
+        value  => $kServerReplayCacheSize,
+        fields => ['ServerReplayCacheSize'],
+        mask   => q{L>},
+        len    => 4,
+    },
+);
+
+# transform to hashes indexed by numeric value and keys
+my %osoptsbyvalue = map { ${$_}{value}, $_ } @OpenSessionOpts;
+my %osoptsbyfield = map { ${$_}{fields}[0], $_ } @OpenSessionOpts;
+
 sub OpenSession { # {{{1
     my ($self, %options) = @_;
     my $logger = Log::Log4perl->get_logger();
     $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
-    my $options_packed = q{};
+    my @options_packed;
     foreach my $key (keys %options) {
-        my $opttype;
-        my $optdata;
-        if ($key eq 'RequestQuanta') {
-            $opttype = $kRequestQuanta;
-            $optdata = pack q{L>}, $options{$key};
-        } elsif ($key eq 'AttentionQuanta') {
-            $opttype = $kAttentionQuanta;
-            $optdata = pack q{L>}, $options{$key};
-        } elsif ($key eq 'ServerReplayCacheSize') {
-            $opttype = $kServerReplayCacheSize;
-            $optdata = pack q{L>}, $options{$key};
-        } else {
-            croak('Unknown option key ' . $key);
+        if (not exists $osoptsbyfield{$key}) {
+            $logger->logconfess(sprintf q{Unknown option key "%s"}, $key);
         }
-        $options_packed .=  pack q{CC/a*}, $opttype, $optdata;
+        my $item = $osoptsbyfield{$key};
+        push @options_packed, pack q{CC/a}, ${$item}{value},
+          pack ${$item}{mask}, $options{$key};
     }
 
     my $sem;
     my $rc;
     my $resp;
-    my $reqId = $self->SendMessage($OP_DSI_OPENSESSION, $options_packed, undef,
-            undef, $sem, \$resp, $rc);
+    my $reqId = $self->SendMessage($OP_DSI_OPENSESSION,
+      join(q{}, @options_packed), undef, undef, $sem, \$resp, $rc);
     return $reqId if $reqId < 0;
     $sem->down();
     push @{$shared{id $self}{sems}}, $sem;
 
     my %rcvd_opts;
-    while (length($resp) > 0) {
-        my ($opttype, $optdata) = unpack q{CC/a}, $resp;
-        if ($opttype == $kRequestQuanta) {
-            $rcvd_opts{RequestQuanta}           = unpack q{L>}, $optdata;
-        } elsif ($opttype == $kAttentionQuanta) {
-            $rcvd_opts{AttentionQuanta}         = unpack q{L>}, $optdata;
-        } elsif ($opttype == $kServerReplayCacheSize) {
-            $rcvd_opts{ServerReplayCacheSize}   = unpack q{L>}, $optdata;
+    my @opts = unpack q{(CC/a)*}, $resp;
+    while (my($type, $data) = splice @opts, 0, 2) {
+        if (not exists $osoptsbyvalue{$type}) {
+            $logger->logconfess(sprintf q{Unknown value type %d from server}, $type);
         }
-        $resp = substr $resp, 2 + length $optdata;
+        my $item = $osoptsbyvalue{$type};
+        @rcvd_opts{@{${$item}{fields}}} = unpack ${$item}{mask}, $data;
     }
     return wantarray ? ($rc, %rcvd_opts) : $rc;
 } # }}}1
