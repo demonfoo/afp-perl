@@ -229,6 +229,7 @@ my @AddrFields = (
     },
 );
 
+## no critic qw(ProhibitCommaSeparatedStatements)
 my %AddrFieldsByType = map { ${$_}{type}, $_ } @AddrFields;
 
 # The inheriting classes will need this to parse the response to the
@@ -244,7 +245,7 @@ sub ParseSrvrInfo { # {{{1
     my $machtype_off = unpack q{S>}, $data;
     (my $afpvers_off, my $uams_off, my $icon_off,
       @{$resp}{qw[Flags ServerName]}, my $extra) =
-            unpack q{x[s]S>S>S>S>C/a*x![s]a*}, substr $data, 0, $machtype_off;
+        unpack q{x[s]S>S>S>S>C/a*x![s]a*}, substr $data, 0, $machtype_off;
 
     @{$resp}{qw[MachineType AFPVersions UAMs]} =
       (unpack(sprintf(q{x[%d]C/a}, $machtype_off), $data),
@@ -603,4 +604,4 @@ sub PackSetParams { # {{{1
 } # }}}1
 
 1;
-# vim: ts=4 fdm=marker
+# vim: ts=4 fdm=marker et sw=4

@@ -154,16 +154,14 @@ sub new { # {{{1
 # operations.
 sub SendAFPMessage { # {{{1
     my $logger = Log::Log4perl->get_logger();
-    $logger->error(sub { sprintf q{called %s() at line %d %s}, (caller 3)[3, 2],
-      ((caller 3)[1] eq q/-/ ? 'on stdin' : 'in file ' . (caller 3)[1]) });
-    croak('Do not call the base class SendAFPMessage method');
+    $logger->logcroak(sub { sprintf q{called %s() at line %d %s}, (caller 3)[3, 2],
+      ((caller 3)[1] eq q{-} ? q{on stdin} : q{in file } . (caller 3)[1]) });
 } # }}}1
 
 sub SendAFPWrite { # {{{1
     my $logger = Log::Log4perl->get_logger();
-    $logger->error(sub { sprintf q{called %s() at line %d %s}, (caller 3)[3, 2],
-      ((caller 3)[1] eq q/-/ ? 'on stdin' : 'in file ' . (caller 3)[1]) });
-    croak('Do not call the base class SendAFPWrite method');
+    $logger->logcroak(sub { sprintf q{called %s() at line %d %s}, (caller 3)[3, 2],
+      ((caller 3)[1] eq q{-} ? q{on stdin} : q{in file } . (caller 3)[1]) });
 } # }}}1
 
 ##no critic qw(RequireFinalReturn)
@@ -3729,4 +3727,4 @@ sub FPZzzzz { # {{{1
 } # }}}1
 
 1;
-# vim: ts=4 fdm=marker
+# vim: ts=4 fdm=marker et sw=4

@@ -645,8 +645,9 @@ sub GetStatus { # {{{1
     # Require that the caller provide a ref to stuff the reply block into.
     # This command is always going to provide a reply block, and the
     # information it contains is kind of important.
-    $logger->logcroak(q{resp_r must be a scalar ref})
-            if ref($resp_r) ne q{SCALAR} and ref($resp_r) ne q{REF};
+    if (ref($resp_r) ne q{SCALAR} and ref($resp_r) ne q{REF}) {
+        $logger->logcroak(q{resp_r must be a scalar ref});
+    }
     my $sem;
     my $rc;
     my $reqId = $self->SendMessage($OP_DSI_GETSTATUS, undef, undef, undef,
@@ -678,7 +679,9 @@ my @OpenSessionOpts = (
 );
 
 # transform to hashes indexed by numeric value and keys
+## no critic qw(ProhibitCommaSeparatedStatements)
 my %osoptsbyvalue = map { ${$_}{value}, $_ } @OpenSessionOpts;
+## no critic qw(ProhibitCommaSeparatedStatements)
 my %osoptsbyfield = map { ${$_}{fields}[0], $_ } @OpenSessionOpts;
 
 sub OpenSession { # {{{1

@@ -101,4 +101,4 @@ sub GetStatus { # {{{1
 } # }}}1
 
 1;
-# vim: ts=4 ai fdm=marker
+# vim: ts=4 ai fdm=marker et sw=4
