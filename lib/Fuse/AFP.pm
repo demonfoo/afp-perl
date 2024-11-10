@@ -107,7 +107,7 @@ sub new { # {{{1
     }
     $obj->{local_encode} = find_encoding($encoding);
     if (not ref $obj->{local_encode}) {
-        croak 'Encoding ' . $encoding . ' was not known';
+        $obj->{logger}->logcroak(sprintf q{Encoding %s was not known}, $encoding);
     }
 
     my($session, %urlparms);
@@ -135,7 +135,7 @@ sub new { # {{{1
 
     if (not defined $urlparms{volume}) {
         $session->close();
-        croak('Unable to extract volume from AFP URL');
+        $obj->{logger}->logcroak('Unable to extract volume from AFP URL');
     }
     $obj->{afpconn} = $session;
 
@@ -396,12 +396,12 @@ sub new { # {{{1
     $obj->{callcount} = {};
     $obj->{metrics} = {
                          wr_maxsize     => 0,
-                         wr_minsize     => 2 ** 31,
+                         wr_minsize     => 1 << 31,
                          wr_totalsz     => 0,
                          wr_count       => 0,
                          wr_totaltime   => 0,
                          wr_maxtime     => 0,
-                         wr_mintime     => 2 ** 31,
+                         wr_mintime     => 1 << 31,
                        };
 
     return $obj;

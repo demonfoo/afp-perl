@@ -218,7 +218,7 @@ sub PackagePath { # {{{1
     my ($PathType, $Pathname, $NoEncType) = @_;
     my $logger = Log::Log4perl->get_logger();
 
-    $Pathname ||= q//;
+    $Pathname ||= q{};
 
     if ($PathType == $kFPShortName or $PathType == $kFPLongName) {
         return pack q{CC/a*}, $PathType, encode(q{MacRoman}, $Pathname);
