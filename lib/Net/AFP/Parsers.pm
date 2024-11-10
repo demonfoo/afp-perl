@@ -183,20 +183,22 @@ my @AddrFields = (
     { # packed IPv4 address + port
         type        => 2,
         parse_field => sub {
+            my($af, $addr, $port) = (AF_INET, unpack q{a[4]S>}, $_[0]);
             {
-                family  => AF_INET,
-                address => inet_ntop(AF_INET, unpack q{a[4]x[s]}, $_[0]),
-                port    => unpack(q{x[4]S>}, $_[0]),
+                family  => $af,
+                address => inet_ntop($af, $addr),
+                port    => $port,
             };
         },
     },
     { # packed DDP (appletalk) address
         type        => 3,
         parse_field => sub {
+            my($af, $net, $host, $port) = (AF_APPLETALK, unpack q{S>CC}, $_[0]);
             {
-                family  => AF_APPLETALK,
-                address => sprintf(q{%u.%u}, unpack q{S>Cx}, $_[0]),
-                port    => unpack q{x[3]C}, $_[0],
+                family  => $af,
+                address => sprintf(q{%u.%u}, $net, $host),
+                port    => $port,
             };
         },
     },
@@ -220,10 +222,11 @@ my @AddrFields = (
     { # packed IPv6 address + port
         type        => 7,
         parse_field => sub {
+            my($af, $addr, $port) = (AF_INET6, unpack q{a[16]S>}, $_[0]);
             {
-                family  => AF_INET6,
-                address => inet_ntop(AF_INET6, unpack q{a[16]x[s]}, $_[0]),
-                port    => unpack(q{x[16]S>}, $_[0]),
+                family  => $af,
+                address => inet_ntop($af, $addr),
+                port    => $port,
             };
         },
     },
