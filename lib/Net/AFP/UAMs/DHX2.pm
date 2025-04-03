@@ -127,7 +127,7 @@ sub auth_common2 {
 
         if ($altClientNonce ne $newClientNonce) {
             croak('encryption error - nonce check failed; ' .
-              $clientNonce->as_hex() . ' != ' . $newClientNonce->as_hex());
+              pack(q{H*}, $clientNonce) . ' != ' . pack(q{H*}, $newClientNonce));
         }
     }
     undef $clientNonce;
@@ -142,7 +142,7 @@ sub auth_common2 {
       unpack q{H*}, $serverNonce });
     $serverNonce = increment_octets_be($serverNonce);;
     $session->{logger}->debug(sub { sprintf q{serverNonce is %s after increment},
-      $serverNonce->as_hex() });
+      pack q{H*}, $serverNonce });
 
     return($serverNonce);
 }
