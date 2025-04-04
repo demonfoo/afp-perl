@@ -1386,7 +1386,7 @@ sub open { # {{{1
         return(0, \$volicon);
     }
     if ($self->{volicon} && $file eq '/autorun.inf') {
-        my $autorun_text = "[autorun]\nicon=\\.volicon.xpm\n";
+        my $autorun_text = "[autorun]\nicon=.volicon.xpm\n";
         return(0, \$autorun_text);
     }
 
