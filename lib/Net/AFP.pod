@@ -622,13 +622,257 @@ Searches a volume for files and directories that match specified criteria.
 
 Deprecated; use C<FPCatSearchExt()> instead.
 
-Not yet implemented.
+=over
+
+=item $self
+
+An object that is a subclass of Net::AFP.
+
+=item VolumeID
+
+Volume identifier.
+
+=item ReqMatches
+
+Maximum number of matches to return.
+
+=item CatalogPosition
+
+Current position in the catalog. Should not be specified if this is the first
+call; subsequent calls should pass this to get further information.
+
+=item FileRsltBitmap
+
+Bitmap describing the file parameters to get or 0 to get directory
+parameters only. Set the bit that corresponds to each desired parameter.
+This bitmap is the same as the L<FPGetFileDirParms()/FileBitmap> with some
+restrictions described later in this section.
+
+=item DirectoryRsltBitmap
+
+Bitmap describing the directory parameters to get or 0 to get file
+parameters only. Set the bit that corresponds to each desired parameter.
+This bitmap is the same as the L<FPGetFileDirParms()/DirectoryBitmap>
+with some restrictions described later in this section.
+
+=item UTF8Name
+
+The file name to search for as part of the catalog search. Must be a
+single string value.
+
+=item Attributes
+
+Attributes to match. Can be a single integer value, or an array containing
+two, with the first one containing the target value, and the second being
+a mask indicating which bits in the first value are relevant to the search.
+
+=item ParentDirID
+
+The numeric ID of the parent directory to search under.
+
+=item CreateDate
+
+Creation date/time to search, expressed as a UN*X timestamp. Can also be
+a range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item ModDate
+
+Modification date/time to search, expressed as a UN*X timestamp. Can also be
+a range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item BackupDate
+
+Backup date/time to search, expressed as a UN*X timestamp. Can also be
+a range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item FinderInfo
+
+Finder info data to search for. This can also expressed as an array containing
+two strings, the first containing the target value, and the second being a
+mask indicating which bits in the first are relevant to the search.
+
+=item LongName
+
+The file name to search for as part of the catalog search. Must be a
+single string value.
+
+=item DataForkLen
+
+Size of the data fork of the file to search for, as a number of bytes. This
+value is expressed as a 32-bit integer, so sizes are limited. Can also be a
+range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item RsrcForkLen
+
+Size of the resource fork of the file to search for, as a number of bytes. This
+value is expressed as a 32-bit integer, so sizes are limited. Can also be a
+range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item ExtDataForkLen
+
+Size of the data fork of the file to search for, as a number of bytes. This
+value is expressed as a 64-bit integer, so sizes are less limited. Can also be a
+range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item ExtRsrcForkLen
+
+Size of the resource fork of the file to search for, as a number of bytes. This
+value is expressed as a 64-bit integer, so sizes are less limited. Can also be a
+range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item OffspringCount
+
+When searching for directories, look for directories containing this number
+of items. Can also be a range, expressed as an array containing two integers,
+the lower and upper bounds being the first and second elements, respectively.
+
+=item MatchPartialNames
+
+Whether to match full file names only, or to search for a provided substring
+in the names. If true, search as substrings.
+
+=back
+
+Returns:
+
+A scalar indicating the error code from the call, and a hash reference
+containing any found items in the C<OffspringParameters> key, and a
+C<CatalogPosition> key containing the UUID for subsequent result requests.
 
 =item FPCatSearchExt()
 
 Searches a volume for files and directories that match specified criteria.
 
-Not yet implemented.
+=over
+
+=item $self
+
+An object that is a subclass of Net::AFP.
+
+=item VolumeID
+
+Volume identifier.
+
+=item ReqMatches
+
+Maximum number of matches to return.
+
+=item CatalogPosition
+
+Current position in the catalog. Should not be specified if this is the first
+call; subsequent calls should pass this to get further information.
+
+=item FileRsltBitmap
+
+Bitmap describing the file parameters to get or 0 to get directory
+parameters only. Set the bit that corresponds to each desired parameter.
+This bitmap is the same as the L<FPGetFileDirParms()/FileBitmap> with some
+restrictions described later in this section.
+
+=item DirectoryRsltBitmap
+
+Bitmap describing the directory parameters to get or 0 to get file
+parameters only. Set the bit that corresponds to each desired parameter.
+This bitmap is the same as the L<FPGetFileDirParms()/DirectoryBitmap>
+with some restrictions described later in this section.
+
+=item UTF8Name
+
+The file name to search for as part of the catalog search. Must be a
+single string value.
+
+=item Attributes
+
+Attributes to match. Can be a single integer value, or an array containing
+two, with the first one containing the target value, and the second being
+a mask indicating which bits in the first value are relevant to the search.
+
+=item ParentDirID
+
+The numeric ID of the parent directory to search under.
+
+=item CreateDate
+
+Creation date/time to search, expressed as a UN*X timestamp. Can also be
+a range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item ModDate
+
+Modification date/time to search, expressed as a UN*X timestamp. Can also be
+a range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item BackupDate
+
+Backup date/time to search, expressed as a UN*X timestamp. Can also be
+a range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item FinderInfo
+
+Finder info data to search for. This can also expressed as an array containing
+two strings, the first containing the target value, and the second being a
+mask indicating which bits in the first are relevant to the search.
+
+=item LongName
+
+The file name to search for as part of the catalog search. Must be a
+single string value.
+
+=item DataForkLen
+
+Size of the data fork of the file to search for, as a number of bytes. This
+value is expressed as a 32-bit integer, so sizes are limited. Can also be a
+range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item RsrcForkLen
+
+Size of the resource fork of the file to search for, as a number of bytes. This
+value is expressed as a 32-bit integer, so sizes are limited. Can also be a
+range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item ExtDataForkLen
+
+Size of the data fork of the file to search for, as a number of bytes. This
+value is expressed as a 64-bit integer, so sizes are less limited. Can also be a
+range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item ExtRsrcForkLen
+
+Size of the resource fork of the file to search for, as a number of bytes. This
+value is expressed as a 64-bit integer, so sizes are less limited. Can also be a
+range, expressed as an array containing two integers, the lower and upper
+bounds being the first and second elements, respectively.
+
+=item OffspringCount
+
+When searching for directories, look for directories containing this number
+of items. Can also be a range, expressed as an array containing two integers,
+the lower and upper bounds being the first and second elements, respectively.
+
+=item MatchPartialNames
+
+Whether to match full file names only, or to search for a provided substring
+in the names. If true, search as substrings.
+
+=back
+
+Returns:
+
+A scalar indicating the error code from the call, and a hash reference
+containing any found items in the C<OffspringParameters> key, and a
+C<CatalogPosition> key containing the UUID for subsequent result requests.
 
 =item FPChangePassword()
 
