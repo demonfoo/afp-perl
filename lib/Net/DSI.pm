@@ -13,6 +13,7 @@ use Log::Log4perl;
 use Data::Dumper;
 use English qw(-no_match_vars);
 use Scalar::Util ();
+use Module::Load;
 
 # Enables a nice call trace on warning events.
 use Carp;
@@ -41,78 +42,68 @@ use Fcntl qw(SEEK_CUR SEEK_SET);
 my $do_sendfile = undef;
 my %sendfile_impls = ();
 
-eval {
-    require Sys::Sendfile;
-    1;
-} and do {
-    $sendfile_impls{q{Sys::Sendfile}} = sub {
-        $_ = Sys::Sendfile::sendfile($_[1], $_[0], $_[2],
-          my $off = sysseek $_[0], 0, SEEK_CUR);
-        sysseek $_[0], $off + $_, SEEK_SET;
-        return $_;
-    };
-    $do_sendfile ||= $sendfile_impls{q{Sys::Sendfile}};
-};
-
-eval {
-    require Linux::PipeMagic;
-    1;
-} and do {
-    $sendfile_impls{q{Linux::PipeMagic}} = sub {
-        return Linux::PipeMagic::syssendfile($_[1], $_[0], $_[2]);
-    };
-    $do_sendfile ||= $sendfile_impls{q{Linux::PipeMagic}};
-};
-
-eval {
-    require Sys::Syscall;
-    1;
-} and do {
-    if (Sys::Syscall::sendfile_defined()) {
-        $sendfile_impls{q{Sys::Syscall}} = sub {
+my @sendfile_could = (
+    {
+        module  => q{Sys::Sendfile},
+        wrapper => sub {
+            $_ = Sys::Sendfile::sendfile($_[1], $_[0], $_[2],
+              my $off = sysseek $_[0], 0, SEEK_CUR);
+            sysseek $_[0], $off + $_, SEEK_SET;
+            return $_;
+        }
+    },
+    {
+        module  => q{Linux::PipeMagic},
+        wrapper => sub {
+            return Linux::PipeMagic::syssendfile($_[1], $_[0], $_[2]);
+        }
+    },
+    {
+        module  => q{Sys::Syscall},
+        wrapper => sub {
             $_ = Sys::Syscall::sendfile($_[1]->fileno, $_[0]->fileno, $_[2]);
             return $_ == -1 ? undef : $_;
-        };
-        $do_sendfile ||= $sendfile_impls{q{Sys::Syscall}};
-    }
-};
+        },
+        checkif => sub { Sys::Syscall::sendfile_defined(); }
+    },
+    {
+        module  => q{IO::SendFile},
+        wrapper => sub {
+            return IO::SendFile::sendfile($_[1]->fileno, $_[0]->fileno, $_ = 0,
+              $_[2]);
+        }
+    },
+    {
+        module  => q{Sys::Sendfile::FreeBSD},
+        wrapper => sub {
+            Sys::Sendfile::FreeBSD::sendfile($_[0]->fileno, $_[1]->fileno,
+              sysseek($_[0], 0, SEEK_CUR), $_[2], $_ = 0);
+            sysseek $_[0], $_, SEEK_CUR;
+            return $_;
+        }
+    },
+    {
+        module => q{Sys::Sendfile::OSX},
+        wrapper => sub {
+            $_ = Sys::Sendfile::OSX::sendfile($_[0], $_[1], $_[2],
+              sysseek $_[0], 0, SEEK_CUR);
+            sysseek $_[0], $_, SEEK_CUR;
+            return $_;
+        }
+    },
+);
 
-eval {
-    require IO::SendFile;
-    1;
-} and do {
-    $sendfile_impls{q{IO::SendFile}} = sub {
-        return IO::SendFile::sendfile($_[1]->fileno, $_[0]->fileno, $_ = 0,
-          $_[2]);
+foreach my $item (@sendfile_could) {
+    eval {
+        load $item->{module};
+        1;
+    } and do {
+        if (not exists $item->{checkif} or &{$item->{checkif}}()) {
+            $sendfile_impls{$item->{module}} = $item->{wrapper};
+            $do_sendfile ||= $item->{wrapper};
+        }
     };
-    $do_sendfile ||= $sendfile_impls{q{IO::SendFile}};
-};
-
-eval {
-    require Sys::Sendfile::FreeBSD;
-    1;
-} and do {
-    $sendfile_impls{q{Sys::Sendfile::FreeBSD}} = sub {
-        Sys::Sendfile::FreeBSD::sendfile($_[0]->fileno, $_[1]->fileno,
-          sysseek($_[0], 0, SEEK_CUR), $_[2], $_ = 0);
-        sysseek $_[0], $_, SEEK_CUR;
-        return $_;
-    };
-    $do_sendfile ||= $sendfile_impls{q{Sys::Sendfile::FreeBSD}};
-};
-
-eval {
-    require Sys::Sendfile::OSX;
-    1;
-} and do {
-    $sendfile_impls{q{Sys::Sendfile::OSX}} = sub {
-        $_ = Sys::Sendfile::OSX::sendfile($_[0], $_[1], $_[2],
-          sysseek $_[0], 0, SEEK_CUR);
-        sysseek $_[0], $_, SEEK_CUR;
-        return $_;
-    };
-    $do_sendfile ||= $sendfile_impls{q{Sys::Sendfile::OSX}};
-};
+}
 
 sub import {
     my $class = shift;
@@ -138,6 +129,7 @@ sub import {
                 $lib =~ s{\s+\z}{}sm;
                 push @libs, $lib;
 
+                # dear perlcritic you are wrong. xoxo me
                 ##no critic qw(ProhibitEnumeratedClasses)
                 if ($lib =~ m{[^a-zA-Z0-9_:]}sm) {
                     carp qq{Library name '${lib}' contains invalid characters};
@@ -149,7 +141,7 @@ sub import {
                     next;
                 }
 
-                if ($lib eq 'none') {
+                if ($lib eq q{none}) {
                     undef $do_sendfile;
                     $overrode = 1;
                     last;
@@ -217,7 +209,7 @@ sub session_thread { # {{{1
         PeerAddr   => $host,
         PeerPort   => $port,
         HostPort   => 0,
-        Proto      => 'tcp',
+        Proto      => q{tcp},
         Type       => SOCK_STREAM,
         Timeout    => 5,
     );
@@ -225,7 +217,7 @@ sub session_thread { # {{{1
     my $active_timer = $params{ActiveTimer} || 60;
     my $idle_timer   = $params{IdleTimer} || 120;
 
-    $logger->debug('connecting to AFP server');
+    $logger->debug(q{connecting to AFP server});
     if ($has_IO__Socket__IP == 1) {
         $conn = IO::Socket::IP->new(%connect_args);
     }
@@ -233,7 +225,7 @@ sub session_thread { # {{{1
         $conn = IO::Socket::INET->new(%connect_args);
     }
     if (!defined($conn) || !$conn->connected()) {
-        $logger->debug('connection attempt failed, aborting');
+        $logger->debug(q{connection attempt failed, aborting});
         ${$shared}{running} = -1;
         # gotta do this so new() completes, one way or another...
         ${$shared}{conn_sem}->up();
@@ -252,7 +244,7 @@ sub session_thread { # {{{1
 
     # Tell the TCP stack that we don't want Nagle's algorithm; for our
     # purposes, all it's going to do is screw us up.
-    $logger->debug('setting up socket and shared data');
+    $logger->debug(q{setting up socket and shared data});
     setsockopt $conn, IPPROTO_TCP, TCP_NODELAY, 1;
     ${$shared}{conn_fd}     = fileno $conn;
     ${$shared}{running}     = 1;
@@ -261,7 +253,7 @@ sub session_thread { # {{{1
     ${$shared}{peeraddr}    = $conn->peeraddr();
     ${$shared}{peerport}    = $conn->peerport();
     ${$shared}{sockdomain}  = AF_INET;
-    if (ref($conn) eq 'IO::Socket::IP') {
+    if (ref($conn) eq q{IO::Socket::IP}) {
         ${$shared}{sockdomain} = $conn->sockdomain();
     }
     my $sem = ${$shared}{conn_sem};
@@ -275,13 +267,13 @@ sub session_thread { # {{{1
             $reserved, $rsz, $userBytes, $ev, $now, $rb_ref, $sem_ref, $msg,
             $wsz, $handler, $rlen);
     my $last_tickle     = gettimeofday();
-    $logger->debug('starting DSI thread main loop');
+    $logger->debug(q{starting DSI thread main loop});
 MAINLOOP:
     while (${$shared}{exit} == 0) {
         $now = gettimeofday();
         # Scan the handlers list to see if there are any callouts that
         # haven't been responded to.
-        $logger->trace('checking for unanswered handlers');
+        $logger->trace(q{checking for unanswered handlers});
         keys %{$handlers};
         while (($id, $handler) = each %{$handlers}) {
             # If we find that a transaction hasn't been responded to in at
@@ -419,7 +411,7 @@ MAINLOOP:
             $last_tickle = $now;
         }
     }
-    $logger->trace('exiting main loop');
+    $logger->trace(q{exiting main loop});
     ${$shared}{running} = -1;
     undef ${$shared}{conn_fd};
     close $conn or $logger->logcroak(q{Couldn't close the connection?});
@@ -428,7 +420,7 @@ MAINLOOP:
     # deal with netatalk shutting down the connection right away when FPLogout
     # is received, instead of waiting for the client to send DSICloseSession.
     # Thanks again, netatalk. :| )
-    $logger->trace('cleaning up any pending handlers');
+    $logger->trace(q{cleaning up any pending handlers});
     keys %{$handlers};
     while (($id, $handler) = each %{$handlers}) {
         $handler = ${$handlers}{$id};
@@ -468,14 +460,14 @@ sub new { # {{{1
     );
 
     $shared{id $obj}     = $shared;
-    $logger->debug('starting session_thread');
+    $logger->debug(q{starting session_thread});
     my $thread           = threads->create(\&session_thread, $shared, $host,
                                              $port, %params);
     $dispatcher{id $obj} = $thread;
     ${$shared}{conn_sem}->down();
     $conn{id $obj}       = IO::Handle->new();
     if (${$shared}{running} == 1) {
-        $conn{id $obj}->fdopen(${$shared}{conn_fd}, 'w');
+        $conn{id $obj}->fdopen(${$shared}{conn_fd}, q{w});
         $conn{id $obj}->autoflush(1);
     }
     ${$shared}{conn_sem}->up();
@@ -660,19 +652,19 @@ sub GetStatus { # {{{1
 my @OpenSessionOpts = (
     {
         value  => $kRequestQuanta,
-        fields => ['RequestQuanta'],
+        fields => [q{RequestQuanta}],
         mask   => q{L>},
         len    => 4,
     },
     {
         value  => $kAttentionQuanta,
-        fields => ['AttentionQuanta'],
+        fields => [q{AttentionQuanta}],
         mask   => q{L>},
         len    => 4,
     },
     {
         value  => $kServerReplayCacheSize,
-        fields => ['ServerReplayCacheSize'],
+        fields => [q{ServerReplayCacheSize}],
         mask   => q{L>},
         len    => 4,
     },
