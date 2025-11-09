@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 use Readonly;
-Readonly my $UAMNAME => 'No User Authent';
+Readonly my $UAMNAME => q{No User Authent};
 use Net::AFP::Result;
 use Net::AFP::Versions;
 use Carp;
@@ -17,11 +17,11 @@ sub Authenticate {
     # The latter two args (username and a password callback function) can
     # be ignored here, since they're not applicable for anonymous auth.
     my($session, $AFPVersion) = @_;
-    $session->{logger}->debug('called ', (caller 0)[3]);
+    $session->{logger}->debug(q{called }, (caller 0)[3]);
 
     # Ensure that we've been handed an appropriate object.
-    if (not ref $session or not $session->isa('Net::AFP')) {
-        croak('Object MUST be of type Net::AFP!');
+    if (not ref $session or not $session->isa(q{Net::AFP})) {
+        croak(q{Object MUST be of type Net::AFP!});
     }
 
     my $rc;

@@ -19,79 +19,79 @@ our @EXPORT = qw($kFPVerNewerThan $kFPVerAtLeast $kFPVerEqual
 my @versions = (
     # AFP 3.4 only changed an AppleTalk to POSIX error mapping.
     {
-        'VersionString' => 'AFP3.4',
-        'MajorNumber'   => 3,
-        'MinorNumber'   => 4,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 0,
+        VersionString => q{AFP3.4},
+        MajorNumber   => 3,
+        MinorNumber   => 4,
+        Supported     => 1,
+        CanDoAtalk    => 0,
     },
     # AFP 3.3 requires replay cache.
     {
-        'VersionString' => 'AFP3.3',
-        'MajorNumber'   => 3,
-        'MinorNumber'   => 3,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 0,
+        VersionString => q{AFP3.3},
+        MajorNumber   => 3,
+        MinorNumber   => 3,
+        Supported     => 1,
+        CanDoAtalk    => 0,
     },
     {
-        'VersionString' => 'AFP3.2',
-        'MajorNumber'   => 3,
-        'MinorNumber'   => 2,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 0,
+        VersionString => q{AFP3.2},
+        MajorNumber   => 3,
+        MinorNumber   => 2,
+        Supported     => 1,
+        CanDoAtalk    => 0,
     },
     {
-        'VersionString' => 'AFP3.1',
-        'MajorNumber'   => 3,
-        'MinorNumber'   => 1,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 0,
+        VersionString => q{AFP3.1},
+        MajorNumber   => 3,
+        MinorNumber   => 1,
+        Supported     => 1,
+        CanDoAtalk    => 0,
     },
     {
-        'VersionString' => 'AFPX03',
-        'MajorNumber'   => 3,
-        'MinorNumber'   => 0,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 0,
+        VersionString => q{AFPX03},
+        MajorNumber   => 3,
+        MinorNumber   => 0,
+        Supported     => 1,
+        CanDoAtalk    => 0,
     },
     {
-        'VersionString' => 'AFP2.3',
-        'MajorNumber'   => 2,
-        'MinorNumber'   => 3,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 1,
+        VersionString => q{AFP2.3},
+        MajorNumber   => 2,
+        MinorNumber   => 3,
+        Supported     => 1,
+        CanDoAtalk    => 1,
     },
     {
-        'VersionString' => 'AFP2.2',
-        'MajorNumber'   => 2,
-        'MinorNumber'   => 2,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 1,
+        VersionString => q{AFP2.2},
+        MajorNumber   => 2,
+        MinorNumber   => 2,
+        Supported     => 1,
+        CanDoAtalk    => 1,
     },
     {
-        'VersionString' => 'AFPVersion 2.1',
-        'MajorNumber'   => 2,
-        'MinorNumber'   => 1,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 1,
+        VersionString => q{AFPVersion 2.1},
+        MajorNumber   => 2,
+        MinorNumber   => 1,
+        Supported     => 1,
+        CanDoAtalk    => 1,
     },
     {
-        'VersionString' => 'AFPVersion 2.0',
-        'MajorNumber'   => 2,
-        'MinorNumber'   => 0,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 1,
+        VersionString => q{AFPVersion 2.0},
+        MajorNumber   => 2,
+        MinorNumber   => 0,
+        Supported     => 1,
+        CanDoAtalk    => 1,
     },
     {
-        'VersionString' => 'AFPVersion 1.1',
-        'MajorNumber'   => 1,
-        'MinorNumber'   => 1,
-        'Supported'     => 1,
-        'CanDoAtalk'    => 1,
+        VersionString => q{AFPVersion 1.1},
+        MajorNumber   => 1,
+        MinorNumber   => 1,
+        Supported     => 1,
+        CanDoAtalk    => 1,
     },
 );
 
-my %versionmap = map { $_->{'VersionString'} => $_ } @versions;
+my %versionmap = map { $_->{VersionString} => $_ } @versions;
 
 Readonly our $kFPVerNewerThan   => 0;
 Readonly our $kFPVerAtLeast     => 1;
@@ -141,7 +141,7 @@ sub CompareByVersionNum {
         return 1;
     }
 
-    croak('Invalid comparison type given');
+    croak(q{Invalid comparison type given});
 }
 
 sub GetPreferredVersion {

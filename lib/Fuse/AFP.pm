@@ -56,7 +56,7 @@ eval {
 # FreeBSD oh-so-handily names this error code differently, so I'm going
 # to cheat just slightly...
 sub ENODATA() {
-    return($OSNAME eq 'freebsd' ? Errno::ENOATTR() : Errno::ENODATA());
+    return($OSNAME eq q{freebsd} ? Errno::ENOATTR() : Errno::ENODATA());
 }
 
 # We need UUID for a portable means to get a UUID to identify ourselves to
@@ -70,13 +70,13 @@ Readonly my $IO_BLKSIZE         => 0x40_000;
 
 # Special magic extended attribute names to take advantage of certain
 # AFP features.
-Readonly my $ACL_XATTR          => 'system.afp_acl';
+Readonly my $ACL_XATTR          => q{system.afp_acl};
 # This rejiggers the ACL data to/from the format that nfs4_setfacl and
 # nfs4_getfacl like (for Linux). Pretty sure this won't work on FreeBSD
 # et al., but I'm not finding anything to indicate that setfacl/getfacl
 # on other OSes actually work with FUSE.
-Readonly my $ACL_NFS4_XATTR     => 'system.nfs4_acl';
-Readonly my $COMMENT_XATTR      => 'system.comment';
+Readonly my $ACL_NFS4_XATTR     => q{system.nfs4_acl};
+Readonly my $COMMENT_XATTR      => q{system.comment};
 
 # }}}1
 
@@ -86,7 +86,7 @@ sub new { # {{{1
 
     # By default, assume utf8 encoding. This is only used if we can't figure
     # it out using I18N::Langinfo, and the user doesn't override it.
-    my $encoding = 'utf8';
+    my $encoding = q{utf8};
     # If the appropriate module is available to us, try to figure out what
     # character set the system is using.
     if ($has_I18N__Langinfo) {
@@ -107,7 +107,8 @@ sub new { # {{{1
     }
     $obj->{local_encode} = find_encoding($encoding);
     if (not ref $obj->{local_encode}) {
-        $obj->{logger}->logcroak(sprintf q{Encoding %s was not known}, $encoding);
+        $obj->{logger}->logcroak(sprintf q{Encoding %s was not known},
+          $encoding);
     }
 
     my($session, %urlparms);
@@ -124,7 +125,7 @@ sub new { # {{{1
     }
     ($session, %urlparms) = do_afp_connect($callback, $url, \$srvinfo,
             %connopts);
-    if (not ref $session or not $session->isa('Net::AFP')) {
+    if (not ref $session or not $session->isa(q{Net::AFP})) {
         exit $session;
     }
 
@@ -135,7 +136,7 @@ sub new { # {{{1
 
     if (not defined $urlparms{volume}) {
         $session->close();
-        $obj->{logger}->logcroak('Unable to extract volume from AFP URL');
+        $obj->{logger}->logcroak(q{Unable to extract volume from AFP URL});
     }
     $obj->{afpconn} = $session;
 
@@ -229,14 +230,14 @@ sub new { # {{{1
     if ($rc == $kFPAccessDenied) {
         # no volume password; does apple's AFP server even support volume
         # passwords anymore? I don't really know.
-        $obj->{logger}->error('Server expected volume password');
+        $obj->{logger}->error(q{Server expected volume password});
         $obj->disconnect();
         return EACCES;
     }
     elsif ($rc == $kFPObjectNotFound || $rc == $kFPParamErr) {
         # Server didn't know the volume we asked for.
-        $obj->{logger}->error(sub { sprintf q{Volume "%s" does not exist on server},
-          $urlparms{volume} });
+        $obj->{logger}->error(sub { sprintf q{Volume "%s" does not exist } .
+          q{on server}, $urlparms{volume} });
         $obj->disconnect();
         return ENODEV;
     }
@@ -245,15 +246,15 @@ sub new { # {{{1
         # should never happen unless we pass bad flags (coding error) or some
         # non-AFP-specific condition causes a failure (which is out of our
         # hands)...
-        $obj->{logger}->error(sub { sprintf q{FPOpenVol failed with error %d (%s)},
-          $rc, afp_strerror($rc) });
+        $obj->{logger}->error(sub { sprintf q{FPOpenVol failed with error } .
+          q{%d (%s)}, $rc, afp_strerror($rc) });
         $obj->disconnect();
         return ENODEV;
     }
     $obj->{logger}->debug(sub { Dumper($volinfo) });
 
     if (${$volinfo}{Signature} == 3) {
-        $obj->{logger}->error('Volume uses variable Directory IDs; not currently supported');
+        $obj->{logger}->error(q{Volume uses variable Directory IDs; not currently supported});
         $obj->disconnect();
         return EINVAL;
     }
@@ -266,23 +267,23 @@ sub new { # {{{1
 
     $obj->{pathType}    = $kFPLongName; # AFP long names by default
     $obj->{pathFlag}    = $kFPLongNameBit;
-    $obj->{pathkey}     = 'LongName';
+    $obj->{pathkey}     = q{LongName};
 
     if ($obj->{volAttrs} & $kSupportsUTF8Names) {
         # If the remote volume does UTF8 names, then we'll go with that..
         $obj->{pathType}    = $kFPUTF8Name;
         $obj->{pathFlag}    = $kFPUTF8NameBit;
-        $obj->{pathkey}     = 'UTF8Name';
+        $obj->{pathkey}     = q{UTF8Name};
     }
 
     $obj->{DForkLenFlag}    = $kFPDataForkLenBit;
     $obj->{RForkLenFlag}    = $kFPRsrcForkLenBit;
-    $obj->{DForkLenKey}     = 'DataForkLen';
-    $obj->{RForkLenKey}     = 'RsrcForkLen';
+    $obj->{DForkLenKey}     = q{DataForkLen};
+    $obj->{RForkLenKey}     = q{RsrcForkLen};
     $obj->{UseExtOps}       = 0;
-    $obj->{ReadFn}          = 'Net::AFP::FPRead';
-    $obj->{WriteFn}         = 'Net::AFP::FPWrite';
-    $obj->{EnumFn}          = 'Net::AFP::FPEnumerate';
+    $obj->{ReadFn}          = q{Net::AFP::FPRead};
+    $obj->{WriteFn}         = q{Net::AFP::FPWrite};
+    $obj->{EnumFn}          = q{Net::AFP::FPEnumerate};
     # AFP prior to 2.0 doesn't provide any locking semantics, so just use
     # a bullshit empty function ref.
     $obj->{LockFn}          = sub { };
@@ -290,7 +291,7 @@ sub new { # {{{1
 
     if (Net::AFP::Versions::CompareByVersionNum($obj->{afpconn}, 2, 0,
             $kFPVerAtLeast)) {
-        $obj->{LockFn}          = 'Net::AFP::FPByteRangeLock';
+        $obj->{LockFn}          = q{Net::AFP::FPByteRangeLock};
     }
 
     # I *think* large file support entered the picture as of AFP 3.0...
@@ -298,18 +299,18 @@ sub new { # {{{1
             $kFPVerAtLeast)) {
         $obj->{DForkLenFlag}    = $kFPExtDataForkLenBit;
         $obj->{RForkLenFlag}    = $kFPExtRsrcForkLenBit;
-        $obj->{DForkLenKey}     = 'ExtDataForkLen';
-        $obj->{RForkLenKey}     = 'ExtRsrcForkLen';
+        $obj->{DForkLenKey}     = q{ExtDataForkLen};
+        $obj->{RForkLenKey}     = q{ExtRsrcForkLen};
         $obj->{UseExtOps}       = 1;
-        $obj->{ReadFn}          = 'Net::AFP::FPReadExt';
-        $obj->{WriteFn}         = 'Net::AFP::FPWriteExt';
-        $obj->{LockFn}          = 'Net::AFP::FPByteRangeLockExt';
-        $obj->{EnumFn}          = 'Net::AFP::FPEnumerateExt';
+        $obj->{ReadFn}          = q{Net::AFP::FPReadExt};
+        $obj->{WriteFn}         = q{Net::AFP::FPWriteExt};
+        $obj->{LockFn}          = q{Net::AFP::FPByteRangeLockExt};
+        $obj->{EnumFn}          = q{Net::AFP::FPEnumerateExt};
     }
 
     if (Net::AFP::Versions::CompareByVersionNum($obj->{afpconn}, 3, 1,
             $kFPVerAtLeast)) {
-        $obj->{EnumFn}          = 'Net::AFP::FPEnumerateExt2';
+        $obj->{EnumFn}          = q{Net::AFP::FPEnumerateExt2};
         $obj->{MaxReplySize}    = 0x3FFFF;
     }
 
@@ -334,8 +335,8 @@ sub new { # {{{1
     # abort.
     # lookup node ID for subpath mount {{{2
     if (defined $urlparms{subpath}) {
-        $obj->{logger}->debug(sub { sprintf q{Looking up directory "%s" as pivot } .
-          q{point for root node}, $urlparms{subpath} });
+        $obj->{logger}->debug(sub { sprintf q{Looking up directory "%s" } .
+          q{as pivot point for root node}, $urlparms{subpath} });
         my $realdirpath = translate_path($urlparms{subpath}, $obj);
         my $dirbitmap = $kFPNodeIDBit;
 
@@ -349,19 +350,19 @@ sub new { # {{{1
                 Pathname        => $realdirpath);
 
         if ($rc != $kFPNoErr or not exists $resp->{NodeID}) {
-            $obj->{logger}->error('Specified directory not found');
+            $obj->{logger}->error(q{Specified directory not found});
             $obj->disconnect();
             return ENOENT;
         }
 
         if ($resp->{FileIsDir} != 1) {
-            $obj->{logger}->error('Attempted to pivot mount root to non-directory');
+            $obj->{logger}->error(q{Attempted to pivot mount root to non-directory});
             $obj->disconnect();
             return ENOTDIR;
         }
         $obj->{topDirID} = $resp->{NodeID};
-        $obj->{logger}->debug(sub { sprintf q{Mount root node ID changed to %s},
-          $obj->{topDirID} });
+        $obj->{logger}->debug(sub { sprintf q{Mount root node ID changed } .
+          q{to %s}, $obj->{topDirID} });
     } # }}}2
 
     # purify URL {{{2
@@ -435,7 +436,7 @@ sub getattr { # {{{1
     $self->{afpconn}->FPGetUserInfo(0x1, 0, 0x3, \my $selfinfo);
     my $uidmap = $self->{uidmap};
     my $gidmap = $self->{gidmap};
-    if ($file eq '/._metrics') {
+    if ($file eq q{/._metrics}) {
         my $timest = time;
         my @stat = ( # {{{2
             # device number (just make it 0, since it's not a real device)
@@ -467,7 +468,7 @@ sub getattr { # {{{1
         ); # }}}2
         return @stat;
     }
-    if ($self->{volicon} && $file eq '/.volicon.xpm') {
+    if ($self->{volicon} && $file eq q{/.volicon.xpm}) {
         my $timest = time;
         my @stat = ( # {{{2
             # device number (just make it 0, since it's not a real device)
@@ -499,7 +500,7 @@ sub getattr { # {{{1
         ); # }}}2
         return @stat;
     }
-    if ($self->{volicon} && $file eq '/autorun.inf') {
+    if ($self->{volicon} && $file eq q{/autorun.inf}) {
         my $timest = time;
         my @stat = ( # {{{2
             # device number (just make it 0, since it's not a real device)
@@ -707,9 +708,9 @@ sub getdir { # {{{1
     my @fileslist = (q{.}, q{..});
 
     if ($dirname eq q{/}) {
-        push @fileslist, '._metrics';
+        push @fileslist, q{._metrics};
         if ($self->{volicon}) {
-            push @fileslist, '.volicon.xpm', 'autorun.inf';
+            push @fileslist, q{.volicon.xpm}, q{autorun.inf};
         }
     }
 
@@ -972,8 +973,8 @@ sub rmdir { return Fuse::AFP::unlink(@_); }
 ##no critic qw(ProhibitBuiltInHomonyms)
 sub symlink { # {{{1
     my ($self, $target, $linkname) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(target = '%s', linkname = '%s')},
-      (caller 3)[3], $target, $linkname });
+    $self->{logger}->debug(sub { sprintf q{called %s(target = '%s', } .
+      q{linkname = '%s')}, (caller 3)[3], $target, $linkname });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1075,7 +1076,7 @@ sub symlink { # {{{1
             Bitmap      => $bitmap,
             PathType    => $self->{pathType},
             Pathname    => $filename,
-            FinderInfo  => "slnkrhap\0\@" . "\0" x 22,
+            FinderInfo  => qq{slnkrhap\0\@} . qq{\0} x 22,
             ModDate     => time - $self->{timedelta});
 
     return 0         if $rc == $kFPNoErr;
@@ -1089,8 +1090,8 @@ sub symlink { # {{{1
 ##no critic qw(ProhibitBuiltInHomonyms)
 sub rename { # {{{1
     my ($self, $oldname, $newname) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(oldname = '%s', newname = '%s')},
-      (caller 3)[3], $oldname, $newname });
+    $self->{logger}->debug(sub { sprintf q{called %s(oldname = '%s', } .
+      q{newname = '%s')}, (caller 3)[3], $oldname, $newname });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1169,8 +1170,8 @@ sub rename { # {{{1
 ##no critic qw(ProhibitBuiltInHomonyms)
 sub link { # {{{1
     my ($self, $file, $target) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', target = %s)},
-      (caller 3)[3], $file, $target });
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', } .
+      q{target = %s)}, (caller 3)[3], $file, $target });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1340,8 +1341,8 @@ sub truncate { # {{{1
 ##no critic qw(ProhibitBuiltInHomonyms)
 sub utime { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
-    $self->{logger}->debug(sub {sprintf q{called %s(file = '%s', actime = %d, } .
-      q{modtime = %d)}, (caller 3)[3], $file, $actime, $modtime });
+    $self->{logger}->debug(sub {sprintf q{called %s(file = '%s', actime } .
+      q{= %d, modtime = %d)}, (caller 3)[3], $file, $actime, $modtime });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1377,16 +1378,16 @@ sub open { # {{{1
     $self->{callcount}{(caller 0)[3]}++;
 
     $file = $self->{local_encode}->decode($file);
-    if ($file eq '/._metrics') {
+    if ($file eq q{/._metrics}) {
         my $data = $self->generate_metrics_data();
         return(0, \$data);
     }
-    if ($self->{volicon} && $file eq '/.volicon.xpm') {
+    if ($self->{volicon} && $file eq q{/.volicon.xpm}) {
         my $volicon = $self->{volicon};
         return(0, \$volicon);
     }
-    if ($self->{volicon} && $file eq '/autorun.inf') {
-        my $autorun_text = "[autorun]\nicon=.volicon.xpm\n";
+    if ($self->{volicon} && $file eq q{/autorun.inf}) {
+        my $autorun_text = qq{[autorun]\nicon=.volicon.xpm\n};
         return(0, \$autorun_text);
     }
 
@@ -1493,8 +1494,8 @@ sub write { # {{{1
     my ($self, $file, $offset, $fh) = @_[0,1,3,4];
     my $data_r = \$_[2];
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', data = %s, } .
-      q{offset = %d, fh = %d)}, (caller 3)[3], $file || q{}, q{[data]}, $offset,
-      ref($fh) ? -1 : $fh });
+      q{offset = %d, fh = %d)}, (caller 3)[3], $file || q{}, q{[data]},
+      $offset, ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
     my $filename = translate_path($file, $self);
@@ -1555,13 +1556,13 @@ sub statfs { # {{{1
     if ($self->{UseExtOps}) {
         $volbitmap |= $kFPVolExtBytesFreeBit | $kFPVolExtBytesTotalBit |
                       $kFPVolBlockSizeBit;
-        $bf_key = 'ExtBytesFree';
-        $bt_key = 'ExtBytesTotal';
+        $bf_key = q{ExtBytesFree};
+        $bt_key = q{ExtBytesTotal};
     }
     else {
         $volbitmap |= $kFPVolBytesFreeBit | $kFPVolBytesTotalBit;
-        $bf_key = 'BytesFree';
-        $bt_key = 'BytesTotal';
+        $bf_key = q{BytesFree};
+        $bt_key = q{BytesTotal};
     }
     my $resp;
     my $rc = $self->{afpconn}->FPGetVolParms($self->{volID}, $volbitmap,
@@ -1618,8 +1619,9 @@ sub release { # {{{1
 
 sub fsync { # {{{1
     my ($self, $file, $flags, $fh) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', flags = %x, } .
-      q{fh = %d)}, (caller 3)[3], $file || q{}, $flags, ref($fh) ? -1 : $fh });
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', flags = } .
+      q{%x, fh = %d)}, (caller 3)[3], $file || q{}, $flags,
+      ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1630,9 +1632,9 @@ sub fsync { # {{{1
 
 sub setxattr { # {{{1
     my ($self, $file, $attr, $value, $flags) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', attr = '%s', } .
-      q{value = '%s', flags = %x)}, (caller 3)[3], $file, $attr, printable($value),
-      $flags });
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', attr = } .
+      q{'%s', value = '%s', flags = %x)}, (caller 3)[3], $file, $attr,
+      printable($value), $flags });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -1731,12 +1733,12 @@ sub setxattr { # {{{1
         return 0;
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ m{^user[.]}sm or $OSNAME eq 'darwin') {
-        if ($OSNAME ne 'darwin') {
+    elsif ($attr =~ m{^user[.]}sm or $OSNAME eq q{darwin}) {
+        if ($OSNAME ne q{darwin}) {
             $attr =~ s{^user[.]}{}sm;
         }
 
-        if ($attr eq 'com.apple.FinderInfo' and
+        if ($attr eq q{com.apple.FinderInfo} and
                 not ($self->{volAttrs} & $kSupportsExtAttrs)) {
             # If FinderInfo is already set to something (there's always data
             # there, but I'm interpreting "existence" to mean "data is there
@@ -1755,10 +1757,10 @@ sub setxattr { # {{{1
                 return -EBADF()   if $rc != $kFPNoErr;
 
                 if ($flags & XATTR_CREATE) {
-                    return -EEXIST()  if $resp->{FinderData} ne "\0" x 32;
+                    return -EEXIST()  if $resp->{FinderData} ne qq{\0} x 32;
                 }
                 elsif ($flags & XATTR_REPLACE) {
-                    return -ENODATA() if $resp->{FinderData} eq "\0" x 32;
+                    return -ENODATA() if $resp->{FinderData} eq qq{\0} x 32;
                 }
             }
             my $rc = $self->{afpconn}->FPSetFileDirParms(
@@ -1774,7 +1776,7 @@ sub setxattr { # {{{1
             return -EROFS()  if $rc == $kFPVolLocked;
             return 0;
         }
-        elsif ($attr eq 'com.apple.ResourceFork') {
+        elsif ($attr eq q{com.apple.ResourceFork}) {
             # Apply special handling for XATTR_{CREATE,REPLACE} cases. It's
             # more clear-cut if there's "something" or "nothing" here, since
             # if there's "something", the resource fork length will be
@@ -1948,12 +1950,12 @@ sub getxattr { # {{{1
         }
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ m{^user[.]}sm || $OSNAME eq 'darwin') {
-        if ($OSNAME ne 'darwin') {
+    elsif ($attr =~ m{^user[.]}sm || $OSNAME eq q{darwin}) {
+        if ($OSNAME ne q{darwin}) {
             $attr =~ s{^user[.]}{}sm;
         }
 
-        if ($attr eq 'com.apple.FinderInfo' and
+        if ($attr eq q{com.apple.FinderInfo} and
                 not ($self->{volAttrs} & $kSupportsExtAttrs)) {
             my($rc, $resp) = $self->{afpconn}->FPGetFileDirParms(
                     VolumeID        => $self->{volID},
@@ -1965,12 +1967,12 @@ sub getxattr { # {{{1
             return -EPERM()   if $rc == $kFPAccessDenied;
             return -ENOENT()  if $rc == $kFPObjectNotFound;
             return -EBADF()   if $rc != $kFPNoErr;
-            return "\0" x 32 if not exists $resp->{FinderInfo};
+            return qq{\0} x 32 if not exists $resp->{FinderInfo};
             my $finfo = $resp->{FinderInfo};
-            $finfo .= "\0" x (32 - length $finfo);
+            $finfo .= qq{\0} x (32 - length $finfo);
             return $resp->{FinderInfo};
         }
-        elsif ($attr eq 'com.apple.ResourceFork') {
+        elsif ($attr eq q{com.apple.ResourceFork}) {
             my($rc, $resp) = $self->{afpconn}->FPGetFileParms(
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
@@ -2119,17 +2121,17 @@ sub listxattr { # {{{1
 
     if (not ($self->{volAttrs} & $kSupportsExtAttrs)
             and exists($resp->{FinderInfo})
-            and $resp->{FinderInfo} ne "\0" x 32) {
-        push @attrs, 'com.apple.FinderInfo';
+            and $resp->{FinderInfo} ne qq{\0} x 32) {
+        push @attrs, q{com.apple.FinderInfo};
     }
 
     if (exists($resp->{$self->{RForkLenKey}}) and
             $resp->{$self->{RForkLenKey}} > 0) {
-        push @attrs, 'com.apple.ResourceFork';
+        push @attrs, q{com.apple.ResourceFork};
     }
 
-    if ($OSNAME ne 'darwin') {
-        @attrs = map { 'user.' . $_ } @attrs;
+    if ($OSNAME ne q{darwin}) {
+        @attrs = map { q{user.} . $_ } @attrs;
     }
 
     # Try getting the ACL for the indicated file; if there's an ACL
@@ -2227,18 +2229,18 @@ sub removexattr { # {{{1
         return 0;
     } # }}}2
     # general xattr handling {{{2
-    elsif ($attr =~ m{^user[.]}sm or $OSNAME eq 'darwin') {
-        if ($OSNAME ne 'darwin') {
+    elsif ($attr =~ m{^user[.]}sm or $OSNAME eq q{darwin}) {
+        if ($OSNAME ne q{darwin}) {
             $attr =~ s{^user[.]}{}sm;
         }
 
-        if ($attr eq 'com.apple.FinderInfo' and
+        if ($attr eq q{com.apple.FinderInfo} and
                 not ($self->{volAttrs} & $kSupportsExtAttrs)) {
             my $rc = $self->{afpconn}->FPSetFileDirParms(
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
                     Bitmap      => $kFPFinderInfoBit,
-                    FinderInfo  => "\0" x 32,
+                    FinderInfo  => qq{\0} x 32,
                     PathType    => $self->{pathType},
                     Pathname    => $filename);
             return -EPERM()  if $rc == $kFPAccessDenied;
@@ -2248,7 +2250,7 @@ sub removexattr { # {{{1
             return -EBADF()  if $rc != $kFPNoErr;
             return 0;
         }
-        elsif ($attr eq 'com.apple.ResourceFork') {
+        elsif ($attr eq q{com.apple.ResourceFork}) {
             my ($rc, %resp) = $self->{afpconn}->FPOpenFork(
                     VolumeID    => $self->{volID},
                     DirectoryID => $self->{topDirID},
@@ -2341,7 +2343,8 @@ sub opendir { # {{{1
 sub readdir { # {{{1
     my ($self, $dirname, $offset, $dh) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(dirname = '%s', } .
-      q{offset = %d, dh = %d)}, (caller 3)[3], $dirname || q{}, $offset, $dh });
+      q{offset = %d, dh = %d)}, (caller 3)[3], $dirname || q{}, $offset,
+      $dh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2361,11 +2364,11 @@ sub readdir { # {{{1
 
         if ($self->{topDirID} == $dh) {
             $entrycount -= 1;
-            push @fileslist, [++$offset, '._metrics'];
+            push @fileslist, [++$offset, q{._metrics}];
             if ($self->{volicon}) {
                 $entrycount -= 2;
-                push @fileslist, [++$offset, '.volicon.xpm'],
-                                 [++$offset, 'autorun.inf'];
+                push @fileslist, [++$offset, q{.volicon.xpm}],
+                                 [++$offset, q{autorun.inf}];
             }
         }
     } # }}}2
@@ -2486,8 +2489,8 @@ sub access { # {{{1
 
 sub create { # {{{1
     my ($self, $file, $mode, $flags) = @_;
-    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', mode = %o, } .
-      q{flags = %x)}, (caller 3)[3], $file, $mode, $flags });
+    $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', mode = } .
+      q{%o, flags = %x)}, (caller 3)[3], $file, $mode, $flags });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2681,8 +2684,8 @@ sub fgetattr { # {{{1
 sub lock { # {{{1
     my ($self, $file, $cmd, $lkparms, $fh) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', cmd = %s, } .
-            q{lkparms = %s, fh = %d)}, (caller 3)[3], $file || q{}, $cmd,
-            Dumper($lkparms), ref($fh) ? -1 : $fh });
+      q{lkparms = %s, fh = %d)}, (caller 3)[3], $file || q{}, $cmd,
+      Dumper($lkparms), ref($fh) ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2691,8 +2694,8 @@ sub lock { # {{{1
     my($rc, $rstart);
     if ($lkparms->{l_whence} == SEEK_CUR) {
         # I doubt this will ever happen, but gotta be sure...
-        $self->{logger}->debug('l_whence was SEEK_CUR, we have no way of ' .
-                'knowing its current offset?');
+        $self->{logger}->debug(q{l_whence was SEEK_CUR, we have no way of } .
+                q{knowing its current offset?});
         return -EBADF();
     }
 
@@ -2764,8 +2767,8 @@ sub utimens { # {{{1
     my ($self, $file, $actime, $modtime) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', } .
       q{actime = %s, modtime = %s)}, (caller 3)[3], $file,
-      ref $actime ? sprintf('[%d, %d]', @{$actime}) : sprintf('%f', $actime),
-      ref $modtime ? sprintf('[%d, %d]', @{$modtime}) : sprintf '%f', $modtime });
+      ref $actime ? sprintf(q{[%d, %d]}, @{$actime}) : sprintf(q{%f}, $actime),
+      ref $modtime ? sprintf(q{[%d, %d]}, @{$modtime}) : sprintf q{%f}, $modtime });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2877,8 +2880,8 @@ sub write_buf {
 sub read_buf {
     my ($self, $file, $len, $off, $bufvec, $fh) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(file = '%s', len = %d, } .
-      q{off = %d, bufvec = [...], fh = %d)}, (caller 3)[3], $file || q{}, $len,
-      $off, ref $fh ? -1 : $fh });
+      q{off = %d, bufvec = [...], fh = %d)}, (caller 3)[3], $file || q{},
+      $len, $off, ref $fh ? -1 : $fh });
 
     $self->{callcount}{(caller 0)[3]}++;
 
@@ -2974,41 +2977,41 @@ sub fallocate {
 sub generate_metrics_data { # {{{1
     my ($self) = @_;
 
-    my $data = __PACKAGE__ . " collected client statistics\n\n";
+    my $data = __PACKAGE__ . qq{ collected client statistics\n\n};
 
-    $data .= 'FUSE API version ' . Fuse::fuse_version() . "\n";
-    #$data .= 'FUSE API version ' . join('.', Fuse::fuse_version()) . "\n";
-    $data .= 'Net::AFP version ' . $Net::AFP::VERSION . "\n";
-    $data .= "Calls made:\n\n";
+    $data .= q{FUSE API version } . Fuse::fuse_version() . qq{\n};
+    #$data .= q{FUSE API version } . join('.', Fuse::fuse_version()) . qq{\n};
+    $data .= q{Net::AFP version } . $Net::AFP::VERSION . qq{\n};
+    $data .= qq{Calls made:\n\n};
 
     my $callcount = $self->{callcount};
     foreach my $key (sort {$a cmp $b} keys %{$callcount}) {
-        $data .= (split m{::}sm, $key)[-1] . ":\t" . $callcount->{$key} .
-                "\n";
+        $data .= (split m{::}sm, $key)[-1] . qq{:\t} . $callcount->{$key} .
+                qq{\n};
     }
 
-    $data .= "\n";
+    $data .= qq{\n};
 
-    $data .= "Average write size:\t";
+    $data .= qq{Average write size:\t};
     if ($self->{metrics}->{wr_count}) {
         $data .= int($self->{metrics}->{wr_totalsz} /
                 $self->{metrics}->{wr_count});
     }
     else {
-        $data .= '0';
+        $data .= q{0};
     }
-    $data .= " bytes\n";
-    $data .= "Largest write size:\t" . $self->{metrics}->{wr_maxsize} .
-            " bytes\n";
-    $data .= "Smallest write size:\t" . $self->{metrics}->{wr_minsize} .
-            " bytes\n";
-    $data .= sprintf "Average write time:\t\%.3f seconds\n",
+    $data .= qq{ bytes\n};
+    $data .= qq{Largest write size:\t} . $self->{metrics}->{wr_maxsize} .
+      qq{ bytes\n};
+    $data .= qq{Smallest write size:\t} . $self->{metrics}->{wr_minsize} .
+            qq{ bytes\n};
+    $data .= sprintf qq{Average write time:\t\%.3f seconds\n},
             $self->{metrics}->{wr_count} ?
                 ($self->{metrics}->{wr_totaltime} /
                  $self->{metrics}->{wr_count}) : 0;
-    $data .= sprintf "Longest write time:\t\%.3f seconds\n",
+    $data .= sprintf qq{Longest write time:\t\%.3f seconds\n},
             $self->{metrics}->{wr_maxtime};
-    $data .= sprintf "Shortest write time:\t\%.3f seconds\n",
+    $data .= sprintf qq{Shortest write time:\t\%.3f seconds\n},
             $self->{metrics}->{wr_mintime};
 
     return $data;
@@ -3103,7 +3106,8 @@ sub path_parent { # {{{1
 sub acl_from_xattr { # {{{1
     my ($self, $raw_xattr, $acl_data) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(raw_xattr = '%s', } .
-      q{acl_data = %s)}, (caller 3)[3], printable($raw_xattr), Dumper($acl_data) });
+      q{acl_data = %s)}, (caller 3)[3], printable($raw_xattr),
+      Dumper($acl_data) });
 
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server
@@ -3371,7 +3375,8 @@ for my $item (@nfs4_def_acl_params) {
 sub acl_from_nfsv4_xattr { # {{{1
     my ($self, $raw_xattr, $acl_data, $filename) = @_;
     $self->{logger}->debug(sub { sprintf q{called %s(raw_xattr = '%s', } .
-      q{acl_data = %s)}, (caller 3)[3], printable($raw_xattr), Dumper($acl_data) });
+      q{acl_data = %s)}, (caller 3)[3], printable($raw_xattr),
+      Dumper($acl_data) });
 
     # unpack the ACL from the client, so we can structure it to be handed
     # up to the AFP server

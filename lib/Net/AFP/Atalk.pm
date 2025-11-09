@@ -83,10 +83,10 @@ sub SendAFPWrite { # {{{1
 sub GetStatus { # {{{1
     my ($class, $host, $port, $resp_r) = @_;
     if (ref $class) {
-        croak('GetStatus() should NEVER be called against an active object');
+        croak(q{GetStatus() should NEVER be called against an active object});
     }
     my $logger = Log::Log4perl->get_logger();
-    $logger->debug(sub { sprintf 'called %s()', (caller 3)[3] });
+    $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     my $obj = Net::Atalk::ASP->new($host, $port);
     my $resp;

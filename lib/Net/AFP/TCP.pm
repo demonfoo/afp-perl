@@ -74,7 +74,7 @@ sub close { # {{{1
 # Net::AFP methods should ever call this.
 sub SendAFPMessage { # {{{1
     my ($self, $payload, $resp_r, $can_cache) = @_;
-    $self->{logger}->debug(sub { sprintf 'called %s()', (caller 3)[3] });
+    $self->{logger}->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     $self->CheckAttnQueue();
     if ($can_cache && exists $self->{ReplayCache}) {
@@ -92,7 +92,7 @@ sub SendAFPMessage { # {{{1
 ##no critic qw(ProhibitManyArgs)
 sub SendAFPWrite { # {{{1
     my ($self, $payload, $data_r, $d_len, $resp_r, $from_fh) = @_;
-    $self->{logger}->debug(sub { sprintf 'called %s()', (caller 3)[3] });
+    $self->{logger}->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     $self->CheckAttnQueue();
     return $self->{Session}->Write($payload, $data_r, $d_len, $resp_r, $from_fh);
@@ -101,10 +101,10 @@ sub SendAFPWrite { # {{{1
 sub GetStatus { # {{{1
     my ($class, $host, $port, $resp_r) = @_;
     if (ref $class) {
-        croak('GetStatus() should NEVER be called against an active object');
+        croak(q{GetStatus() should NEVER be called against an active object});
     }
     my $logger = Log::Log4perl->get_logger();
-    $logger->debug(sub { sprintf 'called %s()', (caller 3)[3] });
+    $logger->debug(sub { sprintf q{called %s()}, (caller 3)[3] });
 
     my $obj = Net::DSI->new($host, $port);
     my $resp;

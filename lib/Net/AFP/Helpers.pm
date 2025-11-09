@@ -66,7 +66,7 @@ sub do_afp_connect {
     }
 
     if (exists $options{aforder}) {
-        if (ref($options{aforder}) ne 'ARRAY') {
+        if (ref($options{aforder}) ne q{ARRAY}) {
             croak(q{Invalid 'aforder' passed, please correct});
         }
         @af_order = @{$options{aforder}};
@@ -83,6 +83,7 @@ sub do_afp_connect {
     }
 
     if (not defined $values{host}) {
+        ##no critic qw(RequireCheckedSyscalls)
         print {\*STDERR} qq{Could not extract host from AFP URL\n};
         exit EINVAL();
     }
@@ -90,13 +91,13 @@ sub do_afp_connect {
     my($srvInfo, $rc, $host, $port);
     if ($values{atalk_transport}) {
         if (not $has_atalk) {
-            croak 'AppleTalk support libraries not available';
+            croak q{AppleTalk support libraries not available};
         }
 
         my @records = NBPLookup($values{host}, q{AFPServer}, $values{port},
                 undef, 1);
         if (not scalar @records) {
-            croak('Could not resolve NBP name ' . $values{host} .
+            croak(q{Could not resolve NBP name } . $values{host} .
 		      q{:AFPServer@} . ($values{port} ? $values{port} : q{*}));
         }
         ($host, $port) = @{$records[0]}[0,1];
@@ -111,7 +112,7 @@ sub do_afp_connect {
         return ENODEV();
     }
 
-    if (ref($srvInfo_r) eq 'SCALAR') {
+    if (ref($srvInfo_r) eq q{SCALAR}) {
         ${$srvInfo_r} = $srvInfo;
     }
 
@@ -129,7 +130,7 @@ sub do_afp_connect {
             } ];
         }
         else {
-            croak('Server supplied no NetworkAddresses, but using IP transport; server is broken');
+            croak(q{Server supplied no NetworkAddresses, but using IP transport; server is broken});
         }
     }
 
@@ -151,7 +152,7 @@ TRY_SOCKADDRS:
         foreach my $sa (@sa_list) {
             if ($af == AF_APPLETALK) {
                 if (not $has_atalk) {
-                    carp('AF_APPLETALK endpoint selected, but atalk support not available');
+                    carp(q{AF_APPLETALK endpoint selected, but atalk support not available});
                     next TRY_SOCKADDRS;
                 }
                 $session = Net::AFP::Atalk->new($sa->{address}, $sa->{port});
@@ -163,11 +164,12 @@ TRY_SOCKADDRS:
                 $using_atalk = 0;
             }
 
-            last TRY_AFS if ref $session and $session->isa('Net::AFP');
+            last TRY_AFS if ref $session and $session->isa(q{Net::AFP});
         }
     }
 
-    if (not ref $session or not $session->isa('Net::AFP')) {
+    if (not ref $session or not $session->isa(q{Net::AFP})) {
+        ##no critic qw(RequireCheckedSyscalls)
         print {\*STDERR} q{Failed connecting to all endpoints supplied } .
           qq{by server?\n};
         return ENODEV();
@@ -176,6 +178,7 @@ TRY_SOCKADDRS:
     my $cv = Net::AFP::Versions::GetPreferredVersion($srvInfo->{AFPVersions},
             $using_atalk);
     if (not $cv) {
+        ##no critic qw(RequireCheckedSyscalls)
         print {\*STDERR} q{Couldn't agree on an AFP protocol version with } .
                 qq{the server\n};
         $session->close();
