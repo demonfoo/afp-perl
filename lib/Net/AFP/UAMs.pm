@@ -26,9 +26,9 @@ my @UAMReg = ();
 sub RegisterUAM {
     my ($uamname, $class, $pref) = @_;
 
-    my $uaminfo = { 'name' => $uamname, 'class' => $class, 'pref' => $pref };
+    my $uaminfo = { name => $uamname, class => $class, pref => $pref };
     for my $i (0 .. $#UAMReg) {
-        next if $UAMReg[$i]->{'pref'} > $pref;
+        next if $UAMReg[$i]->{pref} > $pref;
         @UAMReg = (@UAMReg[0 .. ($i - 1)], $uaminfo, @UAMReg[$i .. $#UAMReg]);
         return;
     }
@@ -40,7 +40,7 @@ sub RegisterUAM {
 # inclusion path where we should pull our own UAMs from.
 my $incname = __PACKAGE__;
 $incname =~ s{::}{/}gsm;
-$incname .= '.pm';
+$incname .= q{.pm};
 # %INC contains the include paths for all currently-imported packages.
 my $incpath = $INC{$incname};
 $incpath =~ s{[.]pm$}{}sm;
@@ -55,8 +55,8 @@ if (-d $incpath) {
 # impair our ability to continue on.
 foreach my $uampath (@uampaths) {
     ## no critic qw(ProhibitEnumeratedClasses)
-    if (($OSNAME ne 'MSWin32' and $uampath !~ m{^/}sm) or
-      ($OSNAME eq 'MSWin32' and $uampath !~ m{[A-Z]:[/\\]}sm)) {
+    if (($OSNAME ne q{MSWin32} and $uampath !~ m{^/}sm) or
+      ($OSNAME eq q{MSWin32} and $uampath !~ m{[A-Z]:[/\\]}sm)) {
         $uampath = q{./} . $uampath;
     }
     eval {
@@ -70,15 +70,15 @@ sub GuestAuth {
     my($session, $AFPVersion) = @_;
     my $rc = Net::AFP::UAMs::Anonymous::Authenticate($session, $AFPVersion);
     if ($rc == $kFPNoErr) {
-        $session->{'AFPVersion'} = $AFPVersion;
+        $session->{AFPVersion} = $AFPVersion;
     }
     return $rc;
 }
 
 sub PasswordAuth {
     my($session, $AFPVersion, $SupportedUAMs, $UserName, $PwCallback) = @_;
-#    die('Need a function ref for password callback')
-#            unless ref($PwCallback) eq 'CODE';
+#    die(q{Need a function ref for password callback})
+#            unless ref($PwCallback) eq q{CODE};
 
     # The AFP server often sets a really lousy UAM order; I should really
     # have a prioritized list of UAMs that we know are good, and try to
@@ -103,7 +103,7 @@ sub PasswordAuth {
             $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
         }
         if ($rc == $kFPNoErr) {
-            $session->{'AFPVersion'} = $AFPVersion;
+            $session->{AFPVersion} = $AFPVersion;
         }
         return $rc;
     }
@@ -119,10 +119,10 @@ sub ChangePassword {
 
     my %ReqUAMs = map { lc() => 1 } @{$SupportedUAMs};
     foreach my $uaminfo (@UAMReg) {
-        if (not exists $ReqUAMs{lc($uaminfo->{'name'})}) {
+        if (not exists $ReqUAMs{lc($uaminfo->{name})}) {
             next;
         }
-        if (not $uaminfo->{class}->can('ChangePassword')) {
+        if (not $uaminfo->{class}->can(q{ChangePassword})) {
             next;
         }
         if ($uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1) {
@@ -146,5 +146,15 @@ sub ChangePassword {
     return $kFPBadUAM;
 }
 
+##no critic qw(RequireArgUnpacking)
+sub zeropad {
+    if (length($_[0]) > $_[1]) {
+        return substr $_[0], length($_[0]) - $_[1], $_[1];
+    }
+    else {
+        return(qq{\0} x ($_[1] - length $_[0]) . $_[0]);
+    }
+}
+
 1;
-# vim: ts=4
+# vim: ts=4 et ai sw=4

@@ -5,21 +5,21 @@
 
 package Net::AFP::UAMs::DHX2;
 
-use Modern::Perl '2021';
+use Modern::Perl q{2021};
 use diagnostics;
 use integer;
 use Carp;
 use Data::Dumper;
 
 use Readonly;
-Readonly my $UAMNAME => 'DHX2';
+Readonly my $UAMNAME => q{DHX2};
 
 # Crypt::Mode::CBC doesn't like if I make these Readonly.
-my $C2SIV = 'LWallace';
-my $S2CIV = 'CJalbert';
+my $C2SIV = q{LWallace};
+my $S2CIV = q{CJalbert};
 
-Readonly my $nonce_len => 16;
-Readonly my $pw_len    => 256;
+Readonly my $nonce_len  => 16;
+Readonly my $pw_len     => 256;
 
 # CryptX modules for crypto-related functionality.
 use Crypt::Mode::CBC;
@@ -33,16 +33,6 @@ use Net::AFP::Versions;
 use Log::Log4perl;
 
 Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 200);
-
-##no critic qw(RequireArgUnpacking)
-sub zeropad {
-    if (length($_[0]) > $_[1]) {
-        return substr $_[0], length($_[0]) - $_[1], $_[1];
-    }
-    else {
-        return "\0" x ($_[1] - length $_[0]) . $_[0];
-    }
-}
 
 # since these parts are the same between authentication and password changing,
 # let's not write the whole thing twice, eh?
@@ -58,42 +48,43 @@ sub auth_common1 {
 
     # Pull p and Mb out of the data the server sent back, based on the length
     # value extracted above.
-    $p = '0x' . unpack q{H*}, $p;
+    $p = q{0x} . unpack q{H*}, $p;
     $session->{logger}->debug(sub { sprintf q{p is %s}, $p });
 
     my $dh = Crypt::PK::DH->new();
     $dh->generate_key({p => $p, g => $g});
 
-    my $K = $dh->shared_secret(Crypt::PK::DH->new()->import_key_raw($Mb, 'public',
-      {p => $p, g => $g}));
+    my $K = $dh->shared_secret(Crypt::PK::DH->new()->import_key_raw($Mb,
+      q{public}, {p => $p, g => $g}));
     undef $Mb;
     $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack q{H*}, $K });
 
     # Get our nonce, which we'll send to the server in the ciphertext.
-    my $clientNonce = zeropad(random_bytes($nonce_len), $nonce_len);
+    my $clientNonce = Net::AFP::UAMs::zeropad(random_bytes($nonce_len),
+      $nonce_len);
     $session->{logger}->debug(sub { sprintf q{clientNonce is %s},
       unpack q{H*}, $clientNonce });
 
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
-    my $key = md5(zeropad($K, $len));
+    my $key = md5(Net::AFP::UAMs::zeropad($K, $len));
     if ($store_sesskey) {
         $session->{SessionKey} = $key;
     }
     undef $K;
-    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
+    my $ctx = Crypt::Mode::CBC->new(q{CAST5}, 0);
 
     # Encrypt the random nonce value we fetched above, then assemble the
     # message to send to the server.
-    my $ciphertext = $ctx->encrypt(zeropad($clientNonce, $nonce_len),
-            $key, $C2SIV);
-    my $Ma = $dh->export_key_raw('public');
+    my $ciphertext = $ctx->encrypt(Net::AFP::UAMs::zeropad($clientNonce,
+      $nonce_len), $key, $C2SIV);
+    my $Ma = $dh->export_key_raw(q{public});
     # Sometimes the result is an extra (zero) byte long; strip that off.
     if (length($Ma) > $len) {
         $Ma = substr $Ma, length($Ma) - $len, $len;
     }
 
-    $message = pack qq{a[${len}]a[${nonce_len}]}, $Ma, $ciphertext;
+    $message = pack sprintf(q{a[%d]a[%d]}, $len, $nonce_len), $Ma, $ciphertext;
 
     return($message, $clientNonce, $ctx, $key);
 }
@@ -120,14 +111,16 @@ sub auth_common2 {
         # gumming up the works. It's fixed in their current git.
         # https://github.com/Netatalk/netatalk/issues/1456
         # In the meantime, I'll just... work around it.
-        increment_octets_be($clientNonce) =~ m{^\x00+(.*)$};
-        my $altClientNonce = $1;
+        my($altClientNonce) =
+            increment_octets_be($clientNonce) =~ m{^\x00+(.*)$}ms;
 
-        $newClientNonce = unpack sprintf(q{a[%d]}, length $altClientNonce), $decrypted;
+        $newClientNonce = unpack sprintf(q{a[%d]}, length $altClientNonce),
+          $decrypted;
 
         if ($altClientNonce ne $newClientNonce) {
-            croak('encryption error - nonce check failed; ' .
-              unpack(q{H*}, $clientNonce) . ' != ' . unpack(q{H*}, $newClientNonce));
+            croak(q{encryption error - nonce check failed; } .
+              unpack(q{H*}, $clientNonce) . q{ != } .
+              unpack q{H*}, $newClientNonce);
         }
     }
     undef $clientNonce;
@@ -135,7 +128,7 @@ sub auth_common2 {
 
     # Increment the nonce value the server sent to us, to be returned as part
     # of the encrypted response.
-    my $serverNonce = unpack sprintf(q{x[%d]a[%d]}, $nonce_len, $nonce_len),
+    my $serverNonce = unpack sprintf(q{x[%1$d]a[%1$d]}, $nonce_len),
       $decrypted;
     undef $decrypted;
     $session->{logger}->debug(sub { sprintf q{serverNonce is %s},
@@ -235,12 +228,12 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    if (not ref $session or not $session->isa('Net::AFP')) {
-        croak('Object MUST be of type Net::AFP!');
+    if (not ref $session or not $session->isa(q{Net::AFP})) {
+        croak(q{Object MUST be of type Net::AFP!});
     }
 
-    if (ref($pw_cb) ne 'CODE') {
-        croak('Password callback MUST be a subroutine ref');
+    if (ref($pw_cb) ne q{CODE}) {
+        croak(q{Password callback MUST be a subroutine ref});
     }
 
     # Unlike with DHCAST128, since we don't know a variety of things yet,
@@ -256,12 +249,14 @@ sub Authenticate {
                 AFPVersion => $AFPVersion,
                 UAM        => $UAMNAME,
                 UserName   => $username);
-        $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
+        $session->{logger}->debug(q{FPLoginExt() completed with result code },
+          $rc);
     }
     else {
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME,
-                pack q{C/a*x![s]}, $username);
-        $session->{logger}->debug('FPLogin() completed with result code ', $rc);
+          pack q{C/ax![s]}, $username);
+        $session->{logger}->debug(q{FPLogin() completed with result code },
+          $rc);
     }
     return $rc if $rc != $kFPAuthContinue;
 
@@ -288,8 +283,8 @@ sub Authenticate {
     # Assemble the final message to send back to the server with the
     # incremented server nonce, and the user's password, then encrypt the
     # message.
-    my $authdata = pack qq{a[${nonce_len}]a[${pw_len}]},
-	                zeropad($serverNonce, $nonce_len), &{$pw_cb}();
+    my $authdata = pack sprintf(q{a[%d]a[%d]}, $nonce_len, $pw_len),
+      Net::AFP::UAMs::zeropad($serverNonce, $nonce_len), &{$pw_cb}();
     undef $serverNonce;
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
@@ -307,8 +302,8 @@ sub ChangePassword {
     my($session, $username, $oldPassword, $newPassword) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    if (not ref $session or not $session->isa('Net::AFP')) {
-        croak('Object MUST be of type Net::AFP!');
+    if (not ref $session or not $session->isa(q{Net::AFP})) {
+        croak(q{Object MUST be of type Net::AFP!});
     }
 
     my $resp = undef;
@@ -318,7 +313,8 @@ sub ChangePassword {
         $username = q{};
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, q{}, \$resp);
-    $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
+    $session->{logger}->debug(q{FPChangePassword() completed with result code },
+      $rc);
     return $rc if $rc != $kFPAuthContinue;
 
     my ($ID, $body) = unpack q{S>a*}, $resp;
@@ -346,9 +342,9 @@ sub ChangePassword {
     # Assemble the final message to send back to the server with the
     # incremented server nonce, the user's current password, and the
     # desired new password, then encrypt the message.
-    my $authdata = pack qq{a[${nonce_len}]a[${pw_len}]a[${pw_len}]},
-	                zeropad($serverNonce, $nonce_len),
-	                $newPassword, $oldPassword;
+    my $authdata = pack sprintf(q{a[%1$d]a[%2$d]a[%2$d]}, $nonce_len, $pw_len),
+      Net::AFP::UAMs::zeropad($serverNonce, $nonce_len), $newPassword,
+      $oldPassword;
     undef $serverNonce;
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
@@ -357,9 +353,10 @@ sub ChangePassword {
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPChangePassword($UAMNAME, $username, pack q{na*}, $ID, $ciphertext);
     undef $ciphertext;
-    $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
+    $session->{logger}->debug(q{FPChangePassword() completed with result code },
+      $rc);
     return $rc;
 }
 
 1;
-# vim: ts=4
+# vim: ts=4 et ai sw=4

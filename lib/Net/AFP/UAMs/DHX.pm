@@ -7,21 +7,22 @@
 # This UAM was added as of AFP 3.0. (Later backported to Classic - AFP 2.3?)
 
 package Net::AFP::UAMs::DHX;
-use Modern::Perl '2021';
+use Modern::Perl q{2021};
 use diagnostics;
 use integer;
 use Carp;
 
 use Readonly;
-Readonly my $UAMNAME => 'DHCAST128';
+Readonly my $UAMNAME => q{DHCAST128};
 
 # Crypt::Mode::CBC doesn't like if I make these Readonly.
-my $C2SIV = 'LWallace';
-my $S2CIV = 'CJalbert';
+my $C2SIV = q{LWallace};
+my $S2CIV = q{CJalbert};
 
-Readonly my $len       => 16;
-Readonly my $nonce_len => 16;
-Readonly my $pw_len    => 64;
+Readonly my $len            => 16;
+Readonly my $nonce_len      => 16;
+Readonly my $pw_len         => 64;
+Readonly my $signature_len  => 16;
 
 # CryptX modules for crypto-related functionality.
 use Crypt::Mode::CBC;
@@ -37,19 +38,8 @@ Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 150);
 
 # These are universal. This particular UAM ALWAYS uses these values - $g
 # as the base for an exponentiation, and $p as a modulus.
-my @p_bytes = (0xba, 0x28, 0x73, 0xdf, 0xb0, 0x60, 0x57, 0xd4, 0x3f, 0x20,
-               0x24, 0x74, 0x4c, 0xee, 0xe7, 0x5b,);
-my @g_bytes = (0x07);
-
-##no critic qw(RequireArgUnpacking)
-sub zeropad {
-    if (length($_[0]) > $_[1]) {
-        return substr $_[0], length($_[0]) - $_[1], $_[1];
-    }
-    else {
-        return("\0" x ($_[1] - length $_[0]) . $_[0]);
-    }
-}
+my $p = q{0xba2873dfb06057d43f2024744ceee75b};
+my $g = q{0x07};
 
 # since these parts are the same between authentication and password changing,
 # let's not write the whole thing twice, eh?
@@ -57,10 +47,9 @@ sub auth_common1 {
     my($session) = @_;
 
     my $dh = Crypt::PK::DH->new();
-    $dh->generate_key({ p => '0x' . unpack(q{H*}, pack q{C*}, @p_bytes),
-                        g => '0x' . unpack q{H*}, pack q{C*}, @g_bytes });
+    $dh->generate_key({ p => $p, g => $g });
 
-    my $Ma = zeropad($dh->export_key_raw('public'), $len);
+    my $Ma = Net::AFP::UAMs::zeropad($dh->export_key_raw(q{public}), $len);
     if (length($Ma) > $len) {
         $Ma = substr $Ma, length($Ma) - $len, $len;
     }
@@ -71,10 +60,9 @@ sub auth_common1 {
 sub auth_common2 {
     my($session, $message, $store_sesskey, $dh) = @_;
 
-    my($Mb, $encrypted) = unpack "a[${len}]a*", $message;
-    my $K = $dh->shared_secret(Crypt::PK::DH->new()->import_key_raw($Mb, 'public',
-      { p => '0x' . unpack(q{H*}, pack q{C*}, @p_bytes),
-        g => '0x' . unpack q{H*}, pack q{C*}, @g_bytes }));
+    my($Mb, $encrypted) = unpack sprintf(q{a[%d]a*}, $len), $message;
+    my $K = $dh->shared_secret(Crypt::PK::DH->new()->import_key_raw($Mb,
+      q{public}, { p => $p, g => $g }));
     $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack q{H*}, $K });
 
     $session->{logger}->debug(sub { sprintf q{encrypted is 0x%s},
@@ -82,12 +70,12 @@ sub auth_common2 {
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
-    my $key = zeropad($K, $len);
+    my $key = Net::AFP::UAMs::zeropad($K, $len);
     if ($store_sesskey) {
         $session->{SessionKey} = $key;
     }
     undef $K;
-    my $ctx = Crypt::Mode::CBC->new('CAST5', 0);
+    my $ctx = Crypt::Mode::CBC->new(q{CAST5}, 0);
     my $decrypted = $ctx->decrypt($encrypted, $key, $S2CIV);
     $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
       unpack q{H*}, $decrypted });
@@ -95,14 +83,16 @@ sub auth_common2 {
     # The nonce is a random value that the server sends as a check; we add
     # one to it, and send it back to the server to prove we understand what
     # it's saying.
-    my($nonce, $sig) = unpack "a[${nonce_len}]a[16]", $decrypted;
+    my($nonce, $sig) = unpack sprintf(q{a[%d]a[%d]}, $nonce_len,
+      $signature_len), $decrypted;
     # signature should be 16 bytes of null; if it's not something has gone
     # very wrong.
-    if ($sig ne qq{\0} x 16) {
-        croak('encryption error - signature was not what was expected?');
+    if ($sig ne qq{\0} x $signature_len) {
+        croak(q{encryption error - signature was not what was expected?});
     }
     undef $decrypted;
-    $session->{logger}->debug(sub { sprintf q{nonce is %s}, unpack q{H*}, $nonce });
+    $session->{logger}->debug(sub { sprintf q{nonce is %s}, unpack q{H*},
+      $nonce });
     # If all bits are 1, this will throw a fatal error.
     $nonce = increment_octets_be($nonce);
     $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
@@ -115,7 +105,7 @@ sub Authenticate {
     my($session, $AFPVersion, $username, $pw_cb) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    if (not ref $session or not $session->isa('Net::AFP')) {
+    if (not ref $session or not $session->isa(q{Net::AFP})) {
         croak(q{Object MUST be of type Net::AFP!});
     }
 
@@ -137,20 +127,22 @@ sub Authenticate {
                 UAM          => $UAMNAME,
                 UserName     => $username,
                 UserAuthInfo => $Ma);
-        $session->{logger}->debug('FPLoginExt() completed with result code ', $rc);
+        $session->{logger}->debug(q{FPLoginExt() completed with result code },
+          $rc);
     }
     else {
-        my $ai = pack q{C/a*x![s]a*}, $username, $Ma;
+        my $ai = pack q{C/ax![s]a*}, $username, $Ma;
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $ai);
-        $session->{logger}->debug('FPLogin() completed with result code ', $rc);
+        $session->{logger}->debug(q{FPLogin() completed with result code },
+          $rc);
     }
     return $rc if $rc != $kFPAuthContinue;
 
     my($nonce, $key, $ctx) =
       auth_common2($session, $resp{UserAuthInfo}, 1, $dh);
 
-    my $authdata = pack "a[${nonce_len}]a[${pw_len}]",
-	                zeropad($nonce, $nonce_len), &{$pw_cb}();
+    my $authdata = pack sprintf(q{a[%d]a[%d]}, $nonce_len, $pw_len),
+      Net::AFP::UAMs::zeropad($nonce, $nonce_len), &{$pw_cb}();
     undef $nonce;
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     undef $authdata;
@@ -169,14 +161,14 @@ sub ChangePassword {
     my($session, $username, $oldPassword, $newPassword) = @_;
 
     # Ensure that we've been handed an appropriate object.
-    if (not ref $session or not $session->isa('Net::AFP')) {
-        croak('Object MUST be of type Net::AFP!');
+    if (not ref $session or not $session->isa(q{Net::AFP})) {
+        croak(q{Object MUST be of type Net::AFP!});
     }
 
     my($dh, $Ma) = auth_common1($session);
 
     # Send an ID value of 0, followed by our Ma value.
-    my $authinfo = pack "na[${len}]", 0, $Ma;
+    my $authinfo = pack sprintf(q{na[%d]}, $len), 0, $Ma;
     undef $Ma;
     $session->{logger}->debug(sub { sprintf q{authinfo is 0x%s},
       unpack q{H*}, $authinfo });
@@ -189,16 +181,15 @@ sub ChangePassword {
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, $authinfo, \$resp);
     undef $authinfo;
-    $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
+    $session->{logger}->debug(q{FPChangePassword() completed with result code },
+      $rc);
     return $rc if $rc != $kFPAuthContinue;
 
     my($ID, $message) = unpack q{S>a*}, $resp;
-    my($nonce, $key, $ctx) =
-      auth_common2($session, $message, 0, $dh);
+    my($nonce, $key, $ctx) = auth_common2($session, $message, 0, $dh);
 
-    my $authdata = pack "a[${nonce_len}]a[${pw_len}]a[${pw_len}]",
-	                zeropad($nonce, $nonce_len), $newPassword,
-                    $oldPassword;
+    my $authdata = pack sprintf(q{a[%1$d]a[%2$d]a[%2$d]}, $nonce_len, $pw_len),
+      Net::AFP::UAMs::zeropad($nonce, $nonce_len), $newPassword, $oldPassword;
     undef $nonce;
     my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
     undef $authdata;
@@ -212,9 +203,10 @@ sub ChangePassword {
     undef $ciphertext;
     $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;
-    $session->{logger}->debug('FPChangePassword() completed with result code ', $rc);
+    $session->{logger}->debug(q{FPChangePassword() completed with result code },
+      $rc);
     return $rc;
 }
 
 1;
-# vim: ts=4
+# vim: ts=4 et ai sw=4
