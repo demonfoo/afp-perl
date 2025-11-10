@@ -35,7 +35,7 @@ use Getopt::Long qw(GetOptionsFromArray);
 use Data::Dumper;       # for debugging; remove later
 use POSIX;              # for POSIX time handling
 use File::Basename;
-if ($OSNAME eq 'MSWin32') {
+if ($OSNAME eq q{MSWin32}) {
     require Term::ReadPassword::Win32;
     Term::ReadPassword::Win32->import;
 }
@@ -55,8 +55,8 @@ my $term_enc = langinfo(CODESET);
 my $blksize  = 1<<19;
 
 # If you're in Windows, you'll probably just get a codepage number.
-if ($OSNAME eq 'MSWin32' && $term_enc =~ m{^\d+$}sm) {
-    $term_enc = 'cp' . $term_enc;
+if ($OSNAME eq q{MSWin32} && $term_enc =~ m{^\d+$}sm) {
+    $term_enc = q{cp} . $term_enc;
 }
 
 my $has_Term__ReadKey = 0;
@@ -70,7 +70,7 @@ eval { require UUID; 1; } and do { $has_UUID = 1; };
 
 my $has_Archive__Tar = 1;
 eval { require Archive::Tar; 1; } or do {
-    print {*STDERR} "WARNING: Sorry, Archive::Tar not available.\n";
+    print {*STDERR} qq{WARNING: Sorry, Archive::Tar not available.\n};
     $has_Archive__Tar = 0;
 };
 
@@ -117,12 +117,12 @@ _EOT_
 
 my %afpopts;
 my($atalk_first, $prefer_v4, $debug_afp, $debug_dsi);
-Getopt::Long::Configure('no_ignore_case');
-GetOptions( 'atalk-first' => \$atalk_first,
-            '4|prefer-v4' => \$prefer_v4,
-            'debug-afp'   => \$debug_afp,
-            'debug-dsi'   => \$debug_dsi,
-            'h|help'      => \&usage) || usage();
+Getopt::Long::Configure(q{no_ignore_case});
+GetOptions( q{atalk-first} => \$atalk_first,
+            q{4|prefer-v4} => \$prefer_v4,
+            q{debug-afp}   => \$debug_afp,
+            q{debug-dsi}   => \$debug_dsi,
+            q{h|help}      => \&usage) || usage();
 
 my $logconf = <<'_EOT_';
 log4perl.appender.AppLogging = Log::Log4perl::Appender::Screen
@@ -169,12 +169,12 @@ my($url) = @ARGV;
 
 my $pw_cb = sub {
     my(%values) = @_;
-    my $prompt = 'Password: ';
+    my $prompt = q{Password: };
     return $values{password} if defined $values{password};
     return read_password($prompt);
 };
 my($session, %values) = do_afp_connect($pw_cb, $url || q{}, undef, %afpopts);
-if (not ref $session or not $session->isa('Net::AFP')) {
+if (not ref $session or not $session->isa(q{Net::AFP})) {
     exit $session;
 }
 
@@ -189,9 +189,9 @@ Volume Name                                 | UNIX privs? | Volume pass?
 -------------------------------------------------------------------------
 _EOT_
     foreach my $volume (@{$srvrParms->{Volumes}}) {
-        printf "\%-43s |     \%-3s     |     \%s\n", $volume->{VolName},
-                $volume->{HasUNIXPrivs} ? 'Yes' : 'No',
-                $volume->{HasPassword} ? 'Yes' : 'No';
+        printf qq{\%-43s |     \%-3s     |     \%s\n}, $volume->{VolName},
+                $volume->{HasUNIXPrivs} ? q{Yes} : q{No},
+                $volume->{HasPassword} ? q{Yes} : q{No};
     }
 
     $session->FPLogout();
@@ -203,7 +203,7 @@ my $volInfo;
 my $ret = $session->FPOpenVol($kFPVolAttributeBit,
         decode($term_enc, $values{volume}), undef, \$volInfo);
 if ($ret != $kFPNoErr) {
-    print {*STDERR} "ERROR: Volume was unknown?\n";
+    print {*STDERR} qq{ERROR: Volume was unknown?\n};
     $session->FPLogout();
     $session->close();
     exit 1;
@@ -213,7 +213,7 @@ my $volID = $volInfo->{ID};
 my $DT_ID;
 $ret = $session->FPOpenDT($volID, \$DT_ID);
 if ($ret != $kFPNoErr) {
-    print {*STDERR} "WARNING: Couldn't open Desktop DB\n";
+    print {*STDERR} qq{WARNING: Couldn't open Desktop DB\n};
     undef $DT_ID;
 }
 
@@ -225,30 +225,31 @@ if ($volAttrs & $kSupportsACLs) {
         $client_uuid = UUID::uuid();
     }
     else {
-        print {*STDERR} "WARNING: Need UUID class for full ACL functionality, ACL checking disabled\n";
+        print {*STDERR} qq{WARNING: Need UUID class for full ACL } .
+          q{functionality, ACL checking disabled\n};
     }
 }
 
 my $pathType    = $kFPLongName;
 my $pathFlag    = $kFPLongNameBit;
-my $pathkey     = 'LongName';
+my $pathkey     = q{LongName};
 
 if ($volAttrs & $kSupportsUTF8Names) {
     # If the remote volume does UTF8 names, then we'll go with that..
     $pathType       = $kFPUTF8Name;
     $pathFlag       = $kFPUTF8NameBit;
-    $pathkey        = 'UTF8Name';
+    $pathkey        = q{UTF8Name};
 }
 
 my $topDirID = 2;
-my $term = Term::ReadLine->new('afpclient');
+my $term = Term::ReadLine->new(q{afpclient});
 my $attribs = $term->Attribs();
 my $curdirnode = $topDirID;
 
 my $DForkLenFlag    = $kFPDataForkLenBit;
 my $RForkLenFlag    = $kFPRsrcForkLenBit;
-my $DForkLenKey     = 'DataForkLen';
-my $RForkLenKey     = 'RsrcForkLen';
+my $DForkLenKey     = q{DataForkLen};
+my $RForkLenKey     = q{RsrcForkLen};
 my $EnumFn          = \&Net::AFP::FPEnumerate;
 my $ReadFn          = \&Net::AFP::FPRead;
 my $WriteFn         = \&Net::AFP::FPWrite;
@@ -258,8 +259,8 @@ if (Net::AFP::Versions::CompareByVersionNum($session, 3, 0,
         $kFPVerAtLeast)) {
     $DForkLenFlag   = $kFPExtDataForkLenBit;
     $RForkLenFlag   = $kFPExtRsrcForkLenBit;
-    $DForkLenKey    = 'ExtDataForkLen';
-    $RForkLenKey    = 'ExtRsrcForkLen';
+    $DForkLenKey    = q{ExtDataForkLen};
+    $RForkLenKey    = q{ExtRsrcForkLen};
     $ReadFn         = \&Net::AFP::FPReadExt;
     $WriteFn        = \&Net::AFP::FPWriteExt;
     $EnumFn         = \&Net::AFP::FPEnumerateExt;
@@ -275,8 +276,8 @@ if (defined $values{subpath}) {
     my ($newDirId, $fileName) = resolve_path($session, $volID, $curdirnode,
             decode($term_enc, $values{subpath}));
     if (defined $fileName || !defined $newDirId) {
-        print {*STDERR} 'WARNING: path ', $values{subpath}, ' is not accessible, defaulting ',
-                "to volume root\n";
+        printf {*STDERR} q{WARNING: path %s is not accessible, defaulting },
+                qq{to volume root\n}, $values{subpath};
     }
     else {
         $curdirnode = $newDirId;
@@ -347,7 +348,7 @@ my %commands = (
                                 MaxReplySize    => $MaxReplySize,
                                 PathType        => $pathType,
                                 Pathname        => q{});
-                        if (ref($results) eq 'ARRAY') {
+                        if (ref($results) eq q{ARRAY}) {
                             push @records, @{$results};
                             $offset += scalar @{$results};
                         }
@@ -357,12 +358,12 @@ my %commands = (
                 if ($rc == $kFPNoErr || $rc == $kFPObjectNotFound) {
                     if ($printDirNames == 1 &&
                             (!defined($fileName) || $fileName eq q{})) {
-                        print $dirName, ":\n";
+                        print $dirName, qq{:\n};
                     }
                     do_listentries(\@records, $volID);
                     if ($printDirNames == 1 &&
                             (!defined($fileName) || $fileName eq q{})) {
-                        print "\n";
+                        print qq{\n};
                     }
                 }
             }
@@ -382,8 +383,8 @@ my %commands = (
                     PathType    => $pathType,
                     Pathname    => $fileName);
             if ($rc != $kFPNoErr) {
-                print 'open attempt failed with code ', $rc, ' (',
-                        afp_strerror($rc), ")\n";
+                printf qq{ERROR: Open attempt failed with code %d (%s)\n}, $rc,
+                  afp_strerror($rc);
                 next;
             }
             my $pos = 0;
@@ -399,8 +400,8 @@ my %commands = (
             }
             $rc = $session->FPCloseFork($resp{OForkRefNum});
             if ($rc != $kFPNoErr) {
-                print 'close attempt failed with code ', $rc, ' (',
-                        afp_strerror($rc), ")\n";
+                printf qq{ERROR: Close attempt failed with code %d (%s)\n},
+                  $rc, afp_strerror($rc);
             }
         }
         return 1;
@@ -415,13 +416,13 @@ my %commands = (
             $path = $words[1];
         }
         else {
-            print "Incorrect number of arguments\n";
+            print qq{Incorrect number of arguments\n};
             return 1;
         }
         my ($newDirId, $fileName) = resolve_path($session, $volID, $curdirnode,
                 $path);
         if (defined $fileName || !defined $newDirId) {
-            print "sorry, couldn't change directory\n";
+            print qq{sorry, couldn't change directory\n};
             return 1;
         }
         $curdirnode = $newDirId;
@@ -432,11 +433,11 @@ my %commands = (
         my($continue, $del_src_after_get, $del_target_before_get, $basedir,
             $outputpath);
         GetOptionsFromArray(\@words,
-            'c'     => \$continue,
-            'E'     => \$del_src_after_get,
-            'e'     => \$del_target_before_get,
-            'O=s'   => \$basedir,
-            'o=s'   => \$outputpath,
+            c      => \$continue,
+            E      => \$del_src_after_get,
+            e      => \$del_target_before_get,
+            q{O=s} => \$basedir,
+            q{o=s} => \$outputpath,
         ); # should print usage and return if this doesn't succeed
         if (scalar(@words) < 1 or scalar(@words) > 2) {
             print <<'_EOT_';
@@ -468,14 +469,14 @@ _EOT_
                 PathType    => $pathType,
                 Pathname    => $fileName);
         if ($rc != $kFPNoErr) {
-            print 'open attempt failed with code ', $rc, ' (',
-                    afp_strerror($rc), ")\n";
+            printf qq{ERROR: Open attempt failed with code %d (%s)\n}, $rc,
+              afp_strerror($rc);
             return 1;
         }
 
-        my $local_fh = IO::File->new($targetFile, 'w');
+        my $local_fh = IO::File->new($targetFile, q{w});
         if (not defined $local_fh) {
-            print "Couldn't open local file for writing!\n";
+            print qq{Couldn't open local file for writing!\n};
             $session->FPCloseFork($resp{OForkRefNum});
             return 1;
         }
@@ -492,7 +493,7 @@ _EOT_
                 FileBitmap  => $bitmap);
 
         if ($sresp->{$RForkLenKey} > 0) {
-            print "note that the resource fork isn't handled yet!\n";
+            print qq{note that the resource fork isn't handled yet!\n};
         }
         my $len = $sresp->{$DForkLenKey};
         STDOUT->autoflush(1);
@@ -552,20 +553,21 @@ _EOT_
                 if ($has_Term__ReadKey) {
                     $twidth = (GetTerminalSize())[0];
                 }
-                printf qq{\r %3d%%  |%-25s|  %-} . ($twidth - 52) . 's  %5.2f %sB/sec', $pcnt,
-                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult;
+                printf qq{\r %3d%%  |%-25s|  %-} . ($twidth - 52) . q{s  %5.2f %sB/sec},
+                  $pcnt, q{*} x ($pcnt * 25 / 100),
+                  substr($fileName, 0, $twidth - 52), $rate, $mult;
                 $lasttime = $time;
                 $lastpos = $pos;
                 last if $rc != $kFPNoErr;
             }
         }
-        printf "\nTransferred %d bytes in %dh%dm%.2fs\n", $pos, $delta / 3600,
+        printf qq{\nTransferred %d bytes in %dh%dm%.2fs\n}, $pos, $delta / 3600,
           $delta / 60 % 60, $delta - (int(int($delta) / 60) * 60);
         close($local_fh) || carp(q{Couldn't close local file});
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != $kFPNoErr) {
-            print 'close attempt failed with code ', $rc, ' (',
-                    afp_strerror($rc), ")\n";
+            printf qq{ERROR: Close attempt failed with code %d (%s)\n}, $rc,
+              afp_strerror($rc);
         }
         return 1;
     },
@@ -594,9 +596,9 @@ _EOT_
             $fileName = $srcFileName;
         }
 
-        my $srcFile = IO::File->new($words[1], 'r');
+        my $srcFile = IO::File->new($words[1], q{r});
         if (not defined $srcFile) {
-            print "couldn't open source file\n";
+            print qq{couldn't open source file\n};
             return 1;
         }
         binmode $srcFile;
@@ -607,8 +609,8 @@ _EOT_
                 PathType    => $pathType,
                 Pathname    => $fileName);
         if ($rc != $kFPNoErr) {
-            printf "Couldn't create file on remote server; server returned code \%d (\%s)\n",
-                    $rc, afp_strerror($rc);
+            printf qq{ERROR: Couldn't create file on remote server; server } .
+              q{returned code %d (%s)\n}, $rc, afp_strerror($rc);
             return 1;
         }
         my %resp;
@@ -619,8 +621,8 @@ _EOT_
                 PathType    => $pathType,
                 Pathname    => $fileName);
         if ($rc != $kFPNoErr) {
-            print 'open attempt failed with code ', $rc, ' (',
-                    afp_strerror($rc), ")\n";
+            printf qq{ERROR: Open attempt failed with code %d (%s)\n}, $rc,
+              afp_strerror($rc);
             return 1;
         }
 
@@ -682,25 +684,26 @@ _EOT_
                 if ($has_Term__ReadKey) {
                     $twidth = (GetTerminalSize())[0];
                 }
-                printf qq{\r %3d%%  |%-25s|  %-} . ($twidth - 52) . 's  %5.2f %sB/sec', $pcnt,
-                        q{*} x ($pcnt * 25 / 100), substr($fileName, 0, $twidth - 52), $rate, $mult;
+                printf qq{\r %3d%%  |%-25s|  %-} . ($twidth - 52) .
+                  q{s  %5.2f %sB/sec}, $pcnt, q{*} x ($pcnt * 25 / 100),
+                  substr($fileName, 0, $twidth - 52), $rate, $mult;
                 $lasttime = $time;
                 $lastpos = $wcount;
             }
             if ($rc != $kFPNoErr) {
-                print 'Write to file on server failed with return code ', $rc,
-                        ' (', afp_strerror($rc), ")\n";
+                printf q{ERROR: Write to file on server failed with } .
+                  q{return code %d (%s)\n}, $rc, afp_strerror($rc);
                 last;
             }
             last if $rc != $kFPNoErr or $fileLen <= $wcount;
         }
-        printf "\nTransferred %d bytes in %dh%dm%.2fs\n", $wcount, $delta / 3600,
+        printf qq{\nTransferred %d bytes in %dh%dm%.2fs\n}, $wcount, $delta / 3600,
           $delta / 60 % 60, $delta - (int(int($delta) / 60) * 60);
         close($srcFile) || carp(q{Couldn't close local file});
         $rc = $session->FPCloseFork($resp{OForkRefNum});
         if ($rc != $kFPNoErr) {
-            print 'close attempt failed with code ', $rc, ' (',
-                    afp_strerror($rc), "\n";
+            printf qq{ERROR: Close attempt failed with code %d (%s)\n},
+              $rc, afp_strerror($rc);
         }
         return 1;
     },
@@ -718,8 +721,8 @@ _EOT_
                 PathType    => $pathType,
                 Pathname    => $words[1]);
         if ($rc != $kFPNoErr) {
-            print 'sorry, couldn\'t create requested directory; response was ',
-                    $rc, ' (', afp_strerror($rc), ")\n";
+            printf qq{ERROR: Couldn't create requested directory; } .
+              q{response was %d (%s)\n}, $rc, afp_strerror($rc);
         }
         return 1;
     },
@@ -735,7 +738,8 @@ NEXT_ARG:
         foreach my $item (@words[1 .. $#words]) {
             my $expansion_list = expand_globbed_path($session, $volID, $curdirnode, $words[1]);
             if (!ref($expansion_list) || scalar(@{$expansion_list}) < 1) {
-                printf qq{Sorry, couldn't find any matches for entry "%s"\n}, $item;
+                printf qq{Sorry, couldn't find any matches for entry "%s"\n},
+                  $item;
                 next NEXT_ARG;
             }
 NEXT_EXPANDED:
@@ -744,9 +748,9 @@ NEXT_EXPANDED:
                 my $rc = $session->FPDelete($volID, $dirId, $pathType,
                         $fileName || q{});
                 if ($rc != $kFPNoErr) {
-                    print 'sorry, couldn\'t remove item "',
-                            $fileName || $dirName, '"; response was ', $rc,
-                            ' (', afp_strerror($rc), ")\n";
+                    printf qq{ERROR: Couldn't remove item "%s"; response } .
+                      q{was %d (%s)\n}, $fileName || $dirName, $rc,
+                      afp_strerror($rc);
                 }
             }
         }
@@ -767,7 +771,7 @@ NEXT_EXPANDED:
             push @nameParts, $entry->{$pathkey};
             $searchID = $entry->{ParentDirID};
         }
-        print q{current directory is /}, join(q{/}, reverse @nameParts), "\n";
+        printf q{current directory is /%s\n}, join(q{/}, reverse @nameParts);
         return 1;
     },
     exit    => sub {
@@ -786,7 +790,7 @@ NEXT_EXPANDED:
                     PathType    => $pathType,
                     Pathname    => $fileName);
             if ($rc != $kFPNoErr) {
-                print "Sorry, file/directory was not found\n";
+                print qq{Sorry, file/directory was not found\n};
                 return 1;
             }
             printf qq{ACL for "%s":\n}, $fname;
@@ -808,7 +812,7 @@ NEXT_EXPANDED:
                     PathType => $pathType,
                     Pathname => $fileName);
             if ($rc != $kFPNoErr) {
-                print "Sorry, file/directory was not found\n";
+                print qq{Sorry, file/directory was not found\n};
                 return 1;
             }
             printf qq{Comment for "%s":\n%s\n}, $fname, $resp;
@@ -824,14 +828,15 @@ NEXT_EXPANDED:
     },
     lcd => sub {
         my @words = @_;
-        chdir($words[1] || $ENV{HOME}) || print q{Couldn't change local directory: } . $ERRNO . "\n";
+        chdir($words[1] || $ENV{HOME}) || 
+          printf qq{Couldn't change local directory: %d\n}, $ERRNO;
         return 1;
     },
     lpwd    => sub {
-        print Cwd::getcwd(), "\n";
+        print Cwd::getcwd(), qq{\n};
         return 1;
     },
-    'chmod'     => sub {
+    chmod     => sub {
         my @words = @_;
         if (scalar(@words) < 3) {
             print <<'_EOT_';
@@ -873,8 +878,8 @@ _EOT_
                 print Dumper($resp);
             }
             else {
-                print "ERROR: Could not look up entry \"$fname\", error $rc (",
-                        afp_strerror($rc), ")\n";
+                printf qq{ERROR: Couldn't look up entry "%s", error %d } .
+                  q{(%s)\n}, $fname, $rc, afp_strerror($rc);
             }
         }
         return 1;
@@ -886,11 +891,11 @@ $commands{quit}   = $commands{exit};
 $commands{cdup}   = [ $commands{cd}, q{..} ];
 $commands{rmdir}  = $commands{rm};
 
-binmode STDOUT, ':encoding(UTF-8)';
-binmode STDIN, ':encoding(UTF-8)';
+binmode STDOUT, q{:encoding(UTF-8)};
+binmode STDIN, q{:encoding(UTF-8)};
 
 local $SIG{INT} = sub {
-    print "\nCtrl-C received, exiting\n";
+    print qq{\nCtrl-C received, exiting\n};
     if (defined $DT_ID) {
         $session->FPCloseDT($DT_ID);
     }
@@ -901,8 +906,8 @@ local $SIG{INT} = sub {
 };
 
 # Tab completion nonsense, or at least my still-early attempts at it.
-if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
-    Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
+if (Term::ReadLine->ReadLine() eq q{Term::ReadLine::Perl} ||
+    Term::ReadLine->ReadLine() eq q{Term::ReadLine::Gnu}) {
     $attribs->{completion_function} = sub {
         my ($text, $line, $start) = @_;
         if ($start == 0) {
@@ -917,16 +922,16 @@ if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
             $prefix = $1;
         }
         if (scalar(@reallist) == 1 && $reallist[0] =~ m{/$}sm) {
-            if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
-                $attribs->{'completion_append_character'} = q{};
+            if (Term::ReadLine->ReadLine() eq q{Term::ReadLine::Gnu}) {
+                $attribs->{completion_append_character} = q{};
             }
             else {
                 ##no critic qw(ProhibitPackageVars)
                 $readline::rl_completer_terminator_character = q{};
             }
         } else {
-            if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Gnu') {
-                $attribs->{'completion_append_character'} = q{ };
+            if (Term::ReadLine->ReadLine() eq q{Term::ReadLine::Gnu}) {
+                $attribs->{completion_append_character} = q{ };
             }
             else {
                 ##no critic qw(ProhibitPackageVars)
@@ -937,7 +942,7 @@ if (Term::ReadLine->ReadLine() eq 'Term::ReadLine::Perl' ||
     };
 }
 else {
-    print {*STDERR} "WARNING: ReadLine implementation doesn't support tab expands\n";
+    print {*STDERR} qq{WARNING: ReadLine implementation doesn't support tab expands\n};
 }
 
 while (1) {
@@ -957,7 +962,7 @@ while (1) {
 
     my $line = $term->readline(q{afpclient } . (exists $values{username} ? $values{username} . q{@} : q{}) . $values{host} . q{:} . $values{volume} . q{/} . join(q{/}, reverse @nameParts) . q{> });
     if (not defined $line) {
-        print "\n";
+        print qq{\n};
         last;
     }
     $line = decode($term_enc, $line);
@@ -965,7 +970,7 @@ while (1) {
     next if (!defined($words[0]) || ($words[0] eq q{}));
     if (exists $commands{$words[0]}) {
         my $docall = $commands{$words[0]};
-        if (ref($docall) eq 'ARRAY') {
+        if (ref($docall) eq q{ARRAY}) {
             @words = ($words[0], @{$docall}[1 .. $#{$docall}], @words[1 .. $#words]);
             $docall = $docall->[0];
         }
@@ -975,7 +980,7 @@ while (1) {
         }
     }
     else {
-        print "Sorry, unknown command\n";
+        print qq{Sorry, unknown command\n};
     }
 }
 
@@ -987,9 +992,9 @@ sub do_listentries {
     @{$results} = sort { $a->{$pathkey} cmp $b->{$pathkey} } @{$results};
     foreach my $ent (@{$results}) {
         my $fmodtime = $ent->{ModDate};
-        my $tfmt = '%b %e  %Y';
+        my $tfmt = q{%b %e  %Y};
         if (time() - $fmodtime < 6 * 30 * 24 * 60 * 60) {
-            $tfmt = '%b %e %H:%M';
+            $tfmt = q{%b %e %H:%M};
         }
         my $up;
         if (exists $ent->{UnixPerms}) {
@@ -1056,7 +1061,7 @@ sub do_listentries {
                 print q{ -> }, ${$data};
             }
         }
-        print "\n";
+        print qq{\n};
         if ($client_uuid) {
             my($rc, %acl_info) = $session->FPGetACL(
                     VolumeID    => $vol,
@@ -1072,64 +1077,64 @@ sub do_listentries {
                             $entry->{ace_applicable}, \$name);
                     my $idtype;
                     if ($name->{Bitmap} == $kFileSec_UUID) {
-                        $idtype = 'user';
+                        $idtype = q{user};
                     }
                     elsif ($name->{Bitmap} == $kFileSec_GRPUUID) {
-                        $idtype = 'group';
+                        $idtype = q{group};
                     }
 
                     my $acl_kind = $entry->{ace_flags} & $KAUTH_ACE_KINDMASK;
-                    my $kind = 'unknown';
+                    my $kind = q{unknown};
                     if ($acl_kind == $KAUTH_ACE_PERMIT) {
-                        $kind = 'allow';
+                        $kind = q{allow};
                     }
                     elsif ($acl_kind == $KAUTH_ACE_DENY) {
-                        $kind = 'deny';
+                        $kind = q{deny};
                     }
 
                     my @actions = ();
                     my $rights = $entry->{ace_rights};
                     if ($rights & $KAUTH_VNODE_READ_DATA) {
-                        push @actions, $ent->{FileIsDir} ? 'list' : 'read';
+                        push @actions, $ent->{FileIsDir} ? q{list} : q{read};
                     }
                     if ($rights & $KAUTH_VNODE_WRITE_DATA) {
-                        push @actions, $ent->{FileIsDir} ? 'add_file' :
-                                'write';
+                        push @actions, $ent->{FileIsDir} ? q{add_file} :
+                                q{write};
                     }
                     if ($rights & $KAUTH_VNODE_EXECUTE) {
-                        push @actions, $ent->{FileIsDir} ? 'search' :
-                                'execute';
+                        push @actions, $ent->{FileIsDir} ? q{search} :
+                                q{execute};
                     }
                     if ($rights & $KAUTH_VNODE_DELETE) {
-                        push @actions, 'delete';
+                        push @actions, q{delete};
                     }
                     if ($rights & $KAUTH_VNODE_APPEND_DATA) {
                         push @actions, $ent->{FileIsDir} ?
-                                'add_subdirectory' : 'append';
+                                q{add_subdirectory} : q{append};
                     }
                     if ($rights & $KAUTH_VNODE_DELETE_CHILD) {
-                        push @actions, 'delete_child';
+                        push @actions, q{delete_child};
                     }
                     if ($rights & $KAUTH_VNODE_READ_ATTRIBUTES) {
-                        push @actions, 'readattr';
+                        push @actions, q{readattr};
                     }
                     if ($rights & $KAUTH_VNODE_WRITE_ATTRIBUTES) {
-                        push @actions, 'writeattr';
+                        push @actions, q{writeattr};
                     }
                     if ($rights & $KAUTH_VNODE_READ_EXTATTRIBUTES) {
-                        push @actions, 'readextattr';
+                        push @actions, q{readextattr};
                     }
                     if ($rights & $KAUTH_VNODE_WRITE_EXTATTRIBUTES) {
-                        push @actions, 'writeextattr';
+                        push @actions, q{writeextattr};
                     }
                     if ($rights & $KAUTH_VNODE_READ_SECURITY) {
-                        push @actions, 'readsecurity';
+                        push @actions, q{readsecurity};
                     }
                     if ($rights & $KAUTH_VNODE_WRITE_SECURITY) {
-                        push @actions, 'writesecurity';
+                        push @actions, q{writesecurity};
                     }
                     if ($rights & $KAUTH_VNODE_CHANGE_OWNER) {
-                        push @actions, 'chown';
+                        push @actions, q{chown};
                     }
 
                     printf qq{ %d: %s:%s %s %s\n}, $i, $idtype,
@@ -1322,4 +1327,4 @@ $session->close();
 exit 0;
 
 
-# vim: ts=4 et ai
+# vim: ts=4 et ai sw=4 hls

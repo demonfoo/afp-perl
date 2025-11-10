@@ -60,7 +60,7 @@ Readonly our $MSG_NEEDPASSWORD  => 1;
 Readonly our $MSG_PASSWORDIS    => 2;
 Readonly our $MSG_RUNNING       => 3;
 Readonly our $MSG_STARTERR      => 4;
-Readonly our $MSGFORMAT         => 'CS';
+Readonly our $MSGFORMAT         => q{CS};
 Readonly our $MSGLEN            => 3;
 my @msgfields = qw(msg payloadlen);
 # }}}1
@@ -120,21 +120,21 @@ sub list_mounts { #{{{1
 
     my $pw_cb =  sub {
         my(%values) = @_;
-        my $prompt = 'Password for ' . $values{username} .
-                ' at ' . $values{host} . ': ';
+        my $prompt = sprintf q{Password for %s at %s: },
+          @values{qw{username host}};
         return $values{password} if $values{password};
         return read_password($prompt) if $has_Term__ReadPassword;
         return q{};
     };
 
     my $session = do_afp_connect($pw_cb, $url, undef);
-    if (!ref($session) || !$session->isa('Net::AFP')) {
+    if (!ref($session) || !$session->isa(q{Net::AFP})) {
         exit $session;
     }
 
     my $srvrParms;
     $session->FPGetSrvrParms(\$srvrParms);
-    print map { $_->{VolName} ."\n" } @{$srvrParms->{Volumes}};
+    print map { $_->{VolName} . qq{\n} } @{$srvrParms->{Volumes}};
 
     $session->FPLogout();
     $session->close();
@@ -155,7 +155,7 @@ _EOT_
     }
 
     if ($has_Net__Bonjour) {
-        my $discover = Net::Bonjour->new('afpovertcp', 'tcp');
+        my $discover = Net::Bonjour->new(q{afpovertcp}, q{tcp});
         $discover->discover();
 
         push @servers, map { q{afp://} . uri_escape($_->hostname()) . q{/} }
@@ -169,14 +169,14 @@ _EOT_
             # Call this in an eval block so that if the AFP stack isn't
             # functional, when it calls die() the whole thing doesn't
             # fall apart on us.
-            @NBPResults = NBPLookup(undef, 'AFPServer');
-        } or carp('AppleTalk stack is probably broken');
+            @NBPResults = NBPLookup(undef, q{AFPServer});
+        } or carp(q{AppleTalk stack is probably broken});
 
         push @servers, map { q{afp:/at/} . uri_escape($_->[3]) . q{/} }
                 @NBPResults;
     }
 
-    print map { $_ . "\n" } @servers;
+    print map { $_ . qq{\n} } @servers;
 
     exit 0;
 } #}}}1
@@ -185,16 +185,16 @@ _EOT_
 my($interactive, $options, $prefer_v4, $atalk_first, $debug_afp, $debug_dsi, $debug_fuse);
 # For now accept --options/-o, and just don't do anything with the option
 # string we get, that allows mounting via fstab to work.
-GetOptions('i|interactive'  => \$interactive,
-           'o|options=s'    => \$options,
-           'h|help'         => \&usage,
-           'list-mounts=s'  => \&list_mounts,
-           'list-servers'   => \&list_servers,
-           '4|prefer-v4'    => \$prefer_v4,
-           'atalk-first'    => \$atalk_first,
-           'debug-afp'      => \$debug_afp,
-           'debug-dsi'      => \$debug_dsi,
-           'debug-fuse'     => \$debug_fuse) || exit EINVAL;
+GetOptions(q{i|interactive} => \$interactive,
+           q{o|options=s}   => \$options,
+           q{h|help}        => \&usage,
+           q{list-mounts=s} => \&list_mounts,
+           q{list-servers}  => \&list_servers,
+           q{4|prefer-v4}   => \$prefer_v4,
+           q{atalk-first}   => \$atalk_first,
+           q{debug-afp}     => \$debug_afp,
+           q{debug-dsi}     => \$debug_dsi,
+           q{debug-fuse}    => \$debug_fuse) || exit EINVAL;
 
 my $logconf = <<'_EOT_';
 log4perl.appender.Syslog = Log::Dispatch::Syslog
@@ -235,7 +235,7 @@ if (!$path || !$mountpoint) {
 }
 
 if (!-d $mountpoint) {
-    print {\*STDERR} "ERROR: attempted to mount to non-directory\n";
+    print {\*STDERR} qq{ERROR: attempted to mount to non-directory\n};
     exit ENOTDIR;
 }#}}}1
 
@@ -267,13 +267,13 @@ else {
 # background), for things like getting the user's password.
 # parent IPC {{{1
 socketpair CHILD, PARENT, AF_UNIX, SOCK_STREAM, PF_UNSPEC
-        or croak('socketpair() failed: ' . $ERRNO);
+        or croak(q{socketpair() failed: } . $ERRNO);
 my $pid = fork;
-croak('fork() failed: ' . $ERRNO) if not defined $pid;
+croak(q{fork() failed: } . $ERRNO) if not defined $pid;
 if ($pid > 0) {
     # parent process; we want the child to become independent, but first we
     # have to hang around until it's running happily.
-    close(PARENT) || carp('Couldn\'t close socket to parent process');
+    close(PARENT) || carp(q{Couldn't close socket to parent process});
 
     my $poll = IO::Poll->new();
     $poll->mask(\*CHILD, POLLIN | POLLERR);
@@ -299,35 +299,35 @@ if ($pid > 0) {
             }
             elsif ($msg{msg} == $MSG_STARTERR) {
                 # some sort of failure condition occurred.
-                my $failcode = unpack 's', $payload;
+                my $failcode = unpack q{s}, $payload;
                 exit $failcode;
             }
             elsif ($msg{msg} == $MSG_NEEDPASSWORD) {
                 # child process needs a password, so we'll do the prompting
                 # for it.
-                my ($username, $hostname) = unpack 'S/a*S/a*', $payload;
-                my $prompt = 'Password for ' . $username .
-                        ' at ' . $hostname . ': ';
+                my ($username, $hostname) = unpack q{S/aS/a}, $payload;
+                my $prompt = sprintf q{Password for %s at %s: }, $username,
+                  $hostname;
                 my $pw;
                 if ($has_Term__ReadPassword) {
                     $pw = read_password($prompt);
                 }
                 else {
-                    print 'Term::ReadPassword was not available, can\'t ',
-                            "get password\n";
+                    print q{Term::ReadPassword was not available, can't },
+                            qq{get password\n};
                 }
                 syswrite CHILD, pack($MSGFORMAT, $MSG_PASSWORDIS,
                         length $pw) . $pw;
             }
             else {
                 # this should never happen...
-                print "unknown message received?\n";
+                print qq{unknown message received?\n};
                 exit 1;
             } # }}}2
         }
         if ($poll->events(\*CHILD) & POLLERR) {
             # this should never happen...
-            print "unknown socket failure occurred, aborting\n";
+            print qq{unknown socket failure occurred, aborting\n};
             exit 1;
         }
     }
@@ -335,7 +335,7 @@ if ($pid > 0) {
     # this should never happen...
     exit 1;
 } # }}}1
-close(CHILD) || carp('Couldn\'t close socket to child process');
+close(CHILD) || carp(q{Couldn't close socket to child process});
 
 my $fuse;
 
@@ -353,7 +353,7 @@ eval {
     $fuse = Fuse::AFP->new($path, sub {
             my ($username, $hostname, $password) = @_;
             if (!defined $password && defined $interactive) {
-                my $sp = pack 'S/a*S/a*', $username, $hostname;
+                my $sp = pack q{S/aS/a}, $username, $hostname;
                 syswrite PARENT, pack($MSGFORMAT, $MSG_NEEDPASSWORD,
                             length $sp) . $sp;
                 my ($data, $payload, %msg) = (q{}, q{});
@@ -374,36 +374,36 @@ eval {
         }, %options, aforder => [ @aforder ]);
 } or do {
     # If an exception does happen, it's probably due to an invalid URL...
-    print {\*STDERR} "Error while invoking Fuse::AFP:\n", $EVAL_ERROR;
-    syswrite PARENT, pack $MSGFORMAT . 's', $MSG_STARTERR, 2, EINVAL;
+    print {\*STDERR} qq{Error while invoking Fuse::AFP:\n}, $EVAL_ERROR;
+    syswrite PARENT, pack $MSGFORMAT . q{s}, $MSG_STARTERR, 2, EINVAL;
     exit 1;
 };
 
 if (!ref $fuse) {
     # if this happens, an error code was returned, so pass that back to
     # the parent process...
-    syswrite PARENT, pack $MSGFORMAT . 's', $MSG_STARTERR, 2, $fuse;
+    syswrite PARENT, pack $MSGFORMAT . q{s}, $MSG_STARTERR, 2, $fuse;
     exit 1;
 } #}}}1
 
 # Send a love note to the folks saying "wish you were here, everything's
 # fine".
 syswrite PARENT, pack $MSGFORMAT, $MSG_RUNNING, 0;
-close(PARENT) || carp('Couldn\'t close socket to parent process');
+close(PARENT) || carp(q{Couldn't close socket to parent process});
 
 # reopen the standard FDs onto /dev/null; they have to be open, since if
 # anything writes to the default FDs after they get opened to by something
 # else, things can break badly.
-#open(STDIN, '<', '/dev/null');
-#open(STDOUT, '>', '/dev/null');
-#open(STDERR, '>&', \*STDOUT);
+#open(STDIN,  q{<},  q{/dev/null});
+#open(STDOUT, q{>},  q{/dev/null});
+#open(STDERR, q{>&}, \*STDOUT);
 
 my $script_name = $PROGRAM_NAME;
 local $PROGRAM_NAME = join q{ }, $script_name, $path, $mountpoint;
 
 # Fixed options that we always want passed...
 $options{allow_other} = undef;
-$options{subtype}     = 'pafpfs';
+$options{subtype}     = q{pafpfs};
 $options{fsname}      = $path;
 delete $options{encoding};
 delete $options{novolicon};

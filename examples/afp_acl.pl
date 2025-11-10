@@ -15,10 +15,10 @@ use Readonly;
 # }}}1
 
 # define constants {{{1
-Readonly our $XATTR_NAME    => 'afp_acl';
-Readonly our $XATTR_NS      => 'system';
+Readonly our $XATTR_NAME    => q{afp_acl};
+Readonly our $XATTR_NS      => q{system};
 sub ENODATA() {
-    return($OSNAME eq 'freebsd' ? Errno::ENOATTR() : Errno::ENODATA());
+    return($OSNAME eq q{freebsd} ? Errno::ENOATTR() : Errno::ENODATA());
 }
 # }}}1
 
@@ -27,7 +27,7 @@ sub ENODATA() {
 sub parse_xattr { # {{{1
     my($raw_acl) = @_;
 
-    my($acl_flags, @acl_parts) = unpack 'LS/(LS/aLL)', $raw_acl;
+    my($acl_flags, @acl_parts) = unpack q{LS/(LS/aLL)}, $raw_acl;
 
     my @entries;
     while (scalar(@acl_parts) > 0) {
@@ -51,109 +51,109 @@ sub assemble_xattr { # {{{1
     my @acl_parts;
     foreach my $ace (@{$acl_ace}) {
 
-        push @acl_parts, pack 'LS/aLL',
+        push @acl_parts, pack q{LS/aLL},
                 $ace->{Bitmap}, encode_utf8($ace->{UTF8Name}),
                 @{$ace}{qw(ace_flags ace_rights)};
     }
-    return pack 'LS/(a*)', $acl_flags, @acl_parts;
+    return pack q{LS/(a*)}, $acl_flags, @acl_parts;
 } # }}}1
 
 # Association of the rights bits with names (and flags in case of directory
 # or non-directory specific rights).
 my @ace_rights_info = ( # {{{1
     {
-      name      => 'read',
+      name      => q{read},
       value     => $KAUTH_VNODE_READ_DATA,
       for_dir   => 0,
     },
     {
-      name      => 'list',
+      name      => q{list},
       value     => $KAUTH_VNODE_LIST_DIRECTORY,
       for_dir   => 1,
     },
     {
-      name      => 'write',
+      name      => q{write},
       value     => $KAUTH_VNODE_WRITE_DATA,
       for_dir   => 0,
     },
     {
-      name      => 'add_file',
+      name      => q{add_file},
       value     => $KAUTH_VNODE_ADD_FILE,
       for_dir   => 1,
     },
     {
-      name      => 'execute',
+      name      => q{execute},
       value     => $KAUTH_VNODE_EXECUTE,
       for_dir   => 0,
     },
     {
-      name      => 'search',
+      name      => q{search},
       value     => $KAUTH_VNODE_SEARCH,
       for_dir   => 1,
     },
     {
-      name      => 'delete',
+      name      => q{delete},
       value     => $KAUTH_VNODE_DELETE,
     },
     {
-      name      => 'append',
+      name      => q{append},
       value     => $KAUTH_VNODE_APPEND_DATA,
       for_dir   => 0,
     },
     {
-      name      => 'add_subdirectory',
+      name      => q{add_subdirectory},
       value     => $KAUTH_VNODE_ADD_SUBDIRECTORY,
       for_dir   => 1,
     },
     {
-      name      => 'delete_child',
+      name      => q{delete_child},
       value     => $KAUTH_VNODE_DELETE_CHILD,
     },
     {
-      name      => 'readattr',
+      name      => q{readattr},
       value     => $KAUTH_VNODE_READ_ATTRIBUTES,
     },
     {
-      name      => 'writeattr',
+      name      => q{writeattr},
       value     => $KAUTH_VNODE_WRITE_ATTRIBUTES,
     },
     {
-      name      => 'readextattr',
+      name      => q{readextattr},
       value     => $KAUTH_VNODE_READ_EXTATTRIBUTES,
     },
     {
-      name      => 'writeextattr',
+      name      => q{writeextattr},
       value     => $KAUTH_VNODE_WRITE_EXTATTRIBUTES,
     },
     {
-      name      => 'readsecurity',
+      name      => q{readsecurity},
       value     => $KAUTH_VNODE_READ_SECURITY,
     },
     {
-      name      => 'writesecurity',
+      name      => q{writesecurity},
       value     => $KAUTH_VNODE_WRITE_SECURITY,
     },
     {
-      name      => 'chown',
+      name      => q{chown},
       value     => $KAUTH_VNODE_CHANGE_OWNER,
     },
 ); # }}}1
 
 my @ace_flags_info = ( # {{{1
     {
-      name      => 'file_inherit',
+      name      => q{file_inherit},
       value     => $KAUTH_ACE_FILE_INHERIT,
     },
     {
-      name      => 'directory_inherit',
+      name      => q{directory_inherit},
       value     => $KAUTH_ACE_DIRECTORY_INHERIT,
     },
     {
-      name      => 'limit_inherit',
+      name      => q{limit_inherit},
       value     => $KAUTH_ACE_LIMIT_INHERIT,
     },
     {
-      name      => 'only_inherit',
+      name      => q{only_inherit},
       value     => $KAUTH_ACE_ONLY_INHERIT,
     },
 ); # }}}1
@@ -164,13 +164,13 @@ my %ace_flags_byname  = map { $_->{name}, $_ } @ace_flags_info;
 
 # Error strings for the errors that we might get...
 my %errors = ( # {{{1
-               EINVAL()     => 'User/group not found',
-               ENOENT()     => 'No such file or directory',
-               EACCES()     => 'Permission denied',
-               EBADF()      => 'Unknown error occurred',
-               EPERM()      => 'Operation not permitted',
-               ENODATA()    => 'AFP server does not support ACLs',
-               EOPNOTSUPP() => 'AFP server does not support ACLs',
+               EINVAL()     => q{User/group not found},
+               ENOENT()     => q{No such file or directory},
+               EACCES()     => q{Permission denied},
+               EBADF()      => q{Unknown error occurred},
+               EPERM()      => q{Operation not permitted},
+               ENODATA()    => q{AFP server does not support ACLs},
+               EOPNOTSUPP() => q{AFP server does not support ACLs},
              ); # }}}1
 
 my($remove, $add, @insert, @replace, $clear, $set_inherited);
@@ -196,12 +196,12 @@ sub make_ace { # {{{1
 
     my $kind = shift @parts;
     $ace->{ace_flags} = 0;
-    if ($kind eq 'allow') {
+    if ($kind eq q{allow}) {
         $ace->{ace_flags} = $KAUTH_ACE_PERMIT;
-    } elsif ($kind eq 'deny') {
+    } elsif ($kind eq q{deny}) {
         $ace->{ace_flags} = $KAUTH_ACE_DENY;
     } else {
-        croak('ACL kind ' . $kind . ' is not valid');
+        croak(q{ACL kind } . $kind . q{ is not valid});
     }
 
     my $rights = shift @parts;
@@ -214,7 +214,7 @@ sub make_ace { # {{{1
             $ace->{ace_flags} |= $ace_flags_byname{$right}{value};
         }
         else {
-            croak('Access right ' . $right . ' is not valid');
+            croak(q{Access right } . $right . q{ is not valid});
         }
     }
     if ($set_inherited) { $ace->{ace_flags} |= $KAUTH_ACE_INHERITED }
@@ -245,12 +245,12 @@ _EOT_
     exit 1;
 }
 
-GetOptions('remove|r=s'     => \$remove,
-           'add=s'          => \$add,
-           'insert|i=s{2}'  => \@insert,
-           'replace=s{2}'   => \@replace,
-           'clear'          => \$clear,
-           'inherited'      => \$set_inherited) || usage();
+GetOptions(q{remove|r=s}    => \$remove,
+           q{add=s}         => \$add,
+           q{insert|i=s{2}} => \@insert,
+           q{replace=s{2}}  => \@replace,
+           q{clear}         => \$clear,
+           q{inherited}     => \$set_inherited) || usage();
 
 if (defined $remove) { # {{{1
     my $ace;
@@ -308,8 +308,8 @@ if (defined $remove) { # {{{1
         my $rv = setfattr($file, $XATTR_NAME, $new_rawacl,
                 { namespace => $XATTR_NS });
         if (!$rv) {
-            print 'Error while updating ACL on "', $file, '": ',
-                    $errors{int $ERRNO},"\n";
+            printf qq{Error while updating ACL on "%s": %s\n}, $file,
+              $errors{int $ERRNO};
         }
     } # }}}2
     exit 0;
@@ -427,8 +427,8 @@ _EOT_
         my $rv = setfattr($file, $XATTR_NAME, $new_rawacl,
                 { namespace => $XATTR_NS });
         if (!$rv) {
-            print 'Error while updating ACL on "', $file, '": ',
-                    $errors{int $ERRNO},"\n";
+            printf qq{Error while updating ACL on "%s": %s\n}, $file,
+              $errors{int $ERRNO};
         }
     } # }}}2
     exit 0;
@@ -448,8 +448,8 @@ if (scalar @insert) { # {{{1
             ($acl_flags, $acl) = parse_xattr($raw_acl);
         }
         if ($offset > scalar @{$acl}) {
-            print 'Cannot add ACL entry at offset ', $offset, ' for file "',
-                    $file, "\"; offset too large\n";
+            printf qq{Cannot add ACL entry at offset %d for file "%s": } .
+              q{offset too large\n}, $offset, $file;
             next;
         }
         # Use array slicing tricks to add the new entry to the list.
@@ -461,8 +461,8 @@ if (scalar @insert) { # {{{1
         my $rv = setfattr($file, $XATTR_NAME, $new_rawacl,
                 { namespace => $XATTR_NS });
         if (!$rv) {
-            print 'Error while updating ACL on "', $file, '": ',
-                    $errors{int $ERRNO}, "\n";
+            printf qq{Error while updating ACL on "%s": %s\n}, $file,
+              $errors{int $ERRNO};
         }
     } # }}}2
     exit 0;
@@ -484,8 +484,8 @@ if (scalar @replace) { # {{{1
         # If the offset points to an entry that doesn't exist, then give up
         # and move on to the next file.
         if ($offset > $#{$acl}) {
-            print 'Cannot replace ACL entry at offset ', $offset,
-                    ' for file "', $file, "\"; offset too large\n";
+            printf qq{Cannot replace ACL entry at offset %d for file } .
+              q{"%s": offset too large\n}, $offset, $file;
             next;
         }
         # Replace the indicated ACE.
@@ -496,8 +496,8 @@ if (scalar @replace) { # {{{1
         my $rv = setfattr($file, $XATTR_NAME, $new_rawacl,
                 { namespace => $XATTR_NS });
         if (!$rv) {
-            print 'Error while updating ACL on "', $file, '": ',
-                    $errors{int $ERRNO},"\n";
+            printf qq{Error while updating ACL on "%s": %s\n}, $file,
+              $errors{int $ERRNO};
         }
     } # }}}2
     exit 0;
@@ -508,8 +508,8 @@ if (defined $clear) { # {{{1
         # to delete the ACL in its entirety.
         my $rv = delfattr($file, $XATTR_NAME, { namespace => $XATTR_NS });
         if (!$rv) {
-            print 'Error while updating ACL on "', $file, '": ',
-                    $errors{int $ERRNO},"\n";
+            printf  qq{Error while updating ACL on "%s": %s\n}, $file,
+              $errors{int $ERRNO};
         }
     }
     exit 0;
@@ -525,7 +525,7 @@ foreach my $file (@ARGV) {
 
     # If multiple files were named, name the file that the ACL goes with.
     if (scalar(@ARGV) > 1) {
-        print 'ACL for file "', $file, "\":\n";
+        printf qq{ACL for file "%s":\n}, $file;
     }
 
     foreach my $i (0 .. $#{$acl}) { # {{{2
@@ -534,17 +534,17 @@ foreach my $file (@ARGV) {
         # What sort of object is this entry about?
         my $idtype;
         if ($entry->{Bitmap} == $kFileSec_UUID) {
-            $idtype = 'user';
+            $idtype = q{user};
         } elsif ($entry->{Bitmap} == $kFileSec_GRPUUID) {
-            $idtype = 'group';
+            $idtype = q{group};
         }
         my $acl_kind = $entry->{ace_flags} & $KAUTH_ACE_KINDMASK;
         # What kind of action does it specify?
-        my $kind = 'unknown';
+        my $kind = q{unknown};
         if ($acl_kind == $KAUTH_ACE_PERMIT) {
-            $kind = 'allow';
+            $kind = q{allow};
         } elsif ($acl_kind == $KAUTH_ACE_DENY) {
-            $kind = 'deny';
+            $kind = q{deny};
         }
 
         # What rights are conferred/retracted?
@@ -571,8 +571,8 @@ foreach my $file (@ARGV) {
         }
         my $is_inherited = $flags & $KAUTH_ACE_INHERITED;
         # Print out the entry.
-        printf " \%d: \%s:\%s\%s \%s \%s\n", $i, $idtype,
-                $entry->{UTF8Name}, $is_inherited ? ' inherited' : q{},
+        printf qq{ %d: %s:%s%s %s %s\n}, $i, $idtype,
+                $entry->{UTF8Name}, $is_inherited ? q{ inherited} : q{},
                 $kind, join q{,}, @actions;
     } # }}}2
 }

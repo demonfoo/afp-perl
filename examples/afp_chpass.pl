@@ -48,18 +48,18 @@ my $pw_cb =  sub {
 
 my $si;
 my($session, %values) = do_afp_connect($pw_cb, $url, \$si);
-if (not ref $session or not $session->isa('Net::AFP')) {
+if (not ref $session or not $session->isa(q{Net::AFP})) {
     exit 2;
 }
 
 if (not($si->{Flags} & $kSupportsChgPwd)) {
-    print "ERROR: Server does not support password changing\n";
+    print qq{ERROR: Server does not support password changing\n};
     $session->close();
     exit 2;
 }
 
-my $new_pass   = read_password('Enter your new password: ');
-my $check_pass = read_password('Reenter your password: ');
+my $new_pass   = read_password(q{Enter your new password: });
+my $check_pass = read_password(q{Reenter your password: });
 
 my $rv = 0;
 
@@ -75,11 +75,11 @@ if ($new_pass eq $check_pass) {
         $rv = 2;
     }
     else {
-        print "No error, password changed successfully\n";
+        print qq{No error, password changed successfully\n};
     }
 }
 else {
-    print "ERROR: Passwords did not match!\n";
+    print qq{ERROR: Passwords did not match!\n};
     $rv = 3;
 }
 

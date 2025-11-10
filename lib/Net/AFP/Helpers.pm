@@ -120,10 +120,10 @@ sub do_afp_connect {
     # empty. Prior to AFP 2.2, that data didn't even exist. Of course, prior
     # to AFP 2.2, there was no TCP socket support, so that kind of simplifies
     # matters.
-    if (!exists($srvInfo->{NetworkAddresses}) ||
-            !scalar(@{$srvInfo->{NetworkAddresses}})) {
+    if (!exists(${$srvInfo}{NetworkAddresses}) ||
+            !scalar(@{${$srvInfo}{NetworkAddresses}})) {
         if ($values{atalk_transport}) {
-            $srvInfo->{NetworkAddresses} = [ {
+            ${$srvInfo}{NetworkAddresses} = [ {
                 family  => AF_APPLETALK(),
                 address => $host,
                 port    => $port,
@@ -139,7 +139,7 @@ sub do_afp_connect {
 TRY_AFS:
     foreach my $af (@af_order) {
         my @sa_list;
-        foreach (@{$srvInfo->{NetworkAddresses}}) {
+        foreach (@{${$srvInfo}{NetworkAddresses}}) {
             if (not exists $_->{family}) {
                 next;
             }
@@ -175,7 +175,7 @@ TRY_SOCKADDRS:
         return ENODEV();
     }
 
-    my $cv = Net::AFP::Versions::GetPreferredVersion($srvInfo->{AFPVersions},
+    my $cv = Net::AFP::Versions::GetPreferredVersion(${$srvInfo}{AFPVersions},
             $using_atalk);
     if (not $cv) {
         ##no critic qw(RequireCheckedSyscalls)
