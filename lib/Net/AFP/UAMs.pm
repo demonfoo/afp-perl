@@ -38,16 +38,12 @@ sub RegisterUAM {
 
 # Where am I being included from? Use our own package name to get the
 # inclusion path where we should pull our own UAMs from.
-my $incname = __PACKAGE__;
-$incname =~ s{::}{/}gsm;
-$incname .= q{.pm};
-# %INC contains the include paths for all currently-imported packages.
-my $incpath = $INC{$incname};
-$incpath =~ s{[.]pm$}{}sm;
+(my $incpath = __FILE__) =~ s{[.]pm$}{}sm;
 my @uampaths;
 if (-d $incpath) {
     opendir my($uamdir), $incpath;
-    push @uampaths, map { $incpath . q{/} . $_ } grep { m{[.]pm$}sm } readdir $uamdir;
+    push @uampaths, map { $incpath . q{/} . $_ }
+      grep { m{[.]pm$}sm } readdir $uamdir;
     closedir $uamdir;
 }
 
@@ -55,14 +51,15 @@ if (-d $incpath) {
 # impair our ability to continue on.
 foreach my $uampath (@uampaths) {
     ## no critic qw(ProhibitEnumeratedClasses)
-    if (($OSNAME ne q{MSWin32} and $uampath !~ m{^/}sm) or
-      ($OSNAME eq q{MSWin32} and $uampath !~ m{[A-Z]:[/\\]}sm)) {
+    if ($OSNAME eq q{MSWin32} ? $uampath !~ m{[A-Z]:[/\\]}sm :
+      $uampath !~ m{^/}sm) {
         $uampath = q{./} . $uampath;
     }
     eval {
         require $uampath;
     } or do {
-        carp(sprintf qq{Couldn't include "%s":\n%s\nThis error is not fatal; other UAMs will be tried.}, $uampath, $EVAL_ERROR);
+        carp(sprintf qq{Couldn't include "%s":\n%s\nThis error is not } .
+          q{fatal; other UAMs will be tried.}, $uampath, $EVAL_ERROR);
     }
 }
 
@@ -109,8 +106,8 @@ sub PasswordAuth {
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    $session->{logger}->error( sub { sprintf q{%s(): Could not find an agreeable } .
-      q{UAM for authenticating to server}, (caller 3)[3]});
+    $session->{logger}->error( sub { sprintf q{%s(): Could not find an } .
+      q{agreeable UAM for authenticating to server}, (caller 3)[3]});
     return $kFPBadUAM;
 }
 
@@ -129,8 +126,8 @@ sub ChangePassword {
             last;
         }
         my $function = $uaminfo->{class} . q{::ChangePassword};
-        $session->{logger}->debug(sub { sprintf q{%s(): password changing function } .
-          q{is %s}, (caller 3)[3], $function });
+        $session->{logger}->debug(sub { sprintf q{%s(): password changing } .
+          q{function is %s}, (caller 3)[3], $function });
         my $rc;
         {
             ##no critic qw(ProhibitNoStrict)
@@ -141,8 +138,8 @@ sub ChangePassword {
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    $session->{logger}->debug(sub { sprintf q{%s(): Could not find valid password } .
-      q{changing UAM}, (caller 3)[3] });
+    $session->{logger}->debug(sub { sprintf q{%s(): Could not find valid } .
+      q{password changing UAM}, (caller 3)[3] });
     return $kFPBadUAM;
 }
 
