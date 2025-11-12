@@ -28,7 +28,7 @@ sub RegisterUAM {
 
     my $uaminfo = { name => $uamname, class => $class, pref => $pref };
     for my $i (0 .. $#UAMReg) {
-        next if $UAMReg[$i]->{pref} > $pref;
+        next if ${$UAMReg[$i]}{pref} > $pref;
         @UAMReg = (@UAMReg[0 .. ($i - 1)], $uaminfo, @UAMReg[$i .. $#UAMReg]);
         return;
     }
@@ -67,7 +67,7 @@ sub GuestAuth {
     my($session, $AFPVersion) = @_;
     my $rc = Net::AFP::UAMs::Anonymous::Authenticate($session, $AFPVersion);
     if ($rc == $kFPNoErr) {
-        $session->{AFPVersion} = $AFPVersion;
+        ${$session}{AFPVersion} = $AFPVersion;
     }
     return $rc;
 }
@@ -83,16 +83,16 @@ sub PasswordAuth {
     # the top of the list... not so great.
     my %ReqUAMs = map { lc() => 1 } @{$SupportedUAMs};
     foreach my $uaminfo (@UAMReg) {
-        if (not exists $ReqUAMs{lc($uaminfo->{name})}) {
+        if (not exists $ReqUAMs{lc(${$uaminfo}{name})}) {
             next;
         }
-        if ($uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1) {
+        if (${$uaminfo}{pref} < 0 and scalar(keys %ReqUAMs) > 1) {
             last;
         }
-        my $function = $uaminfo->{class} . q{::Authenticate};
-        $session->{logger}->debug(sub { sprintf q{%s(): auth function is %s},
+        my $function = ${$uaminfo}{class} . q{::Authenticate};
+        ${$session}{logger}->debug(sub { sprintf q{%s(): auth function is %s},
           (caller 3)[3], $function });
-        $session->{username} = $UserName;
+        ${$session}{username} = $UserName;
         my $rc;
         {
             ##no critic qw(ProhibitNoStrict)
@@ -100,13 +100,13 @@ sub PasswordAuth {
             $rc = &{$function}($session, $AFPVersion, $UserName, $PwCallback);
         }
         if ($rc == $kFPNoErr) {
-            $session->{AFPVersion} = $AFPVersion;
+            ${$session}{AFPVersion} = $AFPVersion;
         }
         return $rc;
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    $session->{logger}->error( sub { sprintf q{%s(): Could not find an } .
+    ${$session}{logger}->error( sub { sprintf q{%s(): Could not find an } .
       q{agreeable UAM for authenticating to server}, (caller 3)[3]});
     return $kFPBadUAM;
 }
@@ -116,17 +116,17 @@ sub ChangePassword {
 
     my %ReqUAMs = map { lc() => 1 } @{$SupportedUAMs};
     foreach my $uaminfo (@UAMReg) {
-        if (not exists $ReqUAMs{lc($uaminfo->{name})}) {
+        if (not exists $ReqUAMs{lc(${$uaminfo}{name})}) {
             next;
         }
-        if (not $uaminfo->{class}->can(q{ChangePassword})) {
+        if (not ${$uaminfo}{class}->can(q{ChangePassword})) {
             next;
         }
-        if ($uaminfo->{pref} < 0 and scalar(keys %ReqUAMs) > 1) {
+        if (${$uaminfo}{pref} < 0 and scalar(keys %ReqUAMs) > 1) {
             last;
         }
-        my $function = $uaminfo->{class} . q{::ChangePassword};
-        $session->{logger}->debug(sub { sprintf q{%s(): password changing } .
+        my $function = ${$uaminfo}{class} . q{::ChangePassword};
+        ${$session}{logger}->debug(sub { sprintf q{%s(): password changing } .
           q{function is %s}, (caller 3)[3], $function });
         my $rc;
         {
@@ -138,7 +138,7 @@ sub ChangePassword {
     }
 
     # If we reach this point, none of the UAMs the server knew were available.
-    $session->{logger}->debug(sub { sprintf q{%s(): Could not find valid } .
+    ${$session}{logger}->debug(sub { sprintf q{%s(): Could not find valid } .
       q{password changing UAM}, (caller 3)[3] });
     return $kFPBadUAM;
 }

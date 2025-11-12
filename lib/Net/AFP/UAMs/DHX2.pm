@@ -37,19 +37,17 @@ Net::AFP::UAMs::RegisterUAM($UAMNAME, __PACKAGE__, 200);
 # since these parts are the same between authentication and password changing,
 # let's not write the whole thing twice, eh?
 sub auth_common1 {
-    my($session, $message, $store_sesskey) = @_;
+    my($session, %params) = @_;
+    $params{store_sesskey} ||= 0;
 
     # Get the value for g, and the length value for assorted things (p, Ma,
     # Mb, Ra, Rb).
-    my ($g, $len, $p, $Mb) = unpack q{L>S>X[s]S>/aa*}, $message;
+    my ($g, $len, $p, $Mb) = unpack q{L>S>X[s]S>/aa*}, $params{message};
+    $p = q{0x} . unpack q{H*}, $p;
 
+    $session->{logger}->debug(sub { sprintf q{p is %s}, $p });
     $session->{logger}->debug(sub { sprintf q{g is %d}, $g });
     $session->{logger}->debug(sub { sprintf q{len is %d}, $len });
-
-    # Pull p and Mb out of the data the server sent back, based on the length
-    # value extracted above.
-    $p = q{0x} . unpack q{H*}, $p;
-    $session->{logger}->debug(sub { sprintf q{p is %s}, $p });
 
     my $dh = Crypt::PK::DH->new();
     $dh->generate_key({p => $p, g => $g});
@@ -68,43 +66,45 @@ sub auth_common1 {
     # Set up an encryption context with the key we derived, for encrypting
     # and decrypting stuff to talk to the server.
     my $key = md5(Net::AFP::UAMs::zeropad($K, $len));
-    if ($store_sesskey) {
-        $session->{SessionKey} = $key;
+    if ($params{store_sesskey}) {
+        ${$session}{SessionKey} = $key;
     }
     undef $K;
     my $ctx = Crypt::Mode::CBC->new(q{CAST5}, 0);
 
     # Encrypt the random nonce value we fetched above, then assemble the
     # message to send to the server.
-    my $ciphertext = $ctx->encrypt(Net::AFP::UAMs::zeropad($clientNonce,
-      $nonce_len), $key, $C2SIV);
-    my $Ma = $dh->export_key_raw(q{public});
+    my $ciphertext = $ctx->encrypt($clientNonce, $key, $C2SIV);
+    my $Ma = Net::AFP::UAMs::zeropad($dh->export_key_raw(q{public}), $len);
     # Sometimes the result is an extra (zero) byte long; strip that off.
     if (length($Ma) > $len) {
         $Ma = substr $Ma, length($Ma) - $len, $len;
     }
 
-    $message = pack sprintf(q{a[%d]a[%d]}, $len, $nonce_len), $Ma, $ciphertext;
+    my $message = pack sprintf(q{a[%d]a[%d]}, $len, $nonce_len), $Ma,
+      $ciphertext;
 
-    return($message, $clientNonce, $ctx, $key);
+    return(message => $message, clientNonce => $clientNonce, ctx => $ctx,
+      key => $key);
 }
 
 sub auth_common2 {
-    my($session, $key, $message, $clientNonce, $ctx) = @_;
+    my($session, %params) = @_;
 
     # Decrypt the message from the server, and separate the (hopefully)
     # incremented nonce value from us, and the server's nonce value.
-    my $decrypted = $ctx->decrypt($message, $key, $S2CIV);
-    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
+    my $decrypted = $params{ctx}->decrypt($params{message}, $params{key},
+      $S2CIV);
+    ${$session}{logger}->debug(sub { sprintf q{decrypted is 0x%s},
       unpack q{H*}, $decrypted });
 
     # Check the client nonce, and see if it really was incremented like we
     # expect it to have been.
     # if all bits are 1, this will throw a fatal error.
     my $newClientNonce = unpack sprintf(q{a[%d]}, $nonce_len), $decrypted;
-    $session->{logger}->debug(sub { sprintf q{newClientNonce is %s},
+    ${$session}{logger}->debug(sub { sprintf q{newClientNonce is %s},
       unpack q{H*}, $newClientNonce });
-    if (increment_octets_be($clientNonce) ne $newClientNonce) {
+    if (increment_octets_be($params{clientNonce}) ne $newClientNonce) {
         # HACK: This is a netatalk bug. If the client nonce is less than the
         # full nonce length, it doesn't check to make sure the value fills
         # the entire target buffer, so garbage bytes get left behind after it,
@@ -112,18 +112,18 @@ sub auth_common2 {
         # https://github.com/Netatalk/netatalk/issues/1456
         # In the meantime, I'll just... work around it.
         my($altClientNonce) =
-            increment_octets_be($clientNonce) =~ m{^\x00+(.*)$}ms;
+            increment_octets_be($params{clientNonce}) =~ m{^\x00+(.*)$}ms;
 
         $newClientNonce = unpack sprintf(q{a[%d]}, length $altClientNonce),
           $decrypted;
 
         if ($altClientNonce ne $newClientNonce) {
-            croak(q{encryption error - nonce check failed; } .
-              unpack(q{H*}, $clientNonce) . q{ != } .
+            croak(sprintf q{encryption error - nonce check failed; %s != %s},
+              unpack(q{H*}, $params{clientNonce}),
               unpack q{H*}, $newClientNonce);
         }
     }
-    undef $clientNonce;
+    delete $params{clientNonce};
     undef $newClientNonce;
 
     # Increment the nonce value the server sent to us, to be returned as part
@@ -131,11 +131,12 @@ sub auth_common2 {
     my $serverNonce = unpack sprintf(q{x[%1$d]a[%1$d]}, $nonce_len),
       $decrypted;
     undef $decrypted;
-    $session->{logger}->debug(sub { sprintf q{serverNonce is %s},
+    ${$session}{logger}->debug(sub { sprintf q{serverNonce is %s},
       unpack q{H*}, $serverNonce });
-    $serverNonce = increment_octets_be($serverNonce);;
-    $session->{logger}->debug(sub { sprintf q{serverNonce is %s after increment},
-      unpack q{H*}, $serverNonce });
+    $serverNonce = Net::AFP::UAMs::zeropad(increment_octets_be($serverNonce),
+      $nonce_len);
+    ${$session}{logger}->debug(sub { sprintf q{serverNonce is %s after } .
+      q{increment}, unpack q{H*}, $serverNonce });
 
     return($serverNonce);
 }
@@ -239,9 +240,8 @@ sub Authenticate {
     # Unlike with DHCAST128, since we don't know a variety of things yet,
     # we just send the username and the requested auth method first. We'll
     # start deriving values later.
-    my %resp;
+    my(%resp, $rc);
     # Sending message 1.
-    my $rc;
 
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
             $kFPVerAtLeast)) {
@@ -249,51 +249,51 @@ sub Authenticate {
                 AFPVersion => $AFPVersion,
                 UAM        => $UAMNAME,
                 UserName   => $username);
-        $session->{logger}->debug(q{FPLoginExt() completed with result code },
+        ${$session}{logger}->debug(q{FPLoginExt() completed with result code },
           $rc);
     }
     else {
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME,
           pack q{C/ax![s]}, $username);
-        $session->{logger}->debug(q{FPLogin() completed with result code },
+        ${$session}{logger}->debug(q{FPLogin() completed with result code },
           $rc);
     }
     return $rc if $rc != $kFPAuthContinue;
 
     # Received message 2, parsing below.
-    my($message, $clientNonce, $ctx, $key) = auth_common1($session,
-      $resp{UserAuthInfo}, 1);
+    my %params = auth_common1($session, message => $resp{UserAuthInfo},
+      store_sesskey => 1);
 
-    $session->{logger}->debug(sub { sprintf q{message is 0x%s},
-      unpack q{H*}, $message });
+    ${$session}{logger}->debug(sub { sprintf q{message is 0x%s},
+      unpack q{H*}, $params{message} });
 
     # Send the message to the server containing Ma (our "public key"), and
     # the encrypted nonce value.
     my $sresp = q{};
     # Sending message 3.
-    $rc = $session->FPLoginCont($resp{ID}, $message, \$sresp);
-    undef $message;
-    $session->{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+    $rc = $session->FPLoginCont($resp{ID}, $params{message}, \$sresp);
+    ${$session}{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
       q{result code %d}, $rc });
     return $rc if $rc != $kFPAuthContinue;
 
+    $params{message} = ${$sresp}{UserAuthInfo};
     # Decrypting message 4.
-    my($serverNonce) = auth_common2($session, $key, $sresp->{UserAuthInfo}, $clientNonce, $ctx);
+    my($serverNonce) = auth_common2($session, %params);
 
     # Assemble the final message to send back to the server with the
     # incremented server nonce, and the user's password, then encrypt the
     # message.
     my $authdata = pack sprintf(q{a[%d]a[%d]}, $nonce_len, $pw_len),
-      Net::AFP::UAMs::zeropad($serverNonce, $nonce_len), &{$pw_cb}();
+      $serverNonce, &{$pw_cb}();
     undef $serverNonce;
-    my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
-    $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
+    my $ciphertext = $params{ctx}->encrypt($authdata, $params{key}, $C2SIV);
+    ${$session}{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
       unpack q{H*}, $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
-    $rc = $session->FPLoginCont($sresp->{ID}, $ciphertext);
+    $rc = $session->FPLoginCont(${$sresp}{ID}, $ciphertext);
     undef $ciphertext;
-    $session->{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+    ${$session}{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
       q{result code %d}, $rc });
     return $rc;
 }
@@ -313,48 +313,48 @@ sub ChangePassword {
         $username = q{};
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, q{}, \$resp);
-    $session->{logger}->debug(q{FPChangePassword() completed with result code },
-      $rc);
+    ${$session}{logger}->debug(q{FPChangePassword() completed with result },
+      q{code }, $rc);
     return $rc if $rc != $kFPAuthContinue;
 
-    my ($ID, $body) = unpack q{S>a*}, $resp;
-    my($message, $clientNonce, $ctx, $key) = auth_common1($session, $body, 0);
+    my($ID, $body) = unpack q{S>a*}, $resp;
+    my %params = auth_common1($session, message => $body);
     undef $body;
 
-    $message = pack q{na*}, $ID, $message;
-    $session->{logger}->debug(sub { sprintf q{message is 0x%s},
-      unpack q{H*}, $message });
+    $params{message} = pack q{na*}, $ID, $params{message};
+    ${$session}{logger}->debug(sub { sprintf q{message is 0x%s},
+      unpack q{H*}, $params{message} });
 
     # Send the message to the server containing Ma (our "public key"), and
     # the encrypted nonce value.
     my $sresp = q{};
-    $rc = $session->FPChangePassword($UAMNAME, $username, $message, \$sresp);
-    undef $message;
-    $session->{logger}->debug(sub { sprintf q{FPChangePassword() completed } .
+    $rc = $session->FPChangePassword($UAMNAME, $username, $params{message},
+      \$sresp);
+    delete $params{message};
+    ${$session}{logger}->debug(sub { sprintf q{FPChangePassword() completed } .
       q{with result code %d}, $rc });
     return $rc if $rc != $kFPAuthContinue;
 
     # Unpack the server response for our perusal.
-    ($ID, $message) = unpack q{na*}, $sresp;
+    ($ID, $params{message}) = unpack q{na*}, $sresp;
 
-    my($serverNonce) = auth_common2($session, $key, $message, $clientNonce, $ctx);
+    my($serverNonce) = auth_common2($session, %params);
 
     # Assemble the final message to send back to the server with the
     # incremented server nonce, the user's current password, and the
     # desired new password, then encrypt the message.
     my $authdata = pack sprintf(q{a[%1$d]a[%2$d]a[%2$d]}, $nonce_len, $pw_len),
-      Net::AFP::UAMs::zeropad($serverNonce, $nonce_len), $newPassword,
-      $oldPassword;
+      $serverNonce, $newPassword, $oldPassword;
     undef $serverNonce;
-    my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
-    $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
+    my $ciphertext = $params{ctx}->encrypt($authdata, $params{key}, $C2SIV);
+    ${$session}{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
       unpack q{H*}, $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPChangePassword($UAMNAME, $username, pack q{na*}, $ID, $ciphertext);
     undef $ciphertext;
-    $session->{logger}->debug(q{FPChangePassword() completed with result code },
-      $rc);
+    ${$session}{logger}->debug(q{FPChangePassword() completed with result },
+        q{code }, $rc);
     return $rc;
 }
 

@@ -95,12 +95,12 @@ my @sendfile_could = (
 
 foreach my $item (@sendfile_could) {
     eval {
-        load $item->{module};
+        load ${$item}{module};
         1;
     } and do {
-        if (not exists $item->{checkif} or &{$item->{checkif}}()) {
-            $sendfile_impls{$item->{module}} = $item->{wrapper};
-            $do_sendfile ||= $item->{wrapper};
+        if (not exists ${$item}{checkif} or &{${$item}{checkif}}()) {
+            $sendfile_impls{${$item}{module}} = ${$item}{wrapper};
+            $do_sendfile ||= ${$item}{wrapper};
         }
     };
 }
@@ -119,8 +119,8 @@ sub import {
             croak qq{Library argument for import parameter ${param} is missing}
               if not  @_;
             my $libs = shift;
-            croak qq{Library argument for import parameter ${param} is undefined}
-              if not defined $libs;
+            croak qq{Library argument for import parameter ${param} is } .
+              q{undefined} if not defined $libs;
 
             my @libs;
             my $overrode = 0;

@@ -54,30 +54,31 @@ sub auth_common1 {
         $Ma = substr $Ma, length($Ma) - $len, $len;
     }
 
-    return($dh, $Ma);
+    return(dh => $dh, Ma => $Ma);
 }
 
 sub auth_common2 {
-    my($session, $message, $store_sesskey, $dh) = @_;
+    my($session, %params) = @_;
+    $params{store_sesskey} ||= 0;
 
-    my($Mb, $encrypted) = unpack sprintf(q{a[%d]a*}, $len), $message;
-    my $K = $dh->shared_secret(Crypt::PK::DH->new()->import_key_raw($Mb,
-      q{public}, { p => $p, g => $g }));
-    $session->{logger}->debug(sub { sprintf q{K is 0x%s}, unpack q{H*}, $K });
+    my($Mb, $encrypted) = unpack sprintf(q{a[%d]a*}, $len), $params{message};
+    my $K = $params{dh}->shared_secret(Crypt::PK::DH->new()
+      ->import_key_raw($Mb, q{public}, { p => $p, g => $g }));
+    ${$session}{logger}->debug(sub { sprintf q{K is 0x%s}, unpack q{H*}, $K });
 
-    $session->{logger}->debug(sub { sprintf q{encrypted is 0x%s},
+    ${$session}{logger}->debug(sub { sprintf q{encrypted is 0x%s},
       unpack q{H*}, $encrypted });
 
     # Set up an encryption context with the key we derived, and decrypt the
     # ciphertext that the server sent back to us.
     my $key = Net::AFP::UAMs::zeropad($K, $len);
-    if ($store_sesskey) {
-        $session->{SessionKey} = $key;
+    if ($params{store_sesskey}) {
+        ${$session}{SessionKey} = $key;
     }
     undef $K;
     my $ctx = Crypt::Mode::CBC->new(q{CAST5}, 0);
     my $decrypted = $ctx->decrypt($encrypted, $key, $S2CIV);
-    $session->{logger}->debug(sub { sprintf q{decrypted is 0x%s},
+    ${$session}{logger}->debug(sub { sprintf q{decrypted is 0x%s},
       unpack q{H*}, $decrypted });
 
     # The nonce is a random value that the server sends as a check; we add
@@ -91,14 +92,15 @@ sub auth_common2 {
         croak(q{encryption error - signature was not what was expected?});
     }
     undef $decrypted;
-    $session->{logger}->debug(sub { sprintf q{nonce is %s}, unpack q{H*},
+    ${$session}{logger}->debug(sub { sprintf q{nonce is %s}, unpack q{H*},
       $nonce });
     # If all bits are 1, this will throw a fatal error.
     $nonce = increment_octets_be($nonce);
-    $session->{logger}->debug(sub { sprintf q{nonce is %s after increment},
+    ${$session}{logger}->debug(sub { sprintf q{nonce is %s after increment},
       unpack q{H*}, $nonce });
+    $nonce = Net::AFP::UAMs::zeropad($nonce, $nonce_len);
 
-    return($nonce, $key, $ctx);
+    return(nonce => $nonce, key => $key, ctx => $ctx);
 }
 
 sub Authenticate {
@@ -113,12 +115,11 @@ sub Authenticate {
         croak(q{Password callback MUST be a subroutine ref});
     }
 
-    my($dh, $Ma) = auth_common1($session);
+    my %params = auth_common1($session);
 
     # Send the "random number" to the server as the first stage of the
     # authentication process, along with the username.
-    my %resp;
-    my $rc;
+    my(%resp, $rc);
 
     if (Net::AFP::Versions::CompareByVersionNum($AFPVersion, 3, 1,
             $kFPVerAtLeast)) {
@@ -126,33 +127,33 @@ sub Authenticate {
                 AFPVersion   => $AFPVersion,
                 UAM          => $UAMNAME,
                 UserName     => $username,
-                UserAuthInfo => $Ma);
-        $session->{logger}->debug(q{FPLoginExt() completed with result code },
+                UserAuthInfo => $params{Ma});
+        ${$session}{logger}->debug(q{FPLoginExt() completed with result code },
           $rc);
     }
     else {
-        my $ai = pack q{C/ax![s]a*}, $username, $Ma;
+        my $ai = pack q{C/ax![s]a*}, $username, $params{Ma};
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $ai);
-        $session->{logger}->debug(q{FPLogin() completed with result code },
+        ${$session}{logger}->debug(q{FPLogin() completed with result code },
           $rc);
     }
     return $rc if $rc != $kFPAuthContinue;
 
-    my($nonce, $key, $ctx) =
-      auth_common2($session, $resp{UserAuthInfo}, 1, $dh);
+    %params = auth_common2($session, message => $resp{UserAuthInfo},
+      store_sesskey => 1, dh => $params{dh});
 
     my $authdata = pack sprintf(q{a[%d]a[%d]}, $nonce_len, $pw_len),
-      Net::AFP::UAMs::zeropad($nonce, $nonce_len), &{$pw_cb}();
-    undef $nonce;
-    my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
+      $params{nonce}, &{$pw_cb}();
+    delete $params{nonce};
+    my $ciphertext = $params{ctx}->encrypt($authdata, $params{key}, $C2SIV);
     undef $authdata;
-    $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
+    ${$session}{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
       unpack q{H*}, $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($resp{ID}, $ciphertext);
     undef $ciphertext;
-    $session->{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+    ${$session}{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
       q{result code %d}, $rc });
     return $rc;
 }
@@ -165,12 +166,12 @@ sub ChangePassword {
         croak(q{Object MUST be of type Net::AFP!});
     }
 
-    my($dh, $Ma) = auth_common1($session);
+    my %params = auth_common1($session);
 
     # Send an ID value of 0, followed by our Ma value.
-    my $authinfo = pack sprintf(q{na[%d]}, $len), 0, $Ma;
-    undef $Ma;
-    $session->{logger}->debug(sub { sprintf q{authinfo is 0x%s},
+    my $authinfo = pack sprintf(q{na[%d]}, $len), 0, $params{Ma};
+    delete $params{Ma};
+    ${$session}{logger}->debug(sub { sprintf q{authinfo is 0x%s},
       unpack q{H*}, $authinfo });
     my $resp = undef;
 
@@ -181,30 +182,30 @@ sub ChangePassword {
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, $authinfo, \$resp);
     undef $authinfo;
-    $session->{logger}->debug(q{FPChangePassword() completed with result code },
-      $rc);
+    ${$session}{logger}->debug(q{FPChangePassword() completed with result },
+      q{code }, $rc);
     return $rc if $rc != $kFPAuthContinue;
 
     my($ID, $message) = unpack q{S>a*}, $resp;
-    my($nonce, $key, $ctx) = auth_common2($session, $message, 0, $dh);
+    %params = auth_common2($session, message => $message, dh => $params{dh});
 
     my $authdata = pack sprintf(q{a[%1$d]a[%2$d]a[%2$d]}, $nonce_len, $pw_len),
-      Net::AFP::UAMs::zeropad($nonce, $nonce_len), $newPassword, $oldPassword;
-    undef $nonce;
-    my $ciphertext = $ctx->encrypt($authdata, $key, $C2SIV);
+      $params{nonce}, $newPassword, $oldPassword;
+    delete $params{nonce};
+    my $ciphertext = $params{ctx}->encrypt($authdata, $params{key}, $C2SIV);
     undef $authdata;
-    $session->{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
+    ${$session}{logger}->debug(sub { sprintf q{ciphertext is 0x%s},
       unpack q{H*}, $ciphertext });
 
     # Send the response back to the server, and hope we did this right.
     $message = pack q{S>a*}, $ID, $ciphertext;
-    $session->{logger}->debug(sub { sprintf q{message is 0x%s},
+    ${$session}{logger}->debug(sub { sprintf q{message is 0x%s},
       unpack q{H*}, $message });
     undef $ciphertext;
     $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;
-    $session->{logger}->debug(q{FPChangePassword() completed with result code },
-      $rc);
+    ${$session}{logger}->debug(q{FPChangePassword() completed with result },
+      q{code }, $rc);
     return $rc;
 }
 
