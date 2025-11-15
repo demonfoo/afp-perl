@@ -226,7 +226,7 @@ if ($volAttrs & $kSupportsACLs) {
     }
     else {
         print {*STDERR} qq{WARNING: Need UUID class for full ACL } .
-          q{functionality, ACL checking disabled\n};
+          qq{functionality, ACL checking disabled\n};
     }
 }
 
