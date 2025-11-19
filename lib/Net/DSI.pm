@@ -147,6 +147,12 @@ sub import {
                     last;
                 }
 
+                if ($lib eq q{list}) {
+                    print qq{Sendfile implmentations available:\n};
+                    print join(qq{\n}, keys(%sendfile_impls)), "\n";
+                    exit 1;
+                }
+
                 if (not exists $sendfile_impls{$lib}) {
                     next;
                 }
