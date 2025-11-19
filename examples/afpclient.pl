@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use diagnostics;
 use English qw(-no_match_vars);
+use Module::Load;
 
 # Enables a nice call trace on warning events.
 use Carp ();
@@ -12,7 +13,6 @@ local $SIG{__WARN__} = \&Carp::cluck;
 # Pull in all the AFP packages that we need, for the connection object
 # itself and return code symbols, helper functions for version handling
 # and UAMs, etc.
-use Net::AFP::Helpers;
 use Net::AFP;
 use Net::AFP::Result;
 use Net::AFP::VolParms;
@@ -91,6 +91,10 @@ Options:
         Turn on debug output for the AFP module.
     --debug-dsi
         Turn on debug output for the DSI module.
+    --sendfile-impl [implementation]
+        Override the sendfile implementation used. Mainly for testing
+        purposes. If a sendfile implementation is specified that isn't
+        known, it will cause a failure.
     --help
         This help summary.
 
@@ -116,13 +120,21 @@ _EOT_
 }
 
 my %afpopts;
-my($atalk_first, $prefer_v4, $debug_afp, $debug_dsi);
+my($atalk_first, $prefer_v4, $debug_afp, $debug_dsi, $sendfile_impl);
 Getopt::Long::Configure(q{no_ignore_case});
-GetOptions( q{atalk-first} => \$atalk_first,
-            q{4|prefer-v4} => \$prefer_v4,
-            q{debug-afp}   => \$debug_afp,
-            q{debug-dsi}   => \$debug_dsi,
-            q{h|help}      => \&usage) || usage();
+GetOptions( q{atalk-first}     => \$atalk_first,
+            q{4|prefer-v4}     => \$prefer_v4,
+            q{debug-afp}       => \$debug_afp,
+            q{debug-dsi}       => \$debug_dsi,
+            q{sendfile-impl=s} => \$sendfile_impl,
+            q{h|help}          => \&usage) || usage();
+
+if (defined $sendfile_impl and $sendfile_impl ne q{}) {
+    load Net::AFP::Helpers, sendfile_only => $sendfile_impl;
+}
+else {
+    load Net::AFP::Helpers;
+}
 
 my $logconf = <<'_EOT_';
 log4perl.appender.AppLogging = Log::Log4perl::Appender::Screen
