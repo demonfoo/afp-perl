@@ -189,7 +189,7 @@ Volume Name                                 | UNIX privs? | Volume pass?
 -------------------------------------------------------------------------
 _EOT_
     foreach my $volume (@{$srvrParms->{Volumes}}) {
-        printf qq{\%-43s |     \%-3s     |     \%s\n}, $volume->{VolName},
+        printf qq{%-43s |     %-3s     |     %s\n}, $volume->{VolName},
                 $volume->{HasUNIXPrivs} ? q{Yes} : q{No},
                 $volume->{HasPassword} ? q{Yes} : q{No};
     }
@@ -276,7 +276,7 @@ if (defined $values{subpath}) {
     my ($newDirId, $fileName) = resolve_path($session, $volID, $curdirnode,
             decode($term_enc, $values{subpath}));
     if (defined $fileName || !defined $newDirId) {
-        printf {*STDERR} q{WARNING: path %s is not accessible, defaulting },
+        printf {*STDERR} q{WARNING: path %s is not accessible, defaulting } .
                 qq{to volume root\n}, $values{subpath};
     }
     else {
@@ -829,7 +829,7 @@ NEXT_EXPANDED:
     },
     lcd => sub {
         my @words = @_;
-        chdir($words[1] || $ENV{HOME}) || 
+        chdir($words[1] || $ENV{HOME}) ||
           printf qq{Couldn't change local directory: %d\n}, $ERRNO;
         return 1;
     },
