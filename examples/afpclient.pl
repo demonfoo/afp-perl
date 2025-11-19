@@ -394,9 +394,10 @@ my %commands = (
                         OForkRefNum => $resp{OForkRefNum},
                         Offset      => $pos,
                         ReqCount    => 1024);
-                last if $rc != $kFPNoErr || ${$data} eq q{};
+                last if $rc != $kFPNoErr and $rc != $kFPEOFErr;
                 print ${$data};
                 $pos += length ${$data};
+                last if $rc == $kFPEOFErr;
             }
             $rc = $session->FPCloseFork($resp{OForkRefNum});
             if ($rc != $kFPNoErr) {
