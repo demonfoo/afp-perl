@@ -134,6 +134,7 @@ if (defined $sendfile_impl and $sendfile_impl ne q{}) {
 }
 else {
     load Net::AFP::Helpers;
+    Net::AFP::Helpers->import();
 }
 
 my $logconf = <<'_EOT_';
