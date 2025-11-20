@@ -149,7 +149,7 @@ sub import {
 
                 if ($lib eq q{list}) {
                     print qq{Sendfile implmentations available:\n};
-                    print join(qq{\n}, keys(%sendfile_impls)), "\n";
+                    map { print $_, qq{\n} } keys(%sendfile_impls);
                     exit 1;
                 }
 
