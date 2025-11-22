@@ -149,7 +149,8 @@ sub import {
 
                 if ($lib eq q{list}) {
                     print qq{Sendfile implmentations available:\n};
-                    map { print $_, qq{\n} } keys(%sendfile_impls);
+                    map { print $_, qq{\n} } sort { $a cmp $b }
+                      keys(%sendfile_impls);
                     exit 1;
                 }
 
