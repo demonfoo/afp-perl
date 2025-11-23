@@ -91,8 +91,9 @@ sub ChangePassword {
     # encrypted with the old one, as directed.
     my $oldcrypt = Crypt::Cipher::DES->new(pack q{a[8]}, $oldPassword);
     my $newcrypt = Crypt::Cipher::DES->new(pack q{a[8]}, $newPassword);
-    my $message = pack q{a[8]a[8]}, $newcrypt->encrypt($oldPassword),
-            $oldcrypt->encrypt($newPassword);
+    my $message = pack q{a[8]a[8]},
+      $newcrypt->encrypt(pack q{a[8]}, $oldPassword),
+      $oldcrypt->encrypt(pack q{a[8]}, $newPassword);
     undef $oldcrypt;
     undef $newcrypt;
 
@@ -110,4 +111,4 @@ sub ChangePassword {
 }
 
 1;
-# vim: ts=4
+# vim: ts=4 et ai sw=4 hls
