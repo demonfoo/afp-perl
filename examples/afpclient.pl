@@ -53,6 +53,7 @@ use Fcntl qw(:mode);
 # Find out the character encoding for the current terminal.
 my $term_enc = langinfo(CODESET);
 my $blksize  = 1<<19;
+my $histfile = $ENV{HOME} . '/.afpclient_history';
 
 # If you're in Windows, you'll probably just get a codepage number.
 if ($OSNAME eq q{MSWin32} && $term_enc =~ m{^\d+$}sm) {
@@ -959,6 +960,14 @@ else {
     print {*STDERR} qq{WARNING: ReadLine implementation doesn't support tab expands\n};
 }
 
+# if we have a readline that can do it, and the file is there, let's
+# load our history file.
+if (Term::ReadLine->ReadLine() eq q{Term::ReadLine::Gnu}) {
+    if (-e $histfile) {
+        $term->read_history($histfile);
+    }
+}
+
 while (1) {
     my @nameParts;
     my $searchID = $curdirnode;
@@ -996,6 +1005,11 @@ while (1) {
     else {
         print qq{Sorry, unknown command\n};
     }
+}
+
+# save the history, if we can...
+if (Term::ReadLine->ReadLine() eq q{Term::ReadLine::Gnu}) {
+    $term->write_history($histfile);
 }
 
 my %uidmap;
