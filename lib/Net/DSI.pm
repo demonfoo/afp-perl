@@ -661,19 +661,16 @@ my @OpenSessionOpts = (
         value  => $kRequestQuanta,
         fields => [q{RequestQuanta}],
         mask   => q{L>},
-        len    => 4,
     },
     {
         value  => $kAttentionQuanta,
         fields => [q{AttentionQuanta}],
         mask   => q{L>},
-        len    => 4,
     },
     {
         value  => $kServerReplayCacheSize,
         fields => [q{ServerReplayCacheSize}],
         mask   => q{L>},
-        len    => 4,
     },
 );
 
