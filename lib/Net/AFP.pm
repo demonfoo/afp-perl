@@ -2782,8 +2782,8 @@ sub FPOpenVol { # {{{1
         $VolumeName = encode(q{MacRoman}, $VolumeName);
     }
 
-    my $PackPattern = q{CxS>Ca*};
-    my @PackArgs = ($kFPOpenVol, $Bitmap, length($VolumeName), $VolumeName);
+    my $PackPattern = q{CxS>C/a};
+    my @PackArgs = ($kFPOpenVol, $Bitmap, $VolumeName);
     # Only append a password if one was provided. If not, we don't provide
     # it.
     if (defined $Password) {
