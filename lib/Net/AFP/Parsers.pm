@@ -49,58 +49,49 @@ my @VolParmFlags = (
         bitval      => $kFPVolAttributeBit,
         fields      => [q{Attribute}],
         mask        => q{S>},
-        len         => 2,
     },
     {
         bitval      => $kFPVolSignatureBit,
         fields      => [q{Signature}],
         mask        => q{S>},
-        len         => 2,
     },
     {
         bitval      => $kFPVolCreateDateBit,
         fields      => [q{CreateDate}],
         mask        => q{l>},
-        len         => 4,
         parse_fixup => sub { $_[1] += globalTimeOffset; },
     },
     {
         bitval      => $kFPVolModDateBit,
         fields      => [q{ModDate}],
         mask        => q{l>},
-        len         => 4,
         parse_fixup => sub { $_[1] += globalTimeOffset; },
     },
     {
         bitval      => $kFPVolBackupDateBit,
         fields      => [q{BackupDate}],
         mask        => q{l>},
-        len         => 4,
         parse_fixup => sub { $_[1] += globalTimeOffset; },
     },
     {
         bitval      => $kFPVolIDBit,
         fields      => [q{ID}],
         mask        => q{S>},
-        len         => 2,
     },
     {
         bitval      => $kFPVolBytesFreeBit,
         fields      => [q{BytesFree}],
         mask        => q{L>},
-        len         => 4,
     },
     {
         bitval      => $kFPVolBytesTotalBit,
         fields      => [q{BytesTotal}],
         mask        => q{L>},
-        len         => 4,
     },
     {
         bitval      => $kFPVolNameBit,
         fields      => [q{Name}],
         stroff      => q{S>},
-        len         => 2,
         mask        => q{C/a},
         parse_fixup => sub {
             # if we're using AFP 3.0 or later, this is UTF8.
@@ -117,19 +108,16 @@ my @VolParmFlags = (
         bitval      => $kFPVolExtBytesFreeBit,
         fields      => [q{ExtBytesFree}],
         mask        => q{Q>},
-        len         => 8,
     },
     {
         bitval      => $kFPVolExtBytesTotalBit,
         fields      => [q{ExtBytesTotal}],
         mask        => q{Q>},
-        len         => 8,
     },
     {
         bitval      => $kFPVolBlockSizeBit,
         fields      => [q{BlockSize}],
         mask        => q{L>},
-        len         => 4,
     },
 
 );
@@ -154,14 +142,14 @@ sub ParseVolParms { # {{{1
             if (exists ${$item}{stroff}) { # it's a string offset
                 $pos = unpack sprintf(q{x[%d]%s}, $offset, ${$item}{stroff}),
                   $data;
-                $offset += exists ${$item}{len} ? ${$item}{len} : 2;
+                $offset += length pack ${$item}{stroff};
                 @values = unpack sprintf(q{x[%d]%s}, $pos, ${$item}{mask}),
                   $data;
             }
             else {
                 @values = unpack sprintf(q{x[%d]%s}, $offset, ${$item}{mask}),
                   $data;
-                $offset += ${$item}{len};
+                $offset += length pack ${$item}{mask};
             }
             if (exists ${$item}{parse_fixup}) {
                 &{${$item}{parse_fixup}}($obj, @values);
@@ -351,7 +339,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPAttributeBit,
         fields      => [q{Attributes}],
         mask        => q{S>},
-        len         => 2,
         file        => 1,
         dir         => 1,
     },
@@ -359,7 +346,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPParentDirIDBit,
         fields      => [q{ParentDirID}],
         mask        => q{L>},
-        len         => 4,
         file        => 1,
         dir         => 1,
     },
@@ -367,7 +353,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPCreateDateBit,
         fields      => [q{CreateDate}],
         mask        => q{l>},
-        len         => 4,
         file        => 1,
         dir         => 1,
         parse_fixup => sub { $_[0] += globalTimeOffset; },
@@ -377,7 +362,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPModDateBit,
         fields      => [q{ModDate}],
         mask        => q{l>},
-        len         => 4,
         file        => 1,
         dir         => 1,
         parse_fixup => sub { $_[0] += globalTimeOffset; },
@@ -387,7 +371,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPBackupDateBit,
         fields      => [q{BackupDate}],
         mask        => q{l>},
-        len         => 4,
         file        => 1,
         dir         => 1,
         parse_fixup => sub { $_[0] += globalTimeOffset; },
@@ -397,7 +380,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPFinderInfoBit,
         fields      => [q{FinderInfo}],
         mask        => q{a[32]},
-        len         => 32,
         file        => 1,
         dir         => 1,
     },
@@ -405,7 +387,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPLongNameBit,
         fields      => [q{LongName}],
         stroff      => q{S>},
-        len         => 2,
         mask        => q{C/a},
         file        => 1,
         dir         => 1,
@@ -416,7 +397,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPShortNameBit,
         fields      => [q{ShortName}],
         stroff      => q{S>},
-        len         => 2,
         mask        => q{C/a},
         file        => 1,
         dir         => 1,
@@ -427,7 +407,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPNodeIDBit,
         fields      => [q{NodeID}],
         mask        => q{L>},
-        len         => 4,
         file        => 1,
         dir         => 1,
     },
@@ -435,7 +414,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPDataForkLenBit,
         fields      => [q{DataForkLen}],
         mask        => q{L>},
-        len         => 4,
         file        => 1,
         dir         => 0,
     },
@@ -443,7 +421,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPOffspringCountBit,
         fields      => [q{OffspringCount}],
         mask        => q{S>},
-        len         => 2,
         file        => 0,
         dir         => 1,
     },
@@ -451,7 +428,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPRsrcForkLenBit,
         fields      => [q{RsrcForkLen}],
         mask        => q{L>},
-        len         => 4,
         file        => 1,
         dir         => 0,
     },
@@ -459,7 +435,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPOwnerIDBit,
         fields      => [q{OwnerID}],
         mask        => q{L>},
-        len         => 4,
         file        => 0,
         dir         => 1,
     },
@@ -467,7 +442,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPExtDataForkLenBit,
         fields      => [q{ExtDataForkLen}],
         mask        => q{Q>},
-        len         => 8,
         file        => 1,
         dir         => 0,
     },
@@ -475,7 +449,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPGroupIDBit,
         fields      => [q{GroupID}],
         mask        => q{L>},
-        len         => 4,
         file        => 0,
         dir         => 1,
     },
@@ -483,7 +456,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPLaunchLimitBit,
         fields      => [q{LaunchLimit}],
         mask        => q{S>},
-        len         => 2,
         file        => 1,
         dir         => 0,
     },
@@ -491,7 +463,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPAccessRightsBit,
         fields      => [q{AccessRights}],
         mask        => q{L>},
-        len         => 4,
         file        => 0,
         dir         => 1,
     },
@@ -499,7 +470,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPUTF8NameBit,
         fields      => [qw(UTF8Hint UTF8Name)],
         stroff      => q{S>x[l]},
-        len         => 6, # has a 4 byte pad after the offset
         mask        => q{L>S>/a},
         pack_mask   => q{S>/a}, # don't include hint when packing
         file        => 1,
@@ -511,7 +481,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPExtRsrcForkLenBit,
         fields      => [q{ExtRsrcForkLen}],
         mask        => q{Q>},
-        len         => 8,
         file        => 1,
         dir         => 0,
     },
@@ -519,7 +488,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPUnixPrivsBit,
         fields      => [qw(UnixUID UnixGID UnixPerms UnixAccessRights)],
         mask        => q{L>L>L>L>},
-        len         => 16,
         file        => 1,
         dir         => 1,
     },
@@ -527,7 +495,6 @@ my @FileDirParmFlags = (
         bitval      => $kFPUUID,
         fields      => [q{UUID}],
         mask        => q{a[16]},
-        len         => 16,
         file        => 0,
         dir         => 1,
         parse_fixup => sub {
@@ -559,14 +526,14 @@ sub _parse_common { # {{{1
             if (exists ${$item}{stroff}) { # it's a string offset
                 $pos = unpack sprintf(q{x[%d]%s}, $offset, ${$item}{stroff}),
                   $data;
-                $offset += exists ${$item}{len} ? ${$item}{len} : 2;
+                $offset += length pack ${$item}{stroff};
                 @values = unpack sprintf(q{x[%d]%s}, $pos, ${$item}{mask}),
                   $data;
             }
             else {
                 @values = unpack sprintf(q{x[%d]%s}, $offset, ${$item}{mask}),
                   $data;
-                $offset += ${$item}{len};
+                $offset += length pack ${$item}{mask};
             }
             if (exists ${$item}{parse_fixup}) {
                 &{${$item}{parse_fixup}}(@values);
