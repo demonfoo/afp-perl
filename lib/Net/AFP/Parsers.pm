@@ -475,7 +475,7 @@ my @FileDirParmFlags = (
         file        => 1,
         dir         => 1,
         parse_fixup => sub { $_[1] = compose(decode_utf8($_[1])); },
-        pack_fixup  => sub { $_[0] = encode_utf8(compose($_[0])); },
+        pack_fixup  => sub { $_[0] = encode_utf8(decompose($_[0])); },
     },
     {
         bitval      => $kFPExtRsrcForkLenBit,
