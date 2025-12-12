@@ -69,10 +69,8 @@ sub Authenticate {
     (my $bin_key = unpack q{B*}, pack q{a[8]}, &{$pw_cb}()) =~
       s/^([01])(.*)$/$2$1/sm;
     # Pack the rotated bitstring back into binary form for use as the DES key.
-    my $key = pack q{B*}, $bin_key;
+    my $deshash = Crypt::Cipher::DES->new(pack q{B*}, $bin_key);
     undef $bin_key;
-    my $deshash = Crypt::Cipher::DES->new($key);
-    undef $key;
     my $crypted = $deshash->encrypt($randnum);
     undef $randnum;
     $session->{logger}->debug(sub { sprintf q{crypted is 0x%s},
