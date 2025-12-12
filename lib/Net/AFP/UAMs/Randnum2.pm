@@ -45,13 +45,13 @@ sub Authenticate {
                 AFPVersion  => $AFPVersion,
                 UAM         => $UAMNAME,
                 UserName    => $username);
-        $session->{logger}->debug(q{FPLoginExt() completed with result code },
+        $session->{logger}->info(q{FPLoginExt() completed with result code },
           $rc);
     }
     else {
         my $authinfo = pack q{C/a*}, $username;
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
-        $session->{logger}->debug(q{FPLogin() completed with result code },
+        $session->{logger}->info(q{FPLogin() completed with result code },
           $rc);
     }
 
@@ -66,8 +66,8 @@ sub Authenticate {
       unpack q{H*}, $randnum });
     # Explode the password out into a bit string, and rotate the leftmost bit
     # to the end of the bit vector.
-    my $bin_key = unpack q{B*}, pack q{a[8]}, &{$pw_cb}();
-    $bin_key =~ s/^([01])(.*)$/$2$1/sm;
+    (my $bin_key = unpack q{B*}, pack q{a[8]}, &{$pw_cb}()) =~
+      s/^([01])(.*)$/$2$1/sm;
     # Pack the rotated bitstring back into binary form for use as the DES key.
     my $key = pack q{B*}, $bin_key;
     undef $bin_key;
@@ -90,7 +90,7 @@ sub Authenticate {
     my $sresp = undef;
     $rc = $session->FPLoginCont($resp{ID}, $crypted . $my_randnum, \$sresp);
     undef $crypted;
-    $session->{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+    $session->{logger}->info(sub { sprintf q{FPLoginCont() completed with } .
       q{result code %d}, $rc });
     if ($rc != $kFPNoErr) {
         return $rc;

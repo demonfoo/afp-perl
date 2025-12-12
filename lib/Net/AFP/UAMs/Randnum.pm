@@ -45,13 +45,13 @@ sub Authenticate {
                 AFPVersion  => $AFPVersion,
                 UAM         => $UAMNAME,
                 UserName    => $username);
-        $session->{logger}->debug(sub { sprintf q{FPLoginExt() completed with } .
+        $session->{logger}->info(sub { sprintf q{FPLoginExt() completed with } .
           q{result code %d}, $rc });
     }
     else {
         my $authinfo = pack q{C/a*}, $username;
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME, $authinfo);
-        $session->{logger}->debug(sub { sprintf q{FPLogin() completed with } .
+        $session->{logger}->info(sub { sprintf q{FPLogin() completed with } .
           q{result code %d}, $rc });
     }
 
@@ -73,7 +73,7 @@ sub Authenticate {
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont($resp{ID}, $crypted);
     undef $crypted;
-    $session->{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+    $session->{logger}->info(sub { sprintf q{FPLoginCont() completed with } .
       q{result code %d}, $rc});
     return $rc;
 }
@@ -105,7 +105,7 @@ sub ChangePassword {
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, $message);
     undef $message;
-    $session->{logger}->debug(sub { sprintf q{FPChangePassword() completed } .
+    $session->{logger}->info(sub { sprintf q{FPChangePassword() completed } .
       q{with result code %d}, $rc });
     return $rc;
 }

@@ -72,7 +72,7 @@ sub Authenticate {
         UAM          => $UAMNAME,
         UserName     => $username,
         PathName     => $realm);
-    $session->{logger}->debug(q{FPLoginExt() completed with result code },
+    $session->{logger}->info(q{FPLoginExt() completed with result code },
       $rc);
 
     if ($rc != $kFPAuthContinue) {

@@ -249,13 +249,13 @@ sub Authenticate {
                 AFPVersion => $AFPVersion,
                 UAM        => $UAMNAME,
                 UserName   => $username);
-        ${$session}{logger}->debug(q{FPLoginExt() completed with result code },
+        ${$session}{logger}->info(q{FPLoginExt() completed with result code },
           $rc);
     }
     else {
         ($rc, %resp) = $session->FPLogin($AFPVersion, $UAMNAME,
           pack q{C/ax![s]}, $username);
-        ${$session}{logger}->debug(q{FPLogin() completed with result code },
+        ${$session}{logger}->info(q{FPLogin() completed with result code },
           $rc);
     }
     return $rc if $rc != $kFPAuthContinue;
@@ -272,7 +272,7 @@ sub Authenticate {
     my $sresp = q{};
     # Sending message 3.
     $rc = $session->FPLoginCont($resp{ID}, $params{message}, \$sresp);
-    ${$session}{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+    ${$session}{logger}->info(sub { sprintf q{FPLoginCont() completed with } .
       q{result code %d}, $rc });
     return $rc if $rc != $kFPAuthContinue;
 
@@ -293,7 +293,7 @@ sub Authenticate {
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPLoginCont(${$sresp}{ID}, $ciphertext);
     undef $ciphertext;
-    ${$session}{logger}->debug(sub { sprintf q{FPLoginCont() completed with } .
+    ${$session}{logger}->info(sub { sprintf q{FPLoginCont() completed with } .
       q{result code %d}, $rc });
     return $rc;
 }
@@ -313,7 +313,7 @@ sub ChangePassword {
         $username = q{};
     }
     my $rc = $session->FPChangePassword($UAMNAME, $username, q{}, \$resp);
-    ${$session}{logger}->debug(q{FPChangePassword() completed with result },
+    ${$session}{logger}->info(q{FPChangePassword() completed with result },
       q{code }, $rc);
     return $rc if $rc != $kFPAuthContinue;
 
@@ -331,7 +331,7 @@ sub ChangePassword {
     $rc = $session->FPChangePassword($UAMNAME, $username, $params{message},
       \$sresp);
     delete $params{message};
-    ${$session}{logger}->debug(sub { sprintf q{FPChangePassword() completed } .
+    ${$session}{logger}->info(sub { sprintf q{FPChangePassword() completed } .
       q{with result code %d}, $rc });
     return $rc if $rc != $kFPAuthContinue;
 
@@ -353,7 +353,7 @@ sub ChangePassword {
     # Send the response back to the server, and hope we did this right.
     $rc = $session->FPChangePassword($UAMNAME, $username, pack q{na*}, $ID, $ciphertext);
     undef $ciphertext;
-    ${$session}{logger}->debug(q{FPChangePassword() completed with result },
+    ${$session}{logger}->info(q{FPChangePassword() completed with result },
         q{code }, $rc);
     return $rc;
 }
