@@ -8,6 +8,7 @@ WriteMakefile(
         'examples/afp_acl.pl',
         'examples/afpmount.pl',
         'examples/afpclient.pl',
+        'examples/afp_chpass.pl',
     ],
     PREREQ_PM => {
         'Log::Log4perl'         => 0,
@@ -42,5 +43,8 @@ WriteMakefile(
                 },
             },
         },
+    },
+    test => {
+        TESTS => 't/*.t',
     },
 );
