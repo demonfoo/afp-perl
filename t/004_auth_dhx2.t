@@ -88,7 +88,9 @@ my $server_password;
         return(
             ID => ${$obj}{$pfx . q{id}},
             UserAuthInfo => pack sprintf(q{L>S>a[%1$d]a[%1$d]}, ${$obj}{len}),
-              @{$obj}{qw(g len)}, pack(q{H*}, substr(${$obj}{p}, 2)), $Mb
+              @{$obj}{qw(g len)},
+              Net::AFP::UAMs::zeropad(pack(q{H*}, substr(${$obj}{p}, 2)),
+                ${$obj}{len}), $Mb
         );
     }
 
