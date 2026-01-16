@@ -173,6 +173,10 @@ q{0xb82f816a7390607cbc3c2d8276a06fdb6f61ecb4ffcae23b67c90c3d39ff3b54b2356c5bad31
     sub dhx2_part3 {
         my ( $obj, $mask, $ai, $pfx ) = @_;
         $pfx ||= q{};
+        # make sure that K is there, so part2 actually happened
+        if ( not exists ${$obj}{ $pfx . q{K} } ) {
+            return $Net::AFP::Result::kFPParamErr;
+        }
         my $len = length pack $mask;
 
         if ( length($ai) != ( ${$obj}{nonce_len} + $len ) ) {

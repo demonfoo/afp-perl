@@ -90,7 +90,7 @@ my $server_password;
             return $Net::AFP::Result::kFPUserNotAuth;
         }
 
-        # also encrypt the password with the client's random number,
+        # also encrypt client's random number with the password,
         # and see if we agree
         ${$resp_r} = { UserAuthInfo => $dh->encrypt($rn) };
         return $Net::AFP::Result::kFPNoErr;
